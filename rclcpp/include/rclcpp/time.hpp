@@ -15,13 +15,11 @@
 #ifndef RCLCPP__TIME_HPP_
 #define RCLCPP__TIME_HPP_
 
-#include <utility>
-
 #include "builtin_interfaces/msg/time.hpp"
-#include "rcl/time.h"
-#include "rcutils/time.h"
 
-#include "rclcpp/exceptions.hpp"
+#include "rclcpp/visibility_control.hpp"
+
+#include "rcl/time.h"
 
 namespace rclcpp
 {
@@ -29,42 +27,72 @@ namespace rclcpp
 class Time
 {
 public:
-  template<rcl_time_source_type_t ClockT = RCL_SYSTEM_TIME>
-  static Time
-  now()
-  {
-    rcutils_time_point_value_t rcutils_now = 0;
-    rcutils_ret_t ret = RCUTILS_RET_ERROR;
-    if (ClockT == RCL_ROS_TIME) {
-      throw std::runtime_error("RCL_ROS_TIME is currently not implemented.");
-      ret = false;
-    } else if (ClockT == RCL_SYSTEM_TIME) {
-      ret = rcutils_system_time_now(&rcutils_now);
-    } else if (ClockT == RCL_STEADY_TIME) {
-      ret = rcutils_steady_time_now(&rcutils_now);
-    }
-    if (ret != RCUTILS_RET_OK) {
-      rclcpp::exceptions::throw_from_rcl_error(
-        ret, "Could not get current time: ");
-    }
+  RCLCPP_PUBLIC
+  static
+  Time
+  now(rcl_time_source_type_t clock = RCL_SYSTEM_TIME);
 
-    return Time(std::move(rcutils_now));
-  }
+  RCLCPP_PUBLIC
+  Time(int32_t seconds, uint32_t nanoseconds, rcl_time_source_type_t clock = RCL_SYSTEM_TIME);
 
-  operator builtin_interfaces::msg::Time() const
-  {
-    builtin_interfaces::msg::Time msg_time;
-    msg_time.sec = static_cast<std::int32_t>(RCL_NS_TO_S(rcl_time_));
-    msg_time.nanosec = static_cast<std::uint32_t>(rcl_time_ % (1000 * 1000 * 1000));
-    return msg_time;
-  }
+  RCLCPP_PUBLIC
+  explicit Time(uint64_t nanoseconds, rcl_time_source_type_t clock = RCL_SYSTEM_TIME);
+
+  RCLCPP_PUBLIC
+  Time(const Time & rhs);
+
+  RCLCPP_PUBLIC
+  Time(const builtin_interfaces::msg::Time & time_msg);  // NOLINT
+
+  RCLCPP_PUBLIC
+  virtual ~Time();
+
+  RCLCPP_PUBLIC
+  operator builtin_interfaces::msg::Time() const;
+
+  RCLCPP_PUBLIC
+  void
+  operator=(const Time & rhs);
+
+  RCLCPP_PUBLIC
+  void
+  operator=(const builtin_interfaces::msg::Time & time_msg);
+
+  RCLCPP_PUBLIC
+  bool
+  operator==(const rclcpp::Time & rhs) const;
+
+  RCLCPP_PUBLIC
+  bool
+  operator<(const rclcpp::Time & rhs) const;
+
+  RCLCPP_PUBLIC
+  bool
+  operator<=(const rclcpp::Time & rhs) const;
+
+  RCLCPP_PUBLIC
+  bool
+  operator>=(const rclcpp::Time & rhs) const;
+
+  RCLCPP_PUBLIC
+  bool
+  operator>(const rclcpp::Time & rhs) const;
+
+  RCLCPP_PUBLIC
+  Time
+  operator+(const rclcpp::Time & rhs) const;
+
+  RCLCPP_PUBLIC
+  Time
+  operator-(const rclcpp::Time & rhs) const;
+
+  RCLCPP_PUBLIC
+  uint64_t
+  nanoseconds() const;
 
 private:
-  rcl_time_point_value_t rcl_time_;
-
-  explicit Time(rcl_time_point_value_t && rcl_time)
-  : rcl_time_(std::forward<decltype(rcl_time)>(rcl_time))
-  {}
+  rcl_time_source_t rcl_time_source_;
+  rcl_time_point_t rcl_time_;
 };
 
 }  // namespace rclcpp

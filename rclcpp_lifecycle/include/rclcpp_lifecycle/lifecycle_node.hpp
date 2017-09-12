@@ -373,7 +373,17 @@ public:
 
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
+  trigger_transition(
+    const Transition & transition, rcl_lifecycle_transition_key_t & cb_return_code);
+
+  RCLCPP_LIFECYCLE_PUBLIC
+  const State &
   trigger_transition(uint8_t transition_id);
+
+  RCLCPP_LIFECYCLE_PUBLIC
+  const State &
+  trigger_transition(
+    uint8_t transition_id, rcl_lifecycle_transition_key_t & cb_return_code);
 
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
@@ -381,7 +391,15 @@ public:
 
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
+  configure(rcl_lifecycle_transition_key_t & cb_return_code);
+
+  RCLCPP_LIFECYCLE_PUBLIC
+  const State &
   cleanup();
+
+  RCLCPP_LIFECYCLE_PUBLIC
+  const State &
+  cleanup(rcl_lifecycle_transition_key_t & cb_return_code);
 
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
@@ -389,35 +407,47 @@ public:
 
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
+  activate(rcl_lifecycle_transition_key_t & cb_return_code);
+
+  RCLCPP_LIFECYCLE_PUBLIC
+  const State &
   deactivate();
+
+  RCLCPP_LIFECYCLE_PUBLIC
+  const State &
+  deactivate(rcl_lifecycle_transition_key_t & cb_return_code);
 
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   shutdown();
 
   RCLCPP_LIFECYCLE_PUBLIC
-  bool
-  register_on_configure(std::function<rcl_lifecycle_ret_t(const State &)> fcn);
+  const State &
+  shutdown(rcl_lifecycle_transition_key_t & cb_return_code);
 
   RCLCPP_LIFECYCLE_PUBLIC
   bool
-  register_on_cleanup(std::function<rcl_lifecycle_ret_t(const State &)> fcn);
+  register_on_configure(std::function<rcl_lifecycle_transition_key_t(const State &)> fcn);
 
   RCLCPP_LIFECYCLE_PUBLIC
   bool
-  register_on_shutdown(std::function<rcl_lifecycle_ret_t(const State &)> fcn);
+  register_on_cleanup(std::function<rcl_lifecycle_transition_key_t(const State &)> fcn);
 
   RCLCPP_LIFECYCLE_PUBLIC
   bool
-  register_on_activate(std::function<rcl_lifecycle_ret_t(const State &)> fcn);
+  register_on_shutdown(std::function<rcl_lifecycle_transition_key_t(const State &)> fcn);
 
   RCLCPP_LIFECYCLE_PUBLIC
   bool
-  register_on_deactivate(std::function<rcl_lifecycle_ret_t(const State &)> fcn);
+  register_on_activate(std::function<rcl_lifecycle_transition_key_t(const State &)> fcn);
 
   RCLCPP_LIFECYCLE_PUBLIC
   bool
-  register_on_error(std::function<rcl_lifecycle_ret_t(const State &)> fcn);
+  register_on_deactivate(std::function<rcl_lifecycle_transition_key_t(const State &)> fcn);
+
+  RCLCPP_LIFECYCLE_PUBLIC
+  bool
+  register_on_error(std::function<rcl_lifecycle_transition_key_t(const State &)> fcn);
 
 protected:
   RCLCPP_LIFECYCLE_PUBLIC

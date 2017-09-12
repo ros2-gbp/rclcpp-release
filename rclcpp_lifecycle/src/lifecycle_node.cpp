@@ -245,40 +245,51 @@ LifecycleNode::get_node_parameters_interface()
 
 ////
 bool
-LifecycleNode::register_on_configure(std::function<rcl_lifecycle_ret_t(const State &)> fcn)
+LifecycleNode::register_on_configure(
+  std::function<rcl_lifecycle_transition_key_t(const State &)> fcn)
 {
-  return impl_->register_callback(lifecycle_msgs::msg::State::TRANSITION_STATE_CONFIGURING, fcn);
+  return impl_->register_callback(
+    lifecycle_msgs::msg::State::TRANSITION_STATE_CONFIGURING, fcn);
 }
 
 bool
-LifecycleNode::register_on_cleanup(std::function<rcl_lifecycle_ret_t(const State &)> fcn)
+LifecycleNode::register_on_cleanup(
+  std::function<rcl_lifecycle_transition_key_t(const State &)> fcn)
 {
-  return impl_->register_callback(lifecycle_msgs::msg::State::TRANSITION_STATE_CLEANINGUP, fcn);
+  return impl_->register_callback(
+    lifecycle_msgs::msg::State::TRANSITION_STATE_CLEANINGUP, fcn);
 }
 
 bool
-LifecycleNode::register_on_shutdown(std::function<rcl_lifecycle_ret_t(const State &)> fcn)
+LifecycleNode::register_on_shutdown(
+  std::function<rcl_lifecycle_transition_key_t(const State &)> fcn)
 {
-  return impl_->register_callback(lifecycle_msgs::msg::State::TRANSITION_STATE_SHUTTINGDOWN, fcn);
+  return impl_->register_callback(
+    lifecycle_msgs::msg::State::TRANSITION_STATE_SHUTTINGDOWN, fcn);
 }
 
 bool
-LifecycleNode::register_on_activate(std::function<rcl_lifecycle_ret_t(const State &)> fcn)
+LifecycleNode::register_on_activate(
+  std::function<rcl_lifecycle_transition_key_t(const State &)> fcn)
 {
-  return impl_->register_callback(lifecycle_msgs::msg::State::TRANSITION_STATE_ACTIVATING, fcn);
+  return impl_->register_callback(
+    lifecycle_msgs::msg::State::TRANSITION_STATE_ACTIVATING, fcn);
 }
 
 bool
-LifecycleNode::register_on_deactivate(std::function<rcl_lifecycle_ret_t(const State &)> fcn)
+LifecycleNode::register_on_deactivate(
+  std::function<rcl_lifecycle_transition_key_t(const State &)> fcn)
 {
-  return impl_->register_callback(lifecycle_msgs::msg::State::TRANSITION_STATE_DEACTIVATING, fcn);
+  return impl_->register_callback(
+    lifecycle_msgs::msg::State::TRANSITION_STATE_DEACTIVATING, fcn);
 }
 
 bool
-LifecycleNode::register_on_error(std::function<rcl_lifecycle_ret_t(const State &)> fcn)
+LifecycleNode::register_on_error(
+  std::function<rcl_lifecycle_transition_key_t(const State &)> fcn)
 {
-  return impl_->register_callback(lifecycle_msgs::msg::State::TRANSITION_STATE_ERRORPROCESSING,
-           fcn);
+  return impl_->register_callback(
+    lifecycle_msgs::msg::State::TRANSITION_STATE_ERRORPROCESSING, fcn);
 }
 
 const State &
@@ -306,9 +317,23 @@ LifecycleNode::trigger_transition(const Transition & transition)
 }
 
 const State &
+LifecycleNode::trigger_transition(
+  const Transition & transition, rcl_lifecycle_transition_key_t & cb_return_code)
+{
+  return trigger_transition(transition.id(), cb_return_code);
+}
+
+const State &
 LifecycleNode::trigger_transition(uint8_t transition_id)
 {
   return impl_->trigger_transition(transition_id);
+}
+
+const State &
+LifecycleNode::trigger_transition(
+  uint8_t transition_id, rcl_lifecycle_transition_key_t & cb_return_code)
+{
+  return impl_->trigger_transition(transition_id, cb_return_code);
 }
 
 const State &
@@ -319,10 +344,24 @@ LifecycleNode::configure()
 }
 
 const State &
+LifecycleNode::configure(rcl_lifecycle_transition_key_t & cb_return_code)
+{
+  return impl_->trigger_transition(
+    lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE, cb_return_code);
+}
+
+const State &
 LifecycleNode::cleanup()
 {
   return impl_->trigger_transition(
     lifecycle_msgs::msg::Transition::TRANSITION_CLEANUP);
+}
+
+const State &
+LifecycleNode::cleanup(rcl_lifecycle_transition_key_t & cb_return_code)
+{
+  return impl_->trigger_transition(
+    lifecycle_msgs::msg::Transition::TRANSITION_CLEANUP, cb_return_code);
 }
 
 const State &
@@ -333,6 +372,13 @@ LifecycleNode::activate()
 }
 
 const State &
+LifecycleNode::activate(rcl_lifecycle_transition_key_t & cb_return_code)
+{
+  return impl_->trigger_transition(
+    lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE, cb_return_code);
+}
+
+const State &
 LifecycleNode::deactivate()
 {
   return impl_->trigger_transition(
@@ -340,10 +386,24 @@ LifecycleNode::deactivate()
 }
 
 const State &
+LifecycleNode::deactivate(rcl_lifecycle_transition_key_t & cb_return_code)
+{
+  return impl_->trigger_transition(
+    lifecycle_msgs::msg::Transition::TRANSITION_DEACTIVATE, cb_return_code);
+}
+
+const State &
 LifecycleNode::shutdown()
 {
   return impl_->trigger_transition(
     lifecycle_msgs::msg::Transition::TRANSITION_SHUTDOWN);
+}
+
+const State &
+LifecycleNode::shutdown(rcl_lifecycle_transition_key_t & cb_return_code)
+{
+  return impl_->trigger_transition(
+    lifecycle_msgs::msg::Transition::TRANSITION_SHUTDOWN, cb_return_code);
 }
 
 void

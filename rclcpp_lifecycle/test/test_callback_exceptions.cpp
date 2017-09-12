@@ -46,16 +46,18 @@ public:
   size_t number_of_callbacks = 0;
 
 protected:
-  rcl_lifecycle_ret_t on_configure(const rclcpp_lifecycle::State &)
+  rcl_lifecycle_transition_key_t
+  on_configure(const rclcpp_lifecycle::State &)
   {
     ++number_of_callbacks;
     throw std::runtime_error("custom exception raised in configure callback");
   }
 
-  rcl_lifecycle_ret_t on_error(const rclcpp_lifecycle::State &)
+  rcl_lifecycle_transition_key_t
+  on_error(const rclcpp_lifecycle::State &)
   {
     ++number_of_callbacks;
-    return RCL_LIFECYCLE_RET_OK;
+    return lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_SUCCESS;
   }
 };
 
@@ -69,6 +71,15 @@ TEST_F(TestCallbackExceptions, positive_on_error) {
   EXPECT_EQ(static_cast<size_t>(2), test_node->number_of_callbacks);
 }
 
+TEST_F(TestCallbackExceptions, positive_on_error_with_code) {
+  auto test_node = std::make_shared<PositiveCallbackExceptionNode>("testnode");
+
+  EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->get_current_state().id());
+  rcl_lifecycle_transition_key_t ret = lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_SUCCESS;
+  test_node->configure(ret);
+  EXPECT_EQ(lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_ERROR, ret);
+}
+
 class NegativeCallbackExceptionNode : public rclcpp_lifecycle::LifecycleNode
 {
 public:
@@ -79,18 +90,21 @@ public:
   size_t number_of_callbacks = 0;
 
 protected:
-  rcl_lifecycle_ret_t on_configure(const rclcpp_lifecycle::State &)
+  rcl_lifecycle_transition_key_t
+  on_configure(const rclcpp_lifecycle::State &)
   {
     ++number_of_callbacks;
     throw std::runtime_error("custom exception raised in configure callback");
   }
 
-  rcl_lifecycle_ret_t on_error(const rclcpp_lifecycle::State &)
+  rcl_lifecycle_transition_key_t
+  on_error(const rclcpp_lifecycle::State &)
   {
     ++number_of_callbacks;
-    return RCL_LIFECYCLE_RET_FAILURE;
+    return lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_FAILURE;
   }
 };
+
 TEST_F(TestCallbackExceptions, negative_on_error) {
   auto test_node = std::make_shared<NegativeCallbackExceptionNode>("testnode");
 
@@ -99,4 +113,13 @@ TEST_F(TestCallbackExceptions, negative_on_error) {
       rclcpp_lifecycle::Transition(Transition::TRANSITION_CONFIGURE)).id());
   // check if all callbacks were successfully overwritten
   EXPECT_EQ(static_cast<size_t>(2), test_node->number_of_callbacks);
+}
+
+TEST_F(TestCallbackExceptions, negative_on_error_with_code) {
+  auto test_node = std::make_shared<NegativeCallbackExceptionNode>("testnode");
+
+  EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->get_current_state().id());
+  rcl_lifecycle_transition_key_t ret = RCL_RET_OK;
+  test_node->configure(ret);
+  EXPECT_EQ(lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_ERROR, ret);
 }
