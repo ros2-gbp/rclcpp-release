@@ -1,1 +1,1 @@
-{"trimbase": "", "parent": "debian/r2b3/rclcpp_lifecycle", "trim": "", "previous": "479ef13", "base": "4e21168"}
+{"previous": "b65b1ec", "parent": "debian/r2b3/rclcpp_lifecycle", "trim": "", "base": "7996f43", "trimbase": ""}
