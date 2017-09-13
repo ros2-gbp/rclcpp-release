@@ -1,1 +1,1 @@
-{"trimbase": "", "parent": "release/r2b3/rclcpp_lifecycle", "trim": "", "previous": "ad7dcfd", "base": "d6482e9"}
+{"previous": "c59e863", "parent": "release/r2b3/rclcpp_lifecycle", "trim": "", "base": "00f211f", "trimbase": ""}
