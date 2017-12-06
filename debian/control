@@ -1,0 +1,12 @@
+Source: ros-ardent-rclcpp-lifecycle
+Section: misc
+Priority: extra
+Maintainer: Karsten Knese <karsten@osrfoundation.org>
+Build-Depends: debhelper (>= 9.0.0), ros-ardent-ament-cmake, ros-ardent-ament-cmake-gtest, ros-ardent-ament-lint-auto, ros-ardent-ament-lint-common, ros-ardent-lifecycle-msgs, ros-ardent-rcl-lifecycle, ros-ardent-rclcpp, ros-ardent-rmw-implementation, ros-ardent-rosidl-default-generators, ros-ardent-std-msgs, ros-ardent-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-ardent-rclcpp-lifecycle
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-ardent-lifecycle-msgs, ros-ardent-rcl-lifecycle, ros-ardent-rclcpp, ros-ardent-rclpy, ros-ardent-rmw-implementation, ros-ardent-rosidl-default-runtime, ros-ardent-std-msgs, ros-ardent-ros-workspace
+Description: Package containing a prototype for lifecycle implementation
