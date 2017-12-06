@@ -27,7 +27,7 @@
 #include "rclcpp/node_interfaces/node_graph_interface.hpp"
 #include "rclcpp/utilities.hpp"
 
-using rclcpp::client::ClientBase;
+using rclcpp::ClientBase;
 using rclcpp::exceptions::InvalidNodeError;
 using rclcpp::exceptions::throw_from_rcl_error;
 
@@ -99,9 +99,8 @@ ClientBase::wait_for_service_nanoseconds(std::chrono::nanoseconds timeout)
     time_to_wait = std::chrono::nanoseconds(0);
   }
   // continue forever if timeout is negative, otherwise continue until out of time_to_wait
-  // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
   do {
-    if (!rclcpp::utilities::ok()) {
+    if (!rclcpp::ok()) {
       return false;
     }
     node_ptr->wait_for_graph_change(event, time_to_wait);
@@ -115,8 +114,7 @@ ClientBase::wait_for_service_nanoseconds(std::chrono::nanoseconds timeout)
     }
     // server is not ready, loop if there is time left
     time_to_wait = timeout - (std::chrono::steady_clock::now() - start);
-  } while (timeout < std::chrono::nanoseconds(0) || time_to_wait > std::chrono::nanoseconds(0));
-  // *INDENT-ON*
+  } while (time_to_wait > std::chrono::nanoseconds(0) || timeout < std::chrono::nanoseconds(0));
   return false;  // timeout exceeded while waiting for the server to be ready
 }
 

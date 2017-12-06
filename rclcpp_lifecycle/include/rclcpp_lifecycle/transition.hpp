@@ -20,6 +20,8 @@
 #include "rclcpp_lifecycle/state.hpp"
 #include "rclcpp_lifecycle/visibility_control.h"
 
+#include "rcutils/allocator.h"
+
 // forward declare rcl_transition_t
 typedef struct rcl_lifecycle_transition_t rcl_lifecycle_transition_t;
 
@@ -33,18 +35,30 @@ public:
   Transition() = delete;
 
   RCLCPP_LIFECYCLE_PUBLIC
-  explicit Transition(uint8_t id, const std::string & label = "");
+  explicit Transition(
+    uint8_t id,
+    const std::string & label = "",
+    rcutils_allocator_t allocator = rcutils_get_default_allocator());
 
   RCLCPP_LIFECYCLE_PUBLIC
   Transition(
     uint8_t id, const std::string & label,
-    State && start, State && goal);
+    State && start, State && goal,
+    rcutils_allocator_t allocator = rcutils_get_default_allocator());
 
   RCLCPP_LIFECYCLE_PUBLIC
-  explicit Transition(const rcl_lifecycle_transition_t * rcl_lifecycle_transition_handle);
+  explicit Transition(
+    const rcl_lifecycle_transition_t * rcl_lifecycle_transition_handle,
+    rcutils_allocator_t allocator = rcutils_get_default_allocator());
+
+  RCLCPP_LIFECYCLE_PUBLIC
+  Transition(const Transition & rhs);
 
   RCLCPP_LIFECYCLE_PUBLIC
   virtual ~Transition();
+
+  RCLCPP_LIFECYCLE_PUBLIC
+  Transition & operator=(const Transition & rhs);
 
   RCLCPP_LIFECYCLE_PUBLIC
   uint8_t
@@ -63,9 +77,15 @@ public:
   goal_state() const;
 
 protected:
+  RCLCPP_LIFECYCLE_PUBLIC
+  void
+  reset();
+
+  rcutils_allocator_t allocator_;
+
   bool owns_rcl_transition_handle_;
 
-  const rcl_lifecycle_transition_t * transition_handle_;
+  rcl_lifecycle_transition_t * transition_handle_;
 };
 
 }  // namespace rclcpp_lifecycle

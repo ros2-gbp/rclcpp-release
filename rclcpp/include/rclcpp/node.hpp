@@ -35,12 +35,16 @@
 
 #include "rclcpp/callback_group.hpp"
 #include "rclcpp/client.hpp"
+#include "rclcpp/clock.hpp"
 #include "rclcpp/context.hpp"
 #include "rclcpp/event.hpp"
+#include "rclcpp/logger.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/message_memory_strategy.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
+#include "rclcpp/node_interfaces/node_clock_interface.hpp"
 #include "rclcpp/node_interfaces/node_graph_interface.hpp"
+#include "rclcpp/node_interfaces/node_logging_interface.hpp"
 #include "rclcpp/node_interfaces/node_parameters_interface.hpp"
 #include "rclcpp/node_interfaces/node_services_interface.hpp"
 #include "rclcpp/node_interfaces/node_timers_interface.hpp"
@@ -49,13 +53,11 @@
 #include "rclcpp/publisher.hpp"
 #include "rclcpp/service.hpp"
 #include "rclcpp/subscription.hpp"
+#include "rclcpp/time.hpp"
 #include "rclcpp/timer.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
-{
-
-namespace node
 {
 
 /// Node is the single point of entry for creating publishers and subscribers.
@@ -77,7 +79,7 @@ public:
     const std::string & namespace_ = "",
     bool use_intra_process_comms = false);
 
-  /// Create a node based on the node name and a rclcpp::context::Context.
+  /// Create a node based on the node name and a rclcpp::Context.
   /**
    * \param[in] node_name Name of the node.
    * \param[in] namespace_ Namespace of the node.
@@ -89,7 +91,7 @@ public:
   Node(
     const std::string & node_name,
     const std::string & namespace_,
-    rclcpp::context::Context::SharedPtr context,
+    rclcpp::Context::SharedPtr context,
     bool use_intra_process_comms = false);
 
   RCLCPP_PUBLIC
@@ -106,6 +108,12 @@ public:
   RCLCPP_PUBLIC
   const char *
   get_namespace() const;
+
+  /// Get the logger of the node.
+  /** \return The logger of the node. */
+  RCLCPP_PUBLIC
+  rclcpp::Logger
+  get_logger() const;
 
   /// Create and return a callback group.
   RCLCPP_PUBLIC
@@ -126,7 +134,7 @@ public:
    */
   template<
     typename MessageT, typename Alloc = std::allocator<void>,
-    typename PublisherT = ::rclcpp::publisher::Publisher<MessageT, Alloc>>
+    typename PublisherT = ::rclcpp::Publisher<MessageT, Alloc>>
   std::shared_ptr<PublisherT>
   create_publisher(
     const std::string & topic_name, size_t qos_history_depth,
@@ -141,7 +149,7 @@ public:
    */
   template<
     typename MessageT, typename Alloc = std::allocator<void>,
-    typename PublisherT = ::rclcpp::publisher::Publisher<MessageT, Alloc>>
+    typename PublisherT = ::rclcpp::Publisher<MessageT, Alloc>>
   std::shared_ptr<PublisherT>
   create_publisher(
     const std::string & topic_name,
@@ -167,7 +175,7 @@ public:
     typename MessageT,
     typename CallbackT,
     typename Alloc = std::allocator<void>,
-    typename SubscriptionT = rclcpp::subscription::Subscription<MessageT, Alloc>>
+    typename SubscriptionT = rclcpp::Subscription<MessageT, Alloc>>
   std::shared_ptr<SubscriptionT>
   create_subscription(
     const std::string & topic_name,
@@ -198,7 +206,7 @@ public:
     typename MessageT,
     typename CallbackT,
     typename Alloc = std::allocator<void>,
-    typename SubscriptionT = rclcpp::subscription::Subscription<MessageT, Alloc>>
+    typename SubscriptionT = rclcpp::Subscription<MessageT, Alloc>>
   std::shared_ptr<SubscriptionT>
   create_subscription(
     const std::string & topic_name,
@@ -217,7 +225,7 @@ public:
    * \param[in] group Callback group to execute this timer's callback in.
    */
   template<typename DurationT = std::milli, typename CallbackT>
-  typename rclcpp::timer::WallTimer<CallbackT>::SharedPtr
+  typename rclcpp::WallTimer<CallbackT>::SharedPtr
   create_wall_timer(
     std::chrono::duration<int64_t, DurationT> period,
     CallbackT callback,
@@ -225,7 +233,7 @@ public:
 
   /* Create and return a Client. */
   template<typename ServiceT>
-  typename rclcpp::client::Client<ServiceT>::SharedPtr
+  typename rclcpp::Client<ServiceT>::SharedPtr
   create_client(
     const std::string & service_name,
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_services_default,
@@ -233,7 +241,7 @@ public:
 
   /* Create and return a Service. */
   template<typename ServiceT, typename CallbackT>
-  typename rclcpp::service::Service<ServiceT>::SharedPtr
+  typename rclcpp::Service<ServiceT>::SharedPtr
   create_service(
     const std::string & service_name,
     CallbackT && callback,
@@ -342,7 +350,7 @@ public:
    * out of scope.
    */
   RCLCPP_PUBLIC
-  rclcpp::event::Event::SharedPtr
+  rclcpp::Event::SharedPtr
   get_graph_event();
 
   /// Wait for a graph event to occur by waiting on an Event to become set.
@@ -356,13 +364,26 @@ public:
   RCLCPP_PUBLIC
   void
   wait_for_graph_change(
-    rclcpp::event::Event::SharedPtr event,
+    rclcpp::Event::SharedPtr event,
     std::chrono::nanoseconds timeout);
+
+  RCLCPP_PUBLIC
+  rclcpp::Clock::SharedPtr
+  get_clock();
+
+  RCLCPP_PUBLIC
+  Time
+  now();
 
   /// Return the Node's internal NodeBaseInterface implementation.
   RCLCPP_PUBLIC
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr
   get_node_base_interface();
+
+  /// Return the Node's internal NodeClockInterface implementation.
+  RCLCPP_PUBLIC
+  rclcpp::node_interfaces::NodeClockInterface::SharedPtr
+  get_node_clock_interface();
 
   /// Return the Node's internal NodeGraphInterface implementation.
   RCLCPP_PUBLIC
@@ -398,15 +419,16 @@ private:
 
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_;
   rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_;
+  rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr node_logging_;
   rclcpp::node_interfaces::NodeTimersInterface::SharedPtr node_timers_;
   rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_;
   rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services_;
   rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters_;
+  rclcpp::node_interfaces::NodeClockInterface::SharedPtr node_clock_;
 
   bool use_intra_process_comms_;
 };
 
-}  // namespace node
 }  // namespace rclcpp
 
 #ifndef RCLCPP__NODE_IMPL_HPP_

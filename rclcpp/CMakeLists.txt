@@ -31,8 +31,10 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/any_executable.cpp
   src/rclcpp/callback_group.cpp
   src/rclcpp/client.cpp
+  src/rclcpp/clock.cpp
   src/rclcpp/context.cpp
   src/rclcpp/contexts/default_context.cpp
+  src/rclcpp/duration.cpp
   src/rclcpp/event.cpp
   src/rclcpp/exceptions.cpp
   src/rclcpp/executor.cpp
@@ -43,26 +45,53 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/graph_listener.cpp
   src/rclcpp/intra_process_manager.cpp
   src/rclcpp/intra_process_manager_impl.cpp
+  src/rclcpp/logger.cpp
   src/rclcpp/memory_strategies.cpp
   src/rclcpp/memory_strategy.cpp
   src/rclcpp/node.cpp
   src/rclcpp/node_interfaces/node_base.cpp
+  src/rclcpp/node_interfaces/node_clock.cpp
   src/rclcpp/node_interfaces/node_graph.cpp
+  src/rclcpp/node_interfaces/node_logging.cpp
   src/rclcpp/node_interfaces/node_parameters.cpp
   src/rclcpp/node_interfaces/node_services.cpp
   src/rclcpp/node_interfaces/node_timers.cpp
   src/rclcpp/node_interfaces/node_topics.cpp
   src/rclcpp/parameter.cpp
   src/rclcpp/parameter_client.cpp
+  src/rclcpp/parameter_events_filter.cpp
   src/rclcpp/parameter_service.cpp
   src/rclcpp/publisher.cpp
   src/rclcpp/service.cpp
   src/rclcpp/subscription.cpp
   src/rclcpp/time.cpp
+  src/rclcpp/time_source.cpp
   src/rclcpp/timer.cpp
   src/rclcpp/type_support.cpp
   src/rclcpp/utilities.cpp
 )
+
+# "watch" template for changes
+configure_file(
+  "resource/logging.hpp.em"
+  "logging.hpp.em.watch"
+  COPYONLY
+)
+# generate header with logging macros
+set(python_code
+  "import em"
+  "em.invoke(['-o', 'include/rclcpp/logging.hpp', '${CMAKE_CURRENT_SOURCE_DIR}/resource/logging.hpp.em'])")
+string(REPLACE ";" "$<SEMICOLON>" python_code "${python_code}")
+add_custom_command(OUTPUT include/rclcpp/logging.hpp
+  COMMAND ${CMAKE_COMMAND} -E make_directory "include/rclcpp"
+  COMMAND ${PYTHON_EXECUTABLE} ARGS -c "${python_code}"
+  DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/logging.hpp.em.watch"
+  COMMENT "Expanding logging.hpp.em"
+  VERBATIM
+)
+list(APPEND ${PROJECT_NAME}_SRCS
+  include/rclcpp/logging.hpp)
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/include")
 
 add_library(${PROJECT_NAME} SHARED
   ${${PROJECT_NAME}_SRCS})
@@ -160,6 +189,16 @@ if(BUILD_TESTING)
     )
     target_link_libraries(test_node ${PROJECT_NAME})
   endif()
+  ament_add_gtest(test_parameter_events_filter test/test_parameter_events_filter.cpp)
+  if(TARGET test_parameter_events_filter)
+    target_include_directories(test_parameter_events_filter PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_parameter_events_filter ${PROJECT_NAME})
+  endif()
   ament_add_gtest(test_publisher test/test_publisher.cpp)
   if(TARGET test_publisher)
     target_include_directories(test_publisher PUBLIC
@@ -244,12 +283,42 @@ if(BUILD_TESTING)
     endforeach()
   endif()
 
+  ament_add_gtest(test_duration test/test_duration.cpp
+    APPEND_LIBRARY_DIRS "${append_library_dirs}")
+  if(TARGET test_duration)
+    ament_target_dependencies(test_duration
+      "rcl")
+    target_link_libraries(test_duration ${PROJECT_NAME})
+  endif()
+
+  ament_add_gtest(test_executor test/test_executor.cpp
+    APPEND_LIBRARY_DIRS "${append_library_dirs}")
+  if(TARGET test_executor)
+    ament_target_dependencies(test_executor
+      "rcl")
+    target_link_libraries(test_executor ${PROJECT_NAME})
+  endif()
+
+  ament_add_gtest(test_logger test/test_logger.cpp)
+  target_link_libraries(test_logger ${PROJECT_NAME})
+
+  ament_add_gmock(test_logging test/test_logging.cpp)
+  target_link_libraries(test_logging ${PROJECT_NAME})
+
   ament_add_gtest(test_time test/test_time.cpp
     APPEND_LIBRARY_DIRS "${append_library_dirs}")
   if(TARGET test_time)
     ament_target_dependencies(test_time
       "rcl")
     target_link_libraries(test_time ${PROJECT_NAME})
+  endif()
+
+  ament_add_gtest(test_time_source test/test_time_source.cpp
+    APPEND_LIBRARY_DIRS "${append_library_dirs}")
+  if(TARGET test_time_source)
+    ament_target_dependencies(test_time_source
+      "rcl")
+    target_link_libraries(test_time_source ${PROJECT_NAME})
   endif()
 endif()
 
@@ -263,6 +332,6 @@ install(
 )
 
 install(
-  DIRECTORY include/
+  DIRECTORY include/ ${CMAKE_CURRENT_BINARY_DIR}/include/
   DESTINATION include
 )

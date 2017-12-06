@@ -38,10 +38,7 @@ namespace rclcpp
 {
 
 // Forward declaration is used in convenience method signature.
-namespace node
-{
 class Node;
-}  // namespace node
 
 namespace executor
 {
@@ -124,7 +121,7 @@ public:
   /// Convenience function which takes Node and forwards NodeBaseInterface.
   RCLCPP_PUBLIC
   virtual void
-  add_node(std::shared_ptr<rclcpp::node::Node> node_ptr, bool notify = true);
+  add_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify = true);
 
   /// Remove a node from the executor.
   /**
@@ -140,7 +137,7 @@ public:
   /// Convenience function which takes Node and forwards NodeBaseInterface.
   RCLCPP_PUBLIC
   virtual void
-  remove_node(std::shared_ptr<rclcpp::node::Node> node_ptr, bool notify = true);
+  remove_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify = true);
 
   /// Add a node to executor, execute the next available unit of work, and remove the node.
   /**
@@ -151,7 +148,8 @@ public:
    */
   template<typename T = std::milli>
   void
-  spin_node_once(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node,
+  spin_node_once(
+    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node,
     std::chrono::duration<int64_t, T> timeout = std::chrono::duration<int64_t, T>(-1))
   {
     return spin_node_once_nanoseconds(
@@ -161,9 +159,10 @@ public:
   }
 
   /// Convenience function which takes Node and forwards NodeBaseInterface.
-  template<typename NodeT = rclcpp::node::Node, typename T = std::milli>
+  template<typename NodeT = rclcpp::Node, typename T = std::milli>
   void
-  spin_node_once(std::shared_ptr<NodeT> node,
+  spin_node_once(
+    std::shared_ptr<NodeT> node,
     std::chrono::duration<int64_t, T> timeout = std::chrono::duration<int64_t, T>(-1))
   {
     return spin_node_once_nanoseconds(
@@ -183,7 +182,7 @@ public:
   /// Convenience function which takes Node and forwards NodeBaseInterface.
   RCLCPP_PUBLIC
   void
-  spin_node_some(std::shared_ptr<rclcpp::node::Node> node);
+  spin_node_some(std::shared_ptr<rclcpp::Node> node);
 
   /// Complete all available queued work without blocking.
   /**
@@ -234,7 +233,7 @@ public:
     }
     std::chrono::nanoseconds timeout_left = timeout_ns;
 
-    while (rclcpp::utilities::ok()) {
+    while (rclcpp::ok()) {
       // Do one item of work.
       spin_once(timeout_left);
       // Check if the future is set, return SUCCESS if it is.
@@ -293,24 +292,24 @@ protected:
   RCLCPP_PUBLIC
   static void
   execute_subscription(
-    rclcpp::subscription::SubscriptionBase::SharedPtr subscription);
+    rclcpp::SubscriptionBase::SharedPtr subscription);
 
   RCLCPP_PUBLIC
   static void
   execute_intra_process_subscription(
-    rclcpp::subscription::SubscriptionBase::SharedPtr subscription);
+    rclcpp::SubscriptionBase::SharedPtr subscription);
 
   RCLCPP_PUBLIC
   static void
-  execute_timer(rclcpp::timer::TimerBase::SharedPtr timer);
+  execute_timer(rclcpp::TimerBase::SharedPtr timer);
 
   RCLCPP_PUBLIC
   static void
-  execute_service(rclcpp::service::ServiceBase::SharedPtr service);
+  execute_service(rclcpp::ServiceBase::SharedPtr service);
 
   RCLCPP_PUBLIC
   static void
-  execute_client(rclcpp::client::ClientBase::SharedPtr client);
+  execute_client(rclcpp::ClientBase::SharedPtr client);
 
   RCLCPP_PUBLIC
   void
@@ -322,7 +321,7 @@ protected:
 
   RCLCPP_PUBLIC
   rclcpp::callback_group::CallbackGroup::SharedPtr
-  get_group_by_timer(rclcpp::timer::TimerBase::SharedPtr timer);
+  get_group_by_timer(rclcpp::TimerBase::SharedPtr timer);
 
   RCLCPP_PUBLIC
   void
@@ -342,8 +341,8 @@ protected:
   /// Guard condition for signaling the rmw layer to wake up for special events.
   rcl_guard_condition_t interrupt_guard_condition_ = rcl_get_zero_initialized_guard_condition();
 
-  /// Waitset for managing entities that the rmw layer waits on.
-  rcl_wait_set_t waitset_ = rcl_get_zero_initialized_wait_set();
+  /// Wait set for managing entities that the rmw layer waits on.
+  rcl_wait_set_t wait_set_ = rcl_get_zero_initialized_wait_set();
 
   /// The memory strategy: an interface for handling user-defined memory allocation strategies.
   memory_strategy::MemoryStrategy::SharedPtr memory_strategy_;

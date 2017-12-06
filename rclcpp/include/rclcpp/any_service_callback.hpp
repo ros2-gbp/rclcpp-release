@@ -27,18 +27,17 @@
 namespace rclcpp
 {
 
-namespace any_service_callback
-{
-
 template<typename ServiceT>
 class AnyServiceCallback
 {
 private:
-  using SharedPtrCallback = std::function<void(
+  using SharedPtrCallback = std::function<
+      void(
         const std::shared_ptr<typename ServiceT::Request>,
         std::shared_ptr<typename ServiceT::Response>
       )>;
-  using SharedPtrWithRequestHeaderCallback = std::function<void(
+  using SharedPtrWithRequestHeaderCallback = std::function<
+      void(
         const std::shared_ptr<rmw_request_id_t>,
         const std::shared_ptr<typename ServiceT::Request>,
         std::shared_ptr<typename ServiceT::Response>
@@ -98,7 +97,6 @@ public:
   }
 };
 
-}  // namespace any_service_callback
 }  // namespace rclcpp
 
 #endif  // RCLCPP__ANY_SERVICE_CALLBACK_HPP_

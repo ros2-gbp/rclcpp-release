@@ -40,8 +40,6 @@
 
 namespace rclcpp
 {
-namespace parameter_client
-{
 
 class AsyncParametersClient
 {
@@ -59,7 +57,13 @@ public:
 
   RCLCPP_PUBLIC
   AsyncParametersClient(
-    const rclcpp::node::Node::SharedPtr node,
+    const rclcpp::Node::SharedPtr node,
+    const std::string & remote_node_name = "",
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
+
+  RCLCPP_PUBLIC
+  AsyncParametersClient(
+    rclcpp::Node * node,
     const std::string & remote_node_name = "",
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
@@ -108,8 +112,8 @@ public:
     typename CallbackT,
     typename Alloc = std::allocator<void>,
     typename SubscriptionT =
-    rclcpp::subscription::Subscription<rcl_interfaces::msg::ParameterEvent, Alloc>>
-  typename rclcpp::subscription::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr
+    rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent, Alloc>>
+  typename rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr
   on_parameter_event(CallbackT && callback)
   {
     using rclcpp::message_memory_strategy::MessageMemoryStrategy;
@@ -150,14 +154,14 @@ protected:
 
 private:
   const rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_interface_;
-  rclcpp::client::Client<rcl_interfaces::srv::GetParameters>::SharedPtr get_parameters_client_;
-  rclcpp::client::Client<rcl_interfaces::srv::GetParameterTypes>::SharedPtr
+  rclcpp::Client<rcl_interfaces::srv::GetParameters>::SharedPtr get_parameters_client_;
+  rclcpp::Client<rcl_interfaces::srv::GetParameterTypes>::SharedPtr
     get_parameter_types_client_;
-  rclcpp::client::Client<rcl_interfaces::srv::SetParameters>::SharedPtr set_parameters_client_;
-  rclcpp::client::Client<rcl_interfaces::srv::SetParametersAtomically>::SharedPtr
+  rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedPtr set_parameters_client_;
+  rclcpp::Client<rcl_interfaces::srv::SetParametersAtomically>::SharedPtr
     set_parameters_atomically_client_;
-  rclcpp::client::Client<rcl_interfaces::srv::ListParameters>::SharedPtr list_parameters_client_;
-  rclcpp::client::Client<rcl_interfaces::srv::DescribeParameters>::SharedPtr
+  rclcpp::Client<rcl_interfaces::srv::ListParameters>::SharedPtr list_parameters_client_;
+  rclcpp::Client<rcl_interfaces::srv::DescribeParameters>::SharedPtr
     describe_parameters_client_;
   std::string remote_node_name_;
 };
@@ -169,13 +173,15 @@ public:
 
   RCLCPP_PUBLIC
   explicit SyncParametersClient(
-    rclcpp::node::Node::SharedPtr node,
+    rclcpp::Node::SharedPtr node,
+    const std::string & remote_node_name = "",
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
   RCLCPP_PUBLIC
   SyncParametersClient(
     rclcpp::executor::Executor::SharedPtr executor,
-    rclcpp::node::Node::SharedPtr node,
+    rclcpp::Node::SharedPtr node,
+    const std::string & remote_node_name = "",
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
   RCLCPP_PUBLIC
@@ -205,20 +211,18 @@ public:
   T
   get_parameter(const std::string & parameter_name, const T & default_value)
   {
-    // *INDENT-OFF*
-    return get_parameter_impl(parameter_name,
-      std::function<T()>([&default_value]() -> T {return default_value; }));
-    // *INDENT-ON*
+    return get_parameter_impl(
+      parameter_name,
+      std::function<T()>([&default_value]() -> T {return default_value;}));
   }
 
   template<typename T>
   T
   get_parameter(const std::string & parameter_name)
   {
-    // *INDENT-OFF*
-    return get_parameter_impl(parameter_name,
-      std::function<T()>([]() -> T {throw std::runtime_error("Parameter not set"); }));
-    // *INDENT-ON*
+    return get_parameter_impl(
+      parameter_name,
+      std::function<T()>([]() -> T {throw std::runtime_error("Parameter not set");}));
   }
 
   RCLCPP_PUBLIC
@@ -240,7 +244,7 @@ public:
     uint64_t depth);
 
   template<typename CallbackT>
-  typename rclcpp::subscription::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr
+  typename rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr
   on_parameter_event(CallbackT && callback)
   {
     return async_parameters_client_->on_parameter_event(std::forward<CallbackT>(callback));
@@ -263,11 +267,10 @@ public:
 
 private:
   rclcpp::executor::Executor::SharedPtr executor_;
-  rclcpp::node::Node::SharedPtr node_;
+  rclcpp::Node::SharedPtr node_;
   AsyncParametersClient::SharedPtr async_parameters_client_;
 };
 
-}  // namespace parameter_client
 }  // namespace rclcpp
 
 #endif  // RCLCPP__PARAMETER_CLIENT_HPP_

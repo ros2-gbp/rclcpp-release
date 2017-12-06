@@ -45,7 +45,7 @@ public:
  */
 template<typename MessageT, typename Alloc = std::allocator<void>>
 class LifecyclePublisher : public LifecyclePublisherInterface,
-  public rclcpp::publisher::Publisher<MessageT, Alloc>
+  public rclcpp::Publisher<MessageT, Alloc>
 {
 public:
   using MessageAllocTraits = rclcpp::allocator::AllocRebind<MessageT, Alloc>;
@@ -58,14 +58,14 @@ public:
     const std::string & topic,
     const rcl_publisher_options_t & publisher_options,
     std::shared_ptr<MessageAlloc> allocator)
-  : rclcpp::publisher::Publisher<MessageT, Alloc>(
+  : rclcpp::Publisher<MessageT, Alloc>(
       node_base, topic, publisher_options, allocator),
     enabled_(false)
   {}
 
   ~LifecyclePublisher() {}
 
-  /// LifecyclePublisher pulish function
+  /// LifecyclePublisher publish function
   /**
    * The publish function checks whether the communication
    * was enabled or disabled and forwards the message
@@ -77,10 +77,10 @@ public:
     if (!enabled_) {
       return;
     }
-    rclcpp::publisher::Publisher<MessageT, Alloc>::publish(msg);
+    rclcpp::Publisher<MessageT, Alloc>::publish(msg);
   }
 
-  /// LifecyclePublisher pulish function
+  /// LifecyclePublisher publish function
   /**
    * The publish function checks whether the communication
    * was enabled or disabled and forwards the message
@@ -92,10 +92,10 @@ public:
     if (!enabled_) {
       return;
     }
-    rclcpp::publisher::Publisher<MessageT, Alloc>::publish(msg);
+    rclcpp::Publisher<MessageT, Alloc>::publish(msg);
   }
 
-  /// LifecyclePublisher pulish function
+  /// LifecyclePublisher publish function
   /**
    * The publish function checks whether the communication
    * was enabled or disabled and forwards the message
@@ -107,10 +107,10 @@ public:
     if (!enabled_) {
       return;
     }
-    rclcpp::publisher::Publisher<MessageT, Alloc>::publish(msg);
+    rclcpp::Publisher<MessageT, Alloc>::publish(msg);
   }
 
-  /// LifecyclePublisher pulish function
+  /// LifecyclePublisher publish function
   /**
    * The publish function checks whether the communication
    * was enabled or disabled and forwards the message
@@ -122,7 +122,7 @@ public:
     if (!enabled_) {
       return;
     }
-    rclcpp::publisher::Publisher<MessageT, Alloc>::publish(msg);
+    rclcpp::Publisher<MessageT, Alloc>::publish(msg);
   }
 
   virtual void
@@ -134,7 +134,7 @@ public:
     this->publish(*msg);
   }
 
-  /// LifecyclePublisher pulish function
+  /// LifecyclePublisher publish function
   /**
    * The publish function checks whether the communication
    * was enabled or disabled and forwards the message
@@ -146,7 +146,7 @@ public:
     if (!enabled_) {
       return;
     }
-    rclcpp::publisher::Publisher<MessageT, Alloc>::publish(msg);
+    rclcpp::Publisher<MessageT, Alloc>::publish(msg);
   }
 
   virtual void

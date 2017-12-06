@@ -47,9 +47,6 @@ namespace node_interfaces
 class NodeBaseInterface;
 }  // namespace node_interfaces
 
-namespace client
-{
-
 class ClientBase
 {
 public:
@@ -193,10 +190,11 @@ public:
   }
 
   void
-  handle_response(std::shared_ptr<rmw_request_id_t> request_header,
+  handle_response(
+    std::shared_ptr<rmw_request_id_t> request_header,
     std::shared_ptr<void> response)
   {
-    std::lock_guard<std::mutex> lock(pending_requests_mutex_);
+    std::unique_lock<std::mutex> lock(pending_requests_mutex_);
     auto typed_response = std::static_pointer_cast<typename ServiceT::Response>(response);
     int64_t sequence_number = request_header->sequence_number;
     // TODO(esteve) this should throw instead since it is not expected to happen in the first place
@@ -209,6 +207,9 @@ public:
     auto callback = std::get<1>(tuple);
     auto future = std::get<2>(tuple);
     this->pending_requests_.erase(sequence_number);
+    // Unlock here to allow the service to be called recursively from one of its callbacks.
+    lock.unlock();
+
     call_promise->set_value(typed_response);
     callback(future);
   }
@@ -278,7 +279,6 @@ private:
   std::mutex pending_requests_mutex_;
 };
 
-}  // namespace client
 }  // namespace rclcpp
 
 #endif  // RCLCPP__CLIENT_HPP_

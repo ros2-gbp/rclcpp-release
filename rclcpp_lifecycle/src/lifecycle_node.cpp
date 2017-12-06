@@ -25,9 +25,12 @@
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/graph_listener.hpp"
+#include "rclcpp/logger.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/node_interfaces/node_base.hpp"
+#include "rclcpp/node_interfaces/node_clock.hpp"
 #include "rclcpp/node_interfaces/node_graph.hpp"
+#include "rclcpp/node_interfaces/node_logging.hpp"
 #include "rclcpp/node_interfaces/node_parameters.hpp"
 #include "rclcpp/node_interfaces/node_services.hpp"
 #include "rclcpp/node_interfaces/node_timers.hpp"
@@ -52,16 +55,23 @@ LifecycleNode::LifecycleNode(
 LifecycleNode::LifecycleNode(
   const std::string & node_name,
   const std::string & namespace_,
-  rclcpp::context::Context::SharedPtr context,
+  rclcpp::Context::SharedPtr context,
   bool use_intra_process_comms)
 : node_base_(new rclcpp::node_interfaces::NodeBase(node_name, namespace_, context)),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),
+  node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_.get())),
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
   node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get())),
   node_services_(new rclcpp::node_interfaces::NodeServices(node_base_.get())),
   node_parameters_(new rclcpp::node_interfaces::NodeParameters(
       node_topics_.get(),
       use_intra_process_comms
+    )),
+  node_clock_(new rclcpp::node_interfaces::NodeClock(
+      node_base_,
+      node_topics_,
+      node_graph_,
+      node_services_
     )),
   use_intra_process_comms_(use_intra_process_comms),
   impl_(new LifecycleNodeInterfaceImpl(node_base_, node_services_))
@@ -93,6 +103,12 @@ const char *
 LifecycleNode::get_namespace() const
 {
   return node_base_->get_namespace();
+}
+
+rclcpp::Logger
+LifecycleNode::get_logger() const
+{
+  return node_logging_->get_logger();
 }
 
 rclcpp::callback_group::CallbackGroup::SharedPtr
@@ -135,7 +151,8 @@ LifecycleNode::get_parameter(const std::string & name) const
   return node_parameters_->get_parameter(name);
 }
 
-bool LifecycleNode::get_parameter(const std::string & name,
+bool LifecycleNode::get_parameter(
+  const std::string & name,
   rclcpp::parameter::ParameterVariant & parameter) const
 {
   return node_parameters_->get_parameter(name, parameter);
@@ -192,7 +209,7 @@ LifecycleNode::get_callback_groups() const
   return node_base_->get_callback_groups();
 }
 
-rclcpp::event::Event::SharedPtr
+rclcpp::Event::SharedPtr
 LifecycleNode::get_graph_event()
 {
   return node_graph_->get_graph_event();
@@ -200,16 +217,34 @@ LifecycleNode::get_graph_event()
 
 void
 LifecycleNode::wait_for_graph_change(
-  rclcpp::event::Event::SharedPtr event,
+  rclcpp::Event::SharedPtr event,
   std::chrono::nanoseconds timeout)
 {
   node_graph_->wait_for_graph_change(event, timeout);
+}
+
+rclcpp::Clock::SharedPtr
+LifecycleNode::get_clock()
+{
+  return node_clock_->get_clock();
+}
+
+rclcpp::Time
+LifecycleNode::now()
+{
+  return node_clock_->get_clock()->now();
 }
 
 rclcpp::node_interfaces::NodeBaseInterface::SharedPtr
 LifecycleNode::get_node_base_interface()
 {
   return node_base_;
+}
+
+rclcpp::node_interfaces::NodeClockInterface::SharedPtr
+LifecycleNode::get_node_clock_interface()
+{
+  return node_clock_;
 }
 
 rclcpp::node_interfaces::NodeGraphInterface::SharedPtr
@@ -414,7 +449,7 @@ LifecycleNode::add_publisher_handle(
 }
 
 void
-LifecycleNode::add_timer_handle(std::shared_ptr<rclcpp::timer::TimerBase> timer)
+LifecycleNode::add_timer_handle(std::shared_ptr<rclcpp::TimerBase> timer)
 {
   impl_->add_timer_handle(timer);
 }

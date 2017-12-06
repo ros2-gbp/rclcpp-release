@@ -21,8 +21,8 @@
 
 #include "./parameter_service_names.hpp"
 
-using rclcpp::parameter_client::AsyncParametersClient;
-using rclcpp::parameter_client::SyncParametersClient;
+using rclcpp::AsyncParametersClient;
+using rclcpp::SyncParametersClient;
 
 AsyncParametersClient::AsyncParametersClient(
   const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_interface,
@@ -42,8 +42,8 @@ AsyncParametersClient::AsyncParametersClient(
   rcl_client_options_t options = rcl_client_get_default_options();
   options.qos = qos_profile;
 
-  using rclcpp::client::Client;
-  using rclcpp::client::ClientBase;
+  using rclcpp::Client;
+  using rclcpp::ClientBase;
 
   get_parameters_client_ = Client<rcl_interfaces::srv::GetParameters>::make_shared(
     node_base_interface.get(),
@@ -89,7 +89,20 @@ AsyncParametersClient::AsyncParametersClient(
 }
 
 AsyncParametersClient::AsyncParametersClient(
-  const rclcpp::node::Node::SharedPtr node,
+  const rclcpp::Node::SharedPtr node,
+  const std::string & remote_node_name,
+  const rmw_qos_profile_t & qos_profile)
+: AsyncParametersClient(
+    node->get_node_base_interface(),
+    node->get_node_topics_interface(),
+    node->get_node_graph_interface(),
+    node->get_node_services_interface(),
+    remote_node_name,
+    qos_profile)
+{}
+
+AsyncParametersClient::AsyncParametersClient(
+  rclcpp::Node * node,
   const std::string & remote_node_name,
   const rmw_qos_profile_t & qos_profile)
 : AsyncParametersClient(
@@ -115,11 +128,10 @@ AsyncParametersClient::get_parameters(
   auto request = std::make_shared<rcl_interfaces::srv::GetParameters::Request>();
   request->names = names;
 
-  // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
   get_parameters_client_->async_send_request(
     request,
-    [request, promise_result, future_result, &callback](
-      rclcpp::client::Client<rcl_interfaces::srv::GetParameters>::SharedFuture cb_f)
+    [request, promise_result, future_result, callback](
+      rclcpp::Client<rcl_interfaces::srv::GetParameters>::SharedFuture cb_f)
     {
       std::vector<rclcpp::parameter::ParameterVariant> parameter_variants;
       auto & pvalues = cb_f.get()->values;
@@ -139,7 +151,6 @@ AsyncParametersClient::get_parameters(
       }
     }
   );
-  // *INDENT-ON*
 
   return future_result;
 }
@@ -158,11 +169,10 @@ AsyncParametersClient::get_parameter_types(
   auto request = std::make_shared<rcl_interfaces::srv::GetParameterTypes::Request>();
   request->names = names;
 
-  // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
   get_parameter_types_client_->async_send_request(
     request,
-    [promise_result, future_result, &callback](
-      rclcpp::client::Client<rcl_interfaces::srv::GetParameterTypes>::SharedFuture cb_f)
+    [promise_result, future_result, callback](
+      rclcpp::Client<rcl_interfaces::srv::GetParameterTypes>::SharedFuture cb_f)
     {
       std::vector<rclcpp::parameter::ParameterType> types;
       auto & pts = cb_f.get()->types;
@@ -175,7 +185,6 @@ AsyncParametersClient::get_parameter_types(
       }
     }
   );
-  // *INDENT-ON*
 
   return future_result;
 }
@@ -193,7 +202,6 @@ AsyncParametersClient::set_parameters(
 
   auto request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
 
-  // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
   std::transform(parameters.begin(), parameters.end(), std::back_inserter(request->parameters),
     [](rclcpp::parameter::ParameterVariant p) {
       return p.to_parameter();
@@ -202,8 +210,8 @@ AsyncParametersClient::set_parameters(
 
   set_parameters_client_->async_send_request(
     request,
-    [promise_result, future_result, &callback](
-      rclcpp::client::Client<rcl_interfaces::srv::SetParameters>::SharedFuture cb_f)
+    [promise_result, future_result, callback](
+      rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture cb_f)
     {
       promise_result->set_value(cb_f.get()->results);
       if (callback != nullptr) {
@@ -211,7 +219,6 @@ AsyncParametersClient::set_parameters(
       }
     }
   );
-  // *INDENT-ON*
 
   return future_result;
 }
@@ -229,7 +236,6 @@ AsyncParametersClient::set_parameters_atomically(
 
   auto request = std::make_shared<rcl_interfaces::srv::SetParametersAtomically::Request>();
 
-  // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
   std::transform(parameters.begin(), parameters.end(), std::back_inserter(request->parameters),
     [](rclcpp::parameter::ParameterVariant p) {
       return p.to_parameter();
@@ -238,8 +244,8 @@ AsyncParametersClient::set_parameters_atomically(
 
   set_parameters_atomically_client_->async_send_request(
     request,
-    [promise_result, future_result, &callback](
-      rclcpp::client::Client<rcl_interfaces::srv::SetParametersAtomically>::SharedFuture cb_f)
+    [promise_result, future_result, callback](
+      rclcpp::Client<rcl_interfaces::srv::SetParametersAtomically>::SharedFuture cb_f)
     {
       promise_result->set_value(cb_f.get()->result);
       if (callback != nullptr) {
@@ -247,7 +253,6 @@ AsyncParametersClient::set_parameters_atomically(
       }
     }
   );
-  // *INDENT-ON*
 
   return future_result;
 }
@@ -268,11 +273,10 @@ AsyncParametersClient::list_parameters(
   request->prefixes = prefixes;
   request->depth = depth;
 
-  // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
   list_parameters_client_->async_send_request(
     request,
-    [promise_result, future_result, &callback](
-      rclcpp::client::Client<rcl_interfaces::srv::ListParameters>::SharedFuture cb_f)
+    [promise_result, future_result, callback](
+      rclcpp::Client<rcl_interfaces::srv::ListParameters>::SharedFuture cb_f)
     {
       promise_result->set_value(cb_f.get()->result);
       if (callback != nullptr) {
@@ -280,7 +284,6 @@ AsyncParametersClient::list_parameters(
       }
     }
   );
-  // *INDENT-ON*
 
   return future_result;
 }
@@ -299,7 +302,7 @@ AsyncParametersClient::service_is_ready() const
 bool
 AsyncParametersClient::wait_for_service_nanoseconds(std::chrono::nanoseconds timeout)
 {
-  const std::vector<std::shared_ptr<rclcpp::client::ClientBase>> clients = {
+  const std::vector<std::shared_ptr<rclcpp::ClientBase>> clients = {
     get_parameters_client_,
     get_parameter_types_client_,
     set_parameters_client_,
@@ -323,21 +326,25 @@ AsyncParametersClient::wait_for_service_nanoseconds(std::chrono::nanoseconds tim
 }
 
 SyncParametersClient::SyncParametersClient(
-  rclcpp::node::Node::SharedPtr node,
+  rclcpp::Node::SharedPtr node,
+  const std::string & remote_node_name,
   const rmw_qos_profile_t & qos_profile)
-: node_(node)
-{
-  executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
-  async_parameters_client_ = std::make_shared<AsyncParametersClient>(node, "", qos_profile);
-}
+: SyncParametersClient(
+    std::make_shared<rclcpp::executors::SingleThreadedExecutor>(),
+    node,
+    remote_node_name,
+    qos_profile)
+{}
 
 SyncParametersClient::SyncParametersClient(
   rclcpp::executor::Executor::SharedPtr executor,
-  rclcpp::node::Node::SharedPtr node,
+  rclcpp::Node::SharedPtr node,
+  const std::string & remote_node_name,
   const rmw_qos_profile_t & qos_profile)
 : executor_(executor), node_(node)
 {
-  async_parameters_client_ = std::make_shared<AsyncParametersClient>(node, "", qos_profile);
+  async_parameters_client_ =
+    std::make_shared<AsyncParametersClient>(node, remote_node_name, qos_profile);
 }
 
 std::vector<rclcpp::parameter::ParameterVariant>

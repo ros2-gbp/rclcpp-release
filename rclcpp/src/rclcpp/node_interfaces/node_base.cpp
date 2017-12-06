@@ -30,7 +30,7 @@ using rclcpp::node_interfaces::NodeBase;
 NodeBase::NodeBase(
   const std::string & node_name,
   const std::string & namespace_,
-  rclcpp::context::Context::SharedPtr context)
+  rclcpp::Context::SharedPtr context)
 : context_(context),
   node_handle_(nullptr),
   default_callback_group_(nullptr),
@@ -133,13 +133,15 @@ NodeBase::NodeBase(
     throw_from_rcl_error(ret, "failed to initialize rcl node");
   }
 
-  node_handle_.reset(rcl_node, [](rcl_node_t * node) -> void {
-    if (rcl_node_fini(node) != RCL_RET_OK) {
-      fprintf(
-        stderr, "Error in destruction of rcl node handle: %s\n", rcl_get_error_string_safe());
-    }
-    delete node;
-  });
+  node_handle_.reset(
+    rcl_node,
+    [](rcl_node_t * node) -> void {
+      if (rcl_node_fini(node) != RCL_RET_OK) {
+        fprintf(
+          stderr, "Error in destruction of rcl node handle: %s\n", rcl_get_error_string_safe());
+      }
+      delete node;
+    });
 
   // Create the default callback group.
   using rclcpp::callback_group::CallbackGroupType;
@@ -174,7 +176,7 @@ NodeBase::get_namespace() const
   return rcl_node_get_namespace(node_handle_.get());
 }
 
-rclcpp::context::Context::SharedPtr
+rclcpp::Context::SharedPtr
 NodeBase::get_context()
 {
   return context_;

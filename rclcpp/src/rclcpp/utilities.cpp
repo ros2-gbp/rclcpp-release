@@ -139,12 +139,10 @@ signal_handler(int signal_value)
       old_action.sa_sigaction(signal_value, siginfo, context);
     }
   } else {
-    // *INDENT-OFF*
     if (
       old_action.sa_handler != NULL &&  // Is set
       old_action.sa_handler != SIG_DFL &&  // Is not default
       old_action.sa_handler != SIG_IGN)  // Is not ignored
-    // *INDENT-ON*
     {
       old_action.sa_handler(signal_value);
     }
@@ -159,7 +157,7 @@ signal_handler(int signal_value)
 }
 
 void
-rclcpp::utilities::init(int argc, char * argv[])
+rclcpp::init(int argc, char * argv[])
 {
   g_is_interrupted.store(false);
   if (rcl_init(argc, argv, rcl_get_default_allocator()) != RCL_RET_OK) {
@@ -176,20 +174,22 @@ rclcpp::utilities::init(int argc, char * argv[])
   action.sa_flags = SA_SIGINFO;
   ::old_action = set_sigaction(SIGINT, action);
   // Register an on_shutdown hook to restore the old action.
-  rclcpp::utilities::on_shutdown([]() {
-    set_sigaction(SIGINT, ::old_action);
-  });
+  rclcpp::on_shutdown(
+    []() {
+      set_sigaction(SIGINT, ::old_action);
+    });
 #else
   ::old_signal_handler = set_signal_handler(SIGINT, ::signal_handler);
   // Register an on_shutdown hook to restore the old signal handler.
-  rclcpp::utilities::on_shutdown([]() {
-    set_signal_handler(SIGINT, ::old_signal_handler);
-  });
+  rclcpp::on_shutdown(
+    []() {
+      set_signal_handler(SIGINT, ::old_signal_handler);
+    });
 #endif
 }
 
 bool
-rclcpp::utilities::ok()
+rclcpp::ok()
 {
   return ::g_signal_status == 0;
 }
@@ -198,7 +198,7 @@ static std::mutex on_shutdown_mutex_;
 static std::vector<std::function<void(void)>> on_shutdown_callbacks_;
 
 void
-rclcpp::utilities::shutdown()
+rclcpp::shutdown()
 {
   trigger_interrupt_guard_condition(SIGINT);
 
@@ -211,17 +211,17 @@ rclcpp::utilities::shutdown()
 }
 
 void
-rclcpp::utilities::on_shutdown(std::function<void(void)> callback)
+rclcpp::on_shutdown(std::function<void(void)> callback)
 {
   std::lock_guard<std::mutex> lock(on_shutdown_mutex_);
   on_shutdown_callbacks_.push_back(callback);
 }
 
 rcl_guard_condition_t *
-rclcpp::utilities::get_sigint_guard_condition(rcl_wait_set_t * waitset)
+rclcpp::get_sigint_guard_condition(rcl_wait_set_t * wait_set)
 {
   std::lock_guard<std::mutex> lock(g_sigint_guard_cond_handles_mutex);
-  auto kv = g_sigint_guard_cond_handles.find(waitset);
+  auto kv = g_sigint_guard_cond_handles.find(wait_set);
   if (kv != g_sigint_guard_cond_handles.end()) {
     return &kv->second;
   } else {
@@ -234,16 +234,16 @@ rclcpp::utilities::get_sigint_guard_condition(rcl_wait_set_t * waitset)
         "Couldn't initialize guard condition: ") + rcl_get_error_string_safe());
       // *INDENT-ON*
     }
-    g_sigint_guard_cond_handles[waitset] = handle;
-    return &g_sigint_guard_cond_handles[waitset];
+    g_sigint_guard_cond_handles[wait_set] = handle;
+    return &g_sigint_guard_cond_handles[wait_set];
   }
 }
 
 void
-rclcpp::utilities::release_sigint_guard_condition(rcl_wait_set_t * waitset)
+rclcpp::release_sigint_guard_condition(rcl_wait_set_t * wait_set)
 {
   std::lock_guard<std::mutex> lock(g_sigint_guard_cond_handles_mutex);
-  auto kv = g_sigint_guard_cond_handles.find(waitset);
+  auto kv = g_sigint_guard_cond_handles.find(wait_set);
   if (kv != g_sigint_guard_cond_handles.end()) {
     if (rcl_guard_condition_fini(&kv->second) != RCL_RET_OK) {
       // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
@@ -256,13 +256,13 @@ rclcpp::utilities::release_sigint_guard_condition(rcl_wait_set_t * waitset)
   } else {
     // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
     throw std::runtime_error(std::string(
-      "Tried to release sigint guard condition for nonexistent waitset"));
+      "Tried to release sigint guard condition for nonexistent wait set"));
     // *INDENT-ON*
   }
 }
 
 bool
-rclcpp::utilities::sleep_for(const std::chrono::nanoseconds & nanoseconds)
+rclcpp::sleep_for(const std::chrono::nanoseconds & nanoseconds)
 {
   std::chrono::nanoseconds time_left = nanoseconds;
   {

@@ -51,7 +51,7 @@ public:
   virtual size_t number_of_ready_timers() const = 0;
   virtual size_t number_of_guard_conditions() const = 0;
 
-  virtual bool add_handles_to_waitset(rcl_wait_set_t * wait_set) = 0;
+  virtual bool add_handles_to_wait_set(rcl_wait_set_t * wait_set) = 0;
   virtual void clear_handles() = 0;
   virtual void remove_null_handles(rcl_wait_set_t * wait_set) = 0;
 
@@ -64,46 +64,52 @@ public:
   virtual void remove_guard_condition(const rcl_guard_condition_t * guard_condition) = 0;
 
   virtual void
-  get_next_subscription(rclcpp::executor::AnyExecutable::SharedPtr any_exec,
+  get_next_subscription(
+    rclcpp::executor::AnyExecutable::SharedPtr any_exec,
     const WeakNodeVector & weak_nodes) = 0;
 
   virtual void
-  get_next_service(rclcpp::executor::AnyExecutable::SharedPtr any_exec,
+  get_next_service(
+    rclcpp::executor::AnyExecutable::SharedPtr any_exec,
     const WeakNodeVector & weak_nodes) = 0;
 
   virtual void
-  get_next_client(rclcpp::executor::AnyExecutable::SharedPtr any_exec,
+  get_next_client(
+    rclcpp::executor::AnyExecutable::SharedPtr any_exec,
     const WeakNodeVector & weak_nodes) = 0;
 
   virtual rcl_allocator_t
   get_allocator() = 0;
 
-  static rclcpp::subscription::SubscriptionBase::SharedPtr
-  get_subscription_by_handle(const rcl_subscription_t * subscriber_handle,
+  static rclcpp::SubscriptionBase::SharedPtr
+  get_subscription_by_handle(
+    const rcl_subscription_t * subscriber_handle,
     const WeakNodeVector & weak_nodes);
 
-  static rclcpp::service::ServiceBase::SharedPtr
+  static rclcpp::ServiceBase::SharedPtr
   get_service_by_handle(const rcl_service_t * service_handle, const WeakNodeVector & weak_nodes);
 
-  static rclcpp::client::ClientBase::SharedPtr
+  static rclcpp::ClientBase::SharedPtr
   get_client_by_handle(const rcl_client_t * client_handle, const WeakNodeVector & weak_nodes);
 
   static rclcpp::node_interfaces::NodeBaseInterface::SharedPtr
-  get_node_by_group(rclcpp::callback_group::CallbackGroup::SharedPtr group,
+  get_node_by_group(
+    rclcpp::callback_group::CallbackGroup::SharedPtr group,
     const WeakNodeVector & weak_nodes);
 
   static rclcpp::callback_group::CallbackGroup::SharedPtr
   get_group_by_subscription(
-    rclcpp::subscription::SubscriptionBase::SharedPtr subscription,
+    rclcpp::SubscriptionBase::SharedPtr subscription,
     const WeakNodeVector & weak_nodes);
 
   static rclcpp::callback_group::CallbackGroup::SharedPtr
   get_group_by_service(
-    rclcpp::service::ServiceBase::SharedPtr service,
+    rclcpp::ServiceBase::SharedPtr service,
     const WeakNodeVector & weak_nodes);
 
   static rclcpp::callback_group::CallbackGroup::SharedPtr
-  get_group_by_client(rclcpp::client::ClientBase::SharedPtr client,
+  get_group_by_client(
+    rclcpp::ClientBase::SharedPtr client,
     const WeakNodeVector & weak_nodes);
 };
 

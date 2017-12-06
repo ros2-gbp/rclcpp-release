@@ -30,9 +30,6 @@
 namespace rclcpp
 {
 
-namespace context
-{
-
 class Context
 {
 public:
@@ -52,13 +49,11 @@ public:
     auto it = sub_contexts_.find(type_i);
     if (it == sub_contexts_.end()) {
       // It doesn't exist yet, make it
-      // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
       sub_context = std::shared_ptr<SubContext>(
         new SubContext(std::forward<Args>(args) ...),
-        [] (SubContext * sub_context_ptr) {
+        [](SubContext * sub_context_ptr) {
           delete sub_context_ptr;
         });
-      // *INDENT-ON*
       sub_contexts_[type_i] = sub_context;
     } else {
       // It exists, get it out and cast it.
@@ -74,7 +69,6 @@ private:
   std::mutex mutex_;
 };
 
-}  // namespace context
 }  // namespace rclcpp
 
 #endif  // RCLCPP__CONTEXT_HPP_

@@ -45,12 +45,9 @@ namespace node_interfaces
 class NodeTopicsInterface;
 }
 
-namespace publisher
-{
-
 class PublisherBase
 {
-  friend rclcpp::node_interfaces::NodeTopicsInterface;
+  friend ::rclcpp::node_interfaces::NodeTopicsInterface;
 
 public:
   RCLCPP_SMART_PTR_DEFINITIONS(PublisherBase)
@@ -304,8 +301,6 @@ protected:
 
   MessageDeleter message_deleter_;
 };
-
-}  // namespace publisher
 
 }  // namespace rclcpp
 

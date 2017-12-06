@@ -27,7 +27,7 @@ NodeTimers::~NodeTimers()
 
 void
 NodeTimers::add_timer(
-  rclcpp::timer::TimerBase::SharedPtr timer,
+  rclcpp::TimerBase::SharedPtr timer,
   rclcpp::callback_group::CallbackGroup::SharedPtr callback_group)
 {
   if (callback_group) {
@@ -42,6 +42,6 @@ NodeTimers::add_timer(
   if (rcl_trigger_guard_condition(node_base_->get_notify_guard_condition()) != RCL_RET_OK) {
     throw std::runtime_error(
             std::string(
-              "Failed to notify waitset on timer creation: ") + rmw_get_error_string());
+              "Failed to notify wait set on timer creation: ") + rmw_get_error_string());
   }
 }

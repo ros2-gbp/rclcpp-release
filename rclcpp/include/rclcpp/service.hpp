@@ -35,8 +35,6 @@
 
 namespace rclcpp
 {
-namespace service
-{
 
 class ServiceBase
 {
@@ -90,8 +88,6 @@ protected:
   std::string service_name_;
   bool owns_rcl_handle_ = true;
 };
-
-using any_service_callback::AnyServiceCallback;
 
 template<typename ServiceT>
 class Service : public ServiceBase
@@ -196,7 +192,8 @@ public:
     return std::shared_ptr<rmw_request_id_t>(new rmw_request_id_t);
   }
 
-  void handle_request(std::shared_ptr<rmw_request_id_t> request_header,
+  void handle_request(
+    std::shared_ptr<rmw_request_id_t> request_header,
     std::shared_ptr<void> request)
   {
     auto typed_request = std::static_pointer_cast<typename ServiceT::Request>(request);
@@ -222,7 +219,6 @@ private:
   AnyServiceCallback<ServiceT> any_callback_;
 };
 
-}  // namespace service
 }  // namespace rclcpp
 
 #endif  // RCLCPP__SERVICE_HPP_

@@ -30,7 +30,7 @@ NodeTopics::NodeTopics(rclcpp::node_interfaces::NodeBaseInterface * node_base)
 NodeTopics::~NodeTopics()
 {}
 
-rclcpp::publisher::PublisherBase::SharedPtr
+rclcpp::PublisherBase::SharedPtr
 NodeTopics::create_publisher(
   const std::string & topic_name,
   const rclcpp::PublisherFactory & publisher_factory,
@@ -63,7 +63,7 @@ NodeTopics::create_publisher(
 
 void
 NodeTopics::add_publisher(
-  rclcpp::publisher::PublisherBase::SharedPtr publisher)
+  rclcpp::PublisherBase::SharedPtr publisher)
 {
   // The publisher is not added to a callback group or anthing like that for now.
   // It may be stored within the NodeTopics class or the NodeBase class in the future.
@@ -74,12 +74,12 @@ NodeTopics::add_publisher(
     if (rcl_trigger_guard_condition(node_base_->get_notify_guard_condition()) != RCL_RET_OK) {
       throw std::runtime_error(
               std::string(
-                "Failed to notify waitset on publisher creation: ") + rmw_get_error_string());
+                "Failed to notify wait set on publisher creation: ") + rmw_get_error_string());
     }
   }
 }
 
-rclcpp::subscription::SubscriptionBase::SharedPtr
+rclcpp::SubscriptionBase::SharedPtr
 NodeTopics::create_subscription(
   const std::string & topic_name,
   const rclcpp::SubscriptionFactory & subscription_factory,
@@ -104,7 +104,7 @@ NodeTopics::create_subscription(
 
 void
 NodeTopics::add_subscription(
-  rclcpp::subscription::SubscriptionBase::SharedPtr subscription,
+  rclcpp::SubscriptionBase::SharedPtr subscription,
   rclcpp::callback_group::CallbackGroup::SharedPtr callback_group)
 {
   // Assign to a group.
@@ -124,7 +124,7 @@ NodeTopics::add_subscription(
     if (rcl_trigger_guard_condition(node_base_->get_notify_guard_condition()) != RCL_RET_OK) {
       throw std::runtime_error(
               std::string(
-                "Failed to notify waitset on subscription creation: ") + rmw_get_error_string()
+                "Failed to notify wait set on subscription creation: ") + rmw_get_error_string()
       );
     }
   }
