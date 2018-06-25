@@ -74,7 +74,9 @@ void TimeSource::attachNode(
 
   auto cb = std::bind(&TimeSource::clock_cb, this, std::placeholders::_1);
 
-  clock_subscription_ = rclcpp::create_subscription<MessageT, decltype(cb), Alloc, SubscriptionT>(
+  clock_subscription_ = rclcpp::create_subscription<
+    MessageT, decltype(cb), Alloc, MessageT, SubscriptionT
+    >(
     node_topics_.get(),
     topic_name,
     std::move(cb),
@@ -118,7 +120,8 @@ void TimeSource::attachClock(std::shared_ptr<rclcpp::Clock> clock)
   associated_clocks_.push_back(clock);
   // Set the clock if there's already data for it
   if (last_msg_set_) {
-    set_clock(last_msg_set_, ros_time_active_, clock);
+    auto time_msg = std::make_shared<builtin_interfaces::msg::Time>(last_msg_set_->clock);
+    set_clock(time_msg, ros_time_active_, clock);
   }
 }
 
@@ -194,17 +197,18 @@ void TimeSource::set_clock(
   clock->invoke_postjump_callbacks(active_callbacks, jump);
 }
 
-void TimeSource::clock_cb(const builtin_interfaces::msg::Time::SharedPtr msg)
+void TimeSource::clock_cb(const rosgraph_msgs::msg::Clock::SharedPtr msg)
 {
   if (!this->ros_time_active_) {
     enable_ros_time();
   }
   // Cache the last message in case a new clock is attached.
   last_msg_set_ = msg;
+  auto time_msg = std::make_shared<builtin_interfaces::msg::Time>(msg->clock);
 
   std::lock_guard<std::mutex> guard(clock_list_lock_);
   for (auto it = associated_clocks_.begin(); it != associated_clocks_.end(); ++it) {
-    set_clock(msg, true, *it);
+    set_clock(time_msg, true, *it);
   }
 }
 
@@ -215,7 +219,7 @@ void TimeSource::on_parameter_event(const rcl_interfaces::msg::ParameterEvent::S
     {rclcpp::ParameterEventsFilter::EventType::NEW,
       rclcpp::ParameterEventsFilter::EventType::CHANGED});
   for (auto & it : filter.get_events()) {
-    if (it.second->value.type != parameter::ParameterType::PARAMETER_BOOL) {
+    if (it.second->value.type != ParameterType::PARAMETER_BOOL) {
       RCUTILS_LOG_ERROR("use_sim_time parameter set to something besides a bool");
       continue;
     }

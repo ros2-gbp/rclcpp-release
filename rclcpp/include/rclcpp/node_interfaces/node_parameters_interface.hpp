@@ -41,30 +41,49 @@ public:
   virtual
   std::vector<rcl_interfaces::msg::SetParametersResult>
   set_parameters(
-    const std::vector<rclcpp::parameter::ParameterVariant> & parameters) = 0;
+    const std::vector<rclcpp::Parameter> & parameters) = 0;
 
   RCLCPP_PUBLIC
   virtual
   rcl_interfaces::msg::SetParametersResult
   set_parameters_atomically(
-    const std::vector<rclcpp::parameter::ParameterVariant> & parameters) = 0;
+    const std::vector<rclcpp::Parameter> & parameters) = 0;
 
+  /// Get descriptions of parameters given their names.
+  /*
+   * \param[in] names a list of parameter names to check.
+   * \return the list of parameters that were found.
+   * Any parameter not found is omitted from the returned list.
+   */
   RCLCPP_PUBLIC
   virtual
-  std::vector<rclcpp::parameter::ParameterVariant>
+  std::vector<rclcpp::Parameter>
   get_parameters(const std::vector<std::string> & names) const = 0;
 
+  /// Get the description of one parameter given a name.
+  /*
+   * \param[in] name the name of the parameter to look for.
+   * \return the parameter if it exists on the node.
+   * \throws std::out_of_range if the parameter does not exist on the node.
+   */
   RCLCPP_PUBLIC
   virtual
-  rclcpp::parameter::ParameterVariant
+  rclcpp::Parameter
   get_parameter(const std::string & name) const = 0;
 
+  /// Get the description of one parameter given a name.
+  /*
+   * \param[in] name the name of the parameter to look for.
+   * \param[out] parameter the description if parameter exists on the node.
+   * \return true if the parameter exists on the node, or
+   * \return false if the parameter does not exist.
+   */
   RCLCPP_PUBLIC
   virtual
   bool
   get_parameter(
     const std::string & name,
-    rclcpp::parameter::ParameterVariant & parameter) const = 0;
+    rclcpp::Parameter & parameter) const = 0;
 
   RCLCPP_PUBLIC
   virtual
@@ -82,8 +101,8 @@ public:
   list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const = 0;
 
   using ParametersCallbackFunction = std::function<
-      rcl_interfaces::msg::SetParametersResult(
-        const std::vector<rclcpp::parameter::ParameterVariant> &)>;
+    rcl_interfaces::msg::SetParametersResult(
+      const std::vector<rclcpp::Parameter> &)>;
 
   RCLCPP_PUBLIC
   virtual

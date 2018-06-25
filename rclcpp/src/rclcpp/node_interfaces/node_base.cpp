@@ -19,7 +19,9 @@
 
 #include "rclcpp/node_interfaces/node_base.hpp"
 
+#include "rcl/arguments.h"
 #include "rclcpp/exceptions.hpp"
+#include "rcutils/logging_macros.h"
 #include "rmw/validate_node_name.h"
 #include "rmw/validate_namespace.h"
 
@@ -30,7 +32,9 @@ using rclcpp::node_interfaces::NodeBase;
 NodeBase::NodeBase(
   const std::string & node_name,
   const std::string & namespace_,
-  rclcpp::Context::SharedPtr context)
+  rclcpp::Context::SharedPtr context,
+  const std::vector<std::string> & arguments,
+  bool use_global_arguments)
 : context_(context),
   node_handle_(nullptr),
   default_callback_group_(nullptr),
@@ -48,8 +52,9 @@ NodeBase::NodeBase(
   auto finalize_notify_guard_condition = [this]() {
       // Finalize the interrupt guard condition.
       if (rcl_guard_condition_fini(&notify_guard_condition_) != RCL_RET_OK) {
-        fprintf(stderr,
-          "[rclcpp::error] failed to destroy guard condition: %s\n", rcl_get_error_string_safe());
+        RCUTILS_LOG_ERROR_NAMED(
+          "rclcpp",
+          "failed to destroy guard condition: %s", rcl_get_error_string_safe());
       }
     };
 
@@ -82,17 +87,44 @@ NodeBase::NodeBase(
   }
 
   // Create the rcl node and store it in a shared_ptr with a custom destructor.
-  rcl_node_t * rcl_node = new rcl_node_t(rcl_get_zero_initialized_node());
+  std::unique_ptr<rcl_node_t> rcl_node(new rcl_node_t(rcl_get_zero_initialized_node()));
 
   rcl_node_options_t options = rcl_node_get_default_options();
+  std::unique_ptr<const char *[]> c_args;
+  if (!arguments.empty()) {
+    c_args.reset(new const char *[arguments.size()]);
+    for (std::size_t i = 0; i < arguments.size(); ++i) {
+      c_args[i] = arguments[i].c_str();
+    }
+  }
+  // TODO(sloretz) Pass an allocator to argument parsing
+  if (arguments.size() > std::numeric_limits<int>::max()) {
+    throw_from_rcl_error(RCL_RET_INVALID_ARGUMENT, "Too many args");
+  }
+  ret = rcl_parse_arguments(
+    static_cast<int>(arguments.size()), c_args.get(), rcl_get_default_allocator(),
+    &(options.arguments));
+  if (RCL_RET_OK != ret) {
+    finalize_notify_guard_condition();
+    throw_from_rcl_error(ret, "failed to parse arguments");
+  }
+
+  options.use_global_arguments = use_global_arguments;
   // TODO(wjwwood): pass the Allocator to the options
   options.domain_id = domain_id;
-  ret = rcl_node_init(rcl_node, node_name.c_str(), namespace_.c_str(), &options);
+
+  ret = rcl_node_init(rcl_node.get(), node_name.c_str(), namespace_.c_str(), &options);
   if (ret != RCL_RET_OK) {
     // Finalize the interrupt guard condition.
     finalize_notify_guard_condition();
-
-    delete rcl_node;
+    // Finalize previously allocated node arguments
+    if (RCL_RET_OK != rcl_arguments_fini(&options.arguments)) {
+      // Print message because exception will be thrown later in this code block
+      RCUTILS_LOG_ERROR_NAMED(
+        "rclcpp",
+        "Failed to fini arguments during error handling: %s", rcl_get_error_string_safe());
+      rcl_reset_error();
+    }
 
     if (ret == RCL_RET_NODE_INVALID_NAME) {
       rcl_reset_error();  // discard rcl_node_init error
@@ -106,10 +138,15 @@ NodeBase::NodeBase(
         }
         throw_from_rcl_error(RCL_RET_ERROR, "failed to validate node name");
       }
-      throw rclcpp::exceptions::InvalidNodeNameError(
-              node_name.c_str(),
-              rmw_node_name_validation_result_string(validation_result),
-              invalid_index);
+
+      if (validation_result != RMW_NODE_NAME_VALID) {
+        throw rclcpp::exceptions::InvalidNodeNameError(
+                node_name.c_str(),
+                rmw_node_name_validation_result_string(validation_result),
+                invalid_index);
+      } else {
+        throw std::runtime_error("valid rmw node name but invalid rcl node name");
+      }
     }
 
     if (ret == RCL_RET_NODE_INVALID_NAMESPACE) {
@@ -124,21 +161,26 @@ NodeBase::NodeBase(
         }
         throw_from_rcl_error(RCL_RET_ERROR, "failed to validate namespace");
       }
-      throw rclcpp::exceptions::InvalidNamespaceError(
-              namespace_.c_str(),
-              rmw_namespace_validation_result_string(validation_result),
-              invalid_index);
-    }
 
+      if (validation_result != RMW_NAMESPACE_VALID) {
+        throw rclcpp::exceptions::InvalidNamespaceError(
+                namespace_.c_str(),
+                rmw_namespace_validation_result_string(validation_result),
+                invalid_index);
+      } else {
+        throw std::runtime_error("valid rmw node namespace but invalid rcl node namespace");
+      }
+    }
     throw_from_rcl_error(ret, "failed to initialize rcl node");
   }
 
   node_handle_.reset(
-    rcl_node,
+    rcl_node.release(),
     [](rcl_node_t * node) -> void {
       if (rcl_node_fini(node) != RCL_RET_OK) {
-        fprintf(
-          stderr, "Error in destruction of rcl node handle: %s\n", rcl_get_error_string_safe());
+        RCUTILS_LOG_ERROR_NAMED(
+          "rclcpp",
+          "Error in destruction of rcl node handle: %s", rcl_get_error_string_safe());
       }
       delete node;
     });
@@ -149,6 +191,15 @@ NodeBase::NodeBase(
 
   // Indicate the notify_guard_condition is now valid.
   notify_guard_condition_is_valid_ = true;
+
+  // Finalize previously allocated node arguments
+  if (RCL_RET_OK != rcl_arguments_fini(&options.arguments)) {
+    // print message because throwing would prevent the destructor from being called
+    RCUTILS_LOG_ERROR_NAMED(
+      "rclcpp",
+      "Failed to fini arguments: %s", rcl_get_error_string_safe());
+    rcl_reset_error();
+  }
 }
 
 NodeBase::~NodeBase()
@@ -158,8 +209,9 @@ NodeBase::~NodeBase()
     std::lock_guard<std::recursive_mutex> notify_condition_lock(notify_guard_condition_mutex_);
     notify_guard_condition_is_valid_ = false;
     if (rcl_guard_condition_fini(&notify_guard_condition_) != RCL_RET_OK) {
-      fprintf(stderr,
-        "[rclcpp::error] failed to destroy guard condition: %s\n", rcl_get_error_string_safe());
+      RCUTILS_LOG_ERROR_NAMED(
+        "rclcpp",
+        "failed to destroy guard condition: %s", rcl_get_error_string_safe());
     }
   }
 }

@@ -2,12 +2,14 @@ cmake_minimum_required(VERSION 3.5)
 
 project(rclcpp)
 
-find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_ros REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(rcl REQUIRED)
 find_package(rcl_interfaces REQUIRED)
+find_package(rcl_yaml_param_parser REQUIRED)
 find_package(rmw REQUIRED)
 find_package(rmw_implementation REQUIRED)
+find_package(rosgraph_msgs REQUIRED)
 find_package(rosidl_generator_cpp REQUIRED)
 find_package(rosidl_typesupport_c REQUIRED)
 find_package(rosidl_typesupport_cpp REQUIRED)
@@ -58,8 +60,10 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/node_interfaces/node_timers.cpp
   src/rclcpp/node_interfaces/node_topics.cpp
   src/rclcpp/parameter.cpp
+  src/rclcpp/parameter_value.cpp
   src/rclcpp/parameter_client.cpp
   src/rclcpp/parameter_events_filter.cpp
+  src/rclcpp/parameter_map.cpp
   src/rclcpp/parameter_service.cpp
   src/rclcpp/publisher.cpp
   src/rclcpp/service.cpp
@@ -93,13 +97,16 @@ list(APPEND ${PROJECT_NAME}_SRCS
   include/rclcpp/logging.hpp)
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/include")
 
-add_library(${PROJECT_NAME} SHARED
+add_library(${PROJECT_NAME}
   ${${PROJECT_NAME}_SRCS})
+# specific order: dependents before dependencies
 ament_target_dependencies(${PROJECT_NAME}
-  "builtin_interfaces"
   "rcl"
-  "rosidl_generator_cpp"
-  "rosidl_typesupport_cpp")
+  "rcl_yaml_param_parser"
+  "builtin_interfaces"
+  "rosgraph_msgs"
+  "rosidl_typesupport_cpp"
+  "rosidl_generator_cpp")
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
@@ -113,18 +120,21 @@ install(
   RUNTIME DESTINATION bin
 )
 
-ament_export_dependencies(ament_cmake)
-ament_export_dependencies(builtin_interfaces)
-ament_export_dependencies(rcl)
-ament_export_dependencies(rosidl_generator_cpp)
-ament_export_dependencies(rosidl_typesupport_c)
-ament_export_dependencies(rosidl_typesupport_cpp)
-
+# specific order: dependents before dependencies
 ament_export_include_directories(include)
-
 ament_export_libraries(${PROJECT_NAME})
 
+ament_export_dependencies(ament_cmake)
+ament_export_dependencies(rcl)
+ament_export_dependencies(builtin_interfaces)
+ament_export_dependencies(rosgraph_msgs)
+ament_export_dependencies(rosidl_typesupport_cpp)
+ament_export_dependencies(rosidl_typesupport_c)
+ament_export_dependencies(rosidl_generator_cpp)
+ament_export_dependencies(rcl_yaml_param_parser)
+
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 
@@ -189,6 +199,20 @@ if(BUILD_TESTING)
     )
     target_link_libraries(test_node ${PROJECT_NAME})
   endif()
+  ament_add_gtest(test_node_global_args test/test_node_global_args.cpp)
+  if(TARGET test_node_global_args)
+    target_include_directories(test_node_global_args PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_node_global_args ${PROJECT_NAME})
+  endif()
+  ament_add_gtest(test_node_initial_parameters test/test_node_initial_parameters.cpp)
+  if(TARGET test_node_initial_parameters)
+    target_link_libraries(test_node_initial_parameters ${PROJECT_NAME})
+  endif()
   ament_add_gtest(test_parameter_events_filter test/test_parameter_events_filter.cpp)
   if(TARGET test_parameter_events_filter)
     target_include_directories(test_parameter_events_filter PUBLIC
@@ -198,6 +222,20 @@ if(BUILD_TESTING)
       ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_parameter_events_filter ${PROJECT_NAME})
+  endif()
+  ament_add_gtest(test_parameter test/test_parameter.cpp)
+  if(TARGET test_parameter)
+    target_include_directories(test_parameter PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_parameter ${PROJECT_NAME})
+  endif()
+  ament_add_gtest(test_parameter_map test/test_parameter_map.cpp)
+  if(TARGET test_parameter_map)
+    target_link_libraries(test_parameter_map ${PROJECT_NAME})
   endif()
   ament_add_gtest(test_publisher test/test_publisher.cpp)
   if(TARGET test_publisher)
@@ -222,6 +260,17 @@ if(BUILD_TESTING)
       ${PROJECT_NAME}
     )
   endif()
+  ament_add_gtest(test_serialized_message_allocator test/test_serialized_message_allocator.cpp
+    ENV RCL_ASSERT_RMW_ID_MATCHES=${rmw_implementation})
+  if(TARGET test_serialized_message_allocator)
+    target_include_directories(test_serialized_message_allocator PUBLIC
+      ${test_msgs_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_serialized_message_allocator
+      ${PROJECT_NAME}
+      ${test_msgs_LIBRARIES}
+    )
+  endif()
   ament_add_gtest(test_service test/test_service.cpp)
   if(TARGET test_service)
     target_include_directories(test_service PUBLIC
@@ -241,6 +290,16 @@ if(BUILD_TESTING)
       ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_subscription ${PROJECT_NAME})
+  endif()
+  find_package(test_msgs REQUIRED)
+  ament_add_gtest(test_subscription_traits test/test_subscription_traits.cpp)
+  if(TARGET test_subscription_traits)
+    target_include_directories(test_subscription_traits PUBLIC
+      ${rcl_INCLUDE_DIRS}
+    )
+  ament_target_dependencies(test_subscription_traits
+    "test_msgs"
+  )
   endif()
   ament_add_gtest(test_find_weak_nodes test/test_find_weak_nodes.cpp)
   if(TARGET test_find_weak_nodes)
@@ -319,6 +378,22 @@ if(BUILD_TESTING)
     ament_target_dependencies(test_time_source
       "rcl")
     target_link_libraries(test_time_source ${PROJECT_NAME})
+  endif()
+
+  ament_add_gtest(test_utilities test/test_utilities.cpp
+    APPEND_LIBRARY_DIRS "${append_library_dirs}")
+  if(TARGET test_utilities)
+    ament_target_dependencies(test_utilities
+      "rcl")
+    target_link_libraries(test_utilities ${PROJECT_NAME})
+  endif()
+
+  ament_add_gtest(test_multi_threaded_executor test/executors/test_multi_threaded_executor.cpp
+    APPEND_LIBRARY_DIRS "${append_library_dirs}")
+  if(TARGET test_multi_threaded_executor)
+    ament_target_dependencies(test_multi_threaded_executor
+      "rcl")
+    target_link_libraries(test_multi_threaded_executor ${PROJECT_NAME})
   endif()
 endif()
 

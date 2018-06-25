@@ -43,23 +43,36 @@ Node::Node(
     node_name,
     namespace_,
     rclcpp::contexts::default_context::get_global_default_context(),
-    use_intra_process_comms)
+    {},
+    {},
+    true,
+    use_intra_process_comms,
+    true)
 {}
 
 Node::Node(
   const std::string & node_name,
   const std::string & namespace_,
   rclcpp::Context::SharedPtr context,
-  bool use_intra_process_comms)
-: node_base_(new rclcpp::node_interfaces::NodeBase(node_name, namespace_, context)),
+  const std::vector<std::string> & arguments,
+  const std::vector<rclcpp::Parameter> & initial_parameters,
+  bool use_global_arguments,
+  bool use_intra_process_comms,
+  bool start_parameter_services)
+: node_base_(new rclcpp::node_interfaces::NodeBase(
+      node_name, namespace_, context, arguments, use_global_arguments)),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),
   node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_.get())),
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
   node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get())),
   node_services_(new rclcpp::node_interfaces::NodeServices(node_base_.get())),
   node_parameters_(new rclcpp::node_interfaces::NodeParameters(
-      node_topics_.get(),
-      use_intra_process_comms
+      node_base_,
+      node_topics_,
+      node_services_,
+      initial_parameters,
+      use_intra_process_comms,
+      start_parameter_services
     )),
   node_clock_(new rclcpp::node_interfaces::NodeClock(
       node_base_,
@@ -107,26 +120,26 @@ Node::group_in_node(rclcpp::callback_group::CallbackGroup::SharedPtr group)
 
 std::vector<rcl_interfaces::msg::SetParametersResult>
 Node::set_parameters(
-  const std::vector<rclcpp::parameter::ParameterVariant> & parameters)
+  const std::vector<rclcpp::Parameter> & parameters)
 {
   return node_parameters_->set_parameters(parameters);
 }
 
 rcl_interfaces::msg::SetParametersResult
 Node::set_parameters_atomically(
-  const std::vector<rclcpp::parameter::ParameterVariant> & parameters)
+  const std::vector<rclcpp::Parameter> & parameters)
 {
   return node_parameters_->set_parameters_atomically(parameters);
 }
 
-std::vector<rclcpp::parameter::ParameterVariant>
+std::vector<rclcpp::Parameter>
 Node::get_parameters(
   const std::vector<std::string> & names) const
 {
   return node_parameters_->get_parameters(names);
 }
 
-rclcpp::parameter::ParameterVariant
+rclcpp::Parameter
 Node::get_parameter(const std::string & name) const
 {
   return node_parameters_->get_parameter(name);
@@ -134,7 +147,7 @@ Node::get_parameter(const std::string & name) const
 
 bool Node::get_parameter(
   const std::string & name,
-  rclcpp::parameter::ParameterVariant & parameter) const
+  rclcpp::Parameter & parameter) const
 {
   return node_parameters_->get_parameter(name, parameter);
 }

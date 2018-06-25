@@ -16,6 +16,7 @@
 #define RCLCPP__NODE_INTERFACES__NODE_PARAMETERS_HPP_
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -30,6 +31,7 @@
 #include "rclcpp/node_interfaces/node_services_interface.hpp"
 #include "rclcpp/node_interfaces/node_topics_interface.hpp"
 #include "rclcpp/parameter.hpp"
+#include "rclcpp/parameter_service.hpp"
 #include "rclcpp/publisher.hpp"
 #include "rclcpp/visibility_control.hpp"
 
@@ -46,8 +48,12 @@ public:
 
   RCLCPP_PUBLIC
   NodeParameters(
-    rclcpp::node_interfaces::NodeTopicsInterface * node_topics,
-    bool use_intra_process);
+    const node_interfaces::NodeBaseInterface::SharedPtr node_base,
+    const node_interfaces::NodeTopicsInterface::SharedPtr node_topics,
+    const node_interfaces::NodeServicesInterface::SharedPtr node_services,
+    const std::vector<Parameter> & initial_parameters,
+    bool use_intra_process,
+    bool start_parameter_services);
 
   RCLCPP_PUBLIC
   virtual
@@ -57,22 +63,22 @@ public:
   virtual
   std::vector<rcl_interfaces::msg::SetParametersResult>
   set_parameters(
-    const std::vector<rclcpp::parameter::ParameterVariant> & parameters);
+    const std::vector<rclcpp::Parameter> & parameters);
 
   RCLCPP_PUBLIC
   virtual
   rcl_interfaces::msg::SetParametersResult
   set_parameters_atomically(
-    const std::vector<rclcpp::parameter::ParameterVariant> & parameters);
+    const std::vector<rclcpp::Parameter> & parameters);
 
   RCLCPP_PUBLIC
   virtual
-  std::vector<rclcpp::parameter::ParameterVariant>
+  std::vector<rclcpp::Parameter>
   get_parameters(const std::vector<std::string> & names) const;
 
   RCLCPP_PUBLIC
   virtual
-  rclcpp::parameter::ParameterVariant
+  rclcpp::Parameter
   get_parameter(const std::string & name) const;
 
   RCLCPP_PUBLIC
@@ -80,7 +86,7 @@ public:
   bool
   get_parameter(
     const std::string & name,
-    rclcpp::parameter::ParameterVariant & parameter) const;
+    rclcpp::Parameter & parameter) const;
 
   RCLCPP_PUBLIC
   virtual
@@ -105,15 +111,15 @@ public:
 private:
   RCLCPP_DISABLE_COPY(NodeParameters)
 
-  rclcpp::node_interfaces::NodeTopicsInterface * node_topics_;
-
   mutable std::mutex mutex_;
 
   ParametersCallbackFunction parameters_callback_ = nullptr;
 
-  std::map<std::string, rclcpp::parameter::ParameterVariant> parameters_;
+  std::map<std::string, rclcpp::Parameter> parameters_;
 
   Publisher<rcl_interfaces::msg::ParameterEvent>::SharedPtr events_publisher_;
+
+  std::shared_ptr<ParameterService> parameter_service_;
 };
 
 }  // namespace node_interfaces

@@ -88,6 +88,10 @@ public:
    * \param[in] node_name Name of the node.
    * \param[in] node_name Namespace of the node.
    * \param[in] context The context for the node (usually represents the state of a process).
+   * \param[in] arguments Command line arguments that should apply only to this node.
+   * \param[in] initial_parameters a list of initial values for parameters on the node.
+   * This can be used to provide remapping rules that only affect one instance.
+   * \param[in] use_global_arguments False to prevent node using arguments passed to the process.
    * \param[in] use_intra_process_comms True to use the optimized intra-process communication
    * pipeline to pass messages between nodes in the same process using shared memory.
    */
@@ -96,7 +100,11 @@ public:
     const std::string & node_name,
     const std::string & namespace_,
     rclcpp::Context::SharedPtr context,
-    bool use_intra_process_comms = false);
+    const std::vector<std::string> & arguments,
+    const std::vector<rclcpp::Parameter> & initial_parameters,
+    bool use_global_arguments = true,
+    bool use_intra_process_comms = false,
+    bool start_parameter_services = true);
 
   RCLCPP_LIFECYCLE_PUBLIC
   virtual ~LifecycleNode();
@@ -180,7 +188,8 @@ public:
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_default,
     rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr,
     bool ignore_local_publications = false,
-    typename rclcpp::message_memory_strategy::MessageMemoryStrategy<MessageT, Alloc>::SharedPtr
+    typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
     msg_mem_strat = nullptr,
     std::shared_ptr<Alloc> allocator = nullptr);
 
@@ -246,25 +255,25 @@ public:
 
   RCLCPP_LIFECYCLE_PUBLIC
   std::vector<rcl_interfaces::msg::SetParametersResult>
-  set_parameters(const std::vector<rclcpp::parameter::ParameterVariant> & parameters);
+  set_parameters(const std::vector<rclcpp::Parameter> & parameters);
 
   RCLCPP_LIFECYCLE_PUBLIC
   rcl_interfaces::msg::SetParametersResult
-  set_parameters_atomically(const std::vector<rclcpp::parameter::ParameterVariant> & parameters);
+  set_parameters_atomically(const std::vector<rclcpp::Parameter> & parameters);
 
   RCLCPP_LIFECYCLE_PUBLIC
-  std::vector<rclcpp::parameter::ParameterVariant>
+  std::vector<rclcpp::Parameter>
   get_parameters(const std::vector<std::string> & names) const;
 
   RCLCPP_LIFECYCLE_PUBLIC
-  rclcpp::parameter::ParameterVariant
+  rclcpp::Parameter
   get_parameter(const std::string & name) const;
 
   RCLCPP_LIFECYCLE_PUBLIC
   bool
   get_parameter(
     const std::string & name,
-    rclcpp::parameter::ParameterVariant & parameter) const;
+    rclcpp::Parameter & parameter) const;
 
   template<typename ParameterT>
   bool

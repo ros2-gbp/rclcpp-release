@@ -29,12 +29,13 @@
 
 #include "rcl_interfaces/msg/intra_process_message.hpp"
 
+#include "rclcpp/any_subscription_callback.hpp"
 #include "rclcpp/exceptions.hpp"
+#include "rclcpp/expand_topic_or_service_name.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/message_memory_strategy.hpp"
-#include "rclcpp/any_subscription_callback.hpp"
+#include "rclcpp/subscription_traits.hpp"
 #include "rclcpp/type_support_decl.hpp"
-#include "rclcpp/expand_topic_or_service_name.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
@@ -64,7 +65,8 @@ public:
     std::shared_ptr<rcl_node_t> node_handle,
     const rosidl_message_type_support_t & type_support_handle,
     const std::string & topic_name,
-    const rcl_subscription_options_t & subscription_options);
+    const rcl_subscription_options_t & subscription_options,
+    bool is_serialized = false);
 
   /// Default destructor.
   RCLCPP_PUBLIC
@@ -76,21 +78,27 @@ public:
   get_topic_name() const;
 
   RCLCPP_PUBLIC
-  rcl_subscription_t *
+  std::shared_ptr<rcl_subscription_t>
   get_subscription_handle();
 
   RCLCPP_PUBLIC
-  const rcl_subscription_t *
+  const std::shared_ptr<rcl_subscription_t>
   get_subscription_handle() const;
 
   RCLCPP_PUBLIC
-  virtual const rcl_subscription_t *
+  virtual const std::shared_ptr<rcl_subscription_t>
   get_intra_process_subscription_handle() const;
 
   /// Borrow a new message.
   /** \return Shared pointer to the fresh message. */
   virtual std::shared_ptr<void>
   create_message() = 0;
+
+  /// Borrow a new serialized message
+  /** \return Shared pointer to a rcl_message_serialized_t. */
+  virtual std::shared_ptr<rcl_serialized_message_t>
+  create_serialized_message() = 0;
+
   /// Check if we need to handle the message, and execute the callback if we do.
   /**
    * \param[in] message Shared pointer to the message to handle.
@@ -104,31 +112,47 @@ public:
   virtual void
   return_message(std::shared_ptr<void> & message) = 0;
 
+  /// Return the message borrowed in create_serialized_message.
+  /** \param[in] message Shared pointer to the returned message. */
+  virtual void
+  return_serialized_message(std::shared_ptr<rcl_serialized_message_t> & message) = 0;
+
   virtual void
   handle_intra_process_message(
     rcl_interfaces::msg::IntraProcessMessage & ipm,
     const rmw_message_info_t & message_info) = 0;
 
+  const rosidl_message_type_support_t &
+  get_message_type_support_handle() const;
+
+  bool
+  is_serialized() const;
+
 protected:
-  rcl_subscription_t intra_process_subscription_handle_ = rcl_get_zero_initialized_subscription();
-  rcl_subscription_t subscription_handle_ = rcl_get_zero_initialized_subscription();
+  std::shared_ptr<rcl_subscription_t> intra_process_subscription_handle_;
+  std::shared_ptr<rcl_subscription_t> subscription_handle_;
   std::shared_ptr<rcl_node_t> node_handle_;
 
 private:
   RCLCPP_DISABLE_COPY(SubscriptionBase)
+
+  rosidl_message_type_support_t type_support_;
+  bool is_serialized_;
 };
 
 /// Subscription implementation, templated on the type of message this subscription receives.
-template<typename MessageT, typename Alloc = std::allocator<void>>
+template<
+  typename CallbackMessageT,
+  typename Alloc = std::allocator<void>>
 class Subscription : public SubscriptionBase
 {
   friend class rclcpp::node_interfaces::NodeTopicsInterface;
 
 public:
-  using MessageAllocTraits = allocator::AllocRebind<MessageT, Alloc>;
+  using MessageAllocTraits = allocator::AllocRebind<CallbackMessageT, Alloc>;
   using MessageAlloc = typename MessageAllocTraits::allocator_type;
-  using MessageDeleter = allocator::Deleter<MessageAlloc, MessageT>;
-  using MessageUniquePtr = std::unique_ptr<MessageT, MessageDeleter>;
+  using MessageDeleter = allocator::Deleter<MessageAlloc, CallbackMessageT>;
+  using MessageUniquePtr = std::unique_ptr<CallbackMessageT, MessageDeleter>;
 
   RCLCPP_SMART_PTR_DEFINITIONS(Subscription)
 
@@ -144,17 +168,19 @@ public:
    */
   Subscription(
     std::shared_ptr<rcl_node_t> node_handle,
+    const rosidl_message_type_support_t & ts,
     const std::string & topic_name,
     const rcl_subscription_options_t & subscription_options,
-    AnySubscriptionCallback<MessageT, Alloc> callback,
-    typename message_memory_strategy::MessageMemoryStrategy<MessageT, Alloc>::SharedPtr
-    memory_strategy = message_memory_strategy::MessageMemoryStrategy<MessageT,
+    AnySubscriptionCallback<CallbackMessageT, Alloc> callback,
+    typename message_memory_strategy::MessageMemoryStrategy<CallbackMessageT, Alloc>::SharedPtr
+    memory_strategy = message_memory_strategy::MessageMemoryStrategy<CallbackMessageT,
     Alloc>::create_default())
   : SubscriptionBase(
       node_handle,
-      *rosidl_typesupport_cpp::get_message_type_support_handle<MessageT>(),
+      ts,
       topic_name,
-      subscription_options),
+      subscription_options,
+      rclcpp::subscription_traits::is_serialized_subscription_argument<CallbackMessageT>::value),
     any_callback_(callback),
     message_memory_strategy_(memory_strategy),
     get_intra_process_message_callback_(nullptr),
@@ -167,11 +193,12 @@ public:
    * \param[in] message_memory_strategy Shared pointer to the memory strategy to set.
    */
   void set_message_memory_strategy(
-    typename message_memory_strategy::MessageMemoryStrategy<MessageT,
+    typename message_memory_strategy::MessageMemoryStrategy<CallbackMessageT,
     Alloc>::SharedPtr message_memory_strategy)
   {
     message_memory_strategy_ = message_memory_strategy;
   }
+
   std::shared_ptr<void> create_message()
   {
     /* The default message memory strategy provides a dynamically allocated message on each call to
@@ -179,6 +206,11 @@ public:
      * used (see rclcpp/strategies/message_pool_memory_strategy.hpp).
      */
     return message_memory_strategy_->borrow_message();
+  }
+
+  std::shared_ptr<rcl_serialized_message_t> create_serialized_message()
+  {
+    return message_memory_strategy_->borrow_serialized_message();
   }
 
   void handle_message(std::shared_ptr<void> & message, const rmw_message_info_t & message_info)
@@ -190,7 +222,7 @@ public:
         return;
       }
     }
-    auto typed_message = std::static_pointer_cast<MessageT>(message);
+    auto typed_message = std::static_pointer_cast<CallbackMessageT>(message);
     any_callback_.dispatch(typed_message, message_info);
   }
 
@@ -198,8 +230,13 @@ public:
   /** \param message message to be returned */
   void return_message(std::shared_ptr<void> & message)
   {
-    auto typed_message = std::static_pointer_cast<MessageT>(message);
+    auto typed_message = std::static_pointer_cast<CallbackMessageT>(message);
     message_memory_strategy_->return_message(typed_message);
+  }
+
+  void return_serialized_message(std::shared_ptr<rcl_serialized_message_t> & message)
+  {
+    message_memory_strategy_->return_serialized_message(message);
   }
 
   void handle_intra_process_message(
@@ -229,7 +266,7 @@ public:
   }
 
   using GetMessageCallbackType =
-      std::function<void(uint64_t, uint64_t, uint64_t, MessageUniquePtr &)>;
+    std::function<void(uint64_t, uint64_t, uint64_t, MessageUniquePtr &)>;
   using MatchesAnyPublishersCallbackType = std::function<bool(const rmw_gid_t *)>;
 
   /// Implemenation detail.
@@ -241,7 +278,7 @@ public:
   {
     std::string intra_process_topic_name = std::string(get_topic_name()) + "/_intra";
     rcl_ret_t ret = rcl_subscription_init(
-      &intra_process_subscription_handle_,
+      intra_process_subscription_handle_.get(),
       node_handle_.get(),
       rclcpp::type_support::get_intra_process_message_msg_type_support(),
       intra_process_topic_name.c_str(),
@@ -266,20 +303,20 @@ public:
   }
 
   /// Implemenation detail.
-  const rcl_subscription_t *
+  const std::shared_ptr<rcl_subscription_t>
   get_intra_process_subscription_handle() const
   {
     if (!get_intra_process_message_callback_) {
       return nullptr;
     }
-    return &intra_process_subscription_handle_;
+    return intra_process_subscription_handle_;
   }
 
 private:
   RCLCPP_DISABLE_COPY(Subscription)
 
-  AnySubscriptionCallback<MessageT, Alloc> any_callback_;
-  typename message_memory_strategy::MessageMemoryStrategy<MessageT, Alloc>::SharedPtr
+  AnySubscriptionCallback<CallbackMessageT, Alloc> any_callback_;
+  typename message_memory_strategy::MessageMemoryStrategy<CallbackMessageT, Alloc>::SharedPtr
     message_memory_strategy_;
 
   GetMessageCallbackType get_intra_process_message_callback_;

@@ -36,6 +36,8 @@
 #include "rclcpp/expand_topic_or_service_name.hpp"
 #include "rclcpp/visibility_control.hpp"
 
+#include "rcutils/logging_macros.h"
+
 #include "rmw/error_handling.h"
 #include "rmw/rmw.h"
 
@@ -55,22 +57,21 @@ public:
   RCLCPP_PUBLIC
   ClientBase(
     rclcpp::node_interfaces::NodeBaseInterface * node_base,
-    rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph,
-    const std::string & service_name);
+    rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph);
 
   RCLCPP_PUBLIC
   virtual ~ClientBase();
 
   RCLCPP_PUBLIC
-  const std::string &
+  const char *
   get_service_name() const;
 
   RCLCPP_PUBLIC
-  rcl_client_t *
+  std::shared_ptr<rcl_client_t>
   get_client_handle();
 
   RCLCPP_PUBLIC
-  const rcl_client_t *
+  std::shared_ptr<const rcl_client_t>
   get_client_handle() const;
 
   RCLCPP_PUBLIC
@@ -110,8 +111,7 @@ protected:
   rclcpp::node_interfaces::NodeGraphInterface::WeakPtr node_graph_;
   std::shared_ptr<rcl_node_t> node_handle_;
 
-  rcl_client_t client_handle_ = rcl_get_zero_initialized_client();
-  std::string service_name_;
+  std::shared_ptr<rcl_client_t> client_handle_;
 };
 
 template<typename ServiceT>
@@ -140,13 +140,13 @@ public:
     rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph,
     const std::string & service_name,
     rcl_client_options_t & client_options)
-  : ClientBase(node_base, node_graph, service_name)
+  : ClientBase(node_base, node_graph)
   {
     using rosidl_typesupport_cpp::get_service_type_support_handle;
     auto service_type_support_handle =
       get_service_type_support_handle<ServiceT>();
     rcl_ret_t ret = rcl_client_init(
-      &client_handle_,
+      this->get_client_handle().get(),
       this->get_rcl_node_handle(),
       service_type_support_handle,
       service_name.c_str(),
@@ -168,11 +168,6 @@ public:
 
   virtual ~Client()
   {
-    if (rcl_client_fini(&client_handle_, this->get_rcl_node_handle()) != RCL_RET_OK) {
-      fprintf(stderr,
-        "Error in destruction of rcl client handle: %s\n", rcl_get_error_string_safe());
-      rcl_reset_error();
-    }
   }
 
   std::shared_ptr<void>
@@ -199,7 +194,9 @@ public:
     int64_t sequence_number = request_header->sequence_number;
     // TODO(esteve) this should throw instead since it is not expected to happen in the first place
     if (this->pending_requests_.count(sequence_number) == 0) {
-      fprintf(stderr, "Received invalid sequence number. Ignoring...\n");
+      RCUTILS_LOG_ERROR_NAMED(
+        "rclcpp",
+        "Received invalid sequence number. Ignoring...");
       return;
     }
     auto tuple = this->pending_requests_[sequence_number];
@@ -234,7 +231,7 @@ public:
   {
     std::lock_guard<std::mutex> lock(pending_requests_mutex_);
     int64_t sequence_number;
-    rcl_ret_t ret = rcl_send_request(get_client_handle(), request.get(), &sequence_number);
+    rcl_ret_t ret = rcl_send_request(get_client_handle().get(), request.get(), &sequence_number);
     if (RCL_RET_OK != ret) {
       rclcpp::exceptions::throw_from_rcl_error(ret, "failed to send request");
     }

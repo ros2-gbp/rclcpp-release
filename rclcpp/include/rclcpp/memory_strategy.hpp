@@ -55,27 +55,23 @@ public:
   virtual void clear_handles() = 0;
   virtual void remove_null_handles(rcl_wait_set_t * wait_set) = 0;
 
-  /// Provide a newly initialized AnyExecutable object.
-  // \return Shared pointer to the fresh executable.
-  virtual rclcpp::executor::AnyExecutable::SharedPtr instantiate_next_executable() = 0;
-
   virtual void add_guard_condition(const rcl_guard_condition_t * guard_condition) = 0;
 
   virtual void remove_guard_condition(const rcl_guard_condition_t * guard_condition) = 0;
 
   virtual void
   get_next_subscription(
-    rclcpp::executor::AnyExecutable::SharedPtr any_exec,
+    rclcpp::executor::AnyExecutable & any_exec,
     const WeakNodeVector & weak_nodes) = 0;
 
   virtual void
   get_next_service(
-    rclcpp::executor::AnyExecutable::SharedPtr any_exec,
+    rclcpp::executor::AnyExecutable & any_exec,
     const WeakNodeVector & weak_nodes) = 0;
 
   virtual void
   get_next_client(
-    rclcpp::executor::AnyExecutable::SharedPtr any_exec,
+    rclcpp::executor::AnyExecutable & any_exec,
     const WeakNodeVector & weak_nodes) = 0;
 
   virtual rcl_allocator_t
@@ -83,14 +79,18 @@ public:
 
   static rclcpp::SubscriptionBase::SharedPtr
   get_subscription_by_handle(
-    const rcl_subscription_t * subscriber_handle,
+    std::shared_ptr<const rcl_subscription_t> subscriber_handle,
     const WeakNodeVector & weak_nodes);
 
   static rclcpp::ServiceBase::SharedPtr
-  get_service_by_handle(const rcl_service_t * service_handle, const WeakNodeVector & weak_nodes);
+  get_service_by_handle(
+    std::shared_ptr<const rcl_service_t> service_handle,
+    const WeakNodeVector & weak_nodes);
 
   static rclcpp::ClientBase::SharedPtr
-  get_client_by_handle(const rcl_client_t * client_handle, const WeakNodeVector & weak_nodes);
+  get_client_by_handle(
+    std::shared_ptr<const rcl_client_t> client_handle,
+    const WeakNodeVector & weak_nodes);
 
   static rclcpp::node_interfaces::NodeBaseInterface::SharedPtr
   get_node_by_group(

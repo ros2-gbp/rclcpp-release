@@ -68,25 +68,25 @@ public:
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
   RCLCPP_PUBLIC
-  std::shared_future<std::vector<rclcpp::parameter::ParameterVariant>>
+  std::shared_future<std::vector<rclcpp::Parameter>>
   get_parameters(
     const std::vector<std::string> & names,
     std::function<
-      void(std::shared_future<std::vector<rclcpp::parameter::ParameterVariant>>)
+      void(std::shared_future<std::vector<rclcpp::Parameter>>)
     > callback = nullptr);
 
   RCLCPP_PUBLIC
-  std::shared_future<std::vector<rclcpp::parameter::ParameterType>>
+  std::shared_future<std::vector<rclcpp::ParameterType>>
   get_parameter_types(
     const std::vector<std::string> & names,
     std::function<
-      void(std::shared_future<std::vector<rclcpp::parameter::ParameterType>>)
+      void(std::shared_future<std::vector<rclcpp::ParameterType>>)
     > callback = nullptr);
 
   RCLCPP_PUBLIC
   std::shared_future<std::vector<rcl_interfaces::msg::SetParametersResult>>
   set_parameters(
-    const std::vector<rclcpp::parameter::ParameterVariant> & parameters,
+    const std::vector<rclcpp::Parameter> & parameters,
     std::function<
       void(std::shared_future<std::vector<rcl_interfaces::msg::SetParametersResult>>)
     > callback = nullptr);
@@ -94,7 +94,7 @@ public:
   RCLCPP_PUBLIC
   std::shared_future<rcl_interfaces::msg::SetParametersResult>
   set_parameters_atomically(
-    const std::vector<rclcpp::parameter::ParameterVariant> & parameters,
+    const std::vector<rclcpp::Parameter> & parameters,
     std::function<
       void(std::shared_future<rcl_interfaces::msg::SetParametersResult>)
     > callback = nullptr);
@@ -120,8 +120,9 @@ public:
     auto msg_mem_strat =
       MessageMemoryStrategy<rcl_interfaces::msg::ParameterEvent, Alloc>::create_default();
 
+    using rcl_interfaces::msg::ParameterEvent;
     return rclcpp::create_subscription<
-      rcl_interfaces::msg::ParameterEvent, CallbackT, Alloc, SubscriptionT>(
+      ParameterEvent, CallbackT, Alloc, ParameterEvent, SubscriptionT>(
       this->node_topics_interface_.get(),
       "parameter_events",
       std::forward<CallbackT>(callback),
@@ -185,7 +186,7 @@ public:
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
   RCLCPP_PUBLIC
-  std::vector<rclcpp::parameter::ParameterVariant>
+  std::vector<rclcpp::Parameter>
   get_parameters(const std::vector<std::string> & parameter_names);
 
   RCLCPP_PUBLIC
@@ -200,7 +201,7 @@ public:
     std::vector<std::string> names;
     names.push_back(parameter_name);
     auto vars = get_parameters(names);
-    if ((vars.size() != 1) || (vars[0].get_type() == rclcpp::parameter::PARAMETER_NOT_SET)) {
+    if ((vars.size() != 1) || (vars[0].get_type() == rclcpp::ParameterType::PARAMETER_NOT_SET)) {
       return parameter_not_found_handler();
     } else {
       return static_cast<T>(vars[0].get_value<T>());
@@ -226,16 +227,16 @@ public:
   }
 
   RCLCPP_PUBLIC
-  std::vector<rclcpp::parameter::ParameterType>
+  std::vector<rclcpp::ParameterType>
   get_parameter_types(const std::vector<std::string> & parameter_names);
 
   RCLCPP_PUBLIC
   std::vector<rcl_interfaces::msg::SetParametersResult>
-  set_parameters(const std::vector<rclcpp::parameter::ParameterVariant> & parameters);
+  set_parameters(const std::vector<rclcpp::Parameter> & parameters);
 
   RCLCPP_PUBLIC
   rcl_interfaces::msg::SetParametersResult
-  set_parameters_atomically(const std::vector<rclcpp::parameter::ParameterVariant> & parameters);
+  set_parameters_atomically(const std::vector<rclcpp::Parameter> & parameters);
 
   RCLCPP_PUBLIC
   rcl_interfaces::msg::ListParametersResult

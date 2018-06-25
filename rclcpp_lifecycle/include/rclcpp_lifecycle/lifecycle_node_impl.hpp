@@ -23,6 +23,7 @@
 #include "rclcpp/intra_process_manager.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/create_publisher.hpp"
+#include "rclcpp/create_service.hpp"
 #include "rclcpp/create_subscription.hpp"
 #include "rclcpp/type_support_decl.hpp"
 
@@ -75,22 +76,23 @@ LifecycleNode::create_subscription(
   const rmw_qos_profile_t & qos_profile,
   rclcpp::callback_group::CallbackGroup::SharedPtr group,
   bool ignore_local_publications,
-  typename rclcpp::message_memory_strategy::MessageMemoryStrategy<MessageT, Alloc>::SharedPtr
+  typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
   msg_mem_strat,
   std::shared_ptr<Alloc> allocator)
 {
+  using CallbackMessageT = typename rclcpp::subscription_traits::has_message_type<CallbackT>::type;
+
   if (!allocator) {
     allocator = std::make_shared<Alloc>();
   }
 
   if (!msg_mem_strat) {
     using rclcpp::message_memory_strategy::MessageMemoryStrategy;
-    msg_mem_strat = MessageMemoryStrategy<MessageT, Alloc>::create_default();
+    msg_mem_strat = MessageMemoryStrategy<CallbackMessageT, Alloc>::create_default();
   }
 
-  return rclcpp::create_subscription<
-    MessageT, CallbackT, Alloc,
-    rclcpp::Subscription<MessageT, Alloc>>(
+  return rclcpp::create_subscription<MessageT, CallbackT, Alloc, CallbackMessageT, SubscriptionT>(
     this->node_topics_.get(),
     topic_name,
     std::forward<CallbackT>(callback),
@@ -176,27 +178,18 @@ LifecycleNode::create_service(
   const rmw_qos_profile_t & qos_profile,
   rclcpp::callback_group::CallbackGroup::SharedPtr group)
 {
-  rclcpp::AnyServiceCallback<ServiceT> any_service_callback;
-  any_service_callback.set(std::forward<CallbackT>(callback));
-
-  rcl_service_options_t service_options = rcl_service_get_default_options();
-  service_options.qos = qos_profile;
-
-  auto serv = rclcpp::Service<ServiceT>::make_shared(
-    node_base_->get_shared_rcl_node_handle(),
-    service_name, any_service_callback, service_options);
-  auto serv_base_ptr = std::dynamic_pointer_cast<rclcpp::ServiceBase>(serv);
-  node_services_->add_service(serv_base_ptr, group);
-  return serv;
+  return rclcpp::create_service<ServiceT, CallbackT>(
+    node_base_, node_services_,
+    service_name, std::forward<CallbackT>(callback), qos_profile, group);
 }
 
 template<typename ParameterT>
 bool
 LifecycleNode::get_parameter(const std::string & name, ParameterT & parameter) const
 {
-  rclcpp::parameter::ParameterVariant parameter_variant(name, parameter);
-  bool result = get_parameter(name, parameter_variant);
-  parameter = parameter_variant.get_value<ParameterT>();
+  rclcpp::Parameter param(name, parameter);
+  bool result = get_parameter(name, param);
+  parameter = param.get_value<ParameterT>();
 
   return result;
 }

@@ -16,6 +16,7 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/node.hpp"
@@ -75,14 +76,25 @@ TEST_F(TestNode, get_name_and_namespace) {
 }
 
 TEST_F(TestNode, get_logger) {
-  // Currently the namespace is not taken into account with the node logger name
   {
     auto node = std::make_shared<rclcpp::Node>("my_node");
     EXPECT_STREQ("my_node", node->get_logger().get_name());
   }
   {
     auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
-    EXPECT_STREQ("my_node", node->get_logger().get_name());
+    EXPECT_STREQ("ns.my_node", node->get_logger().get_name());
+  }
+  {
+    auto node = std::make_shared<rclcpp::Node>("my_node", "ns");
+    EXPECT_STREQ("ns.my_node", node->get_logger().get_name());
+  }
+  {
+    auto node = std::make_shared<rclcpp::Node>("my_node", "/my/ns");
+    EXPECT_STREQ("my.ns.my_node", node->get_logger().get_name());
+  }
+  {
+    auto node = std::make_shared<rclcpp::Node>("my_node", "my/ns");
+    EXPECT_STREQ("my.ns.my_node", node->get_logger().get_name());
   }
 }
 
@@ -99,5 +111,5 @@ TEST_F(TestNode, now) {
   auto now_builtin = node->now().nanoseconds();
   auto now_external = clock->now().nanoseconds();
   EXPECT_GE(now_external, now_builtin);
-  EXPECT_LT(now_external - now_builtin, 50000ul);
+  EXPECT_LT(now_external - now_builtin, 50000L);
 }

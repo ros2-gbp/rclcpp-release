@@ -68,7 +68,9 @@ public:
     auto ret = rcl_lifecycle_state_machine_fini(
       &state_machine_, node_handle, &node_options->allocator);
     if (ret != RCL_RET_OK) {
-      fprintf(stderr, "FATAL: failed to destroy rcl_state_machine\n");
+      RCUTILS_LOG_FATAL_NAMED(
+        "rclcpp_lifecycle",
+        "failed to destroy rcl_state_machine");
     }
   }
 
@@ -295,11 +297,14 @@ public:
       return RCL_RET_ERROR;
     }
 
+    constexpr bool publish_update = true;
     // keep the initial state to pass to a transition callback
     State initial_state(state_machine_.current_state);
 
     uint8_t transition_id = lifecycle_transition;
-    if (rcl_lifecycle_trigger_transition(&state_machine_, transition_id, true) != RCL_RET_OK) {
+    if (rcl_lifecycle_trigger_transition(
+        &state_machine_, transition_id, publish_update) != RCL_RET_OK)
+    {
       RCUTILS_LOG_ERROR("Unable to start transition %u from current state %s: %s",
         transition_id, state_machine_.current_state->label, rcl_get_error_string_safe())
       return RCL_RET_ERROR;
@@ -309,7 +314,7 @@ public:
       state_machine_.current_state->id, initial_state);
 
     if (rcl_lifecycle_trigger_transition(
-        &state_machine_, cb_return_code, true) != RCL_RET_OK)
+        &state_machine_, cb_return_code, publish_update) != RCL_RET_OK)
     {
       RCUTILS_LOG_ERROR("Failed to finish transition %u. Current state is now: %s",
         transition_id, state_machine_.current_state->label)
@@ -324,13 +329,17 @@ public:
         state_machine_.current_state->id, initial_state);
       if (error_resolved == lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_SUCCESS) {
         // We call cleanup on the error state
-        if (rcl_lifecycle_trigger_transition(&state_machine_, error_resolved, true) != RCL_RET_OK) {
+        if (rcl_lifecycle_trigger_transition(
+            &state_machine_, error_resolved, publish_update) != RCL_RET_OK)
+        {
           RCUTILS_LOG_ERROR("Failed to call cleanup on error state")
           return RCL_RET_ERROR;
         }
       } else {
         // We call shutdown on the error state
-        if (rcl_lifecycle_trigger_transition(&state_machine_, error_resolved, true) != RCL_RET_OK) {
+        if (rcl_lifecycle_trigger_transition(
+            &state_machine_, error_resolved, publish_update) != RCL_RET_OK)
+        {
           RCUTILS_LOG_ERROR("Failed to call cleanup on error state")
           return RCL_RET_ERROR;
         }
@@ -357,9 +366,9 @@ public:
       } catch (const std::exception &) {
         // TODO(karsten1987): Windows CI doens't let me print the msg here
         // the todo is to forward the exception to the on_error callback
-        // fprintf(stderr, "Caught exception in callback for transition %d\n",
-        //  it->first);
-        // fprintf(stderr, "Original error msg: %s\n", e.what());
+        // RCUTILS_LOG_ERROR("Caught exception in callback for transition %d\n",
+        //  it->first)
+        // RCUTILS_LOG_ERROR("Original error msg: %s\n", e.what())
         // maybe directly go for error handling here
         // and pass exception along with it
         cb_success = lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_ERROR;
@@ -407,9 +416,9 @@ public:
   using ChangeStateSrvPtr = std::shared_ptr<rclcpp::Service<ChangeStateSrv>>;
   using GetStateSrvPtr = std::shared_ptr<rclcpp::Service<GetStateSrv>>;
   using GetAvailableStatesSrvPtr =
-      std::shared_ptr<rclcpp::Service<GetAvailableStatesSrv>>;
+    std::shared_ptr<rclcpp::Service<GetAvailableStatesSrv>>;
   using GetAvailableTransitionsSrvPtr =
-      std::shared_ptr<rclcpp::Service<GetAvailableTransitionsSrv>>;
+    std::shared_ptr<rclcpp::Service<GetAvailableTransitionsSrv>>;
 
   NodeBasePtr node_base_interface_;
   NodeServicesPtr node_services_interface_;

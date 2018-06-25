@@ -24,6 +24,7 @@
 #include <string>
 
 #include "rcl_interfaces/msg/intra_process_message.hpp"
+#include "rcutils/logging_macros.h"
 #include "rmw/impl/cpp/demangle.hpp"
 
 #include "rclcpp/allocator/allocator_common.hpp"
@@ -79,17 +80,17 @@ PublisherBase::PublisherBase(
 PublisherBase::~PublisherBase()
 {
   if (rcl_publisher_fini(&intra_process_publisher_handle_, rcl_node_handle_.get()) != RCL_RET_OK) {
-    fprintf(
-      stderr,
-      "Error in destruction of intra process rcl publisher handle: %s\n",
+    RCUTILS_LOG_ERROR_NAMED(
+      "rclcpp",
+      "Error in destruction of intra process rcl publisher handle: %s",
       rcl_get_error_string_safe());
     rcl_reset_error();
   }
 
   if (rcl_publisher_fini(&publisher_handle_, rcl_node_handle_.get()) != RCL_RET_OK) {
-    fprintf(
-      stderr,
-      "Error in destruction of rcl publisher handle: %s\n",
+    RCUTILS_LOG_ERROR_NAMED(
+      "rclcpp",
+      "Error in destruction of rcl publisher handle: %s",
       rcl_get_error_string_safe());
     rcl_reset_error();
   }
@@ -170,7 +171,13 @@ PublisherBase::setup_intra_process(
   StoreMessageCallbackT callback,
   const rcl_publisher_options_t & intra_process_options)
 {
-  auto intra_process_topic_name = std::string(this->get_topic_name()) + "/_intra";
+  const char * topic_name = this->get_topic_name();
+  if (!topic_name) {
+    throw std::runtime_error("failed to get topic name");
+  }
+
+  auto intra_process_topic_name = std::string(topic_name) + "/_intra";
+
   rcl_ret_t ret = rcl_publisher_init(
     &intra_process_publisher_handle_,
     rcl_node_handle_.get(),

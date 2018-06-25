@@ -25,6 +25,8 @@
 #include "rclcpp/node.hpp"
 #include "rclcpp/visibility_control.hpp"
 
+#include "rcutils/logging_macros.h"
+
 #include "rmw/types.h"
 
 namespace rclcpp
@@ -46,21 +48,16 @@ class AllocatorMemoryStrategy : public memory_strategy::MemoryStrategy
 public:
   RCLCPP_SMART_PTR_DEFINITIONS(AllocatorMemoryStrategy<Alloc>)
 
-  using ExecAllocTraits = allocator::AllocRebind<executor::AnyExecutable, Alloc>;
-  using ExecAlloc = typename ExecAllocTraits::allocator_type;
-  using ExecDeleter = allocator::Deleter<ExecAlloc, executor::AnyExecutable>;
   using VoidAllocTraits = typename allocator::AllocRebind<void *, Alloc>;
   using VoidAlloc = typename VoidAllocTraits::allocator_type;
 
   explicit AllocatorMemoryStrategy(std::shared_ptr<Alloc> allocator)
   {
-    executable_allocator_ = std::make_shared<ExecAlloc>(*allocator.get());
     allocator_ = std::make_shared<VoidAlloc>(*allocator.get());
   }
 
   AllocatorMemoryStrategy()
   {
-    executable_allocator_ = std::make_shared<ExecAlloc>();
     allocator_ = std::make_shared<VoidAlloc>();
   }
 
@@ -96,22 +93,22 @@ public:
   {
     for (size_t i = 0; i < wait_set->size_of_subscriptions; ++i) {
       if (!wait_set->subscriptions[i]) {
-        subscription_handles_[i] = nullptr;
+        subscription_handles_[i].reset();
       }
     }
     for (size_t i = 0; i < wait_set->size_of_services; ++i) {
       if (!wait_set->services[i]) {
-        service_handles_[i] = nullptr;
+        service_handles_[i].reset();
       }
     }
     for (size_t i = 0; i < wait_set->size_of_clients; ++i) {
       if (!wait_set->clients[i]) {
-        client_handles_[i] = nullptr;
+        client_handles_[i].reset();
       }
     }
     for (size_t i = 0; i < wait_set->size_of_timers; ++i) {
       if (!wait_set->timers[i]) {
-        timer_handles_[i] = nullptr;
+        timer_handles_[i].reset();
       }
     }
 
@@ -186,36 +183,46 @@ public:
   bool add_handles_to_wait_set(rcl_wait_set_t * wait_set)
   {
     for (auto subscription : subscription_handles_) {
-      if (rcl_wait_set_add_subscription(wait_set, subscription) != RCL_RET_OK) {
-        fprintf(stderr, "Couldn't add subscription to wait set: %s\n", rcl_get_error_string_safe());
+      if (rcl_wait_set_add_subscription(wait_set, subscription.get()) != RCL_RET_OK) {
+        RCUTILS_LOG_ERROR_NAMED(
+          "rclcpp",
+          "Couldn't add subscription to wait set: %s", rcl_get_error_string_safe());
         return false;
       }
     }
 
     for (auto client : client_handles_) {
-      if (rcl_wait_set_add_client(wait_set, client) != RCL_RET_OK) {
-        fprintf(stderr, "Couldn't add client to wait set: %s\n", rcl_get_error_string_safe());
+      if (rcl_wait_set_add_client(wait_set, client.get()) != RCL_RET_OK) {
+        RCUTILS_LOG_ERROR_NAMED(
+          "rclcpp",
+          "Couldn't add client to wait set: %s", rcl_get_error_string_safe());
         return false;
       }
     }
 
     for (auto service : service_handles_) {
-      if (rcl_wait_set_add_service(wait_set, service) != RCL_RET_OK) {
-        fprintf(stderr, "Couldn't add service to wait set: %s\n", rcl_get_error_string_safe());
+      if (rcl_wait_set_add_service(wait_set, service.get()) != RCL_RET_OK) {
+        RCUTILS_LOG_ERROR_NAMED(
+          "rclcpp",
+          "Couldn't add service to wait set: %s", rcl_get_error_string_safe());
         return false;
       }
     }
 
     for (auto timer : timer_handles_) {
-      if (rcl_wait_set_add_timer(wait_set, timer) != RCL_RET_OK) {
-        fprintf(stderr, "Couldn't add timer to wait set: %s\n", rcl_get_error_string_safe());
+      if (rcl_wait_set_add_timer(wait_set, timer.get()) != RCL_RET_OK) {
+        RCUTILS_LOG_ERROR_NAMED(
+          "rclcpp",
+          "Couldn't add timer to wait set: %s", rcl_get_error_string_safe());
         return false;
       }
     }
 
     for (auto guard_condition : guard_conditions_) {
       if (rcl_wait_set_add_guard_condition(wait_set, guard_condition) != RCL_RET_OK) {
-        fprintf(stderr, "Couldn't add guard_condition to wait set: %s\n",
+        RCUTILS_LOG_ERROR_NAMED(
+          "rclcpp",
+          "Couldn't add guard_condition to wait set: %s",
           rcl_get_error_string_safe());
         return false;
       }
@@ -223,16 +230,9 @@ public:
     return true;
   }
 
-  /// Provide a newly initialized AnyExecutable object.
-  // \return Shared pointer to the fresh executable.
-  executor::AnyExecutable::SharedPtr instantiate_next_executable()
-  {
-    return std::allocate_shared<executor::AnyExecutable>(*executable_allocator_.get());
-  }
-
   virtual void
   get_next_subscription(
-    executor::AnyExecutable::SharedPtr any_exec,
+    executor::AnyExecutable & any_exec,
     const WeakNodeVector & weak_nodes)
   {
     auto it = subscription_handles_.begin();
@@ -249,7 +249,7 @@ public:
         if (!group) {
           // Group was not found, meaning the subscription is not valid...
           // Remove it from the ready list and continue looking
-          subscription_handles_.erase(it);
+          it = subscription_handles_.erase(it);
           continue;
         }
         if (!group->can_be_taken_from().load()) {
@@ -260,23 +260,23 @@ public:
         }
         // Otherwise it is safe to set and return the any_exec
         if (is_intra_process) {
-          any_exec->subscription_intra_process = subscription;
+          any_exec.subscription_intra_process = subscription;
         } else {
-          any_exec->subscription = subscription;
+          any_exec.subscription = subscription;
         }
-        any_exec->callback_group = group;
-        any_exec->node_base = get_node_by_group(group, weak_nodes);
+        any_exec.callback_group = group;
+        any_exec.node_base = get_node_by_group(group, weak_nodes);
         subscription_handles_.erase(it);
         return;
       }
       // Else, the subscription is no longer valid, remove it and continue
-      subscription_handles_.erase(it);
+      it = subscription_handles_.erase(it);
     }
   }
 
   virtual void
   get_next_service(
-    executor::AnyExecutable::SharedPtr any_exec,
+    executor::AnyExecutable & any_exec,
     const WeakNodeVector & weak_nodes)
   {
     auto it = service_handles_.begin();
@@ -288,7 +288,7 @@ public:
         if (!group) {
           // Group was not found, meaning the service is not valid...
           // Remove it from the ready list and continue looking
-          service_handles_.erase(it);
+          it = service_handles_.erase(it);
           continue;
         }
         if (!group->can_be_taken_from().load()) {
@@ -298,19 +298,19 @@ public:
           continue;
         }
         // Otherwise it is safe to set and return the any_exec
-        any_exec->service = service;
-        any_exec->callback_group = group;
-        any_exec->node_base = get_node_by_group(group, weak_nodes);
+        any_exec.service = service;
+        any_exec.callback_group = group;
+        any_exec.node_base = get_node_by_group(group, weak_nodes);
         service_handles_.erase(it);
         return;
       }
       // Else, the service is no longer valid, remove it and continue
-      service_handles_.erase(it);
+      it = service_handles_.erase(it);
     }
   }
 
   virtual void
-  get_next_client(executor::AnyExecutable::SharedPtr any_exec, const WeakNodeVector & weak_nodes)
+  get_next_client(executor::AnyExecutable & any_exec, const WeakNodeVector & weak_nodes)
   {
     auto it = client_handles_.begin();
     while (it != client_handles_.end()) {
@@ -321,7 +321,7 @@ public:
         if (!group) {
           // Group was not found, meaning the service is not valid...
           // Remove it from the ready list and continue looking
-          client_handles_.erase(it);
+          it = client_handles_.erase(it);
           continue;
         }
         if (!group->can_be_taken_from().load()) {
@@ -331,14 +331,14 @@ public:
           continue;
         }
         // Otherwise it is safe to set and return the any_exec
-        any_exec->client = client;
-        any_exec->callback_group = group;
-        any_exec->node_base = get_node_by_group(group, weak_nodes);
+        any_exec.client = client;
+        any_exec.callback_group = group;
+        any_exec.node_base = get_node_by_group(group, weak_nodes);
         client_handles_.erase(it);
         return;
       }
       // Else, the service is no longer valid, remove it and continue
-      client_handles_.erase(it);
+      it = client_handles_.erase(it);
     }
   }
 
@@ -375,16 +375,15 @@ public:
 private:
   template<typename T>
   using VectorRebind =
-      std::vector<T, typename std::allocator_traits<Alloc>::template rebind_alloc<T>>;
+    std::vector<T, typename std::allocator_traits<Alloc>::template rebind_alloc<T>>;
 
   VectorRebind<const rcl_guard_condition_t *> guard_conditions_;
 
-  VectorRebind<const rcl_subscription_t *> subscription_handles_;
-  VectorRebind<const rcl_service_t *> service_handles_;
-  VectorRebind<const rcl_client_t *> client_handles_;
-  VectorRebind<const rcl_timer_t *> timer_handles_;
+  VectorRebind<std::shared_ptr<const rcl_subscription_t>> subscription_handles_;
+  VectorRebind<std::shared_ptr<const rcl_service_t>> service_handles_;
+  VectorRebind<std::shared_ptr<const rcl_client_t>> client_handles_;
+  VectorRebind<std::shared_ptr<const rcl_timer_t>> timer_handles_;
 
-  std::shared_ptr<ExecAlloc> executable_allocator_;
   std::shared_ptr<VoidAlloc> allocator_;
 };
 

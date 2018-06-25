@@ -50,7 +50,6 @@ protected:
   rclcpp::Node::SharedPtr node;
 };
 
-
 TEST_F(TestTimeSource, detachUnattached) {
   rclcpp::TimeSource ts;
 
@@ -93,18 +92,17 @@ TEST_F(TestTimeSource, clock) {
   ts.attachClock(ros_clock);
   EXPECT_FALSE(ros_clock->ros_time_is_active());
 
-  auto clock_pub = node->create_publisher<builtin_interfaces::msg::Time>("clock",
+  auto clock_pub = node->create_publisher<rosgraph_msgs::msg::Clock>("clock",
       rmw_qos_profile_default);
   rclcpp::WallRate loop_rate(50);
   for (int i = 0; i < 5; ++i) {
     if (!rclcpp::ok()) {
       break;  // Break for ctrl-c
     }
-    auto msg = std::make_shared<builtin_interfaces::msg::Time>();
-    msg->sec = i;
-    msg->nanosec = 1000;
+    auto msg = std::make_shared<rosgraph_msgs::msg::Clock>();
+    msg->clock.sec = i;
+    msg->clock.nanosec = 1000;
     clock_pub->publish(msg);
-    // std::cout << "Publishing: '" << msg->sec << ".000000" << msg->nanosec << "'" << std::endl;
     rclcpp::spin_some(node);
     loop_rate.sleep();
   }
@@ -116,7 +114,7 @@ TEST_F(TestTimeSource, clock) {
 
   auto t_out = ros_clock->now();
 
-  EXPECT_NE(0UL, t_out.nanoseconds());
+  EXPECT_NE(0L, t_out.nanoseconds());
   EXPECT_LT(t_low.nanoseconds(), t_out.nanoseconds());
   EXPECT_GT(t_high.nanoseconds(), t_out.nanoseconds());
 }
@@ -163,7 +161,7 @@ TEST_F(TestTimeSource, callbacks) {
   ts.attachClock(ros_clock);
   EXPECT_FALSE(ros_clock->ros_time_is_active());
 
-  auto clock_pub = node->create_publisher<builtin_interfaces::msg::Time>("clock",
+  auto clock_pub = node->create_publisher<rosgraph_msgs::msg::Clock>("clock",
       rmw_qos_profile_default);
 
   rclcpp::WallRate loop_rate(50);
@@ -171,11 +169,10 @@ TEST_F(TestTimeSource, callbacks) {
     if (!rclcpp::ok()) {
       break;  // Break for ctrl-c
     }
-    auto msg = std::make_shared<builtin_interfaces::msg::Time>();
-    msg->sec = i;
-    msg->nanosec = 1000;
+    auto msg = std::make_shared<rosgraph_msgs::msg::Clock>();
+    msg->clock.sec = i;
+    msg->clock.nanosec = 1000;
     clock_pub->publish(msg);
-    // std::cout << "Publishing: '" << msg->sec << ".000000" << msg->nanosec << "'" << std::endl;
     rclcpp::spin_some(node);
     loop_rate.sleep();
   }
@@ -190,7 +187,7 @@ TEST_F(TestTimeSource, callbacks) {
 
   auto t_out = ros_clock->now();
 
-  EXPECT_NE(0UL, t_out.nanoseconds());
+  EXPECT_NE(0L, t_out.nanoseconds());
   EXPECT_LT(t_low.nanoseconds(), t_out.nanoseconds());
   EXPECT_GT(t_high.nanoseconds(), t_out.nanoseconds());
 
@@ -205,11 +202,10 @@ TEST_F(TestTimeSource, callbacks) {
     if (!rclcpp::ok()) {
       break;  // Break for ctrl-c
     }
-    auto msg = std::make_shared<builtin_interfaces::msg::Time>();
-    msg->sec = i;
-    msg->nanosec = 2000;
+    auto msg = std::make_shared<rosgraph_msgs::msg::Clock>();
+    msg->clock.sec = i;
+    msg->clock.nanosec = 2000;
     clock_pub->publish(msg);
-    // std::cout << "Publishing: '" << msg->sec << ".000000" << msg->nanosec << "'" << std::endl;
     rclcpp::spin_some(node);
     loop_rate.sleep();
   }
@@ -222,7 +218,7 @@ TEST_F(TestTimeSource, callbacks) {
 
   t_out = ros_clock->now();
 
-  EXPECT_NE(0UL, t_out.nanoseconds());
+  EXPECT_NE(0L, t_out.nanoseconds());
   EXPECT_LT(t_low.nanoseconds(), t_out.nanoseconds());
   EXPECT_GT(t_high.nanoseconds(), t_out.nanoseconds());
 }
@@ -230,7 +226,7 @@ TEST_F(TestTimeSource, callbacks) {
 void trigger_clock_changes(
   rclcpp::Node::SharedPtr node)
 {
-  auto clock_pub = node->create_publisher<builtin_interfaces::msg::Time>("clock",
+  auto clock_pub = node->create_publisher<rosgraph_msgs::msg::Clock>("clock",
       rmw_qos_profile_default);
 
   rclcpp::executors::SingleThreadedExecutor executor;
@@ -241,11 +237,10 @@ void trigger_clock_changes(
     if (!rclcpp::ok()) {
       break;  // Break for ctrl-c
     }
-    auto msg = std::make_shared<builtin_interfaces::msg::Time>();
-    msg->sec = i;
-    msg->nanosec = 1000;
+    auto msg = std::make_shared<rosgraph_msgs::msg::Clock>();
+    msg->clock.sec = i;
+    msg->clock.nanosec = 1000;
     clock_pub->publish(msg);
-    // std::cout << "Publishing: '" << msg->sec << ".000000" << msg->nanosec << "'" << std::endl;
     executor.spin_once(1000000ns);
     loop_rate.sleep();
   }
@@ -296,7 +291,7 @@ TEST_F(TestTimeSource, callback_handler_erasure) {
 
   auto t_out = ros_clock->now();
 
-  EXPECT_NE(0UL, t_out.nanoseconds());
+  EXPECT_NE(0L, t_out.nanoseconds());
   EXPECT_LT(t_low.nanoseconds(), t_out.nanoseconds());
   EXPECT_GT(t_high.nanoseconds(), t_out.nanoseconds());
 
@@ -320,7 +315,7 @@ TEST_F(TestTimeSource, callback_handler_erasure) {
 
   t_out = ros_clock->now();
 
-  EXPECT_NE(0UL, t_out.nanoseconds());
+  EXPECT_NE(0L, t_out.nanoseconds());
   EXPECT_LT(t_low.nanoseconds(), t_out.nanoseconds());
   EXPECT_GT(t_high.nanoseconds(), t_out.nanoseconds());
 }
@@ -334,13 +329,24 @@ TEST_F(TestTimeSource, parameter_activation) {
   ts.attachClock(ros_clock);
   EXPECT_FALSE(ros_clock->ros_time_is_active());
 
-  auto parameter_service = std::make_shared<rclcpp::ParameterService>(node);
   auto parameters_client = std::make_shared<rclcpp::SyncParametersClient>(node);
 
   using namespace std::chrono_literals;
   EXPECT_TRUE(parameters_client->wait_for_service(2s));
   auto set_parameters_results = parameters_client->set_parameters({
-    rclcpp::parameter::ParameterVariant("use_sim_time", true)
+    rclcpp::Parameter("use_sim_time", true)
+  });
+  for (auto & result : set_parameters_results) {
+    EXPECT_TRUE(result.successful);
+  }
+  // SyncParametersClient returns when parameters have been set on the node_parameters interface,
+  // but it doesn't mean the on_parameter_event subscription in TimeSource has been called.
+  // Spin some to handle that subscription.
+  rclcpp::spin_some(node);
+  EXPECT_TRUE(ros_clock->ros_time_is_active());
+
+  set_parameters_results = parameters_client->set_parameters({
+    rclcpp::Parameter("use_sim_time", rclcpp::ParameterType::PARAMETER_NOT_SET)
   });
   for (auto & result : set_parameters_results) {
     EXPECT_TRUE(result.successful);
@@ -348,28 +354,21 @@ TEST_F(TestTimeSource, parameter_activation) {
   rclcpp::spin_some(node);
   EXPECT_TRUE(ros_clock->ros_time_is_active());
 
-
   set_parameters_results = parameters_client->set_parameters({
-    rclcpp::parameter::ParameterVariant("use_sim_time", rclcpp::parameter::PARAMETER_NOT_SET)
+    rclcpp::Parameter("use_sim_time", false)
   });
   for (auto & result : set_parameters_results) {
     EXPECT_TRUE(result.successful);
   }
-  EXPECT_TRUE(ros_clock->ros_time_is_active());
-
-  set_parameters_results = parameters_client->set_parameters({
-    rclcpp::parameter::ParameterVariant("use_sim_time", false)
-  });
-  for (auto & result : set_parameters_results) {
-    EXPECT_TRUE(result.successful);
-  }
+  rclcpp::spin_some(node);
   EXPECT_FALSE(ros_clock->ros_time_is_active());
 
   set_parameters_results = parameters_client->set_parameters({
-    rclcpp::parameter::ParameterVariant("use_sim_time", rclcpp::parameter::PARAMETER_NOT_SET)
+    rclcpp::Parameter("use_sim_time", rclcpp::ParameterType::PARAMETER_NOT_SET)
   });
   for (auto & result : set_parameters_results) {
     EXPECT_TRUE(result.successful);
   }
+  rclcpp::spin_some(node);
   EXPECT_FALSE(ros_clock->ros_time_is_active());
 }

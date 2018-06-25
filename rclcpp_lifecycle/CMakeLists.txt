@@ -10,7 +10,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rcl_lifecycle REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -20,16 +20,16 @@ include_directories(include)
 
 ### CPP High level library
 add_library(rclcpp_lifecycle
-  SHARED
   src/lifecycle_node.cpp
   src/node_interfaces/lifecycle_node_interface.cpp
   src/state.cpp
   src/transition.cpp
 )
+# specific order: dependents before dependencies
 ament_target_dependencies(rclcpp_lifecycle
-  "lifecycle_msgs"
+  "rclcpp"
   "rcl_lifecycle"
-  "rclcpp")
+  "lifecycle_msgs")
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
@@ -101,11 +101,12 @@ if(BUILD_TESTING)
   endif()
 endif()
 
+# specific order: dependents before dependencies
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(rclcpp)
 ament_export_dependencies(rcl_lifecycle)
 ament_export_dependencies(lifecycle_msgs)
-ament_export_include_directories(include)
-ament_export_libraries(${PROJECT_NAME})
 ament_package()
 
 install(DIRECTORY include/

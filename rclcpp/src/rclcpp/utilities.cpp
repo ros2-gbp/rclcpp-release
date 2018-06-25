@@ -24,11 +24,15 @@
 #include <string>
 #include <vector>
 
+#include "rclcpp/exceptions.hpp"
+
 #include "rcl/error_handling.h"
 #include "rcl/rcl.h"
 
 #include "rmw/error_handling.h"
 #include "rmw/rmw.h"
+
+#include "rcutils/logging_macros.h"
 
 // Determine if sigaction is available
 #if __APPLE__ || _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
@@ -114,8 +118,9 @@ trigger_interrupt_guard_condition(int signal_value)
     for (auto & kv : g_sigint_guard_cond_handles) {
       rcl_ret_t status = rcl_trigger_guard_condition(&(kv.second));
       if (status != RCL_RET_OK) {
-        fprintf(stderr,
-          "[rclcpp::error] failed to trigger guard condition: %s\n", rcl_get_error_string_safe());
+        RCUTILS_LOG_ERROR_NAMED(
+          "rclcpp",
+          "failed to trigger guard condition: %s", rcl_get_error_string_safe());
       }
     }
   }
@@ -157,7 +162,7 @@ signal_handler(int signal_value)
 }
 
 void
-rclcpp::init(int argc, char * argv[])
+rclcpp::init(int argc, char const * const argv[])
 {
   g_is_interrupted.store(false);
   if (rcl_init(argc, argv, rcl_get_default_allocator()) != RCL_RET_OK) {
@@ -186,6 +191,71 @@ rclcpp::init(int argc, char * argv[])
       set_signal_handler(SIGINT, ::old_signal_handler);
     });
 #endif
+}
+
+std::vector<std::string>
+rclcpp::init_and_remove_ros_arguments(int argc, char const * const argv[])
+{
+  rclcpp::init(argc, argv);
+  return rclcpp::remove_ros_arguments(argc, argv);
+}
+
+std::vector<std::string>
+rclcpp::remove_ros_arguments(int argc, char const * const argv[])
+{
+  rcl_allocator_t alloc = rcl_get_default_allocator();
+  rcl_arguments_t parsed_args = rcl_get_zero_initialized_arguments();
+
+  rcl_ret_t ret;
+
+  ret = rcl_parse_arguments(argc, argv, alloc, &parsed_args);
+  if (RCL_RET_OK != ret) {
+    exceptions::throw_from_rcl_error(ret, "failed to parse arguments");
+  }
+
+  int nonros_argc = 0;
+  const char ** nonros_argv = NULL;
+
+  ret = rcl_remove_ros_arguments(
+    argv,
+    &parsed_args,
+    alloc,
+    &nonros_argc,
+    &nonros_argv);
+
+  if (RCL_RET_OK != ret) {
+    // Not using throw_from_rcl_error, because we may need to append deallocation failures.
+    exceptions::RCLErrorBase base_exc(ret, rcl_get_error_state());
+    rcl_reset_error();
+    if (NULL != nonros_argv) {
+      alloc.deallocate(nonros_argv, alloc.state);
+    }
+    if (RCL_RET_OK != rcl_arguments_fini(&parsed_args)) {
+      base_exc.formatted_message += std::string(
+        ", failed also to cleanup parsed arguments, leaking memory: ") +
+        rcl_get_error_string_safe();
+      rcl_reset_error();
+    }
+    throw exceptions::RCLError(base_exc, "");
+  }
+
+  std::vector<std::string> return_arguments;
+  return_arguments.resize(nonros_argc);
+
+  for (int ii = 0; ii < nonros_argc; ++ii) {
+    return_arguments[ii] = std::string(nonros_argv[ii]);
+  }
+
+  if (NULL != nonros_argv) {
+    alloc.deallocate(nonros_argv, alloc.state);
+  }
+
+  ret = rcl_arguments_fini(&parsed_args);
+  if (RCL_RET_OK != ret) {
+    exceptions::throw_from_rcl_error(ret, "failed to cleanup parsed arguments, leaking memory");
+  }
+
+  return return_arguments;
 }
 
 bool

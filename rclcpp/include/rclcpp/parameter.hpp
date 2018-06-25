@@ -15,54 +15,34 @@
 #ifndef RCLCPP__PARAMETER_HPP_
 #define RCLCPP__PARAMETER_HPP_
 
+#include <iostream>
 #include <ostream>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "rcl_interfaces/msg/parameter.hpp"
-#include "rcl_interfaces/msg/parameter_type.hpp"
-#include "rcl_interfaces/msg/parameter_value.hpp"
+#include "rclcpp/parameter_value.hpp"
 #include "rclcpp/visibility_control.hpp"
-#include "rmw/rmw.h"
 
 namespace rclcpp
 {
-namespace parameter
-{
 
-enum ParameterType
-{
-  PARAMETER_NOT_SET = rcl_interfaces::msg::ParameterType::PARAMETER_NOT_SET,
-  PARAMETER_BOOL = rcl_interfaces::msg::ParameterType::PARAMETER_BOOL,
-  PARAMETER_INTEGER = rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER,
-  PARAMETER_DOUBLE = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE,
-  PARAMETER_STRING = rcl_interfaces::msg::ParameterType::PARAMETER_STRING,
-  PARAMETER_BYTES = rcl_interfaces::msg::ParameterType::PARAMETER_BYTES,
-};
-
-// Structure to store an arbitrary parameter with templated get/set methods
-class ParameterVariant
+/// Structure to store an arbitrary parameter with templated get/set methods.
+class Parameter
 {
 public:
   RCLCPP_PUBLIC
-  ParameterVariant();
+  Parameter();
+
   RCLCPP_PUBLIC
-  explicit ParameterVariant(const std::string & name, const bool bool_value);
-  RCLCPP_PUBLIC
-  explicit ParameterVariant(const std::string & name, const int int_value);
-  RCLCPP_PUBLIC
-  explicit ParameterVariant(const std::string & name, const int64_t int_value);
-  RCLCPP_PUBLIC
-  explicit ParameterVariant(const std::string & name, const float double_value);
-  RCLCPP_PUBLIC
-  explicit ParameterVariant(const std::string & name, const double double_value);
-  RCLCPP_PUBLIC
-  explicit ParameterVariant(const std::string & name, const std::string & string_value);
-  RCLCPP_PUBLIC
-  explicit ParameterVariant(const std::string & name, const char * string_value);
-  RCLCPP_PUBLIC
-  explicit ParameterVariant(const std::string & name, const std::vector<uint8_t> & bytes_value);
+  Parameter(const std::string & name, const ParameterValue & value);
+
+  template<typename ValueTypeT>
+  explicit Parameter(const std::string & name, ValueTypeT value)
+  : Parameter(name, ParameterValue(value))
+  {
+  }
 
   RCLCPP_PUBLIC
   ParameterType
@@ -78,105 +58,27 @@ public:
 
   RCLCPP_PUBLIC
   rcl_interfaces::msg::ParameterValue
-  get_parameter_value() const;
+  get_value_message() const;
 
-  // The following get_value() variants require the use of ParameterType
-
-  template<ParameterType type>
-  typename std::enable_if<type == ParameterType::PARAMETER_INTEGER, int64_t>::type
+  /// Get value of parameter using rclcpp::ParameterType as template argument.
+  template<ParameterType ParamT>
+  decltype(auto)
   get_value() const
   {
-    if (value_.type != rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER) {
-      // TODO(wjwwood): use custom exception
-      throw std::runtime_error("Invalid type");
-    }
-    return value_.integer_value;
+    return value_.get<ParamT>();
   }
 
-  template<ParameterType type>
-  typename std::enable_if<type == ParameterType::PARAMETER_DOUBLE, double>::type
+  /// Get value of parameter using c++ types as template argument.
+  template<typename T>
+  decltype(auto)
   get_value() const
   {
-    if (value_.type != rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE) {
-      // TODO(wjwwood): use custom exception
-      throw std::runtime_error("Invalid type");
-    }
-    return value_.double_value;
+    return value_.get<T>();
   }
 
-  template<ParameterType type>
-  typename std::enable_if<type == ParameterType::PARAMETER_STRING, const std::string &>::type
-  get_value() const
-  {
-    if (value_.type != rcl_interfaces::msg::ParameterType::PARAMETER_STRING) {
-      // TODO(wjwwood): use custom exception
-      throw std::runtime_error("Invalid type");
-    }
-    return value_.string_value;
-  }
-
-  template<ParameterType type>
-  typename std::enable_if<type == ParameterType::PARAMETER_BOOL, bool>::type
-  get_value() const
-  {
-    if (value_.type != rcl_interfaces::msg::ParameterType::PARAMETER_BOOL) {
-      // TODO(wjwwood): use custom exception
-      throw std::runtime_error("Invalid type");
-    }
-    return value_.bool_value;
-  }
-
-  template<ParameterType type>
-  typename std::enable_if<
-    type == ParameterType::PARAMETER_BYTES, const std::vector<uint8_t> &>::type
-  get_value() const
-  {
-    if (value_.type != rcl_interfaces::msg::ParameterType::PARAMETER_BYTES) {
-      // TODO(wjwwood): use custom exception
-      throw std::runtime_error("Invalid type");
-    }
-    return value_.bytes_value;
-  }
-
-  // The following get_value() variants allow the use of primitive types
-
-  template<typename type>
-  typename std::enable_if<
-    std::is_integral<type>::value && !std::is_same<type, bool>::value, int64_t>::type
-  get_value() const
-  {
-    return get_value<ParameterType::PARAMETER_INTEGER>();
-  }
-
-  template<typename type>
-  typename std::enable_if<std::is_floating_point<type>::value, double>::type
-  get_value() const
-  {
-    return get_value<ParameterType::PARAMETER_DOUBLE>();
-  }
-
-  template<typename type>
-  typename std::enable_if<std::is_convertible<type, std::string>::value, const std::string &>::type
-  get_value() const
-  {
-    return get_value<ParameterType::PARAMETER_STRING>();
-  }
-
-  template<typename type>
-  typename std::enable_if<std::is_same<type, bool>::value, bool>::type
-  get_value() const
-  {
-    return get_value<ParameterType::PARAMETER_BOOL>();
-  }
-
-  template<typename type>
-  typename std::enable_if<
-    std::is_convertible<
-      type, const std::vector<uint8_t> &>::value, const std::vector<uint8_t> &>::type
-  get_value() const
-  {
-    return get_value<ParameterType::PARAMETER_BYTES>();
-  }
+  RCLCPP_PUBLIC
+  bool
+  as_bool() const;
 
   RCLCPP_PUBLIC
   int64_t
@@ -191,20 +93,32 @@ public:
   as_string() const;
 
   RCLCPP_PUBLIC
-  bool
-  as_bool() const;
-
-  RCLCPP_PUBLIC
   const std::vector<uint8_t> &
-  as_bytes() const;
+  as_byte_array() const;
 
   RCLCPP_PUBLIC
-  static ParameterVariant
-  from_parameter(const rcl_interfaces::msg::Parameter & parameter);
+  const std::vector<bool> &
+  as_bool_array() const;
+
+  RCLCPP_PUBLIC
+  const std::vector<int64_t> &
+  as_integer_array() const;
+
+  RCLCPP_PUBLIC
+  const std::vector<double> &
+  as_double_array() const;
+
+  RCLCPP_PUBLIC
+  const std::vector<std::string> &
+  as_string_array() const;
+
+  RCLCPP_PUBLIC
+  static Parameter
+  from_parameter_msg(const rcl_interfaces::msg::Parameter & parameter);
 
   RCLCPP_PUBLIC
   rcl_interfaces::msg::Parameter
-  to_parameter();
+  to_parameter_msg() const;
 
   RCLCPP_PUBLIC
   std::string
@@ -212,24 +126,22 @@ public:
 
 private:
   std::string name_;
-  rcl_interfaces::msg::ParameterValue value_;
+  ParameterValue value_;
 };
-
 
 /// Return a json encoded version of the parameter intended for a dict.
 RCLCPP_PUBLIC
 std::string
-_to_json_dict_entry(const ParameterVariant & param);
+_to_json_dict_entry(const Parameter & param);
 
 RCLCPP_PUBLIC
 std::ostream &
-operator<<(std::ostream & os, const rclcpp::parameter::ParameterVariant & pv);
+operator<<(std::ostream & os, const rclcpp::Parameter & pv);
 
 RCLCPP_PUBLIC
 std::ostream &
-operator<<(std::ostream & os, const std::vector<ParameterVariant> & parameters);
+operator<<(std::ostream & os, const std::vector<Parameter> & parameters);
 
-}  // namespace parameter
 }  // namespace rclcpp
 
 namespace std
@@ -238,12 +150,12 @@ namespace std
 /// Return a json encoded version of the parameter intended for a list.
 RCLCPP_PUBLIC
 std::string
-to_string(const rclcpp::parameter::ParameterVariant & param);
+to_string(const rclcpp::Parameter & param);
 
 /// Return a json encoded version of a vector of parameters, as a string.
 RCLCPP_PUBLIC
 std::string
-to_string(const std::vector<rclcpp::parameter::ParameterVariant> & parameters);
+to_string(const std::vector<rclcpp::Parameter> & parameters);
 
 }  // namespace std
 
