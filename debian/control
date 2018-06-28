@@ -1,0 +1,12 @@
+Source: ros-bouncy-rclcpp-lifecycle
+Section: misc
+Priority: extra
+Maintainer: Karsten Knese <karsten@osrfoundation.org>
+Build-Depends: debhelper (>= 9.0.0), ros-bouncy-ament-cmake-gtest, ros-bouncy-ament-cmake-ros, ros-bouncy-ament-lint-auto, ros-bouncy-ament-lint-common, ros-bouncy-lifecycle-msgs, ros-bouncy-rcl-lifecycle, ros-bouncy-rclcpp, ros-bouncy-rmw-implementation, ros-bouncy-rosidl-default-generators, ros-bouncy-std-msgs, ros-bouncy-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-bouncy-rclcpp-lifecycle
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-bouncy-lifecycle-msgs, ros-bouncy-rcl-lifecycle, ros-bouncy-rclcpp, ros-bouncy-rclpy, ros-bouncy-rmw-implementation, ros-bouncy-rosidl-default-runtime, ros-bouncy-std-msgs, ros-bouncy-ros-workspace
+Description: Package containing a prototype for lifecycle implementation
