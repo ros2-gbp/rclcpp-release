@@ -1,0 +1,12 @@
+Source: ros-bouncy-rclcpp
+Section: misc
+Priority: extra
+Maintainer: Dirk Thomas <dthomas@osrfoundation.org>
+Build-Depends: debhelper (>= 9.0.0), ros-bouncy-ament-cmake-gmock, ros-bouncy-ament-cmake-gtest, ros-bouncy-ament-cmake-ros, ros-bouncy-ament-lint-auto, ros-bouncy-ament-lint-common, ros-bouncy-builtin-interfaces, ros-bouncy-rcl, ros-bouncy-rcl-interfaces, ros-bouncy-rcl-yaml-param-parser, ros-bouncy-rmw, ros-bouncy-rmw-implementation, ros-bouncy-rmw-implementation-cmake, ros-bouncy-rosgraph-msgs, ros-bouncy-rosidl-generator-cpp, ros-bouncy-rosidl-typesupport-c, ros-bouncy-rosidl-typesupport-cpp, ros-bouncy-test-msgs, ros-bouncy-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-bouncy-rclcpp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-bouncy-ament-cmake, ros-bouncy-builtin-interfaces, ros-bouncy-rcl, ros-bouncy-rcl-interfaces, ros-bouncy-rcl-yaml-param-parser, ros-bouncy-rmw, ros-bouncy-rmw-implementation, ros-bouncy-rosgraph-msgs, ros-bouncy-rosidl-generator-cpp, ros-bouncy-rosidl-typesupport-c, ros-bouncy-rosidl-typesupport-cpp, ros-bouncy-ros-workspace
+Description: The ROS client library in C++.
