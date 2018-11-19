@@ -120,7 +120,7 @@ trigger_interrupt_guard_condition(int signal_value)
       if (status != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
-          "failed to trigger guard condition: %s", rcl_get_error_string_safe());
+          "failed to trigger guard condition: %s", rcl_get_error_string().str);
       }
     }
   }
@@ -167,7 +167,7 @@ rclcpp::init(int argc, char const * const argv[])
   g_is_interrupted.store(false);
   if (rcl_init(argc, argv, rcl_get_default_allocator()) != RCL_RET_OK) {
     std::string msg = "failed to initialize rmw implementation: ";
-    msg += rcl_get_error_string_safe();
+    msg += rcl_get_error_string().str;
     rcl_reset_error();
     throw std::runtime_error(msg);
   }
@@ -233,7 +233,7 @@ rclcpp::remove_ros_arguments(int argc, char const * const argv[])
     if (RCL_RET_OK != rcl_arguments_fini(&parsed_args)) {
       base_exc.formatted_message += std::string(
         ", failed also to cleanup parsed arguments, leaking memory: ") +
-        rcl_get_error_string_safe();
+        rcl_get_error_string().str;
       rcl_reset_error();
     }
     throw exceptions::RCLError(base_exc, "");
@@ -262,6 +262,12 @@ bool
 rclcpp::ok()
 {
   return ::g_signal_status == 0;
+}
+
+bool
+rclcpp::is_initialized()
+{
+  return rcl_ok();
 }
 
 static std::mutex on_shutdown_mutex_;
@@ -301,7 +307,7 @@ rclcpp::get_sigint_guard_condition(rcl_wait_set_t * wait_set)
     if (rcl_guard_condition_init(&handle, options) != RCL_RET_OK) {
       // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
       throw std::runtime_error(std::string(
-        "Couldn't initialize guard condition: ") + rcl_get_error_string_safe());
+        "Couldn't initialize guard condition: ") + rcl_get_error_string().str);
       // *INDENT-ON*
     }
     g_sigint_guard_cond_handles[wait_set] = handle;
@@ -319,7 +325,7 @@ rclcpp::release_sigint_guard_condition(rcl_wait_set_t * wait_set)
       // *INDENT-OFF* (prevent uncrustify from making unnecessary indents here)
       throw std::runtime_error(std::string(
         "Failed to destroy sigint guard condition: ") +
-        rcl_get_error_string_safe());
+        rcl_get_error_string().str);
       // *INDENT-ON*
     }
     g_sigint_guard_cond_handles.erase(kv);
@@ -346,4 +352,16 @@ rclcpp::sleep_for(const std::chrono::nanoseconds & nanoseconds)
   }
   // Return true if the timeout elapsed successfully, otherwise false.
   return !g_is_interrupted;
+}
+
+const char *
+rclcpp::get_c_string(const char * string_in)
+{
+  return string_in;
+}
+
+const char *
+rclcpp::get_c_string(const std::string & string_in)
+{
+  return string_in.c_str();
 }

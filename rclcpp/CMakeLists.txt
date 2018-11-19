@@ -19,12 +19,7 @@ if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
 endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  # we dont use add_compile_options with pedantic in message packages
-  # because the Python C extensions dont comply with it
-  # TODO(mikaelarguedas) change to add_compile_options
-  # once this is not a message package anymore
-  # https://github.com/ros2/system_tests/issues/191
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
+  add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 include_directories(include)
@@ -247,8 +242,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(test_publisher ${PROJECT_NAME})
   endif()
-  ament_add_gtest(test_rate test/test_rate.cpp
-    ENV RCL_ASSERT_RMW_ID_MATCHES=${rmw_implementation})
+  ament_add_gtest(test_rate test/test_rate.cpp)
   if(TARGET test_rate)
     target_include_directories(test_rate PUBLIC
       ${rcl_interfaces_INCLUDE_DIRS}
@@ -260,8 +254,7 @@ if(BUILD_TESTING)
       ${PROJECT_NAME}
     )
   endif()
-  ament_add_gtest(test_serialized_message_allocator test/test_serialized_message_allocator.cpp
-    ENV RCL_ASSERT_RMW_ID_MATCHES=${rmw_implementation})
+  ament_add_gtest(test_serialized_message_allocator test/test_serialized_message_allocator.cpp)
   if(TARGET test_serialized_message_allocator)
     target_include_directories(test_serialized_message_allocator PUBLIC
       ${test_msgs_INCLUDE_DIRS}
@@ -386,6 +379,14 @@ if(BUILD_TESTING)
     ament_target_dependencies(test_utilities
       "rcl")
     target_link_libraries(test_utilities ${PROJECT_NAME})
+  endif()
+
+  ament_add_gtest(test_init test/test_init.cpp
+    APPEND_LIBRARY_DIRS "${append_library_dirs}")
+  if(TARGET test_init)
+    ament_target_dependencies(test_init
+      "rcl")
+    target_link_libraries(test_init ${PROJECT_NAME})
   endif()
 
   ament_add_gtest(test_multi_threaded_executor test/executors/test_multi_threaded_executor.cpp

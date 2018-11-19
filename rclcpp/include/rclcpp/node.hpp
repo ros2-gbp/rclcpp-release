@@ -91,6 +91,8 @@ public:
    * \param[in] use_global_arguments False to prevent node using arguments passed to the process.
    * \param[in] use_intra_process_comms True to use the optimized intra-process communication
    * pipeline to pass messages between nodes in the same process using shared memory.
+   * \param[in] start_parameter_services True to setup ROS interfaces for accessing parameters
+   * in the node.
    */
   RCLCPP_PUBLIC
   Node(
@@ -319,6 +321,24 @@ public:
     ParameterT & value,
     const ParameterT & alternative_value) const;
 
+  /// Get the parameter value; if not set, set the "alternative value" and store it in the node.
+  /**
+   * If the parameter is set, then the "value" argument is assigned the value
+   * in the parameter.
+   * If the parameter is not set, then the "value" argument is assigned the "alternative_value",
+   * and the parameter is set to the "alternative_value" on the node.
+   *
+   * \param[in] name The name of the parameter to get.
+   * \param[out] value The output where the value of the parameter should be assigned.
+   * \param[in] alternative_value Value to be stored in output and parameter if the parameter was not set.
+   */
+  template<typename ParameterT>
+  void
+  get_parameter_or_set(
+    const std::string & name,
+    ParameterT & value,
+    const ParameterT & alternative_value);
+
   RCLCPP_PUBLIC
   std::vector<rcl_interfaces::msg::ParameterDescriptor>
   describe_parameters(const std::vector<std::string> & names) const;
@@ -340,6 +360,10 @@ public:
   template<typename CallbackT>
   void
   register_param_change_callback(CallbackT && callback);
+
+  RCLCPP_PUBLIC
+  std::vector<std::string>
+  get_node_names() const;
 
   RCLCPP_PUBLIC
   std::map<std::string, std::vector<std::string>>

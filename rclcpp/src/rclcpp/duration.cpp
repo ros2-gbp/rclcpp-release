@@ -88,9 +88,6 @@ Duration::operator=(const Duration & rhs)
 Duration &
 Duration::operator=(const builtin_interfaces::msg::Duration & duration_msg)
 {
-  if (duration_msg.sec < 0) {
-    throw std::runtime_error("cannot store a negative duration point in rclcpp::Duration");
-  }
   rcl_duration_.nanoseconds = RCL_S_TO_NS(static_cast<int64_t>(duration_msg.sec));
   rcl_duration_.nanoseconds += duration_msg.nanosec;
   return *this;
@@ -215,6 +212,18 @@ rcl_duration_value_t
 Duration::nanoseconds() const
 {
   return rcl_duration_.nanoseconds;
+}
+
+Duration
+Duration::max()
+{
+  return Duration(std::numeric_limits<int32_t>::max(), 999999999);
+}
+
+double
+Duration::seconds() const
+{
+  return std::chrono::duration<double>(std::chrono::nanoseconds(rcl_duration_.nanoseconds)).count();
 }
 
 }  // namespace rclcpp

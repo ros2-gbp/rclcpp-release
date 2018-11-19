@@ -227,6 +227,12 @@ Time::nanoseconds() const
   return rcl_time_.nanoseconds;
 }
 
+double
+Time::seconds() const
+{
+  return std::chrono::duration<double>(std::chrono::nanoseconds(rcl_time_.nanoseconds)).count();
+}
+
 rcl_clock_type_t
 Time::get_clock_type() const
 {
@@ -243,6 +249,12 @@ operator+(const rclcpp::Duration & lhs, const rclcpp::Time & rhs)
     throw std::underflow_error("addition leads to int64_t underflow");
   }
   return Time(lhs.nanoseconds() + rhs.nanoseconds(), rhs.get_clock_type());
+}
+
+Time
+Time::max()
+{
+  return Time(std::numeric_limits<int32_t>::max(), 999999999);
 }
 
 

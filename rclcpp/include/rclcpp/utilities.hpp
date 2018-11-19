@@ -87,6 +87,12 @@ RCLCPP_PUBLIC
 bool
 ok();
 
+/// Returns true if init() has already been called.
+/** \return True if init() has been called, false otherwise. */
+RCLCPP_PUBLIC
+bool
+is_initialized();
+
 /// Notify the signal handler and rmw that rclcpp is shutting down.
 RCLCPP_PUBLIC
 void
@@ -203,6 +209,26 @@ sub_will_underflow(const T x, const T y)
 {
   return (y > 0) && (x < (std::numeric_limits<T>::min() + y));
 }
+
+/// Return the given string.
+/**
+ * This function is overloaded to transform any string to C-style string.
+ *
+ * \param[in] string_in is the string to be returned
+ * \return the given string
+ */
+RCLCPP_PUBLIC
+const char *
+get_c_string(const char * string_in);
+
+/// Return the C string from the given std::string.
+/**
+ * \param[in] string_in is a std::string
+ * \return the C string from the std::string
+ */
+RCLCPP_PUBLIC
+const char *
+get_c_string(const std::string & string_in);
 
 }  // namespace rclcpp
 

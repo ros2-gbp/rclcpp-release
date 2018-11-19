@@ -13,7 +13,7 @@ endif()
 find_package(ament_cmake_ros REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rcl_lifecycle REQUIRED)
-find_package(std_msgs REQUIRED)
+find_package(rosidl_typesupport_cpp REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
 
 include_directories(include)
@@ -29,7 +29,9 @@ add_library(rclcpp_lifecycle
 ament_target_dependencies(rclcpp_lifecycle
   "rclcpp"
   "rcl_lifecycle"
-  "lifecycle_msgs")
+  "lifecycle_msgs"
+  "rosidl_typesupport_cpp"
+)
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
@@ -50,7 +52,6 @@ if(BUILD_TESTING)
     target_include_directories(test_lifecycle_node PUBLIC
       ${rcl_lifecycle_INCLUDE_DIRS}
       ${rclcpp_INCLUDE_DIRS}
-      ${rclcpp_lifecycle_INCLUDE_DIRS}
     )
     target_link_libraries(test_lifecycle_node ${PROJECT_NAME})
   endif()
@@ -59,7 +60,6 @@ if(BUILD_TESTING)
     target_include_directories(test_state_machine_info PUBLIC
       ${rcl_lifecycle_INCLUDE_DIRS}
       ${rclcpp_INCLUDE_DIRS}
-      ${rclcpp_lifecycle_INCLUDE_DIRS}
     )
     target_link_libraries(test_state_machine_info ${PROJECT_NAME})
   endif()
@@ -68,7 +68,6 @@ if(BUILD_TESTING)
     target_include_directories(test_register_custom_callbacks PUBLIC
       ${rcl_lifecycle_INCLUDE_DIRS}
       ${rclcpp_INCLUDE_DIRS}
-      ${rclcpp_lifecycle_INCLUDE_DIRS}
     )
     target_link_libraries(test_register_custom_callbacks ${PROJECT_NAME})
   endif()
@@ -77,7 +76,6 @@ if(BUILD_TESTING)
     target_include_directories(test_callback_exceptions PUBLIC
       ${rcl_lifecycle_INCLUDE_DIRS}
       ${rclcpp_INCLUDE_DIRS}
-      ${rclcpp_lifecycle_INCLUDE_DIRS}
     )
     target_link_libraries(test_callback_exceptions ${PROJECT_NAME})
   endif()
@@ -86,7 +84,6 @@ if(BUILD_TESTING)
     target_include_directories(test_state_wrapper PUBLIC
       ${rcl_lifecycle_INCLUDE_DIRS}
       ${rclcpp_INCLUDE_DIRS}
-      ${rclcpp_lifecycle_INCLUDE_DIRS}
     )
     target_link_libraries(test_state_wrapper ${PROJECT_NAME})
   endif()
@@ -95,7 +92,6 @@ if(BUILD_TESTING)
     target_include_directories(test_transition_wrapper PUBLIC
       ${rcl_lifecycle_INCLUDE_DIRS}
       ${rclcpp_INCLUDE_DIRS}
-      ${rclcpp_lifecycle_INCLUDE_DIRS}
     )
     target_link_libraries(test_transition_wrapper ${PROJECT_NAME})
   endif()

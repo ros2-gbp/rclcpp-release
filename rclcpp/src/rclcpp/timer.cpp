@@ -22,29 +22,34 @@
 
 using rclcpp::TimerBase;
 
-TimerBase::TimerBase(std::chrono::nanoseconds period)
+TimerBase::TimerBase(rclcpp::Clock::SharedPtr clock, std::chrono::nanoseconds period)
 {
+  clock_ = clock;
+
   timer_handle_ = std::shared_ptr<rcl_timer_t>(
-    new rcl_timer_t, [ = ](rcl_timer_t * timer)
+    new rcl_timer_t, [ = ](rcl_timer_t * timer) mutable
     {
       if (rcl_timer_fini(timer) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
-          "Failed to clean up rcl timer handle: %s", rcl_get_error_string_safe());
+          "Failed to clean up rcl timer handle: %s", rcl_get_error_string().str);
         rcl_reset_error();
       }
       delete timer;
+      // Captured shared pointer by copy, reset to make sure timer is finalized before clock
+      clock.reset();
     });
 
   *timer_handle_.get() = rcl_get_zero_initialized_timer();
 
+  rcl_clock_t * clock_handle = clock_->get_clock_handle();
   if (rcl_timer_init(
-      timer_handle_.get(), period.count(), nullptr,
+      timer_handle_.get(), clock_handle, period.count(), nullptr,
       rcl_get_default_allocator()) != RCL_RET_OK)
   {
     RCUTILS_LOG_ERROR_NAMED(
       "rclcpp",
-      "Couldn't initialize rcl timer handle: %s\n", rcl_get_error_string_safe());
+      "Couldn't initialize rcl timer handle: %s\n", rcl_get_error_string().str);
     rcl_reset_error();
   }
 }
@@ -56,7 +61,7 @@ void
 TimerBase::cancel()
 {
   if (rcl_timer_cancel(timer_handle_.get()) != RCL_RET_OK) {
-    throw std::runtime_error(std::string("Couldn't cancel timer: ") + rcl_get_error_string_safe());
+    throw std::runtime_error(std::string("Couldn't cancel timer: ") + rcl_get_error_string().str);
   }
 }
 
@@ -64,7 +69,7 @@ void
 TimerBase::reset()
 {
   if (rcl_timer_reset(timer_handle_.get()) != RCL_RET_OK) {
-    throw std::runtime_error(std::string("Couldn't reset timer: ") + rcl_get_error_string_safe());
+    throw std::runtime_error(std::string("Couldn't reset timer: ") + rcl_get_error_string().str);
   }
 }
 
@@ -73,7 +78,7 @@ TimerBase::is_ready()
 {
   bool ready = false;
   if (rcl_timer_is_ready(timer_handle_.get(), &ready) != RCL_RET_OK) {
-    throw std::runtime_error(std::string("Failed to check timer: ") + rcl_get_error_string_safe());
+    throw std::runtime_error(std::string("Failed to check timer: ") + rcl_get_error_string().str);
   }
   return ready;
 }
@@ -87,7 +92,7 @@ TimerBase::time_until_trigger()
   {
     throw std::runtime_error(
             std::string("Timer could not get time until next call: ") +
-            rcl_get_error_string_safe());
+            rcl_get_error_string().str);
   }
   return std::chrono::nanoseconds(time_until_next_call);
 }

@@ -34,7 +34,8 @@ namespace rclcpp
 {
 
 TimeSource::TimeSource(std::shared_ptr<rclcpp::Node> node)
-: ros_time_active_(false)
+: clock_subscription_(nullptr),
+  ros_time_active_(false)
 {
   this->attachNode(node);
 }
@@ -65,34 +66,12 @@ void TimeSource::attachNode(
   node_services_ = node_services_interface;
   // TODO(tfoote): Update QOS
 
-  const std::string & topic_name = "/clock";
-
-  rclcpp::callback_group::CallbackGroup::SharedPtr group;
-  using rclcpp::message_memory_strategy::MessageMemoryStrategy;
-  auto msg_mem_strat = MessageMemoryStrategy<MessageT, Alloc>::create_default();
-  auto allocator = std::make_shared<Alloc>();
-
-  auto cb = std::bind(&TimeSource::clock_cb, this, std::placeholders::_1);
-
-  clock_subscription_ = rclcpp::create_subscription<
-    MessageT, decltype(cb), Alloc, MessageT, SubscriptionT
-    >(
-    node_topics_.get(),
-    topic_name,
-    std::move(cb),
-    rmw_qos_profile_default,
-    group,
-    false,
-    false,
-    msg_mem_strat,
-    allocator);
-
   parameter_client_ = std::make_shared<rclcpp::AsyncParametersClient>(
     node_base_,
     node_topics_,
     node_graph_,
     node_services_
-    );
+  );
   parameter_subscription_ =
     parameter_client_->on_parameter_event(std::bind(&TimeSource::on_parameter_event,
       this, std::placeholders::_1));
@@ -147,69 +126,70 @@ void TimeSource::set_clock(
   const builtin_interfaces::msg::Time::SharedPtr msg, bool set_ros_time_enabled,
   std::shared_ptr<rclcpp::Clock> clock)
 {
-  // Compute diff
-  rclcpp::Time msg_time = rclcpp::Time(*msg);
-  rclcpp::Time now = clock->now();
-  auto diff = now - msg_time;
-  rclcpp::TimeJump jump;
-  jump.delta_.nanoseconds = diff.nanoseconds();
-
-  // Compute jump type
-  if (clock->ros_time_is_active()) {
-    if (set_ros_time_enabled) {
-      jump.jump_type_ = TimeJump::ClockChange_t::ROS_TIME_NO_CHANGE;
-    } else {
-      jump.jump_type_ = TimeJump::ClockChange_t::ROS_TIME_DEACTIVATED;
-    }
-  } else if (!clock->ros_time_is_active()) {
-    if (set_ros_time_enabled) {
-      jump.jump_type_ = TimeJump::ClockChange_t::ROS_TIME_ACTIVATED;
-    } else {
-      jump.jump_type_ = TimeJump::ClockChange_t::SYSTEM_TIME_NO_CHANGE;
-    }
-  }
-
-  if (jump.jump_type_ == TimeJump::ClockChange_t::SYSTEM_TIME_NO_CHANGE) {
-    // No change/no updates don't act.
-    return;
-  }
-
-  auto active_callbacks = clock->get_triggered_callback_handlers(jump);
-  clock->invoke_prejump_callbacks(active_callbacks);
-
   // Do change
-  if (jump.jump_type_ == TimeJump::ClockChange_t::ROS_TIME_DEACTIVATED) {
+  if (!set_ros_time_enabled && clock->ros_time_is_active()) {
     disable_ros_time(clock);
-  } else if (jump.jump_type_ == TimeJump::ClockChange_t::ROS_TIME_ACTIVATED) {
+  } else if (set_ros_time_enabled && !clock->ros_time_is_active()) {
     enable_ros_time(clock);
   }
 
-  if (jump.jump_type_ == TimeJump::ClockChange_t::ROS_TIME_ACTIVATED ||
-    jump.jump_type_ == TimeJump::ClockChange_t::ROS_TIME_NO_CHANGE)
-  {
-    auto ret = rcl_set_ros_time_override(&(clock->rcl_clock_), msg_time.nanoseconds());
-    if (ret != RCL_RET_OK) {
-      rclcpp::exceptions::throw_from_rcl_error(
-        ret, "Failed to set ros_time_override_status");
-    }
+  auto ret = rcl_set_ros_time_override(&(clock->rcl_clock_), rclcpp::Time(*msg).nanoseconds());
+  if (ret != RCL_RET_OK) {
+    rclcpp::exceptions::throw_from_rcl_error(
+      ret, "Failed to set ros_time_override_status");
   }
-  // Post change callbacks
-  clock->invoke_postjump_callbacks(active_callbacks, jump);
 }
 
 void TimeSource::clock_cb(const rosgraph_msgs::msg::Clock::SharedPtr msg)
 {
-  if (!this->ros_time_active_) {
+  if (!this->ros_time_active_ && SET_TRUE == this->parameter_state_) {
     enable_ros_time();
   }
   // Cache the last message in case a new clock is attached.
   last_msg_set_ = msg;
   auto time_msg = std::make_shared<builtin_interfaces::msg::Time>(msg->clock);
 
-  std::lock_guard<std::mutex> guard(clock_list_lock_);
-  for (auto it = associated_clocks_.begin(); it != associated_clocks_.end(); ++it) {
-    set_clock(time_msg, true, *it);
+  if (SET_TRUE == this->parameter_state_) {
+    std::lock_guard<std::mutex> guard(clock_list_lock_);
+    for (auto it = associated_clocks_.begin(); it != associated_clocks_.end(); ++it) {
+      set_clock(time_msg, true, *it);
+    }
   }
+}
+
+void TimeSource::create_clock_sub()
+{
+  std::lock_guard<std::mutex> guard(clock_sub_lock_);
+  if (clock_subscription_) {
+    // Subscription already created.
+    return;
+  }
+  const std::string topic_name = "/clock";
+
+  rclcpp::callback_group::CallbackGroup::SharedPtr group;
+  using rclcpp::message_memory_strategy::MessageMemoryStrategy;
+  auto msg_mem_strat = MessageMemoryStrategy<MessageT, Alloc>::create_default();
+  auto allocator = std::make_shared<Alloc>();
+  auto cb = std::bind(&TimeSource::clock_cb, this, std::placeholders::_1);
+
+  clock_subscription_ = rclcpp::create_subscription<
+    MessageT, decltype(cb), Alloc, MessageT, SubscriptionT
+    >(
+    node_topics_.get(),
+    topic_name,
+    std::move(cb),
+    rmw_qos_profile_default,
+    group,
+    false,
+    false,
+    msg_mem_strat,
+    allocator);
+}
+
+void TimeSource::destroy_clock_sub()
+{
+  std::lock_guard<std::mutex> guard(clock_sub_lock_);
+  clock_subscription_.reset();
 }
 
 void TimeSource::on_parameter_event(const rcl_interfaces::msg::ParameterEvent::SharedPtr event)
@@ -226,9 +206,11 @@ void TimeSource::on_parameter_event(const rcl_interfaces::msg::ParameterEvent::S
     if (it.second->value.bool_value) {
       parameter_state_ = SET_TRUE;
       enable_ros_time();
+      create_clock_sub();
     } else {
       parameter_state_ = SET_FALSE;
       disable_ros_time();
+      destroy_clock_sub();
     }
   }
   // Handle the case that use_sim_time was deleted.

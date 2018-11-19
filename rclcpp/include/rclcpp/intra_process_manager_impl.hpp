@@ -45,7 +45,7 @@ public:
   RCLCPP_SMART_PTR_DEFINITIONS_NOT_COPYABLE(IntraProcessManagerImplBase)
 
   IntraProcessManagerImplBase() = default;
-  ~IntraProcessManagerImplBase() = default;
+  virtual ~IntraProcessManagerImplBase() = default;
 
   virtual void
   add_subscription(uint64_t id, SubscriptionBase::SharedPtr subscription) = 0;
@@ -262,7 +262,7 @@ private:
     std::hash<uint64_t>, std::equal_to<uint64_t>,
     RebindAlloc<std::pair<const uint64_t, SubscriptionBase::WeakPtr>>>;
 
-  struct strcmp_wrapper : public std::binary_function<const char *, const char *, bool>
+  struct strcmp_wrapper
   {
     bool
     operator()(const char * lhs, const char * rhs) const
