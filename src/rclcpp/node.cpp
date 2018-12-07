@@ -31,6 +31,7 @@
 #include "rclcpp/node_interfaces/node_services.hpp"
 #include "rclcpp/node_interfaces/node_timers.hpp"
 #include "rclcpp/node_interfaces/node_topics.hpp"
+#include "rclcpp/node_interfaces/node_waitables.hpp"
 
 using rclcpp::Node;
 using rclcpp::exceptions::throw_from_rcl_error;
@@ -66,20 +67,23 @@ Node::Node(
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
   node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get())),
   node_services_(new rclcpp::node_interfaces::NodeServices(node_base_.get())),
-  node_parameters_(new rclcpp::node_interfaces::NodeParameters(
-      node_base_,
-      node_topics_,
-      node_services_,
-      initial_parameters,
-      use_intra_process_comms,
-      start_parameter_services
-    )),
   node_clock_(new rclcpp::node_interfaces::NodeClock(
       node_base_,
       node_topics_,
       node_graph_,
-      node_services_
+      node_services_,
+      node_logging_
     )),
+  node_parameters_(new rclcpp::node_interfaces::NodeParameters(
+      node_base_,
+      node_topics_,
+      node_services_,
+      node_clock_,
+      initial_parameters,
+      use_intra_process_comms,
+      start_parameter_services
+    )),
+  node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
   use_intra_process_comms_(use_intra_process_comms)
 {
 }
@@ -253,6 +257,12 @@ Node::get_node_graph_interface()
   return node_graph_;
 }
 
+rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr
+Node::get_node_logging_interface()
+{
+  return node_logging_;
+}
+
 rclcpp::node_interfaces::NodeTimersInterface::SharedPtr
 Node::get_node_timers_interface()
 {
@@ -275,4 +285,10 @@ rclcpp::node_interfaces::NodeParametersInterface::SharedPtr
 Node::get_node_parameters_interface()
 {
   return node_parameters_;
+}
+
+rclcpp::node_interfaces::NodeWaitablesInterface::SharedPtr
+Node::get_node_waitables_interface()
+{
+  return node_waitables_;
 }

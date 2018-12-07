@@ -12,18 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <gtest/gtest.h>
+#include "rclcpp/waitable.hpp"
 
-#include "rclcpp/utilities.hpp"
+using rclcpp::Waitable;
 
-TEST(TestInit, is_initialized) {
-  EXPECT_FALSE(rclcpp::is_initialized());
+size_t
+Waitable::get_number_of_ready_subscriptions()
+{
+  return 0u;
+}
 
-  rclcpp::init(0, nullptr);
+size_t
+Waitable::get_number_of_ready_timers()
+{
+  return 0u;
+}
 
-  EXPECT_TRUE(rclcpp::is_initialized());
+size_t
+Waitable::get_number_of_ready_clients()
+{
+  return 0u;
+}
 
-  rclcpp::shutdown();
+size_t
+Waitable::get_number_of_ready_services()
+{
+  return 0u;
+}
 
-  EXPECT_FALSE(rclcpp::is_initialized());
+size_t
+Waitable::get_number_of_ready_guard_conditions()
+{
+  return 0u;
 }

@@ -87,28 +87,40 @@ public:
     service_handles_.clear();
     client_handles_.clear();
     timer_handles_.clear();
+    waitable_handles_.clear();
   }
 
   virtual void remove_null_handles(rcl_wait_set_t * wait_set)
   {
-    for (size_t i = 0; i < wait_set->size_of_subscriptions; ++i) {
+    // TODO(jacobperron): Check if wait set sizes are what we expect them to be?
+    //                    e.g. wait_set->size_of_clients == client_handles_.size()
+
+    // Important to use subscription_handles_.size() instead of wait set's size since
+    // there may be more subscriptions in the wait set due to Waitables added to the end.
+    // The same logic applies for other entities.
+    for (size_t i = 0; i < subscription_handles_.size(); ++i) {
       if (!wait_set->subscriptions[i]) {
         subscription_handles_[i].reset();
       }
     }
-    for (size_t i = 0; i < wait_set->size_of_services; ++i) {
+    for (size_t i = 0; i < service_handles_.size(); ++i) {
       if (!wait_set->services[i]) {
         service_handles_[i].reset();
       }
     }
-    for (size_t i = 0; i < wait_set->size_of_clients; ++i) {
+    for (size_t i = 0; i < client_handles_.size(); ++i) {
       if (!wait_set->clients[i]) {
         client_handles_[i].reset();
       }
     }
-    for (size_t i = 0; i < wait_set->size_of_timers; ++i) {
+    for (size_t i = 0; i < timer_handles_.size(); ++i) {
       if (!wait_set->timers[i]) {
         timer_handles_[i].reset();
+      }
+    }
+    for (size_t i = 0; i < waitable_handles_.size(); ++i) {
+      if (!waitable_handles_[i]->is_ready(wait_set)) {
+        waitable_handles_[i].reset();
       }
     }
 
@@ -130,6 +142,11 @@ public:
     timer_handles_.erase(
       std::remove(timer_handles_.begin(), timer_handles_.end(), nullptr),
       timer_handles_.end()
+    );
+
+    waitable_handles_.erase(
+      std::remove(waitable_handles_.begin(), waitable_handles_.end(), nullptr),
+      waitable_handles_.end()
     );
   }
 
@@ -175,6 +192,12 @@ public:
             timer_handles_.push_back(timer->get_timer_handle());
           }
         }
+        for (auto & weak_waitable : group->get_waitable_ptrs()) {
+          auto waitable = weak_waitable.lock();
+          if (waitable) {
+            waitable_handles_.push_back(waitable);
+          }
+        }
       }
     }
     return has_invalid_weak_nodes;
@@ -183,7 +206,7 @@ public:
   bool add_handles_to_wait_set(rcl_wait_set_t * wait_set)
   {
     for (auto subscription : subscription_handles_) {
-      if (rcl_wait_set_add_subscription(wait_set, subscription.get()) != RCL_RET_OK) {
+      if (rcl_wait_set_add_subscription(wait_set, subscription.get(), NULL) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add subscription to wait set: %s", rcl_get_error_string().str);
@@ -192,7 +215,7 @@ public:
     }
 
     for (auto client : client_handles_) {
-      if (rcl_wait_set_add_client(wait_set, client.get()) != RCL_RET_OK) {
+      if (rcl_wait_set_add_client(wait_set, client.get(), NULL) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add client to wait set: %s", rcl_get_error_string().str);
@@ -201,7 +224,7 @@ public:
     }
 
     for (auto service : service_handles_) {
-      if (rcl_wait_set_add_service(wait_set, service.get()) != RCL_RET_OK) {
+      if (rcl_wait_set_add_service(wait_set, service.get(), NULL) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add service to wait set: %s", rcl_get_error_string().str);
@@ -210,7 +233,7 @@ public:
     }
 
     for (auto timer : timer_handles_) {
-      if (rcl_wait_set_add_timer(wait_set, timer.get()) != RCL_RET_OK) {
+      if (rcl_wait_set_add_timer(wait_set, timer.get(), NULL) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add timer to wait set: %s", rcl_get_error_string().str);
@@ -219,11 +242,20 @@ public:
     }
 
     for (auto guard_condition : guard_conditions_) {
-      if (rcl_wait_set_add_guard_condition(wait_set, guard_condition) != RCL_RET_OK) {
+      if (rcl_wait_set_add_guard_condition(wait_set, guard_condition, NULL) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add guard_condition to wait set: %s",
           rcl_get_error_string().str);
+        return false;
+      }
+    }
+
+    for (auto waitable : waitable_handles_) {
+      if (!waitable->add_to_wait_set(wait_set)) {
+        RCUTILS_LOG_ERROR_NAMED(
+          "rclcpp",
+          "Couldn't add waitable to wait set: %s", rcl_get_error_string().str);
         return false;
       }
     }
@@ -342,6 +374,39 @@ public:
     }
   }
 
+  virtual void
+  get_next_waitable(executor::AnyExecutable & any_exec, const WeakNodeVector & weak_nodes)
+  {
+    auto it = waitable_handles_.begin();
+    while (it != waitable_handles_.end()) {
+      auto waitable = *it;
+      if (waitable) {
+        // Find the group for this handle and see if it can be serviced
+        auto group = get_group_by_waitable(waitable, weak_nodes);
+        if (!group) {
+          // Group was not found, meaning the waitable is not valid...
+          // Remove it from the ready list and continue looking
+          it = waitable_handles_.erase(it);
+          continue;
+        }
+        if (!group->can_be_taken_from().load()) {
+          // Group is mutually exclusive and is being used, so skip it for now
+          // Leave it to be checked next time, but continue searching
+          ++it;
+          continue;
+        }
+        // Otherwise it is safe to set and return the any_exec
+        any_exec.waitable = waitable;
+        any_exec.callback_group = group;
+        any_exec.node_base = get_node_by_group(group, weak_nodes);
+        waitable_handles_.erase(it);
+        return;
+      }
+      // Else, the waitable is no longer valid, remove it and continue
+      it = waitable_handles_.erase(it);
+    }
+  }
+
   virtual rcl_allocator_t get_allocator()
   {
     return rclcpp::allocator::get_rcl_allocator<void *, VoidAlloc>(*allocator_.get());
@@ -349,27 +414,52 @@ public:
 
   size_t number_of_ready_subscriptions() const
   {
-    return subscription_handles_.size();
+    size_t number_of_subscriptions = subscription_handles_.size();
+    for (auto waitable : waitable_handles_) {
+      number_of_subscriptions += waitable->get_number_of_ready_subscriptions();
+    }
+    return number_of_subscriptions;
   }
 
   size_t number_of_ready_services() const
   {
-    return service_handles_.size();
+    size_t number_of_services = service_handles_.size();
+    for (auto waitable : waitable_handles_) {
+      number_of_services += waitable->get_number_of_ready_services();
+    }
+    return number_of_services;
   }
 
   size_t number_of_ready_clients() const
   {
-    return client_handles_.size();
+    size_t number_of_clients = client_handles_.size();
+    for (auto waitable : waitable_handles_) {
+      number_of_clients += waitable->get_number_of_ready_clients();
+    }
+    return number_of_clients;
   }
 
   size_t number_of_guard_conditions() const
   {
-    return guard_conditions_.size();
+    size_t number_of_guard_conditions = guard_conditions_.size();
+    for (auto waitable : waitable_handles_) {
+      number_of_guard_conditions += waitable->get_number_of_ready_guard_conditions();
+    }
+    return number_of_guard_conditions;
   }
 
   size_t number_of_ready_timers() const
   {
-    return timer_handles_.size();
+    size_t number_of_timers = timer_handles_.size();
+    for (auto waitable : waitable_handles_) {
+      number_of_timers += waitable->get_number_of_ready_timers();
+    }
+    return number_of_timers;
+  }
+
+  size_t number_of_waitables() const
+  {
+    return waitable_handles_.size();
   }
 
 private:
@@ -383,6 +473,7 @@ private:
   VectorRebind<std::shared_ptr<const rcl_service_t>> service_handles_;
   VectorRebind<std::shared_ptr<const rcl_client_t>> client_handles_;
   VectorRebind<std::shared_ptr<const rcl_timer_t>> timer_handles_;
+  VectorRebind<std::shared_ptr<Waitable>> waitable_handles_;
 
   std::shared_ptr<VoidAlloc> allocator_;
 };

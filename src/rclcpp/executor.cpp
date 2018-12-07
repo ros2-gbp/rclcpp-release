@@ -30,6 +30,7 @@
 
 #include "rcutils/logging_macros.h"
 
+using rclcpp::exceptions::throw_from_rcl_error;
 using rclcpp::executor::AnyExecutable;
 using rclcpp::executor::Executor;
 using rclcpp::executor::ExecutorArgs;
@@ -40,23 +41,25 @@ Executor::Executor(const ExecutorArgs & args)
   memory_strategy_(args.memory_strategy)
 {
   rcl_guard_condition_options_t guard_condition_options = rcl_guard_condition_get_default_options();
-  if (rcl_guard_condition_init(
-      &interrupt_guard_condition_, guard_condition_options) != RCL_RET_OK)
-  {
-    throw std::runtime_error(
-            std::string("Failed to create interrupt guard condition in Executor constructor: ") +
-            rcl_get_error_string().str);
+  rcl_ret_t ret = rcl_guard_condition_init(
+    &interrupt_guard_condition_, args.context->get_rcl_context().get(), guard_condition_options);
+  if (RCL_RET_OK != ret) {
+    throw_from_rcl_error(ret, "Failed to create interrupt guard condition in Executor constructor");
   }
 
   // The number of guard conditions is always at least 2: 1 for the ctrl-c guard cond,
   // and one for the executor's guard cond (interrupt_guard_condition_)
 
   // Put the global ctrl-c guard condition in
-  memory_strategy_->add_guard_condition(rclcpp::get_sigint_guard_condition(&wait_set_));
+  memory_strategy_->add_guard_condition(
+    rclcpp::get_sigint_guard_condition(&wait_set_, args.context));
 
   // Put the executor's guard condition in
   memory_strategy_->add_guard_condition(&interrupt_guard_condition_);
   rcl_allocator_t allocator = memory_strategy_->get_allocator();
+
+  // Store the context for later use.
+  context_ = args.context;
 
   if (rcl_wait_set_init(
       &wait_set_, 0, 2, 0, 0, 0, allocator) != RCL_RET_OK)
@@ -103,7 +106,7 @@ Executor::~Executor()
   }
   // Remove and release the sigint guard condition
   memory_strategy_->remove_guard_condition(
-    rclcpp::get_sigint_guard_condition(&wait_set_));
+    rclcpp::get_sigint_guard_condition(&wait_set_, context_));
   rclcpp::release_sigint_guard_condition(&wait_set_);
 }
 
@@ -281,6 +284,9 @@ Executor::execute_any_executable(AnyExecutable & any_exec)
   if (any_exec.client) {
     execute_client(any_exec.client);
   }
+  if (any_exec.waitable) {
+    any_exec.waitable->execute();
+  }
   // Reset the callback_group, regardless of type
   any_exec.callback_group->can_be_taken_from().store(true);
   // Wake the wait, because it may need to be recalculated or work that
@@ -427,6 +433,7 @@ Executor::wait_for_work(std::chrono::nanoseconds timeout)
     throw std::runtime_error("Couldn't clear wait set");
   }
 
+  // The size of waitables are accounted for in size of the other entities
   rcl_ret_t ret = rcl_wait_set_resize(
     &wait_set_, memory_strategy_->number_of_ready_subscriptions(),
     memory_strategy_->number_of_guard_conditions(), memory_strategy_->number_of_ready_timers(),
@@ -547,6 +554,11 @@ Executor::get_next_ready_executable(AnyExecutable & any_executable)
   // Check the clients to see if there are any that are ready
   memory_strategy_->get_next_client(any_executable, weak_nodes_);
   if (any_executable.client) {
+    return true;
+  }
+  // Check the waitables to see if there are any that are ready
+  memory_strategy_->get_next_waitable(any_executable, weak_nodes_);
+  if (any_executable.waitable) {
     return true;
   }
   // If there is no ready executable, return a null ptr
