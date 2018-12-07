@@ -35,6 +35,7 @@
 #include "rclcpp/node_interfaces/node_services.hpp"
 #include "rclcpp/node_interfaces/node_timers.hpp"
 #include "rclcpp/node_interfaces/node_topics.hpp"
+#include "rclcpp/node_interfaces/node_waitables.hpp"
 #include "rclcpp/parameter_service.hpp"
 
 #include "lifecycle_node_interface_impl.hpp"  // implementation
@@ -73,20 +74,23 @@ LifecycleNode::LifecycleNode(
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
   node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get())),
   node_services_(new rclcpp::node_interfaces::NodeServices(node_base_.get())),
-  node_parameters_(new rclcpp::node_interfaces::NodeParameters(
-      node_base_,
-      node_topics_,
-      node_services_,
-      initial_parameters,
-      use_intra_process_comms,
-      start_parameter_services
-    )),
   node_clock_(new rclcpp::node_interfaces::NodeClock(
       node_base_,
       node_topics_,
       node_graph_,
-      node_services_
+      node_services_,
+      node_logging_
     )),
+  node_parameters_(new rclcpp::node_interfaces::NodeParameters(
+      node_base_,
+      node_topics_,
+      node_services_,
+      node_clock_,
+      initial_parameters,
+      use_intra_process_comms,
+      start_parameter_services
+    )),
+  node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
   use_intra_process_comms_(use_intra_process_comms),
   impl_(new LifecycleNodeInterfaceImpl(node_base_, node_services_))
 {
@@ -295,6 +299,12 @@ rclcpp::node_interfaces::NodeParametersInterface::SharedPtr
 LifecycleNode::get_node_parameters_interface()
 {
   return node_parameters_;
+}
+
+rclcpp::node_interfaces::NodeWaitablesInterface::SharedPtr
+LifecycleNode::get_node_waitables_interface()
+{
+  return node_waitables_;
 }
 
 

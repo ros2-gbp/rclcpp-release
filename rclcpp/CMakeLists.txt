@@ -40,6 +40,7 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/executors/multi_threaded_executor.cpp
   src/rclcpp/executors/single_threaded_executor.cpp
   src/rclcpp/graph_listener.cpp
+  src/rclcpp/init_options.cpp
   src/rclcpp/intra_process_manager.cpp
   src/rclcpp/intra_process_manager_impl.cpp
   src/rclcpp/logger.cpp
@@ -54,6 +55,7 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/node_interfaces/node_services.cpp
   src/rclcpp/node_interfaces/node_timers.cpp
   src/rclcpp/node_interfaces/node_topics.cpp
+  src/rclcpp/node_interfaces/node_waitables.cpp
   src/rclcpp/parameter.cpp
   src/rclcpp/parameter_value.cpp
   src/rclcpp/parameter_client.cpp
@@ -68,6 +70,7 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/timer.cpp
   src/rclcpp/type_support.cpp
   src/rclcpp/utilities.cpp
+  src/rclcpp/waitable.cpp
 )
 
 # "watch" template for changes
