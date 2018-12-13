@@ -1,0 +1,12 @@
+Source: ros-crystal-rclcpp
+Section: misc
+Priority: extra
+Maintainer: Dirk Thomas <dthomas@osrfoundation.org>
+Build-Depends: debhelper (>= 9.0.0), ros-crystal-ament-cmake-gmock, ros-crystal-ament-cmake-gtest, ros-crystal-ament-cmake-ros, ros-crystal-ament-lint-auto, ros-crystal-ament-lint-common, ros-crystal-builtin-interfaces, ros-crystal-rcl, ros-crystal-rcl-interfaces, ros-crystal-rcl-yaml-param-parser, ros-crystal-rmw, ros-crystal-rmw-implementation, ros-crystal-rmw-implementation-cmake, ros-crystal-rosgraph-msgs, ros-crystal-rosidl-generator-cpp, ros-crystal-rosidl-typesupport-c, ros-crystal-rosidl-typesupport-cpp, ros-crystal-test-msgs, ros-crystal-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-crystal-rclcpp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-crystal-ament-cmake, ros-crystal-builtin-interfaces, ros-crystal-rcl, ros-crystal-rcl-interfaces, ros-crystal-rcl-yaml-param-parser, ros-crystal-rmw, ros-crystal-rmw-implementation, ros-crystal-rosgraph-msgs, ros-crystal-rosidl-generator-cpp, ros-crystal-rosidl-typesupport-c, ros-crystal-rosidl-typesupport-cpp, ros-crystal-ros-workspace
+Description: The ROS client library in C++.
