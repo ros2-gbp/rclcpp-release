@@ -1,0 +1,24 @@
+ros-crystal-rclcpp-action (0.6.3-0bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Fri, 08 Feb 2019 08:00:00 -0000
+
+ros-crystal-rclcpp-action (0.6.2-0bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Thu, 13 Dec 2018 08:00:00 -0000
+
+ros-crystal-rclcpp-action (0.6.1-0bionic) bionic; urgency=high
+
+  * Added wait_for_action_server() for action clients (#598 <https://github.com/ros2/rclcpp/issues/598>)
+  * Updated to adapt to action implicit changes (#602 <https://github.com/ros2/rclcpp/issues/602>)
+  * Added rclcpp_action Server implementation (#593 <https://github.com/ros2/rclcpp/issues/593>)
+  * Added action client implementation (#594 <https://github.com/ros2/rclcpp/issues/594>)
+  * Added skeleton for Action Server and Client (#579 <https://github.com/ros2/rclcpp/issues/579>)
+  * Contributors: Michel Hidalgo, Shane Loretz, William Woodall
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Fri, 07 Dec 2018 08:00:00 -0000
+
+
