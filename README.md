@@ -1,3 +1,29 @@
+## rclcpp (crystal) - 0.6.4-0
+
+The packages in the `rclcpp` repository were released into the `crystal` distro by running `/usr/bin/bloom-release -r crystal rclcpp --override-release-repository-push-url git@github.com:ros2-gbp/rclcpp-release` on `Sat, 06 Apr 2019 04:58:04 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `0.6.3-0`
+- old version: `0.6.3-0`
+- new version: `0.6.4-0`
+
+Versions of tools used:
+
+- bloom version: `0.7.2`
+- catkin_pkg version: `0.4.11`
+- rosdep version: `0.15.1`
+- rosdistro version: `0.7.3`
+- vcstools version: `0.1.40`
+
+
 ## rclcpp (crystal) - 0.6.3-0
 
 The packages in the `rclcpp` repository were released into the `crystal` distro by running `/usr/bin/bloom-release -r crystal rclcpp --override-release-repository-push-url git@github.com:ros2-gbp/rclcpp-release` on `Fri, 08 Feb 2019 18:56:22 -0000`
