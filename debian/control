@@ -1,0 +1,12 @@
+Source: ros-crystal-rclcpp-action
+Section: misc
+Priority: extra
+Maintainer: Dirk Thomas <dthomas@osrfoundation.org>
+Build-Depends: debhelper (>= 9.0.0), ros-crystal-action-msgs, ros-crystal-ament-cmake, ros-crystal-ament-cmake-gtest, ros-crystal-ament-cmake-ros, ros-crystal-ament-lint-auto, ros-crystal-ament-lint-common, ros-crystal-rcl-action, ros-crystal-rclcpp, ros-crystal-rosidl-generator-c, ros-crystal-rosidl-generator-cpp, ros-crystal-test-msgs, ros-crystal-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-crystal-rclcpp-action
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-crystal-action-msgs, ros-crystal-ament-cmake, ros-crystal-rcl-action, ros-crystal-rclcpp, ros-crystal-rosidl-generator-c, ros-crystal-rosidl-generator-cpp, ros-crystal-ros-workspace
+Description: Adds action APIs for C++.
