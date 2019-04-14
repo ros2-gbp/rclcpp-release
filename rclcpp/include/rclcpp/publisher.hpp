@@ -45,6 +45,15 @@ namespace node_interfaces
 class NodeTopicsInterface;
 }
 
+namespace intra_process_manager
+{
+/**
+ * NOTE(ivanpauno): IntraProcessManager is forward declared here, avoiding a circular inclusion between intra_process_manager.hpp and publisher.hpp.
+ * SharedPtr and WeakPtr of the IntraProcessManager are defined again here, to avoid a warning for accessing a member of a forward declared class.
+ */
+class IntraProcessManager;
+}
+
 class PublisherBase
 {
   friend ::rclcpp::node_interfaces::NodeTopicsInterface;
@@ -107,6 +116,32 @@ public:
   const rcl_publisher_t *
   get_publisher_handle() const;
 
+  /// Get subscription count
+  /** \return The number of subscriptions. */
+  RCLCPP_PUBLIC
+  size_t
+  get_subscription_count() const;
+
+  /// Get intraprocess subscription count
+  /** \return The number of intraprocess subscriptions. */
+  RCLCPP_PUBLIC
+  size_t
+  get_intra_process_subscription_count() const;
+
+  /// Get the actual QoS settings, after the defaults have been determined.
+  /**
+   * The actual configuration applied when using RMW_QOS_POLICY_*_SYSTEM_DEFAULT
+   * can only be resolved after the creation of the publisher, and it
+   * depends on the underlying rmw implementation.
+   * If the underlying setting in use can't be represented in ROS terms,
+   * it will be set to RMW_QOS_POLICY_*_UNKNOWN.
+   * May throw runtime_error when an unexpected error occurs.
+   * \return The actual qos settings.
+   */
+  RCLCPP_PUBLIC
+  rmw_qos_profile_t
+  get_actual_qos() const;
+
   /// Compare this publisher to a gid.
   /**
    * Note that this function calls the next function.
@@ -128,13 +163,16 @@ public:
   operator==(const rmw_gid_t * gid) const;
 
   using StoreMessageCallbackT = std::function<uint64_t(uint64_t, void *, const std::type_info &)>;
+  using IntraProcessManagerSharedPtr =
+    std::shared_ptr<rclcpp::intra_process_manager::IntraProcessManager>;
 
   /// Implementation utility function used to setup intra process publishing after creation.
   RCLCPP_PUBLIC
   void
   setup_intra_process(
     uint64_t intra_process_publisher_id,
-    StoreMessageCallbackT callback,
+    StoreMessageCallbackT store_callback,
+    IntraProcessManagerSharedPtr ipm,
     const rcl_publisher_options_t & intra_process_options);
 
 protected:
@@ -143,6 +181,10 @@ protected:
   rcl_publisher_t publisher_handle_ = rcl_get_zero_initialized_publisher();
   rcl_publisher_t intra_process_publisher_handle_ = rcl_get_zero_initialized_publisher();
 
+  using IntraProcessManagerWeakPtr =
+    std::weak_ptr<rclcpp::intra_process_manager::IntraProcessManager>;
+  bool intra_process_is_enabled_;
+  IntraProcessManagerWeakPtr weak_ipm_;
   uint64_t intra_process_publisher_id_;
   StoreMessageCallbackT store_intra_process_message_;
 
@@ -188,7 +230,11 @@ public:
   virtual void
   publish(std::unique_ptr<MessageT, MessageDeleter> & msg)
   {
-    this->do_inter_process_publish(msg.get());
+    bool inter_process_subscriptions_exist =
+      get_subscription_count() > get_intra_process_subscription_count();
+    if (!intra_process_is_enabled_ || inter_process_subscriptions_exist) {
+      this->do_inter_process_publish(msg.get());
+    }
     if (store_intra_process_message_) {
       // Take the pointer from the unique_msg, release it and pass as a void *
       // to the ipm. The ipm should then capture it again as a unique_ptr of
