@@ -2,14 +2,6 @@
 Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-0.6.4 (2019-04-05)
-------------------
-* Wait for action server before sending goal (`#686 <https://github.com/ros2/rclcpp/issues/686>`_)
-* Contributors: Jacob Perron, Shane Loretz
-
-0.6.3 (2019-02-08)
-------------------
-
 0.6.2 (2018-12-13)
 ------------------
 
