@@ -21,6 +21,7 @@
 
 #include "rclcpp/context.hpp"
 #include "rclcpp/macros.hpp"
+#include "rclcpp/node_options.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/visibility_control.hpp"
 
@@ -39,9 +40,7 @@ public:
   NodeBase(
     const std::string & node_name,
     const std::string & namespace_,
-    rclcpp::Context::SharedPtr context,
-    const std::vector<std::string> & arguments,
-    bool use_global_arguments);
+    const NodeOptions & options);
 
   RCLCPP_PUBLIC
   virtual
@@ -56,6 +55,11 @@ public:
   virtual
   const char *
   get_namespace() const;
+
+  RCLCPP_PUBLIC
+  virtual
+  const char *
+  get_fully_qualified_name() const;
 
   RCLCPP_PUBLIC
   virtual
