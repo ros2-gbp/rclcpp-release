@@ -138,10 +138,10 @@ public:
   bool
   service_is_ready() const;
 
-  template<typename RatioT = std::milli>
+  template<typename RepT = int64_t, typename RatioT = std::milli>
   bool
   wait_for_service(
-    std::chrono::duration<int64_t, RatioT> timeout = std::chrono::duration<int64_t, RatioT>(-1))
+    std::chrono::duration<RepT, RatioT> timeout = std::chrono::duration<RepT, RatioT>(-1))
   {
     return wait_for_service_nanoseconds(
       std::chrono::duration_cast<std::chrono::nanoseconds>(timeout)
@@ -182,6 +182,29 @@ public:
   SyncParametersClient(
     rclcpp::executor::Executor::SharedPtr executor,
     rclcpp::Node::SharedPtr node,
+    const std::string & remote_node_name = "",
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
+
+  RCLCPP_PUBLIC
+  explicit SyncParametersClient(
+    rclcpp::Node * node,
+    const std::string & remote_node_name = "",
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
+
+  RCLCPP_PUBLIC
+  SyncParametersClient(
+    rclcpp::executor::Executor::SharedPtr executor,
+    rclcpp::Node * node,
+    const std::string & remote_node_name = "",
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
+
+  RCLCPP_PUBLIC
+  SyncParametersClient(
+    rclcpp::executor::Executor::SharedPtr executor,
+    const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_interface,
+    const rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_interface,
+    const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_interface,
+    const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services_interface,
     const std::string & remote_node_name = "",
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
@@ -258,17 +281,17 @@ public:
     return async_parameters_client_->service_is_ready();
   }
 
-  template<typename RatioT = std::milli>
+  template<typename RepT = int64_t, typename RatioT = std::milli>
   bool
   wait_for_service(
-    std::chrono::duration<int64_t, RatioT> timeout = std::chrono::duration<int64_t, RatioT>(-1))
+    std::chrono::duration<RepT, RatioT> timeout = std::chrono::duration<RepT, RatioT>(-1))
   {
     return async_parameters_client_->wait_for_service(timeout);
   }
 
 private:
   rclcpp::executor::Executor::SharedPtr executor_;
-  rclcpp::Node::SharedPtr node_;
+  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_interface_;
   AsyncParametersClient::SharedPtr async_parameters_client_;
 };
 
