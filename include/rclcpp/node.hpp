@@ -41,6 +41,7 @@
 #include "rclcpp/logger.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/message_memory_strategy.hpp"
+#include "rclcpp/node_options.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/node_interfaces/node_clock_interface.hpp"
 #include "rclcpp/node_interfaces/node_graph_interface.hpp"
@@ -53,8 +54,10 @@
 #include "rclcpp/node_interfaces/node_waitables_interface.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/publisher.hpp"
+#include "rclcpp/publisher_options.hpp"
 #include "rclcpp/service.hpp"
 #include "rclcpp/subscription.hpp"
+#include "rclcpp/subscription_options.hpp"
 #include "rclcpp/subscription_traits.hpp"
 #include "rclcpp/time.hpp"
 #include "rclcpp/timer.hpp"
@@ -72,40 +75,24 @@ public:
   /// Create a new node with the specified name.
   /**
    * \param[in] node_name Name of the node.
-   * \param[in] namespace_ Namespace of the node.
-   * \param[in] use_intra_process_comms True to use the optimized intra-process communication
-   * pipeline to pass messages between nodes in the same process using shared memory.
+   * \param[in] options Additional options to control creation of the node.
    */
   RCLCPP_PUBLIC
   explicit Node(
     const std::string & node_name,
-    const std::string & namespace_ = "",
-    bool use_intra_process_comms = false);
+    const NodeOptions & options = NodeOptions());
 
-  /// Create a node based on the node name and a rclcpp::Context.
+  /// Create a new node with the specified name.
   /**
    * \param[in] node_name Name of the node.
    * \param[in] namespace_ Namespace of the node.
-   * \param[in] context The context for the node (usually represents the state of a process).
-   * \param[in] arguments Command line arguments that should apply only to this node.
-   * \param[in] initial_parameters a list of initial values for parameters on the node.
-   * This can be used to provide remapping rules that only affect one instance.
-   * \param[in] use_global_arguments False to prevent node using arguments passed to the process.
-   * \param[in] use_intra_process_comms True to use the optimized intra-process communication
-   * pipeline to pass messages between nodes in the same process using shared memory.
-   * \param[in] start_parameter_services True to setup ROS interfaces for accessing parameters
-   * in the node.
+   * \param[in] options Additional options to control creation of the node.
    */
   RCLCPP_PUBLIC
-  Node(
+  explicit Node(
     const std::string & node_name,
     const std::string & namespace_,
-    rclcpp::Context::SharedPtr context,
-    const std::vector<std::string> & arguments,
-    const std::vector<Parameter> & initial_parameters,
-    bool use_global_arguments = true,
-    bool use_intra_process_comms = false,
-    bool start_parameter_services = true);
+    const NodeOptions & options = NodeOptions());
 
   RCLCPP_PUBLIC
   virtual ~Node();
@@ -117,10 +104,26 @@ public:
   get_name() const;
 
   /// Get the namespace of the node.
-  /** \return The namespace of the node. */
+  /**
+   * This namespace is the "node's" namespace, and therefore is not affected
+   * by any sub-namespace's that may affect entities created with this instance.
+   * Use get_effective_namespace() to get the full namespace used by entities.
+   *
+   * \sa get_sub_namespace()
+   * \sa get_effective_namespace()
+   * \return The namespace of the node.
+   */
   RCLCPP_PUBLIC
   const char *
   get_namespace() const;
+
+  /// Get the fully-qualified name of the node.
+  /**
+   * The fully-qualified name includes the local namespace and name of the node.
+   */
+  RCLCPP_PUBLIC
+  const char *
+  get_fully_qualified_name() const;
 
   /// Get the logger of the node.
   /** \return The logger of the node. */
@@ -142,16 +145,40 @@ public:
   /**
    * \param[in] topic_name The topic for this publisher to publish on.
    * \param[in] qos_history_depth The depth of the publisher message queue.
+   * \param[in] options Additional options for the created Publisher.
+   * \return Shared pointer to the created publisher.
+   */
+  template<
+    typename MessageT,
+    typename AllocatorT = std::allocator<void>,
+    typename PublisherT = ::rclcpp::Publisher<MessageT, AllocatorT>>
+  std::shared_ptr<PublisherT>
+  create_publisher(
+    const std::string & topic_name,
+    size_t qos_history_depth,
+    const PublisherOptionsWithAllocator<AllocatorT> &
+    options = PublisherOptionsWithAllocator<AllocatorT>());
+
+  /// Create and return a Publisher.
+  /**
+   * \param[in] topic_name The topic for this publisher to publish on.
+   * \param[in] qos_history_depth The depth of the publisher message queue.
    * \param[in] allocator Optional custom allocator.
    * \return Shared pointer to the created publisher.
    */
   template<
     typename MessageT, typename Alloc = std::allocator<void>,
     typename PublisherT = ::rclcpp::Publisher<MessageT, Alloc>>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated(
+    "use the create_publisher(const std::string &, size_t, const PublisherOptions<Alloc> & = "
+    "PublisherOptions<Alloc>()) signature instead")]]
   std::shared_ptr<PublisherT>
   create_publisher(
-    const std::string & topic_name, size_t qos_history_depth,
-    std::shared_ptr<Alloc> allocator = nullptr);
+    const std::string & topic_name,
+    size_t qos_history_depth,
+    std::shared_ptr<Alloc> allocator,
+    IntraProcessSetting use_intra_process_comm = IntraProcessSetting::NodeDefault);
 
   /// Create and return a Publisher.
   /**
@@ -167,7 +194,39 @@ public:
   create_publisher(
     const std::string & topic_name,
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_default,
-    std::shared_ptr<Alloc> allocator = nullptr);
+    std::shared_ptr<Alloc> allocator = nullptr,
+    IntraProcessSetting use_intra_process_comm = IntraProcessSetting::NodeDefault);
+
+  /// Create and return a Subscription.
+  /**
+   * \param[in] topic_name The topic to subscribe on.
+   * \param[in] callback The user-defined callback function to receive a message
+   * \param[in] qos_history_depth The depth of the subscription's incoming message queue.
+   * \param[in] options Additional options for the creation of the Subscription.
+   * \param[in] msg_mem_strat The message memory strategy to use for allocating messages.
+   * \return Shared pointer to the created subscription.
+   */
+  /* TODO(jacquelinekay):
+     Windows build breaks when static member function passed as default
+     argument to msg_mem_strat, nullptr is a workaround.
+   */
+  template<
+    typename MessageT,
+    typename CallbackT,
+    typename AllocatorT = std::allocator<void>,
+    typename SubscriptionT = rclcpp::Subscription<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, AllocatorT>>
+  std::shared_ptr<SubscriptionT>
+  create_subscription(
+    const std::string & topic_name,
+    CallbackT && callback,
+    size_t qos_history_depth,
+    const SubscriptionOptionsWithAllocator<AllocatorT> &
+    options = SubscriptionOptionsWithAllocator<AllocatorT>(),
+    typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, AllocatorT
+    >::SharedPtr
+    msg_mem_strat = nullptr);
 
   /// Create and return a Subscription.
   /**
@@ -200,7 +259,8 @@ public:
     typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
       typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
     msg_mem_strat = nullptr,
-    std::shared_ptr<Alloc> allocator = nullptr);
+    std::shared_ptr<Alloc> allocator = nullptr,
+    IntraProcessSetting use_intra_process_comm = IntraProcessSetting::NodeDefault);
 
   /// Create and return a Subscription.
   /**
@@ -223,17 +283,21 @@ public:
     typename Alloc = std::allocator<void>,
     typename SubscriptionT = rclcpp::Subscription<
       typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>>
+  [[deprecated(
+    "use the create_subscription(const std::string &, CallbackT &&, size_t, "
+    "const SubscriptionOptions<Alloc> & = SubscriptionOptions<Alloc>(), ...) signature instead")]]
   std::shared_ptr<SubscriptionT>
   create_subscription(
     const std::string & topic_name,
     CallbackT && callback,
     size_t qos_history_depth,
-    rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr,
+    rclcpp::callback_group::CallbackGroup::SharedPtr group,
     bool ignore_local_publications = false,
     typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
       typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
     msg_mem_strat = nullptr,
-    std::shared_ptr<Alloc> allocator = nullptr);
+    std::shared_ptr<Alloc> allocator = nullptr,
+    IntraProcessSetting use_intra_process_comm = IntraProcessSetting::NodeDefault);
 
   /// Create a timer.
   /**
@@ -241,10 +305,10 @@ public:
    * \param[in] callback User-defined callback function.
    * \param[in] group Callback group to execute this timer's callback in.
    */
-  template<typename DurationT = std::milli, typename CallbackT>
+  template<typename DurationRepT = int64_t, typename DurationT = std::milli, typename CallbackT>
   typename rclcpp::WallTimer<CallbackT>::SharedPtr
   create_wall_timer(
-    std::chrono::duration<int64_t, DurationT> period,
+    std::chrono::duration<DurationRepT, DurationT> period,
     CallbackT callback,
     rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr);
 
@@ -279,6 +343,20 @@ public:
     const std::string & name,
     const ParameterT & value);
 
+  /// Set a map of parameters with the same prefix.
+  /**
+   * For each key in the map, a parameter with a name of "name.key" will be set
+   * to the value in the map.
+   *
+   * \param[in] name The prefix of the parameters to set.
+   * \param[in] values The parameters to set in the given prefix.
+   */
+  template<typename MapValueT>
+  void
+  set_parameters_if_not_set(
+    const std::string & name,
+    const std::map<std::string, MapValueT> & values);
+
   RCLCPP_PUBLIC
   std::vector<rclcpp::Parameter>
   get_parameters(const std::vector<std::string> & names) const;
@@ -304,6 +382,24 @@ public:
   template<typename ParameterT>
   bool
   get_parameter(const std::string & name, ParameterT & parameter) const;
+
+  /// Assign the value of the map parameter if set into the values argument.
+  /**
+   * Parameter names that are part of a map are of the form "name.member".
+   * This API gets all parameters that begin with "name", storing them into the
+   * map with the name of the parameter and their value.
+   * If there are no members in the named map, then the "values" argument is not changed.
+   *
+   * \param[in] name The prefix of the parameters to get.
+   * \param[out] values The map of output values, with one std::string,MapValueT
+   *                    per parameter.
+   * \returns true if values was changed, false otherwise
+   */
+  template<typename MapValueT>
+  bool
+  get_parameters(
+    const std::string & name,
+    std::map<std::string, MapValueT> & values) const;
 
   /// Get the parameter value, or the "alternative value" if not set, and assign it to "value".
   /**
@@ -464,6 +560,122 @@ public:
   rclcpp::node_interfaces::NodeTimeSourceInterface::SharedPtr
   get_node_time_source_interface();
 
+  /// Return the sub-namespace, if this is a sub-node, otherwise an empty string.
+  /**
+   * The returned sub-namespace is either the accumulated sub-namespaces which
+   * were given to one-to-many create_sub_node() calls, or an empty string if
+   * this is an original node instance, i.e. not a sub-node.
+   *
+   * For example, consider:
+   *
+   *   auto node = std::make_shared<rclcpp::Node>("my_node", "my_ns");
+   *   node->get_sub_namespace();  // -> ""
+   *   auto sub_node1 = node->create_sub_node("a");
+   *   sub_node1->get_sub_namespace();  // -> "a"
+   *   auto sub_node2 = sub_node1->create_sub_node("b");
+   *   sub_node2->get_sub_namespace();  // -> "a/b"
+   *   auto sub_node3 = node->create_sub_node("foo");
+   *   sub_node3->get_sub_namespace();  // -> "foo"
+   *   node->get_sub_namespace();  // -> ""
+   *
+   * get_namespace() will return the original node namespace, and will not
+   * include the sub-namespace if one exists.
+   * To get that you need to call the get_effective_namespace() method.
+   *
+   * \sa get_namespace()
+   * \sa get_effective_namespace()
+   * \return the sub-namespace string, not including the node's original namespace
+   */
+  RCLCPP_PUBLIC
+  const std::string &
+  get_sub_namespace() const;
+
+  /// Return the effective namespace that is used when creating entities.
+  /**
+   * The returned namespace is a concatenation of the node namespace and the
+   * accumulated sub-namespaces, which is used as the namespace when creating
+   * entities which have relative names.
+   *
+   * For example, consider:
+   *
+   *   auto node = std::make_shared<rclcpp::Node>("my_node", "my_ns");
+   *   node->get_effective_namespace();  // -> "/my_ns"
+   *   auto sub_node1 = node->create_sub_node("a");
+   *   sub_node1->get_effective_namespace();  // -> "/my_ns/a"
+   *   auto sub_node2 = sub_node1->create_sub_node("b");
+   *   sub_node2->get_effective_namespace();  // -> "/my_ns/a/b"
+   *   auto sub_node3 = node->create_sub_node("foo");
+   *   sub_node3->get_effective_namespace();  // -> "/my_ns/foo"
+   *   node->get_effective_namespace();  // -> "/my_ns"
+   *
+   * \sa get_namespace()
+   * \sa get_sub_namespace()
+   * \return the sub-namespace string, not including the node's original namespace
+   */
+  RCLCPP_PUBLIC
+  const std::string &
+  get_effective_namespace() const;
+
+  /// Create a sub-node, which will extend the namespace of all entities created with it.
+  /**
+   * A sub-node (short for subordinate node) is an instance of this class
+   * which has been created using an existing instance of this class, but which
+   * has an additional sub-namespace (short for subordinate namespace)
+   * associated with it.
+   * The sub-namespace will extend the node's namespace for the purpose of
+   * creating additional entities, such as Publishers, Subscriptions, Service
+   * Clients and Servers, and so on.
+   *
+   * By default, when an instance of this class is created using one of the
+   * public constructors, it has no sub-namespace associated with it, and
+   * therefore is not a sub-node.
+   * That "normal" node instance may, however, be used to create further
+   * instances of this class, based on the original instance, which have an
+   * additional sub-namespace associated with them.
+   * This may be done by using this method, create_sub_node().
+   *
+   * Furthermore, a sub-node may be used to create additional sub-node's, in
+   * which case the sub-namespace passed to this function will further
+   * extend the sub-namespace of the existing sub-node.
+   * See get_sub_namespace() and get_effective_namespace() for examples.
+   *
+   * Note that entities which use absolute names are not affected by any
+   * namespaces, neither the normal node namespace nor any sub-namespace.
+   * Note also that the fully qualified node name is unaffected by a
+   * sub-namespace.
+   *
+   * The sub-namespace should be relative, and an exception will be thrown if
+   * the sub-namespace is absolute, i.e. if it starts with a leading '/'.
+   *
+   * \sa get_sub_namespace()
+   * \sa get_effective_namespace()
+   * \param[in] sub_namespace sub-namespace of the sub-node.
+   * \return newly created sub-node
+   * \throws NameValidationError if the sub-namespace is absolute, i.e. starts
+   *   with a leading '/'.
+   */
+  RCLCPP_PUBLIC
+  Node::SharedPtr
+  create_sub_node(const std::string & sub_namespace);
+
+  /// Return the NodeOptions used when creating this node.
+  RCLCPP_PUBLIC
+  const NodeOptions &
+  get_node_options() const;
+
+protected:
+  /// Construct a sub-node, which will extend the namespace of all entities created with it.
+  /**
+   * \sa create_sub_node()
+   *
+   * \param[in] other The node from which a new sub-node is created.
+   * \param[in] sub_namespace The sub-namespace of the sub-node.
+   */
+  RCLCPP_PUBLIC
+  Node(
+    const Node & other,
+    const std::string & sub_namespace);
+
 private:
   RCLCPP_DISABLE_COPY(Node)
 
@@ -482,7 +694,9 @@ private:
   rclcpp::node_interfaces::NodeTimeSourceInterface::SharedPtr node_time_source_;
   rclcpp::node_interfaces::NodeWaitablesInterface::SharedPtr node_waitables_;
 
-  bool use_intra_process_comms_;
+  const NodeOptions node_options_;
+  const std::string sub_namespace_;
+  const std::string effective_namespace_;
 };
 
 }  // namespace rclcpp

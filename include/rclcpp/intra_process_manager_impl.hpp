@@ -16,6 +16,7 @@
 #define RCLCPP__INTRA_PROCESS_MANAGER_IMPL_HPP_
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cstring>
 #include <functional>
@@ -24,9 +25,12 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
+
+#include "rmw/validate_full_topic_name.h"
 
 #include "rclcpp/macros.hpp"
 #include "rclcpp/mapped_ring_buffer.hpp"
@@ -80,6 +84,9 @@ public:
   virtual bool
   matches_any_publishers(const rmw_gid_t * id) const = 0;
 
+  virtual size_t
+  get_subscription_count(uint64_t intra_process_publisher_id) const = 0;
+
 private:
   RCLCPP_DISABLE_COPY(IntraProcessManagerImplBase)
 };
@@ -95,9 +102,7 @@ public:
   add_subscription(uint64_t id, SubscriptionBase::SharedPtr subscription)
   {
     subscriptions_[id] = subscription;
-    // subscription->get_topic_name() -> const char * can be used as the key,
-    // since subscriptions_ shares the ownership of subscription
-    subscription_ids_by_topic_[subscription->get_topic_name()].insert(id);
+    subscription_ids_by_topic_[fixed_size_string(subscription->get_topic_name())].insert(id);
   }
 
   void
@@ -172,7 +177,8 @@ public:
     }
 
     // Figure out what subscriptions should receive the message.
-    auto & destined_subscriptions = subscription_ids_by_topic_[publisher->get_topic_name()];
+    auto & destined_subscriptions =
+      subscription_ids_by_topic_[fixed_size_string(publisher->get_topic_name())];
     // Store the list for later comparison.
     if (info.target_subscriptions_by_message_sequence.count(message_seq) == 0) {
       info.target_subscriptions_by_message_sequence.emplace(
@@ -248,8 +254,51 @@ public:
     return false;
   }
 
+  size_t
+  get_subscription_count(uint64_t intra_process_publisher_id) const
+  {
+    auto publisher_it = publishers_.find(intra_process_publisher_id);
+    if (publisher_it == publishers_.end()) {
+      // Publisher is either invalid or no longer exists.
+      return 0;
+    }
+    auto publisher = publisher_it->second.publisher.lock();
+    if (!publisher) {
+      throw std::runtime_error("publisher has unexpectedly gone out of scope");
+    }
+    auto sub_map_it =
+      subscription_ids_by_topic_.find(fixed_size_string(publisher->get_topic_name()));
+    if (sub_map_it == subscription_ids_by_topic_.end()) {
+      // No intraprocess subscribers
+      return 0;
+    }
+    return sub_map_it->second.size();
+  }
+
 private:
   RCLCPP_DISABLE_COPY(IntraProcessManagerImpl)
+
+  using FixedSizeString = std::array<char, RMW_TOPIC_MAX_NAME_LENGTH + 1>;
+
+  FixedSizeString
+  fixed_size_string(const char * str) const
+  {
+    FixedSizeString ret;
+    size_t size = std::strlen(str) + 1;
+    if (size > ret.size()) {
+      throw std::runtime_error("failed to copy topic name");
+    }
+    std::memcpy(ret.data(), str, size);
+    return ret;
+  }
+  struct strcmp_wrapper
+  {
+    bool
+    operator()(const FixedSizeString lhs, const FixedSizeString rhs) const
+    {
+      return std::strcmp(lhs.data(), rhs.data()) < 0;
+    }
+  };
 
   template<typename T>
   using RebindAlloc = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
@@ -262,19 +311,11 @@ private:
     std::hash<uint64_t>, std::equal_to<uint64_t>,
     RebindAlloc<std::pair<const uint64_t, SubscriptionBase::WeakPtr>>>;
 
-  struct strcmp_wrapper
-  {
-    bool
-    operator()(const char * lhs, const char * rhs) const
-    {
-      return std::strcmp(lhs, rhs) < 0;
-    }
-  };
   using IDTopicMap = std::map<
-    const char *,
+    FixedSizeString,
     AllocSet,
     strcmp_wrapper,
-    RebindAlloc<std::pair<const char * const, AllocSet>>>;
+    RebindAlloc<std::pair<const FixedSizeString, AllocSet>>>;
 
   SubscriptionMap subscriptions_;
 
