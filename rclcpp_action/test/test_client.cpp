@@ -42,6 +42,7 @@
 #include "rclcpp_action/exceptions.hpp"
 #include "rclcpp_action/create_client.hpp"
 #include "rclcpp_action/client.hpp"
+#include "rclcpp_action/qos.hpp"
 #include "rclcpp_action/types.hpp"
 
 using namespace std::chrono_literals;
@@ -196,7 +197,8 @@ protected:
     ret = rcl_action_get_feedback_topic_name(
       action_name, allocator, &feedback_topic_name);
     ASSERT_EQ(RCL_RET_OK, ret);
-    feedback_publisher = server_node->create_publisher<ActionFeedbackMessage>(feedback_topic_name);
+    feedback_publisher =
+      server_node->create_publisher<ActionFeedbackMessage>(feedback_topic_name, 10);
     ASSERT_TRUE(feedback_publisher != nullptr);
     allocator.deallocate(feedback_topic_name, allocator.state);
 
@@ -205,7 +207,7 @@ protected:
       action_name, allocator, &status_topic_name);
     ASSERT_EQ(RCL_RET_OK, ret);
     status_publisher = server_node->create_publisher<ActionStatusMessage>(
-      status_topic_name, rcl_action_qos_profile_status_default);
+      status_topic_name, rclcpp_action::DefaultActionStatusQoS());
     ASSERT_TRUE(status_publisher != nullptr);
     allocator.deallocate(status_topic_name, allocator.state);
     server_executor.add_node(server_node);
@@ -464,8 +466,8 @@ TEST_F(TestClient, async_cancel_one_goal)
 
   auto future_cancel = action_client->async_cancel_goal(goal_handle);
   dual_spin_until_future_complete(future_cancel);
-  bool goal_canceled = future_cancel.get();
-  EXPECT_TRUE(goal_canceled);
+  ActionCancelGoalResponse::SharedPtr cancel_response = future_cancel.get();
+  EXPECT_EQ(ActionCancelGoalResponse::ERROR_NONE, cancel_response->return_code);
 }
 
 TEST_F(TestClient, async_cancel_one_goal_with_callback)
@@ -484,18 +486,21 @@ TEST_F(TestClient, async_cancel_one_goal_with_callback)
   auto future_cancel = action_client->async_cancel_goal(
     goal_handle,
     [&cancel_response_received, goal_handle](
-      typename ActionGoalHandle::SharedPtr goal_handle_canceled, bool cancel_accepted) mutable
+      ActionCancelGoalResponse::SharedPtr response) mutable
     {
       if (
-        goal_handle_canceled->get_goal_id() == goal_handle->get_goal_id() &&
-        cancel_accepted)
+        ActionCancelGoalResponse::ERROR_NONE == response->return_code &&
+        1ul == response->goals_canceling.size() &&
+        goal_handle->get_goal_id() == response->goals_canceling[0].goal_id.uuid)
       {
         cancel_response_received = true;
       }
     });
   dual_spin_until_future_complete(future_cancel);
-  bool goal_canceled = future_cancel.get();
-  EXPECT_TRUE(goal_canceled);
+  auto cancel_response = future_cancel.get();
+  EXPECT_EQ(ActionCancelGoalResponse::ERROR_NONE, cancel_response->return_code);
+  ASSERT_EQ(1ul, cancel_response->goals_canceling.size());
+  EXPECT_EQ(goal_handle->get_goal_id(), cancel_response->goals_canceling[0].goal_id.uuid);
   EXPECT_TRUE(cancel_response_received);
 }
 
@@ -527,6 +532,7 @@ TEST_F(TestClient, async_cancel_all_goals)
   dual_spin_until_future_complete(future_cancel_all);
   auto cancel_response = future_cancel_all.get();
 
+  EXPECT_EQ(ActionCancelGoalResponse::ERROR_NONE, cancel_response->return_code);
   ASSERT_EQ(2ul, cancel_response->goals_canceling.size());
   EXPECT_EQ(goal_handle0->get_goal_id(), cancel_response->goals_canceling[0].goal_id.uuid);
   EXPECT_EQ(goal_handle1->get_goal_id(), cancel_response->goals_canceling[1].goal_id.uuid);
@@ -575,6 +581,7 @@ TEST_F(TestClient, async_cancel_all_goals_with_callback)
   dual_spin_until_future_complete(future_cancel_all);
   auto cancel_response = future_cancel_all.get();
 
+  EXPECT_EQ(ActionCancelGoalResponse::ERROR_NONE, cancel_response->return_code);
   EXPECT_TRUE(cancel_callback_received);
   ASSERT_EQ(2ul, cancel_response->goals_canceling.size());
   EXPECT_EQ(goal_handle0->get_goal_id(), cancel_response->goals_canceling[0].goal_id.uuid);
@@ -608,6 +615,7 @@ TEST_F(TestClient, async_cancel_some_goals)
   dual_spin_until_future_complete(future_cancel_some);
   auto cancel_response = future_cancel_some.get();
 
+  EXPECT_EQ(ActionCancelGoalResponse::ERROR_NONE, cancel_response->return_code);
   ASSERT_EQ(1ul, cancel_response->goals_canceling.size());
   EXPECT_EQ(goal_handle0->get_goal_id(), cancel_response->goals_canceling[0].goal_id.uuid);
   EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_CANCELED, goal_handle0->get_status());
@@ -649,6 +657,7 @@ TEST_F(TestClient, async_cancel_some_goals_with_callback)
   dual_spin_until_future_complete(future_cancel_some);
   auto cancel_response = future_cancel_some.get();
 
+  EXPECT_EQ(ActionCancelGoalResponse::ERROR_NONE, cancel_response->return_code);
   EXPECT_TRUE(cancel_callback_received);
   ASSERT_EQ(1ul, cancel_response->goals_canceling.size());
   EXPECT_EQ(goal_handle0->get_goal_id(), cancel_response->goals_canceling[0].goal_id.uuid);
