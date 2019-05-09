@@ -109,7 +109,11 @@ Node::Node(
   const std::string & namespace_,
   const NodeOptions & options)
 : node_base_(new rclcpp::node_interfaces::NodeBase(
-      node_name, namespace_, options)),
+      node_name,
+      namespace_,
+      options.context(),
+      *(options.get_rcl_node_options()),
+      options.use_intra_process_comms())),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),
   node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_.get())),
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
@@ -129,10 +133,10 @@ Node::Node(
       node_services_,
       node_clock_,
       options.initial_parameters(),
-      options.use_intra_process_comms(),
       options.start_parameter_services(),
       options.start_parameter_event_publisher(),
-      options.parameter_event_qos_profile(),
+      options.parameter_event_qos(),
+      options.parameter_event_publisher_options(),
       options.allow_undeclared_parameters(),
       options.automatically_declare_initial_parameters()
     )),
@@ -469,4 +473,10 @@ const NodeOptions &
 Node::get_node_options() const
 {
   return this->node_options_;
+}
+
+bool
+Node::assert_liveliness() const
+{
+  return node_base_->assert_liveliness();
 }

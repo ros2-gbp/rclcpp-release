@@ -60,7 +60,11 @@ Executor::Executor(const ExecutorArgs & args)
   // Store the context for later use.
   context_ = args.context;
 
-  ret = rcl_wait_set_init(&wait_set_, 0, 2, 0, 0, 0, context_->get_rcl_context().get(), allocator);
+  ret = rcl_wait_set_init(
+    &wait_set_,
+    0, 2, 0, 0, 0, 0,
+    context_->get_rcl_context().get(),
+    allocator);
   if (RCL_RET_OK != ret) {
     RCUTILS_LOG_ERROR_NAMED(
       "rclcpp",
@@ -304,7 +308,7 @@ Executor::execute_subscription(
     auto serialized_msg = subscription->create_serialized_message();
     auto ret = rcl_take_serialized_message(
       subscription->get_subscription_handle().get(),
-      serialized_msg.get(), &message_info);
+      serialized_msg.get(), &message_info, nullptr);
     if (RCL_RET_OK == ret) {
       auto void_serialized_msg = std::static_pointer_cast<void>(serialized_msg);
       subscription->handle_message(void_serialized_msg, message_info);
@@ -320,7 +324,7 @@ Executor::execute_subscription(
     std::shared_ptr<void> message = subscription->create_message();
     auto ret = rcl_take(
       subscription->get_subscription_handle().get(),
-      message.get(), &message_info);
+      message.get(), &message_info, nullptr);
     if (RCL_RET_OK == ret) {
       subscription->handle_message(message, message_info);
     } else if (RCL_RET_SUBSCRIPTION_TAKE_FAILED != ret) {
@@ -343,7 +347,8 @@ Executor::execute_intra_process_subscription(
   rcl_ret_t status = rcl_take(
     subscription->get_intra_process_subscription_handle().get(),
     &ipm,
-    &message_info);
+    &message_info,
+    nullptr);
 
   if (status == RCL_RET_OK) {
     message_info.from_intra_process = true;
@@ -434,7 +439,8 @@ Executor::wait_for_work(std::chrono::nanoseconds timeout)
   rcl_ret_t ret = rcl_wait_set_resize(
     &wait_set_, memory_strategy_->number_of_ready_subscriptions(),
     memory_strategy_->number_of_guard_conditions(), memory_strategy_->number_of_ready_timers(),
-    memory_strategy_->number_of_ready_clients(), memory_strategy_->number_of_ready_services());
+    memory_strategy_->number_of_ready_clients(), memory_strategy_->number_of_ready_services(),
+    memory_strategy_->number_of_ready_events());
   if (RCL_RET_OK != ret) {
     throw std::runtime_error(
             std::string("Couldn't resize the wait set : ") + rcl_get_error_string().str);
