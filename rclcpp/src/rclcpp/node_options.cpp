@@ -21,6 +21,8 @@
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/logging.hpp"
+#include "rclcpp/publisher_options.hpp"
+#include "rclcpp/qos.hpp"
 
 using rclcpp::exceptions::throw_from_rcl_error;
 
@@ -67,6 +69,9 @@ NodeOptions::operator=(const NodeOptions & other)
     this->use_intra_process_comms_ = other.use_intra_process_comms_;
     this->start_parameter_services_ = other.start_parameter_services_;
     this->allocator_ = other.allocator_;
+    this->allow_undeclared_parameters_ = other.allow_undeclared_parameters_;
+    this->automatically_declare_initial_parameters_ =
+      other.automatically_declare_initial_parameters_;
   }
   return *this;
 }
@@ -205,16 +210,30 @@ NodeOptions::start_parameter_event_publisher(bool start_parameter_event_publishe
   return *this;
 }
 
-const rmw_qos_profile_t &
-NodeOptions::parameter_event_qos_profile() const
+const rclcpp::QoS &
+NodeOptions::parameter_event_qos() const
 {
-  return this->parameter_event_qos_profile_;
+  return this->parameter_event_qos_;
 }
 
 NodeOptions &
-NodeOptions::parameter_event_qos_profile(const rmw_qos_profile_t & parameter_event_qos_profile)
+NodeOptions::parameter_event_qos(const rclcpp::QoS & parameter_event_qos)
 {
-  this->parameter_event_qos_profile_ = parameter_event_qos_profile;
+  this->parameter_event_qos_ = parameter_event_qos;
+  return *this;
+}
+
+const rclcpp::PublisherOptionsBase &
+NodeOptions::parameter_event_publisher_options() const
+{
+  return parameter_event_publisher_options_;
+}
+
+NodeOptions &
+NodeOptions::parameter_event_publisher_options(
+  const rclcpp::PublisherOptionsBase & parameter_event_publisher_options)
+{
+  parameter_event_publisher_options_ = parameter_event_publisher_options;
   return *this;
 }
 
