@@ -45,14 +45,14 @@ using rclcpp::node_interfaces::NodeParameters;
 NodeParameters::NodeParameters(
   const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base,
   const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr node_logging,
-  const rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics,
+  rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics,
   const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services,
   const rclcpp::node_interfaces::NodeClockInterface::SharedPtr node_clock,
   const std::vector<rclcpp::Parameter> & initial_parameters,
-  bool use_intra_process,
   bool start_parameter_services,
   bool start_parameter_event_publisher,
-  const rmw_qos_profile_t & parameter_event_qos_profile,
+  const rclcpp::QoS & parameter_event_qos,
+  const rclcpp::PublisherOptionsBase & parameter_event_publisher_options,
   bool allow_undeclared_parameters,
   bool automatically_declare_initial_parameters)
 : allow_undeclared_(allow_undeclared_parameters),
@@ -64,7 +64,9 @@ NodeParameters::NodeParameters(
   using PublisherT = rclcpp::Publisher<MessageT>;
   using AllocatorT = std::allocator<void>;
   // TODO(wjwwood): expose this allocator through the Parameter interface.
-  auto allocator = std::make_shared<AllocatorT>();
+  rclcpp::PublisherOptionsWithAllocator<AllocatorT> publisher_options(
+    parameter_event_publisher_options);
+  publisher_options.allocator = std::make_shared<AllocatorT>();
 
   if (start_parameter_services) {
     parameter_service_ = std::make_shared<ParameterService>(node_base, node_services, this);
@@ -72,11 +74,10 @@ NodeParameters::NodeParameters(
 
   if (start_parameter_event_publisher) {
     events_publisher_ = rclcpp::create_publisher<MessageT, AllocatorT, PublisherT>(
-      node_topics.get(),
+      node_topics,
       "parameter_events",
-      parameter_event_qos_profile,
-      use_intra_process,
-      allocator);
+      parameter_event_qos,
+      publisher_options);
   }
 
   // Get the node options
@@ -121,18 +122,7 @@ NodeParameters::NodeParameters(
   get_yaml_paths(&(options->arguments));
 
   // Get fully qualified node name post-remapping to use to find node's params in yaml files
-  const std::string node_name = node_base->get_name();
-  const std::string node_namespace = node_base->get_namespace();
-  if (0u == node_namespace.size() || 0u == node_name.size()) {
-    // Should never happen
-    throw std::runtime_error("Node name and namespace were not set");
-  }
-
-  if ('/' == node_namespace.at(node_namespace.size() - 1)) {
-    combined_name_ = node_namespace + node_name;
-  } else {
-    combined_name_ = node_namespace + '/' + node_name;
-  }
+  combined_name_ = node_base->get_fully_qualified_name();
 
   // TODO(sloretz) use rcl to parse yaml when circular dependency is solved
   // See https://github.com/ros2/rcl/issues/252
@@ -302,8 +292,10 @@ NodeParameters::declare_parameter(
             "parameter '" + name + "' could not be set: " + result.reason);
   }
 
-  // Publish the event.
-  events_publisher_->publish(parameter_event);
+  // Publish if events_publisher_ is not nullptr, which may be if disabled in the constructor.
+  if (nullptr != events_publisher_) {
+    events_publisher_->publish(parameter_event);
+  }
 
   return parameters_.at(name).value;
 }

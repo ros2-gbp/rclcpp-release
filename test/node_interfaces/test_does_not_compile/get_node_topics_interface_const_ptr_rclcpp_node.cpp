@@ -1,4 +1,4 @@
-// Copyright 2018 Open Source Robotics Foundation, Inc.
+// Copyright 2019 Open Source Robotics Foundation, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,42 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rclcpp/waitable.hpp"
+#include <memory>
 
-using rclcpp::Waitable;
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/node_interfaces/get_node_topics_interface.hpp"
 
-size_t
-Waitable::get_number_of_ready_subscriptions()
+int main(void)
 {
-  return 0u;
-}
-
-size_t
-Waitable::get_number_of_ready_timers()
-{
-  return 0u;
-}
-
-size_t
-Waitable::get_number_of_ready_clients()
-{
-  return 0u;
-}
-
-size_t
-Waitable::get_number_of_ready_events()
-{
-  return 0u;
-}
-
-size_t
-Waitable::get_number_of_ready_services()
-{
-  return 0u;
-}
-
-size_t
-Waitable::get_number_of_ready_guard_conditions()
-{
-  return 0u;
+  auto node = std::make_shared<rclcpp::Node>("test_node");
+  std::shared_ptr<const rclcpp::Node> const_node_ptr = node;
+  // Should fail because a const node cannot have a non-const method called on it.
+  rclcpp::node_interfaces::NodeTopicsInterface * result =
+    rclcpp::node_interfaces::get_node_topics_interface(const_node_ptr);
+  (void)result;
 }

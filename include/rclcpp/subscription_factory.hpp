@@ -51,7 +51,7 @@ struct SubscriptionFactory
     rclcpp::SubscriptionBase::SharedPtr(
       rclcpp::node_interfaces::NodeBaseInterface * node_base,
       const std::string & topic_name,
-      rcl_subscription_options_t & subscription_options)>;
+      const rcl_subscription_options_t & subscription_options)>;
 
   SubscriptionFactoryFunction create_typed_subscription;
 
@@ -75,6 +75,7 @@ template<
 SubscriptionFactory
 create_subscription_factory(
   CallbackT && callback,
+  const SubscriptionEventCallbacks & event_callbacks,
   typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
     CallbackMessageT, Alloc>::SharedPtr
   msg_mem_strat,
@@ -91,13 +92,14 @@ create_subscription_factory(
 
   // factory function that creates a MessageT specific SubscriptionT
   factory.create_typed_subscription =
-    [allocator, msg_mem_strat, any_subscription_callback, message_alloc](
+    [allocator, msg_mem_strat, any_subscription_callback, event_callbacks, message_alloc](
     rclcpp::node_interfaces::NodeBaseInterface * node_base,
     const std::string & topic_name,
-    rcl_subscription_options_t & subscription_options
+    const rcl_subscription_options_t & subscription_options
     ) -> rclcpp::SubscriptionBase::SharedPtr
     {
-      subscription_options.allocator =
+      auto options_copy = subscription_options;
+      options_copy.allocator =
         rclcpp::allocator::get_rcl_allocator<CallbackMessageT>(*message_alloc.get());
 
       using rclcpp::Subscription;
@@ -107,70 +109,13 @@ create_subscription_factory(
         node_base->get_shared_rcl_node_handle(),
         *rosidl_typesupport_cpp::get_message_type_support_handle<MessageT>(),
         topic_name,
-        subscription_options,
+        options_copy,
         any_subscription_callback,
+        event_callbacks,
         msg_mem_strat);
       auto sub_base_ptr = std::dynamic_pointer_cast<SubscriptionBase>(sub);
       return sub_base_ptr;
     };
-
-  // function that will setup intra process communications for the subscription
-  factory.setup_intra_process =
-    [message_alloc](
-    rclcpp::intra_process_manager::IntraProcessManager::SharedPtr ipm,
-    rclcpp::SubscriptionBase::SharedPtr subscription,
-    const rcl_subscription_options_t & subscription_options)
-    {
-      rclcpp::intra_process_manager::IntraProcessManager::WeakPtr weak_ipm = ipm;
-      uint64_t intra_process_subscription_id = ipm->add_subscription(subscription);
-
-      auto intra_process_options = rcl_subscription_get_default_options();
-      intra_process_options.allocator = rclcpp::allocator::get_rcl_allocator<CallbackMessageT>(
-        *message_alloc.get());
-      intra_process_options.qos = subscription_options.qos;
-      intra_process_options.ignore_local_publications = false;
-
-      // function that will be called to take a MessageT from the intra process manager
-      auto take_intra_process_message_func =
-        [weak_ipm](
-        uint64_t publisher_id,
-        uint64_t message_sequence,
-        uint64_t subscription_id,
-        typename rclcpp::Subscription<CallbackMessageT, Alloc>::MessageUniquePtr & message)
-        {
-          auto ipm = weak_ipm.lock();
-          if (!ipm) {
-            // TODO(wjwwood): should this just return silently? Or return with a logged warning?
-            throw std::runtime_error(
-                    "intra process take called after destruction of intra process manager");
-          }
-          ipm->take_intra_process_message<CallbackMessageT, Alloc>(
-            publisher_id, message_sequence, subscription_id, message);
-        };
-
-      // function that is called to see if the publisher id matches any local publishers
-      auto matches_any_publisher_func =
-        [weak_ipm](const rmw_gid_t * sender_gid) -> bool
-        {
-          auto ipm = weak_ipm.lock();
-          if (!ipm) {
-            throw std::runtime_error(
-                    "intra process publisher check called "
-                    "after destruction of intra process manager");
-          }
-          return ipm->matches_any_publishers(sender_gid);
-        };
-
-      auto typed_sub_ptr = std::dynamic_pointer_cast<SubscriptionT>(subscription);
-      typed_sub_ptr->setup_intra_process(
-        intra_process_subscription_id,
-        take_intra_process_message_func,
-        matches_any_publisher_func,
-        weak_ipm,
-        intra_process_options
-      );
-    };
-  // end definition of factory function to setup intra process
 
   // return the factory now that it is populated
   return factory;
