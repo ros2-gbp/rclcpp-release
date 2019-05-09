@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rclcpp/publisher.hpp"
+#include "rclcpp/publisher_base.hpp"
 
 #include <rmw/error_handling.h>
 #include <rmw/rmw.h>
@@ -22,6 +22,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "rcl_interfaces/msg/intra_process_message.hpp"
 #include "rcutils/logging_macros.h"
@@ -30,10 +31,10 @@
 #include "rclcpp/allocator/allocator_common.hpp"
 #include "rclcpp/allocator/allocator_deleter.hpp"
 #include "rclcpp/exceptions.hpp"
+#include "rclcpp/expand_topic_or_service_name.hpp"
 #include "rclcpp/intra_process_manager.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node.hpp"
-#include "rclcpp/expand_topic_or_service_name.hpp"
 
 using rclcpp::PublisherBase;
 
@@ -43,8 +44,7 @@ PublisherBase::PublisherBase(
   const rosidl_message_type_support_t & type_support,
   const rcl_publisher_options_t & publisher_options)
 : rcl_node_handle_(node_base->get_shared_rcl_node_handle()),
-  intra_process_is_enabled_(false), intra_process_publisher_id_(0),
-  store_intra_process_message_(nullptr)
+  intra_process_is_enabled_(false), intra_process_publisher_id_(0)
 {
   rcl_ret_t ret = rcl_publisher_init(
     &publisher_handle_,
@@ -81,6 +81,9 @@ PublisherBase::PublisherBase(
 
 PublisherBase::~PublisherBase()
 {
+  // must fini the events before fini-ing the publisher
+  event_handlers_.clear();
+
   if (rcl_publisher_fini(&intra_process_publisher_handle_, rcl_node_handle_.get()) != RCL_RET_OK) {
     RCUTILS_LOG_ERROR_NAMED(
       "rclcpp",
@@ -154,6 +157,12 @@ PublisherBase::get_publisher_handle() const
   return &publisher_handle_;
 }
 
+const std::vector<std::shared_ptr<rclcpp::QOSEventHandlerBase>> &
+PublisherBase::get_event_handlers() const
+{
+  return event_handlers_;
+}
+
 size_t
 PublisherBase::get_subscription_count() const
 {
@@ -209,6 +218,12 @@ PublisherBase::get_actual_qos() const
 }
 
 bool
+PublisherBase::assert_liveliness() const
+{
+  return RCL_RET_OK == rcl_publisher_assert_liveliness(&publisher_handle_);
+}
+
+bool
 PublisherBase::operator==(const rmw_gid_t & gid) const
 {
   return *this == &gid;
@@ -235,10 +250,16 @@ PublisherBase::operator==(const rmw_gid_t * gid) const
   return result;
 }
 
+rclcpp::mapped_ring_buffer::MappedRingBufferBase::SharedPtr
+PublisherBase::make_mapped_ring_buffer(size_t size) const
+{
+  (void)size;
+  return nullptr;
+}
+
 void
 PublisherBase::setup_intra_process(
   uint64_t intra_process_publisher_id,
-  StoreMessageCallbackT store_callback,
   IntraProcessManagerSharedPtr ipm,
   const rcl_publisher_options_t & intra_process_options)
 {
@@ -275,7 +296,6 @@ PublisherBase::setup_intra_process(
   }
 
   intra_process_publisher_id_ = intra_process_publisher_id;
-  store_intra_process_message_ = store_callback;
   weak_ipm_ = ipm;
   intra_process_is_enabled_ = true;
 
