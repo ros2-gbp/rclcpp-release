@@ -149,7 +149,8 @@ ComponentManager::OnLoadNode(
       }
 
       auto options = rclcpp::NodeOptions()
-        .initial_parameters(parameters)
+        .use_global_arguments(false)
+        .parameter_overrides(parameters)
         .arguments(remap_rules);
 
       auto node_id = unique_id++;
