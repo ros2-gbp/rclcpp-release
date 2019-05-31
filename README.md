@@ -1,3 +1,30 @@
+## rclcpp (dashing) - 0.7.5-1
+
+The packages in the `rclcpp` repository were released into the `dashing` distro by running `/home/jacob/.local/bin/bloom-release -r dashing rclcpp` on `Fri, 31 May 2019 00:32:16 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_components`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `0.7.4-1`
+- old version: `0.7.4-1`
+- new version: `0.7.5-1`
+
+Versions of tools used:
+
+- bloom version: `0.8.0`
+- catkin_pkg version: `0.4.12`
+- rosdep version: `0.15.1`
+- rosdistro version: `0.7.4`
+- vcstools version: `0.1.40`
+
+
 ## rclcpp (dashing) - 0.7.4-1
 
 The packages in the `rclcpp` repository were released into the `dashing` distro by running `/usr/bin/bloom-release --rosdistro dashing --track dashing rclcpp` on `Wed, 29 May 2019 23:55:23 -0000`
