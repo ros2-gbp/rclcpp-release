@@ -22,8 +22,13 @@
 #include "rclcpp/utilities.hpp"
 
 TEST(TestUtilities, remove_ros_arguments) {
-  const char * const argv[] = {"process_name", "-d", "__ns:=/foo/bar",
-    "__ns:=/fiz/buz", "--foo=bar", "--baz"};
+  const char * const argv[] = {
+    "process_name",
+    "-d", "--ros-args",
+    "-r", "__ns:=/foo/bar",
+    "-r", "__ns:=/fiz/buz",
+    "--", "--foo=bar", "--baz"
+  };
   int argc = sizeof(argv) / sizeof(const char *);
   auto args = rclcpp::remove_ros_arguments(argc, argv);
 
@@ -37,7 +42,8 @@ TEST(TestUtilities, remove_ros_arguments) {
 TEST(TestUtilities, remove_ros_arguments_null) {
   // In the case of a C executable, we would expect to get
   // argc=1 and argv = ["process_name"], so this is an invalid input.
-  ASSERT_THROW({
+  ASSERT_THROW(
+  {
     rclcpp::remove_ros_arguments(0, nullptr);
   }, rclcpp::exceptions::RCLErrorBase);
 }

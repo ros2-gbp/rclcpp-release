@@ -3,20 +3,13 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-0.7.10 (2019-09-23)
--------------------
-
-0.7.9 (2019-09-20)
+0.8.0 (2019-09-26)
 ------------------
-
-0.7.8 (2019-09-06)
-------------------
-
-0.7.7 (2019-07-31)
-------------------
-
-0.7.6 (2019-06-12)
-------------------
+* Fix UnknownGoalHandle error string. (`#856 <https://github.com/ros2/rclcpp/issues/856>`_)
+* Guard against making multiple result requests for a goal handle (`#808 <https://github.com/ros2/rclcpp/issues/808>`_)
+* Add line break after first open paren in multiline function call (`#785 <https://github.com/ros2/rclcpp/issues/785>`_)
+* Fix typo in test fixture tear down method name (`#787 <https://github.com/ros2/rclcpp/issues/787>`_)
+* Contributors: Chris Lalancette, Dan Rose, Jacob Perron
 
 0.7.5 (2019-05-30)
 ------------------
