@@ -33,15 +33,12 @@ ComponentManager::ComponentManager(
 : Node("ComponentManager"),
   executor_(executor)
 {
-  loadNode_srv_ = create_service<LoadNode>(
-    "~/_container/load_node",
-    std::bind(&ComponentManager::OnLoadNode, this, _1, _2, _3));
-  unloadNode_srv_ = create_service<UnloadNode>(
-    "~/_container/unload_node",
-    std::bind(&ComponentManager::OnUnloadNode, this, _1, _2, _3));
-  listNodes_srv_ = create_service<ListNodes>(
-    "~/_container/list_nodes",
-    std::bind(&ComponentManager::OnListNodes, this, _1, _2, _3));
+  loadNode_srv_ = create_service<LoadNode>("~/_container/load_node",
+      std::bind(&ComponentManager::OnLoadNode, this, _1, _2, _3));
+  unloadNode_srv_ = create_service<UnloadNode>("~/_container/unload_node",
+      std::bind(&ComponentManager::OnUnloadNode, this, _1, _2, _3));
+  listNodes_srv_ = create_service<ListNodes>("~/_container/list_nodes",
+      std::bind(&ComponentManager::OnListNodes, this, _1, _2, _3));
 }
 
 ComponentManager::~ComponentManager()
@@ -61,8 +58,7 @@ ComponentManager::get_component_resources(const std::string & package_name) cons
 {
   std::string content;
   std::string base_path;
-  if (
-    !ament_index_cpp::get_resource(
+  if (!ament_index_cpp::get_resource(
       "rclcpp_components", package_name, content, &base_path))
   {
     throw ComponentManagerException("Could not find requested resource in ament index");
@@ -142,21 +138,13 @@ ComponentManager::OnLoadNode(
         parameters.push_back(rclcpp::Parameter::from_parameter_msg(p));
       }
 
-      std::vector<std::string> remap_rules;
-      remap_rules.reserve(request->remap_rules.size() * 2 + 1);
-      remap_rules.push_back("--ros-args");
-      for (const std::string & rule : request->remap_rules) {
-        remap_rules.push_back("-r");
-        remap_rules.push_back(rule);
-      }
+      std::vector<std::string> remap_rules {request->remap_rules};
 
       if (!request->node_name.empty()) {
-        remap_rules.push_back("-r");
         remap_rules.push_back("__node:=" + request->node_name);
       }
 
       if (!request->node_namespace.empty()) {
-        remap_rules.push_back("-r");
         remap_rules.push_back("__ns:=" + request->node_namespace);
       }
 

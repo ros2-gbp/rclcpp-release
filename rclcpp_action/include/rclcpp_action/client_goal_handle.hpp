@@ -134,8 +134,7 @@ private:
     typename ClientGoalHandle<ActionT>::SharedPtr shared_this,
     typename std::shared_ptr<const Feedback> feedback_message);
 
-  /// Returns the previous value of awareness
-  bool
+  void
   set_result_awareness(bool awareness);
 
   void

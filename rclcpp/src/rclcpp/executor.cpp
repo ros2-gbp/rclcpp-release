@@ -517,23 +517,48 @@ Executor::get_group_by_timer(rclcpp::TimerBase::SharedPtr timer)
       if (!group) {
         continue;
       }
-      auto timer_ref = group->find_timer_ptrs_if(
-        [timer](const rclcpp::TimerBase::SharedPtr & timer_ptr) -> bool {
-          return timer_ptr == timer;
-        });
-      if (timer_ref) {
-        return group;
+      for (auto & weak_timer : group->get_timer_ptrs()) {
+        auto t = weak_timer.lock();
+        if (t == timer) {
+          return group;
+        }
       }
     }
   }
   return rclcpp::callback_group::CallbackGroup::SharedPtr();
 }
 
+void
+Executor::get_next_timer(AnyExecutable & any_exec)
+{
+  for (auto & weak_node : weak_nodes_) {
+    auto node = weak_node.lock();
+    if (!node) {
+      continue;
+    }
+    for (auto & weak_group : node->get_callback_groups()) {
+      auto group = weak_group.lock();
+      if (!group || !group->can_be_taken_from().load()) {
+        continue;
+      }
+      for (auto & timer_ref : group->get_timer_ptrs()) {
+        auto timer = timer_ref.lock();
+        if (timer && timer->is_ready()) {
+          any_exec.timer = timer;
+          any_exec.callback_group = group;
+          node = get_node_by_group(group);
+          return;
+        }
+      }
+    }
+  }
+}
+
 bool
 Executor::get_next_ready_executable(AnyExecutable & any_executable)
 {
-  // Check the timers to see if there are any that are ready
-  memory_strategy_->get_next_timer(any_executable, weak_nodes_);
+  // Check the timers to see if there are any that are ready, if so return
+  get_next_timer(any_executable);
   if (any_executable.timer) {
     return true;
   }

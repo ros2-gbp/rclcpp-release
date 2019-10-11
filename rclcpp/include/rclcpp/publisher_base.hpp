@@ -52,7 +52,7 @@ namespace intra_process_manager
 class IntraProcessManager;
 }
 
-class PublisherBase : public std::enable_shared_from_this<PublisherBase>
+class PublisherBase
 {
   friend ::rclcpp::node_interfaces::NodeTopicsInterface;
 
@@ -184,9 +184,8 @@ public:
 
   /// Implementation utility function that creates a typed mapped ring buffer.
   RCLCPP_PUBLIC
-  virtual
   mapped_ring_buffer::MappedRingBufferBase::SharedPtr
-  make_mapped_ring_buffer(size_t size) const;
+  virtual make_mapped_ring_buffer(size_t size) const;
 
   /// Implementation utility function used to setup intra process publishing after creation.
   RCLCPP_PUBLIC

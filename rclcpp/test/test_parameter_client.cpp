@@ -67,8 +67,7 @@ TEST_F(TestParameterClient, async_construction_and_destruction) {
   }
 
   {
-    ASSERT_THROW(
-    {
+    ASSERT_THROW({
       std::make_shared<rclcpp::AsyncParametersClient>(node, "invalid_remote_node?");
     }, rclcpp::exceptions::InvalidServiceNameError);
   }
@@ -101,8 +100,7 @@ TEST_F(TestParameterClient, sync_construction_and_destruction) {
   }
 
   {
-    ASSERT_THROW(
-    {
+    ASSERT_THROW({
       std::make_shared<rclcpp::SyncParametersClient>(node, "invalid_remote_node?");
     }, rclcpp::exceptions::InvalidServiceNameError);
   }

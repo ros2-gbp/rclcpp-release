@@ -28,15 +28,14 @@ class TestNodeWithGlobalArgs : public ::testing::Test
 protected:
   static void SetUpTestCase()
   {
-    const char * const args[] = {"proc", "--ros-args", "-r", "__node:=global_node_name"};
-    const int argc = sizeof(args) / sizeof(const char *);
-    rclcpp::init(argc, args);
+    const char * const args[] = {"proc", "__node:=global_node_name"};
+    rclcpp::init(2, args);
   }
 };
 
 TEST_F(TestNodeWithGlobalArgs, local_arguments_before_global) {
   auto options = rclcpp::NodeOptions()
-    .arguments({"--ros-args", "-r", "__node:=local_arguments_test"});
+    .arguments({"__node:=local_arguments_test"});
 
   auto node = rclcpp::Node::make_shared("orig_name", options);
   EXPECT_STREQ("local_arguments_test", node->get_name());

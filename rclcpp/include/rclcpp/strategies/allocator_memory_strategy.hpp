@@ -164,31 +164,40 @@ public:
         if (!group || !group->can_be_taken_from().load()) {
           continue;
         }
-        group->find_subscription_ptrs_if(
-          [this](const rclcpp::SubscriptionBase::SharedPtr & subscription) {
+        for (auto & weak_subscription : group->get_subscription_ptrs()) {
+          auto subscription = weak_subscription.lock();
+          if (subscription) {
             subscription_handles_.push_back(subscription->get_subscription_handle());
             if (subscription->get_intra_process_subscription_handle()) {
               subscription_handles_.push_back(
                 subscription->get_intra_process_subscription_handle());
             }
-            return false;
-          });
-        group->find_service_ptrs_if([this](const rclcpp::ServiceBase::SharedPtr & service) {
+          }
+        }
+        for (auto & weak_service : group->get_service_ptrs()) {
+          auto service = weak_service.lock();
+          if (service) {
             service_handles_.push_back(service->get_service_handle());
-            return false;
-          });
-        group->find_client_ptrs_if([this](const rclcpp::ClientBase::SharedPtr & client) {
+          }
+        }
+        for (auto & weak_client : group->get_client_ptrs()) {
+          auto client = weak_client.lock();
+          if (client) {
             client_handles_.push_back(client->get_client_handle());
-            return false;
-          });
-        group->find_timer_ptrs_if([this](const rclcpp::TimerBase::SharedPtr & timer) {
+          }
+        }
+        for (auto & weak_timer : group->get_timer_ptrs()) {
+          auto timer = weak_timer.lock();
+          if (timer) {
             timer_handles_.push_back(timer->get_timer_handle());
-            return false;
-          });
-        group->find_waitable_ptrs_if([this](const rclcpp::Waitable::SharedPtr & waitable) {
+          }
+        }
+        for (auto & weak_waitable : group->get_waitable_ptrs()) {
+          auto waitable = weak_waitable.lock();
+          if (waitable) {
             waitable_handles_.push_back(waitable);
-            return false;
-          });
+          }
+        }
       }
     }
     return has_invalid_weak_nodes;
@@ -362,41 +371,6 @@ public:
       }
       // Else, the service is no longer valid, remove it and continue
       it = client_handles_.erase(it);
-    }
-  }
-
-  virtual void
-  get_next_timer(
-    executor::AnyExecutable & any_exec,
-    const WeakNodeList & weak_nodes)
-  {
-    auto it = timer_handles_.begin();
-    while (it != timer_handles_.end()) {
-      auto timer = get_timer_by_handle(*it, weak_nodes);
-      if (timer) {
-        // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_timer(timer, weak_nodes);
-        if (!group) {
-          // Group was not found, meaning the timer is not valid...
-          // Remove it from the ready list and continue looking
-          it = timer_handles_.erase(it);
-          continue;
-        }
-        if (!group->can_be_taken_from().load()) {
-          // Group is mutually exclusive and is being used, so skip it for now
-          // Leave it to be checked next time, but continue searching
-          ++it;
-          continue;
-        }
-        // Otherwise it is safe to set and return the any_exec
-        any_exec.timer = timer;
-        any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_nodes);
-        timer_handles_.erase(it);
-        return;
-      }
-      // Else, the service is no longer valid, remove it and continue
-      it = timer_handles_.erase(it);
     }
   }
 

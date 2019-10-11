@@ -7,7 +7,6 @@ find_package(builtin_interfaces REQUIRED)
 find_package(rcl REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(rcl_yaml_param_parser REQUIRED)
-find_package(rcpputils REQUIRED)
 find_package(rmw REQUIRED)
 find_package(rmw_implementation REQUIRED)
 find_package(rosgraph_msgs REQUIRED)
@@ -107,7 +106,6 @@ add_library(${PROJECT_NAME}
 ament_target_dependencies(${PROJECT_NAME}
   "rcl"
   "rcl_yaml_param_parser"
-  "rcpputils"
   "builtin_interfaces"
   "rosgraph_msgs"
   "rosidl_typesupport_cpp"
@@ -131,7 +129,6 @@ ament_export_libraries(${PROJECT_NAME})
 
 ament_export_dependencies(ament_cmake)
 ament_export_dependencies(rcl)
-ament_export_dependencies(rcpputils)
 ament_export_dependencies(builtin_interfaces)
 ament_export_dependencies(rosgraph_msgs)
 ament_export_dependencies(rosidl_typesupport_cpp)
@@ -146,11 +143,7 @@ if(BUILD_TESTING)
 
   find_package(rmw_implementation_cmake REQUIRED)
 
-  find_package(test_msgs REQUIRED)
-
   include(cmake/rclcpp_add_build_failure_test.cmake)
-
-  add_definitions(-DTEST_RESOURCES_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}/test/resources")
 
   ament_add_gtest(test_client test/test_client.cpp)
   if(TARGET test_client)
@@ -217,7 +210,6 @@ if(BUILD_TESTING)
   if(TARGET test_node)
     ament_target_dependencies(test_node
       "rcl_interfaces"
-      "rcpputils"
       "rmw"
       "rosidl_generator_cpp"
       "rosidl_typesupport_cpp"
@@ -261,11 +253,6 @@ if(BUILD_TESTING)
       "rosidl_typesupport_cpp"
     )
     target_link_libraries(test_node_global_args ${PROJECT_NAME})
-  endif()
-  ament_add_gtest(test_node_options test/test_node_options.cpp)
-  if(TARGET test_node_options)
-    ament_target_dependencies(test_node_options "rcl")
-    target_link_libraries(test_node_options ${PROJECT_NAME})
   endif()
   ament_add_gtest(test_parameter_client test/test_parameter_client.cpp)
   if(TARGET test_parameter_client)
@@ -369,6 +356,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(test_subscription_publisher_count_api ${PROJECT_NAME})
   endif()
+  find_package(test_msgs REQUIRED)
   ament_add_gtest(test_subscription_traits test/test_subscription_traits.cpp)
   if(TARGET test_subscription_traits)
     ament_target_dependencies(test_subscription_traits
@@ -384,17 +372,38 @@ if(BUILD_TESTING)
     target_link_libraries(test_find_weak_nodes ${PROJECT_NAME})
   endif()
 
+  get_default_rmw_implementation(default_rmw)
+  find_package(${default_rmw} REQUIRED)
+  get_rmw_typesupport(typesupport_impls_cpp "${default_rmw}" LANGUAGE "cpp")
+  get_rmw_typesupport(typesupport_impls_c "${default_rmw}" LANGUAGE "c")
+  set(mock_msg_files
+    "test/mock_msgs/srv/Mock.srv")
+  rosidl_generate_interfaces(mock_msgs
+    ${mock_msg_files}
+    LIBRARY_NAME "rclcpp"
+    SKIP_INSTALL)
+
   set(append_library_dirs "${CMAKE_CURRENT_BINARY_DIR}")
   if(WIN32)
     set(append_library_dirs "${append_library_dirs}/$<CONFIG>")
   endif()
 
-  ament_add_gtest(test_externally_defined_services test/test_externally_defined_services.cpp)
-  ament_target_dependencies(test_externally_defined_services
-    "rcl"
-    "test_msgs"
-  )
-  target_link_libraries(test_externally_defined_services ${PROJECT_NAME})
+  ament_add_gtest(test_externally_defined_services test/test_externally_defined_services.cpp
+    APPEND_LIBRARY_DIRS "${append_library_dirs}")
+  if(TARGET test_externally_defined_services)
+    ament_target_dependencies(test_externally_defined_services
+      "rcl"
+    )
+    target_link_libraries(test_externally_defined_services ${PROJECT_NAME})
+    foreach(typesupport_impl_cpp ${typesupport_impls_cpp})
+      rosidl_target_interfaces(test_externally_defined_services
+        mock_msgs ${typesupport_impl_cpp})
+    endforeach()
+    foreach(typesupport_impl_c ${typesupport_impls_c})
+      rosidl_target_interfaces(test_externally_defined_services
+        mock_msgs ${typesupport_impl_c})
+    endforeach()
+  endif()
 
   ament_add_gtest(test_duration test/test_duration.cpp
     APPEND_LIBRARY_DIRS "${append_library_dirs}")
@@ -466,10 +475,16 @@ if(BUILD_TESTING)
     target_link_libraries(test_multi_threaded_executor ${PROJECT_NAME})
   endif()
 
-  # Install test resources
-  install(
-    DIRECTORY test/resources
-    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/test)
+  ament_add_gtest(test_local_parameters test/test_local_parameters.cpp)
+  if(TARGET test_local_parameters)
+    ament_target_dependencies(test_local_parameters
+      "rcl_interfaces"
+      "rmw"
+      "rosidl_generator_cpp"
+      "rosidl_typesupport_cpp"
+    )
+    target_link_libraries(test_local_parameters ${PROJECT_NAME})
+  endif()
 endif()
 
 ament_package()

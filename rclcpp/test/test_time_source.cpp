@@ -161,8 +161,7 @@ void set_use_sim_time_parameter(
 
   using namespace std::chrono_literals;
   EXPECT_TRUE(parameters_client->wait_for_service(2s));
-  auto set_parameters_results = parameters_client->set_parameters(
-  {
+  auto set_parameters_results = parameters_client->set_parameters({
     rclcpp::Parameter("use_sim_time", value)
   });
   for (auto & result : set_parameters_results) {
