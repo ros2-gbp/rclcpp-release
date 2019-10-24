@@ -1,0 +1,12 @@
+Source: ros-eloquent-rclcpp-components
+Section: misc
+Priority: optional
+Maintainer: Michael Carroll <michael@openrobotics.org>
+Build-Depends: debhelper (>= 9.0.0), ros-eloquent-ament-cmake-gtest, ros-eloquent-ament-cmake-ros, ros-eloquent-ament-index-cpp, ros-eloquent-ament-lint-auto, ros-eloquent-ament-lint-common, ros-eloquent-class-loader, ros-eloquent-composition-interfaces, ros-eloquent-launch-testing, ros-eloquent-rclcpp, ros-eloquent-rcpputils, ros-eloquent-std-msgs, ros-eloquent-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-eloquent-rclcpp-components
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-eloquent-ament-index-cpp, ros-eloquent-class-loader, ros-eloquent-composition-interfaces, ros-eloquent-rclcpp, ros-eloquent-ros-workspace
+Description: Package containing tools for dynamically loadable components
