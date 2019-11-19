@@ -2,6 +2,9 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.8.2 (2019-11-18)
+------------------
+
 0.8.1 (2019-10-23)
 ------------------
 * Enable intra-process comm via LoadNode request. (`#871 <https://github.com/ros2/rclcpp/issues/871>`_)
