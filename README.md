@@ -1,3 +1,30 @@
+## rclcpp (eloquent) - 0.8.3-1
+
+The packages in the `rclcpp` repository were released into the `eloquent` distro by running `/home/mjcarroll/.local/bin/bloom-release --ros-distro eloquent rclcpp` on `Wed, 20 Nov 2019 05:17:58 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_components`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `0.8.2-1`
+- old version: `0.8.2-1`
+- new version: `0.8.3-1`
+
+Versions of tools used:
+
+- bloom version: `0.9.0`
+- catkin_pkg version: `0.4.14`
+- rosdep version: `0.17.1`
+- rosdistro version: `0.7.5`
+- vcstools version: `0.1.42`
+
+
 ## rclcpp (eloquent) - 0.8.2-1
 
 The packages in the `rclcpp` repository were released into the `eloquent` distro by running `/usr/local/bin/bloom-release -r eloquent -t eloquent rclcpp` on `Tue, 19 Nov 2019 00:59:08 -0000`
