@@ -1,0 +1,12 @@
+Source: ros-crystal-rclcpp-lifecycle
+Section: misc
+Priority: optional
+Maintainer: Karsten Knese <karsten@osrfoundation.org>
+Build-Depends: debhelper (>= 9.0.0), ros-crystal-ament-cmake-gtest, ros-crystal-ament-cmake-ros, ros-crystal-ament-lint-auto, ros-crystal-ament-lint-common, ros-crystal-lifecycle-msgs, ros-crystal-rcl-lifecycle, ros-crystal-rclcpp, ros-crystal-rmw-implementation, ros-crystal-rosidl-typesupport-cpp, ros-crystal-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-crystal-rclcpp-lifecycle
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-crystal-lifecycle-msgs, ros-crystal-rcl-lifecycle, ros-crystal-rclcpp, ros-crystal-rclpy, ros-crystal-rmw-implementation, ros-crystal-rosidl-typesupport-cpp, ros-crystal-ros-workspace
+Description: Package containing a prototype for lifecycle implementation
