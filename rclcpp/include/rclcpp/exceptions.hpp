@@ -110,15 +110,13 @@ public:
  * \throws std::runtime_error if the rcl_get_error_state returns 0
  * \throws RCLErrorBase some child class exception based on ret
  */
-/* *INDENT-OFF* */  // Uncrustify cannot yet understand [[noreturn]] properly
 RCLCPP_PUBLIC
 void
-throw_from_rcl_error [[noreturn]] (
+throw_from_rcl_error(
   rcl_ret_t ret,
   const std::string & prefix = "",
   const rcl_error_state_t * error_state = nullptr,
   void (* reset_error)() = rcl_reset_error);
-/* *INDENT-ON* */
 
 class RCLErrorBase
 {
@@ -187,35 +185,14 @@ public:
 class InvalidParametersException : public std::runtime_error
 {
 public:
-  // Inherit constructors from runtime_error.
+  // Inherit constructors from runtime_error;
   using std::runtime_error::runtime_error;
 };
 
-/// Thrown if passed parameter value is invalid.
+/// Throwing if passed parameter value is invalid.
 class InvalidParameterValueException : public std::runtime_error
 {
-  // Inherit constructors from runtime_error.
-  using std::runtime_error::runtime_error;
-};
-
-/// Thrown if parameter is already declared.
-class ParameterAlreadyDeclaredException : public std::runtime_error
-{
-  // Inherit constructors from runtime_error.
-  using std::runtime_error::runtime_error;
-};
-
-/// Thrown if parameter is not declared, e.g. either set or get was called without first declaring.
-class ParameterNotDeclaredException : public std::runtime_error
-{
-  // Inherit constructors from runtime_error.
-  using std::runtime_error::runtime_error;
-};
-
-/// Thrown if parameter is immutable and therefore cannot be undeclared.
-class ParameterImmutableException : public std::runtime_error
-{
-  // Inherit constructors from runtime_error.
+  // Inherit constructors from runtime_error;
   using std::runtime_error::runtime_error;
 };
 

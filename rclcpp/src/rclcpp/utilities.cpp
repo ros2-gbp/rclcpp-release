@@ -24,48 +24,45 @@
 #include "rcl/error_handling.h"
 #include "rcl/rcl.h"
 
-namespace rclcpp
-{
-
 void
-init(int argc, char const * const argv[], const InitOptions & init_options)
+rclcpp::init(int argc, char const * const argv[], const rclcpp::InitOptions & init_options)
 {
-  using contexts::default_context::get_global_default_context;
+  using rclcpp::contexts::default_context::get_global_default_context;
   get_global_default_context()->init(argc, argv, init_options);
   // Install the signal handlers.
-  install_signal_handlers();
+  rclcpp::install_signal_handlers();
 }
 
 bool
-install_signal_handlers()
+rclcpp::install_signal_handlers()
 {
-  return SignalHandler::get_global_signal_handler().install();
+  return rclcpp::SignalHandler::get_global_signal_handler().install();
 }
 
 bool
-signal_handlers_installed()
+rclcpp::signal_handlers_installed()
 {
-  return SignalHandler::get_global_signal_handler().is_installed();
+  return rclcpp::SignalHandler::get_global_signal_handler().is_installed();
 }
 
 bool
-uninstall_signal_handlers()
+rclcpp::uninstall_signal_handlers()
 {
-  return SignalHandler::get_global_signal_handler().uninstall();
+  return rclcpp::SignalHandler::get_global_signal_handler().uninstall();
 }
 
 std::vector<std::string>
-init_and_remove_ros_arguments(
+rclcpp::init_and_remove_ros_arguments(
   int argc,
   char const * const argv[],
-  const InitOptions & init_options)
+  const rclcpp::InitOptions & init_options)
 {
-  init(argc, argv, init_options);
-  return remove_ros_arguments(argc, argv);
+  rclcpp::init(argc, argv, init_options);
+  return rclcpp::remove_ros_arguments(argc, argv);
 }
 
 std::vector<std::string>
-remove_ros_arguments(int argc, char const * const argv[])
+rclcpp::remove_ros_arguments(int argc, char const * const argv[])
 {
   rcl_allocator_t alloc = rcl_get_default_allocator();
   rcl_arguments_t parsed_args = rcl_get_zero_initialized_arguments();
@@ -74,7 +71,7 @@ remove_ros_arguments(int argc, char const * const argv[])
 
   ret = rcl_parse_arguments(argc, argv, alloc, &parsed_args);
   if (RCL_RET_OK != ret) {
-    exceptions::throw_from_rcl_error(ret, "failed to parse arguments");
+    rclcpp::exceptions::throw_from_rcl_error(ret, "failed to parse arguments");
   }
 
   int nonros_argc = 0;
@@ -87,9 +84,9 @@ remove_ros_arguments(int argc, char const * const argv[])
     &nonros_argc,
     &nonros_argv);
 
-  if (RCL_RET_OK != ret || nonros_argc < 0) {
+  if (RCL_RET_OK != ret) {
     // Not using throw_from_rcl_error, because we may need to append deallocation failures.
-    exceptions::RCLErrorBase base_exc(ret, rcl_get_error_state());
+    rclcpp::exceptions::RCLErrorBase base_exc(ret, rcl_get_error_state());
     rcl_reset_error();
     if (NULL != nonros_argv) {
       alloc.deallocate(nonros_argv, alloc.state);
@@ -100,10 +97,11 @@ remove_ros_arguments(int argc, char const * const argv[])
         rcl_get_error_string().str;
       rcl_reset_error();
     }
-    throw exceptions::RCLError(base_exc, "");
+    throw rclcpp::exceptions::RCLError(base_exc, "");
   }
 
-  std::vector<std::string> return_arguments(nonros_argc);
+  std::vector<std::string> return_arguments;
+  return_arguments.resize(nonros_argc);
 
   for (int ii = 0; ii < nonros_argc; ++ii) {
     return_arguments[ii] = std::string(nonros_argv[ii]);
@@ -115,7 +113,7 @@ remove_ros_arguments(int argc, char const * const argv[])
 
   ret = rcl_arguments_fini(&parsed_args);
   if (RCL_RET_OK != ret) {
-    exceptions::throw_from_rcl_error(
+    rclcpp::exceptions::throw_from_rcl_error(
       ret, "failed to cleanup parsed arguments, leaking memory");
   }
 
@@ -123,9 +121,9 @@ remove_ros_arguments(int argc, char const * const argv[])
 }
 
 bool
-ok(Context::SharedPtr context)
+rclcpp::ok(rclcpp::Context::SharedPtr context)
 {
-  using contexts::default_context::get_global_default_context;
+  using rclcpp::contexts::default_context::get_global_default_context;
   if (nullptr == context) {
     context = get_global_default_context();
   }
@@ -133,30 +131,30 @@ ok(Context::SharedPtr context)
 }
 
 bool
-is_initialized(Context::SharedPtr context)
+rclcpp::is_initialized(rclcpp::Context::SharedPtr context)
 {
-  return ok(context);
+  return rclcpp::ok(context);
 }
 
 bool
-shutdown(Context::SharedPtr context, const std::string & reason)
+rclcpp::shutdown(rclcpp::Context::SharedPtr context, const std::string & reason)
 {
-  using contexts::default_context::get_global_default_context;
+  using rclcpp::contexts::default_context::get_global_default_context;
   auto default_context = get_global_default_context();
   if (nullptr == context) {
     context = default_context;
   }
   bool ret = context->shutdown(reason);
   if (context == default_context) {
-    uninstall_signal_handlers();
+    rclcpp::uninstall_signal_handlers();
   }
   return ret;
 }
 
 void
-on_shutdown(std::function<void()> callback, Context::SharedPtr context)
+rclcpp::on_shutdown(std::function<void()> callback, rclcpp::Context::SharedPtr context)
 {
-  using contexts::default_context::get_global_default_context;
+  using rclcpp::contexts::default_context::get_global_default_context;
   if (nullptr == context) {
     context = get_global_default_context();
   }
@@ -164,9 +162,9 @@ on_shutdown(std::function<void()> callback, Context::SharedPtr context)
 }
 
 bool
-sleep_for(const std::chrono::nanoseconds & nanoseconds, Context::SharedPtr context)
+rclcpp::sleep_for(const std::chrono::nanoseconds & nanoseconds, rclcpp::Context::SharedPtr context)
 {
-  using contexts::default_context::get_global_default_context;
+  using rclcpp::contexts::default_context::get_global_default_context;
   if (nullptr == context) {
     context = get_global_default_context();
   }
@@ -174,15 +172,13 @@ sleep_for(const std::chrono::nanoseconds & nanoseconds, Context::SharedPtr conte
 }
 
 const char *
-get_c_string(const char * string_in)
+rclcpp::get_c_string(const char * string_in)
 {
   return string_in;
 }
 
 const char *
-get_c_string(const std::string & string_in)
+rclcpp::get_c_string(const std::string & string_in)
 {
   return string_in.c_str();
 }
-
-}  // namespace rclcpp

@@ -34,7 +34,7 @@ rclcpp::PublisherBase::SharedPtr
 NodeTopics::create_publisher(
   const std::string & topic_name,
   const rclcpp::PublisherFactory & publisher_factory,
-  const rcl_publisher_options_t & publisher_options,
+  rcl_publisher_options_t & publisher_options,
   bool use_intra_process)
 {
   // Create the MessageT specific Publisher using the factory, but store it as PublisherBase.
@@ -47,18 +47,13 @@ NodeTopics::create_publisher(
     // Get the intra process manager instance for this context.
     auto ipm = context->get_sub_context<rclcpp::intra_process_manager::IntraProcessManager>();
     // Register the publisher with the intra process manager.
-    if (publisher_options.qos.history == RMW_QOS_POLICY_HISTORY_KEEP_ALL) {
-      throw std::invalid_argument(
-              "intraprocess communication is not allowed with keep all history qos policy");
-    }
-    if (publisher_options.qos.depth == 0) {
-      throw std::invalid_argument(
-              "intraprocess communication is not allowed with a zero qos history depth value");
-    }
-    uint64_t intra_process_publisher_id = ipm->add_publisher(publisher);
+    uint64_t intra_process_publisher_id =
+      publisher_factory.add_publisher_to_intra_process_manager(ipm.get(), publisher);
+    // Create a function to be called when publisher to do the intra process publish.
+    auto shared_publish_callback = publisher_factory.create_shared_publish_callback(ipm);
     publisher->setup_intra_process(
       intra_process_publisher_id,
-      ipm,
+      shared_publish_callback,
       publisher_options);
   }
 
@@ -68,22 +63,11 @@ NodeTopics::create_publisher(
 
 void
 NodeTopics::add_publisher(
-  rclcpp::PublisherBase::SharedPtr publisher,
-  rclcpp::callback_group::CallbackGroup::SharedPtr callback_group)
+  rclcpp::PublisherBase::SharedPtr publisher)
 {
-  // Assign to a group.
-  if (callback_group) {
-    if (!node_base_->callback_group_in_node(callback_group)) {
-      throw std::runtime_error("Cannot create publisher, callback group not in node.");
-    }
-  } else {
-    callback_group = node_base_->get_default_callback_group();
-  }
-
-  for (auto & publisher_event : publisher->get_event_handlers()) {
-    callback_group->add_waitable(publisher_event);
-  }
-
+  // The publisher is not added to a callback group or anthing like that for now.
+  // It may be stored within the NodeTopics class or the NodeBase class in the future.
+  (void)publisher;
   // Notify the executor that a new publisher was created using the parent Node.
   {
     auto notify_guard_condition_lock = node_base_->acquire_notify_guard_condition_lock();
@@ -99,7 +83,7 @@ rclcpp::SubscriptionBase::SharedPtr
 NodeTopics::create_subscription(
   const std::string & topic_name,
   const rclcpp::SubscriptionFactory & subscription_factory,
-  const rcl_subscription_options_t & subscription_options,
+  rcl_subscription_options_t & subscription_options,
   bool use_intra_process)
 {
   auto subscription = subscription_factory.create_typed_subscription(
@@ -108,12 +92,10 @@ NodeTopics::create_subscription(
   // Setup intra process publishing if requested.
   if (use_intra_process) {
     auto context = node_base_->get_context();
-    auto ipm =
+    auto intra_process_manager =
       context->get_sub_context<rclcpp::intra_process_manager::IntraProcessManager>();
-    uint64_t intra_process_subscription_id = ipm->add_subscription(subscription);
-    auto options_copy = subscription_options;
-    options_copy.ignore_local_publications = false;
-    subscription->setup_intra_process(intra_process_subscription_id, ipm, options_copy);
+    subscription_factory.setup_intra_process(
+      intra_process_manager, subscription, subscription_options);
   }
 
   // Return the completed subscription.
@@ -131,13 +113,9 @@ NodeTopics::add_subscription(
       // TODO(jacquelinekay): use custom exception
       throw std::runtime_error("Cannot create subscription, callback group not in node.");
     }
+    callback_group->add_subscription(subscription);
   } else {
-    callback_group = node_base_->get_default_callback_group();
-  }
-
-  callback_group->add_subscription(subscription);
-  for (auto & subscription_event : subscription->get_event_handlers()) {
-    callback_group->add_waitable(subscription_event);
+    node_base_->get_default_callback_group()->add_subscription(subscription);
   }
 
   // Notify the executor that a new subscription was created using the parent Node.
@@ -150,10 +128,4 @@ NodeTopics::add_subscription(
       );
     }
   }
-}
-
-rclcpp::node_interfaces::NodeBaseInterface *
-NodeTopics::get_node_base_interface() const
-{
-  return node_base_;
 }

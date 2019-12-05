@@ -15,20 +15,16 @@
 #ifndef RCLCPP_LIFECYCLE__LIFECYCLE_NODE_IMPL_HPP_
 #define RCLCPP_LIFECYCLE__LIFECYCLE_NODE_IMPL_HPP_
 
-#include <map>
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "rclcpp/contexts/default_context.hpp"
 #include "rclcpp/intra_process_manager.hpp"
-#include "rclcpp/event.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/create_publisher.hpp"
 #include "rclcpp/create_service.hpp"
 #include "rclcpp/create_subscription.hpp"
-#include "rclcpp/subscription_options.hpp"
 #include "rclcpp/type_support_decl.hpp"
 
 #include "lifecycle_publisher.hpp"
@@ -39,34 +35,18 @@
 namespace rclcpp_lifecycle
 {
 
-template<typename MessageT, typename AllocatorT>
-std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<MessageT, AllocatorT>>
-LifecycleNode::create_publisher(
-  const std::string & topic_name,
-  const rclcpp::QoS & qos,
-  const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options)
-{
-  using PublisherT = rclcpp_lifecycle::LifecyclePublisher<MessageT, AllocatorT>;
-  return rclcpp::create_publisher<MessageT, AllocatorT, PublisherT>(
-    *this,
-    topic_name,
-    qos,
-    options);
-}
-
 template<typename MessageT, typename Alloc>
 std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<MessageT, Alloc>>
 LifecycleNode::create_publisher(
-  const std::string & topic_name,
-  size_t qos_history_depth,
+  const std::string & topic_name, size_t qos_history_depth,
   std::shared_ptr<Alloc> allocator)
 {
-  rclcpp::PublisherOptionsWithAllocator<Alloc> options;
-  options.allocator = allocator;
-  return this->create_publisher<MessageT, Alloc>(
-    topic_name,
-    rclcpp::QoS(rclcpp::KeepLast(qos_history_depth)),
-    options);
+  if (!allocator) {
+    allocator = std::make_shared<Alloc>();
+  }
+  rmw_qos_profile_t qos = rmw_qos_profile_default;
+  qos.depth = qos_history_depth;
+  return this->create_publisher<MessageT, Alloc>(topic_name, qos, allocator);
 }
 
 template<typename MessageT, typename Alloc>
@@ -76,48 +56,19 @@ LifecycleNode::create_publisher(
   const rmw_qos_profile_t & qos_profile,
   std::shared_ptr<Alloc> allocator)
 {
-  rclcpp::QoS qos(rclcpp::QoSInitialization::from_rmw(qos_profile));
-  qos.get_rmw_qos_profile() = qos_profile;
+  using PublisherT = rclcpp_lifecycle::LifecyclePublisher<MessageT, Alloc>;
 
-  rclcpp::PublisherOptionsWithAllocator<Alloc> pub_options;
-  pub_options.allocator = allocator;
-
-  return this->create_publisher<MessageT, Alloc>(
+  // create regular publisher in rclcpp::Node
+  return rclcpp::create_publisher<MessageT, Alloc, PublisherT>(
+    this->node_topics_.get(),
     topic_name,
-    qos,
-    pub_options);
+    qos_profile,
+    use_intra_process_comms_,
+    allocator);
 }
 
 // TODO(karsten1987): Create LifecycleSubscriber
-template<
-  typename MessageT,
-  typename CallbackT,
-  typename AllocatorT,
-  typename SubscriptionT>
-std::shared_ptr<SubscriptionT>
-LifecycleNode::create_subscription(
-  const std::string & topic_name,
-  const rclcpp::QoS & qos,
-  CallbackT && callback,
-  const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options,
-  typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
-    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, AllocatorT>::SharedPtr
-  msg_mem_strat)
-{
-  return rclcpp::create_subscription<MessageT>(
-    *this,
-    topic_name,
-    qos,
-    std::forward<CallbackT>(callback),
-    options,
-    msg_mem_strat);
-}
-
-template<
-  typename MessageT,
-  typename CallbackT,
-  typename Alloc,
-  typename SubscriptionT>
+template<typename MessageT, typename CallbackT, typename Alloc, typename SubscriptionT>
 std::shared_ptr<SubscriptionT>
 LifecycleNode::create_subscription(
   const std::string & topic_name,
@@ -130,16 +81,27 @@ LifecycleNode::create_subscription(
   msg_mem_strat,
   std::shared_ptr<Alloc> allocator)
 {
-  rclcpp::QoS qos(rclcpp::QoSInitialization::from_rmw(qos_profile));
-  qos.get_rmw_qos_profile() = qos_profile;
+  using CallbackMessageT = typename rclcpp::subscription_traits::has_message_type<CallbackT>::type;
 
-  rclcpp::SubscriptionOptionsWithAllocator<Alloc> sub_options;
-  sub_options.callback_group = group;
-  sub_options.ignore_local_publications = ignore_local_publications;
-  sub_options.allocator = allocator;
+  if (!allocator) {
+    allocator = std::make_shared<Alloc>();
+  }
 
-  return this->create_subscription<MessageT, CallbackT, Alloc, SubscriptionT>(
-    topic_name, std::forward<CallbackT>(callback), qos, sub_options, msg_mem_strat);
+  if (!msg_mem_strat) {
+    using rclcpp::message_memory_strategy::MessageMemoryStrategy;
+    msg_mem_strat = MessageMemoryStrategy<CallbackMessageT, Alloc>::create_default();
+  }
+
+  return rclcpp::create_subscription<MessageT, CallbackT, Alloc, CallbackMessageT, SubscriptionT>(
+    this->node_topics_.get(),
+    topic_name,
+    std::forward<CallbackT>(callback),
+    qos_profile,
+    group,
+    ignore_local_publications,
+    use_intra_process_comms_,
+    msg_mem_strat,
+    allocator);
 }
 
 template<
@@ -154,28 +116,26 @@ LifecycleNode::create_subscription(
   CallbackT && callback,
   rclcpp::callback_group::CallbackGroup::SharedPtr group,
   bool ignore_local_publications,
-  typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
-    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
+  typename rclcpp::message_memory_strategy::MessageMemoryStrategy<MessageT, Alloc>::SharedPtr
   msg_mem_strat,
   std::shared_ptr<Alloc> allocator)
 {
-  rclcpp::SubscriptionOptionsWithAllocator<Alloc> sub_options;
-  sub_options.callback_group = group;
-  sub_options.ignore_local_publications = ignore_local_publications;
-  sub_options.allocator = allocator;
-
-  return this->create_subscription<MessageT, CallbackT, Alloc, SubscriptionT>(
+  rmw_qos_profile_t qos = rmw_qos_profile_default;
+  qos.depth = qos_history_depth;
+  return this->create_subscription<MessageT, CallbackT, Alloc>(
     topic_name,
     std::forward<CallbackT>(callback),
-    rclcpp::QoS(rclcpp::KeepLast(qos_history_depth)),
-    sub_options,
-    msg_mem_strat);
+    qos,
+    group,
+    ignore_local_publications,
+    msg_mem_strat,
+    allocator);
 }
 
-template<typename DurationRepT, typename DurationT, typename CallbackT>
+template<typename DurationT, typename CallbackT>
 typename rclcpp::WallTimer<CallbackT>::SharedPtr
 LifecycleNode::create_wall_timer(
-  std::chrono::duration<DurationRepT, DurationT> period,
+  std::chrono::duration<int64_t, DurationT> period,
   CallbackT callback,
   rclcpp::callback_group::CallbackGroup::SharedPtr group)
 {
@@ -224,62 +184,6 @@ LifecycleNode::create_service(
 }
 
 template<typename ParameterT>
-auto
-LifecycleNode::declare_parameter(
-  const std::string & name,
-  const ParameterT & default_value,
-  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor)
-{
-  return this->declare_parameter(
-    name,
-    rclcpp::ParameterValue(default_value),
-    parameter_descriptor
-  ).get<ParameterT>();
-}
-
-template<typename ParameterT>
-std::vector<ParameterT>
-LifecycleNode::declare_parameters(
-  const std::string & namespace_,
-  const std::map<std::string, ParameterT> & parameters)
-{
-  std::vector<ParameterT> result;
-  std::string normalized_namespace = namespace_.empty() ? "" : (namespace_ + ".");
-  std::transform(
-    parameters.begin(), parameters.end(), std::back_inserter(result),
-    [this, &normalized_namespace](auto element) {
-      return this->declare_parameter(normalized_namespace + element.first, element.second);
-    }
-  );
-  return result;
-}
-
-template<typename ParameterT>
-std::vector<ParameterT>
-LifecycleNode::declare_parameters(
-  const std::string & namespace_,
-  const std::map<
-    std::string,
-    std::pair<ParameterT, rcl_interfaces::msg::ParameterDescriptor>
-  > & parameters)
-{
-  std::vector<ParameterT> result;
-  std::string normalized_namespace = namespace_.empty() ? "" : (namespace_ + ".");
-  std::transform(
-    parameters.begin(), parameters.end(), std::back_inserter(result),
-    [this, &normalized_namespace](auto element) {
-      return static_cast<ParameterT>(
-        this->declare_parameter(
-          normalized_namespace + element.first,
-          element.second.first,
-          element.second.second)
-      );
-    }
-  );
-  return result;
-}
-
-template<typename ParameterT>
 bool
 LifecycleNode::get_parameter(const std::string & name, ParameterT & parameter) const
 {
@@ -294,93 +198,7 @@ template<typename CallbackT>
 void
 LifecycleNode::register_param_change_callback(CallbackT && callback)
 {
-  this->node_parameters_->set_on_parameters_set_callback(std::forward<CallbackT>(callback));
-}
-
-template<typename ParameterT>
-void
-LifecycleNode::set_parameter_if_not_set(
-  const std::string & name,
-  const ParameterT & value)
-{
-  rclcpp::Parameter parameter;
-  if (!this->get_parameter(name, parameter)) {
-    this->set_parameters({
-        rclcpp::Parameter(name, value),
-      });
-  }
-}
-
-// this is a partially-specialized version of set_parameter_if_not_set above,
-// where our concrete type for ParameterT is std::map, but the to-be-determined
-// type is the value in the map.
-template<typename MapValueT>
-void
-LifecycleNode::set_parameters_if_not_set(
-  const std::string & name,
-  const std::map<std::string, MapValueT> & values)
-{
-  std::vector<rclcpp::Parameter> params;
-
-  for (const auto & val : values) {
-    std::string param_name = name + "." + val.first;
-    rclcpp::Parameter parameter;
-    if (!this->get_parameter(param_name, parameter)) {
-      params.push_back(rclcpp::Parameter(param_name, val.second));
-    }
-  }
-
-  this->set_parameters(params);
-}
-
-// this is a partially-specialized version of get_parameter above,
-// where our concrete type for ParameterT is std::map, but the to-be-determined
-// type is the value in the map.
-template<typename MapValueT>
-bool
-LifecycleNode::get_parameters(
-  const std::string & prefix,
-  std::map<std::string, MapValueT> & values) const
-{
-  std::map<std::string, rclcpp::Parameter> params;
-  bool result = node_parameters_->get_parameters_by_prefix(prefix, params);
-  if (result) {
-    for (const auto & param : params) {
-      values[param.first] = param.second.get_value<MapValueT>();
-    }
-  }
-
-  return result;
-}
-
-template<typename ParameterT>
-bool
-LifecycleNode::get_parameter_or(
-  const std::string & name,
-  ParameterT & value,
-  const ParameterT & alternative_value) const
-{
-  bool got_parameter = get_parameter(name, value);
-  if (!got_parameter) {
-    value = alternative_value;
-  }
-  return got_parameter;
-}
-
-template<typename ParameterT>
-void
-LifecycleNode::get_parameter_or_set(
-  const std::string & name,
-  ParameterT & value,
-  const ParameterT & alternative_value)
-{
-  bool got_parameter = get_parameter(name, value);
-  if (!got_parameter) {
-    this->set_parameters({
-        rclcpp::Parameter(name, alternative_value),
-      });
-    value = alternative_value;
-  }
+  this->node_parameters_->register_param_change_callback(std::forward<CallbackT>(callback));
 }
 
 }  // namespace rclcpp_lifecycle

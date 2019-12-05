@@ -227,15 +227,3 @@ ParameterValue::to_value_msg() const
 {
   return value_;
 }
-
-bool
-ParameterValue::operator==(const ParameterValue & rhs) const
-{
-  return this->value_ == rhs.value_;
-}
-
-bool
-ParameterValue::operator!=(const ParameterValue & rhs) const
-{
-  return this->value_ != rhs.value_;
-}

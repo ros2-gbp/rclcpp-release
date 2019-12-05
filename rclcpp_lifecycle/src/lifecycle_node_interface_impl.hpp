@@ -369,7 +369,6 @@ public:
     {
       RCUTILS_LOG_ERROR("Unable to start transition %u from current state %s: %s",
         transition_id, state_machine_.current_state->label, rcl_get_error_string().str);
-      rcutils_reset_error();
       return RCL_RET_ERROR;
     }
 
@@ -390,10 +389,8 @@ public:
     if (rcl_lifecycle_trigger_transition_by_label(
         &state_machine_, transition_label, publish_update) != RCL_RET_OK)
     {
-      RCUTILS_LOG_ERROR(
-        "Failed to finish transition %u. Current state is now: %s (%s)",
-        transition_id, state_machine_.current_state->label, rcl_get_error_string().str);
-      rcutils_reset_error();
+      RCUTILS_LOG_ERROR("Failed to finish transition %u. Current state is now: %s",
+        transition_id, state_machine_.current_state->label);
       return RCL_RET_ERROR;
     }
 
@@ -407,8 +404,7 @@ public:
       if (rcl_lifecycle_trigger_transition_by_label(
           &state_machine_, error_cb_label, publish_update) != RCL_RET_OK)
       {
-        RCUTILS_LOG_ERROR("Failed to call cleanup on error state: %s", rcl_get_error_string().str);
-        rcutils_reset_error();
+        RCUTILS_LOG_ERROR("Failed to call cleanup on error state");
         return RCL_RET_ERROR;
       }
     }
@@ -429,9 +425,14 @@ public:
       auto callback = it->second;
       try {
         cb_success = callback(State(previous_state));
-      } catch (const std::exception & e) {
-        RCUTILS_LOG_ERROR("Caught exception in callback for transition %d", it->first);
-        RCUTILS_LOG_ERROR("Original error: %s", e.what());
+      } catch (const std::exception &) {
+        // TODO(karsten1987): Windows CI doesn't let me print the msg here
+        // the todo is to forward the exception to the on_error callback
+        // RCUTILS_LOG_ERROR("Caught exception in callback for transition %d\n",
+        //  it->first);
+        // RCUTILS_LOG_ERROR("Original error msg: %s\n", e.what());
+        // maybe directly go for error handling here
+        // and pass exception along with it
         cb_success = node_interfaces::LifecycleNodeInterface::CallbackReturn::ERROR;
       }
     }

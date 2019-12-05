@@ -42,44 +42,44 @@ public:
   explicit NodeTopics(rclcpp::node_interfaces::NodeBaseInterface * node_base);
 
   RCLCPP_PUBLIC
-  ~NodeTopics() override;
+  virtual
+  ~NodeTopics();
 
   RCLCPP_PUBLIC
+  virtual
   rclcpp::PublisherBase::SharedPtr
   create_publisher(
     const std::string & topic_name,
     const rclcpp::PublisherFactory & publisher_factory,
-    const rcl_publisher_options_t & publisher_options,
-    bool use_intra_process) override;
+    rcl_publisher_options_t & publisher_options,
+    bool use_intra_process);
 
   RCLCPP_PUBLIC
+  virtual
   void
   add_publisher(
-    rclcpp::PublisherBase::SharedPtr publisher,
-    rclcpp::callback_group::CallbackGroup::SharedPtr callback_group) override;
+    rclcpp::PublisherBase::SharedPtr publisher);
 
   RCLCPP_PUBLIC
+  virtual
   rclcpp::SubscriptionBase::SharedPtr
   create_subscription(
     const std::string & topic_name,
     const rclcpp::SubscriptionFactory & subscription_factory,
-    const rcl_subscription_options_t & subscription_options,
-    bool use_intra_process) override;
+    rcl_subscription_options_t & subscription_options,
+    bool use_intra_process);
 
   RCLCPP_PUBLIC
+  virtual
   void
   add_subscription(
     rclcpp::SubscriptionBase::SharedPtr subscription,
-    rclcpp::callback_group::CallbackGroup::SharedPtr callback_group) override;
-
-  RCLCPP_PUBLIC
-  rclcpp::node_interfaces::NodeBaseInterface *
-  get_node_base_interface() const override;
+    rclcpp::callback_group::CallbackGroup::SharedPtr callback_group);
 
 private:
   RCLCPP_DISABLE_COPY(NodeTopics)
 
-  rclcpp::node_interfaces::NodeBaseInterface * node_base_;
+  NodeBaseInterface * node_base_;
 };
 
 }  // namespace node_interfaces

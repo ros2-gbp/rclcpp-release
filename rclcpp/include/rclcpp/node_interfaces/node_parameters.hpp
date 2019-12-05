@@ -40,16 +40,6 @@ namespace rclcpp
 namespace node_interfaces
 {
 
-// Internal struct for holding useful info about parameters
-struct ParameterInfo
-{
-  /// Current value of the parameter.
-  rclcpp::ParameterValue value;
-
-  /// A description of the parameter
-  rcl_interfaces::msg::ParameterDescriptor descriptor;
-};
-
 /// Implementation of the NodeParameters part of the Node API.
 class NodeParameters : public NodeParametersInterface
 {
@@ -59,104 +49,74 @@ public:
   RCLCPP_PUBLIC
   NodeParameters(
     const node_interfaces::NodeBaseInterface::SharedPtr node_base,
-    const node_interfaces::NodeLoggingInterface::SharedPtr node_logging,
     const node_interfaces::NodeTopicsInterface::SharedPtr node_topics,
     const node_interfaces::NodeServicesInterface::SharedPtr node_services,
     const node_interfaces::NodeClockInterface::SharedPtr node_clock,
-    const std::vector<Parameter> & parameter_overrides,
-    bool start_parameter_services,
-    bool start_parameter_event_publisher,
-    const rclcpp::QoS & parameter_event_qos,
-    const rclcpp::PublisherOptionsBase & parameter_event_publisher_options,
-    bool allow_undeclared_parameters,
-    bool automatically_declare_parameters_from_overrides);
+    const std::vector<Parameter> & initial_parameters,
+    bool use_intra_process,
+    bool start_parameter_services);
 
   RCLCPP_PUBLIC
   virtual
   ~NodeParameters();
 
   RCLCPP_PUBLIC
-  const rclcpp::ParameterValue &
-  declare_parameter(
-    const std::string & name,
-    const rclcpp::ParameterValue & default_value,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor) override;
-
-  RCLCPP_PUBLIC
-  void
-  undeclare_parameter(const std::string & name) override;
-
-  RCLCPP_PUBLIC
-  bool
-  has_parameter(const std::string & name) const override;
-
-  RCLCPP_PUBLIC
+  virtual
   std::vector<rcl_interfaces::msg::SetParametersResult>
   set_parameters(
-    const std::vector<rclcpp::Parameter> & parameters) override;
+    const std::vector<rclcpp::Parameter> & parameters);
 
   RCLCPP_PUBLIC
+  virtual
   rcl_interfaces::msg::SetParametersResult
   set_parameters_atomically(
-    const std::vector<rclcpp::Parameter> & parameters) override;
+    const std::vector<rclcpp::Parameter> & parameters);
 
   RCLCPP_PUBLIC
+  virtual
   std::vector<rclcpp::Parameter>
-  get_parameters(const std::vector<std::string> & names) const override;
+  get_parameters(const std::vector<std::string> & names) const;
 
   RCLCPP_PUBLIC
+  virtual
   rclcpp::Parameter
-  get_parameter(const std::string & name) const override;
+  get_parameter(const std::string & name) const;
 
   RCLCPP_PUBLIC
+  virtual
   bool
   get_parameter(
     const std::string & name,
-    rclcpp::Parameter & parameter) const override;
+    rclcpp::Parameter & parameter) const;
 
   RCLCPP_PUBLIC
-  bool
-  get_parameters_by_prefix(
-    const std::string & prefix,
-    std::map<std::string, rclcpp::Parameter> & parameters) const override;
-
-  RCLCPP_PUBLIC
+  virtual
   std::vector<rcl_interfaces::msg::ParameterDescriptor>
-  describe_parameters(const std::vector<std::string> & names) const override;
+  describe_parameters(const std::vector<std::string> & names) const;
 
   RCLCPP_PUBLIC
+  virtual
   std::vector<uint8_t>
-  get_parameter_types(const std::vector<std::string> & names) const override;
+  get_parameter_types(const std::vector<std::string> & names) const;
 
   RCLCPP_PUBLIC
+  virtual
   rcl_interfaces::msg::ListParametersResult
-  list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const override;
+  list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const;
 
   RCLCPP_PUBLIC
-  OnParametersSetCallbackType
-  set_on_parameters_set_callback(OnParametersSetCallbackType callback) override;
-
-  [[deprecated("use set_on_parameters_set_callback() instead")]]
-  RCLCPP_PUBLIC
+  virtual
   void
-  register_param_change_callback(OnParametersSetCallbackType callback) override;
-
-  RCLCPP_PUBLIC
-  const std::map<std::string, rclcpp::ParameterValue> &
-  get_parameter_overrides() const override;
+  register_param_change_callback(ParametersCallbackFunction callback);
 
 private:
   RCLCPP_DISABLE_COPY(NodeParameters)
 
   mutable std::mutex mutex_;
 
-  OnParametersSetCallbackType on_parameters_set_callback_ = nullptr;
+  ParametersCallbackFunction parameters_callback_ = nullptr;
 
-  std::map<std::string, ParameterInfo> parameters_;
-
-  std::map<std::string, rclcpp::ParameterValue> parameter_overrides_;
-
-  bool allow_undeclared_ = false;
+  std::map<std::string, rclcpp::Parameter> parameters_;
 
   Publisher<rcl_interfaces::msg::ParameterEvent>::SharedPtr events_publisher_;
 
@@ -164,7 +124,6 @@ private:
 
   std::string combined_name_;
 
-  node_interfaces::NodeLoggingInterface::SharedPtr node_logging_;
   node_interfaces::NodeClockInterface::SharedPtr node_clock_;
 };
 

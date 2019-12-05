@@ -47,7 +47,6 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/memory_strategies.cpp
   src/rclcpp/memory_strategy.cpp
   src/rclcpp/node.cpp
-  src/rclcpp/node_options.cpp
   src/rclcpp/node_interfaces/node_base.cpp
   src/rclcpp/node_interfaces/node_clock.cpp
   src/rclcpp/node_interfaces/node_graph.cpp
@@ -64,12 +63,10 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/parameter_events_filter.cpp
   src/rclcpp/parameter_map.cpp
   src/rclcpp/parameter_service.cpp
-  src/rclcpp/publisher_base.cpp
-  src/rclcpp/qos.cpp
-  src/rclcpp/qos_event.cpp
+  src/rclcpp/publisher.cpp
   src/rclcpp/service.cpp
   src/rclcpp/signal_handler.cpp
-  src/rclcpp/subscription_base.cpp
+  src/rclcpp/subscription.cpp
   src/rclcpp/time.cpp
   src/rclcpp/time_source.cpp
   src/rclcpp/timer.cpp
@@ -143,141 +140,96 @@ if(BUILD_TESTING)
 
   find_package(rmw_implementation_cmake REQUIRED)
 
-  include(cmake/rclcpp_add_build_failure_test.cmake)
-
   ament_add_gtest(test_client test/test_client.cpp)
   if(TARGET test_client)
-    ament_target_dependencies(test_client
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_client PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_client ${PROJECT_NAME})
   endif()
-  ament_add_gtest(test_create_timer test/test_create_timer.cpp)
-  if(TARGET test_create_timer)
-    ament_target_dependencies(test_create_timer
-      "rcl_interfaces"
-      "rmw"
-      "rcl"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
-    )
-    target_link_libraries(test_create_timer ${PROJECT_NAME})
-    target_include_directories(test_create_timer PRIVATE test/)
-  endif()
   ament_add_gtest(test_expand_topic_or_service_name test/test_expand_topic_or_service_name.cpp)
   if(TARGET test_expand_topic_or_service_name)
-    ament_target_dependencies(test_expand_topic_or_service_name
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_expand_topic_or_service_name PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_expand_topic_or_service_name ${PROJECT_NAME})
   endif()
   ament_add_gtest(test_function_traits test/test_function_traits.cpp)
   if(TARGET test_function_traits)
-    ament_target_dependencies(test_function_traits
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_function_traits PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
   endif()
   ament_add_gtest(test_mapped_ring_buffer test/test_mapped_ring_buffer.cpp)
   if(TARGET test_mapped_ring_buffer)
-    ament_target_dependencies(test_mapped_ring_buffer
-      "rcl"
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_mapped_ring_buffer PUBLIC
+      ${rcl_INCLUDE_DIRS}
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
   endif()
   ament_add_gtest(test_intra_process_manager test/test_intra_process_manager.cpp)
   if(TARGET test_intra_process_manager)
-    ament_target_dependencies(test_intra_process_manager
-      "rcl"
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_intra_process_manager PUBLIC
+      ${rcl_INCLUDE_DIRS}
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
   endif()
   ament_add_gtest(test_node test/test_node.cpp)
   if(TARGET test_node)
-    ament_target_dependencies(test_node
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_node PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_node ${PROJECT_NAME})
   endif()
-
-  ament_add_gtest(test_node_interfaces__get_node_interfaces
-    test/node_interfaces/test_get_node_interfaces.cpp)
-  if(TARGET test_node_interfaces__get_node_interfaces)
-    target_link_libraries(test_node_interfaces__get_node_interfaces ${PROJECT_NAME})
-  endif()
-
-  # TODO(wjwwood): reenable these build failure tests when I can get Jenkins to ignore their output
-  # rclcpp_add_build_failure_test(build_failure__get_node_topics_interface_const_ref_rclcpp_node
-  #   test/node_interfaces/test_does_not_compile/get_node_topics_interface_const_ref_rclcpp_node.cpp)
-  # target_link_libraries(build_failure__get_node_topics_interface_const_ref_rclcpp_node
-  #   ${PROJECT_NAME})
-
-  # rclcpp_add_build_failure_test(build_failure__get_node_topics_interface_const_ptr_rclcpp_node
-  #   test/node_interfaces/test_does_not_compile/get_node_topics_interface_const_ptr_rclcpp_node.cpp)
-  # target_link_libraries(build_failure__get_node_topics_interface_const_ptr_rclcpp_node
-  #   ${PROJECT_NAME})
-
-  # rclcpp_add_build_failure_test(build_failure__get_node_topics_interface_const_ref_wrapped_node
-  #   test/node_interfaces/test_does_not_compile/get_node_topics_interface_const_ref_wrapped_node.cpp)
-  # target_link_libraries(build_failure__get_node_topics_interface_const_ref_rclcpp_node
-  #   ${PROJECT_NAME})
-
-  # rclcpp_add_build_failure_test(build_failure__get_node_topics_interface_const_ptr_wrapped_node
-  #   test/node_interfaces/test_does_not_compile/get_node_topics_interface_const_ptr_wrapped_node.cpp)
-  # target_link_libraries(build_failure__get_node_topics_interface_const_ptr_rclcpp_node
-  #   ${PROJECT_NAME})
-
   ament_add_gtest(test_node_global_args test/test_node_global_args.cpp)
   if(TARGET test_node_global_args)
-    ament_target_dependencies(test_node_global_args
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_node_global_args PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_node_global_args ${PROJECT_NAME})
   endif()
-  ament_add_gtest(test_parameter_client test/test_parameter_client.cpp)
-  if(TARGET test_parameter_client)
-    ament_target_dependencies(test_parameter_client
-      "rcl_interfaces"
-    )
-    target_link_libraries(test_parameter_client ${PROJECT_NAME})
+  ament_add_gtest(test_node_initial_parameters test/test_node_initial_parameters.cpp)
+  if(TARGET test_node_initial_parameters)
+    target_link_libraries(test_node_initial_parameters ${PROJECT_NAME})
   endif()
   ament_add_gtest(test_parameter_events_filter test/test_parameter_events_filter.cpp)
   if(TARGET test_parameter_events_filter)
-    ament_target_dependencies(test_parameter_events_filter
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_parameter_events_filter PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_parameter_events_filter ${PROJECT_NAME})
   endif()
   ament_add_gtest(test_parameter test/test_parameter.cpp)
   if(TARGET test_parameter)
-    ament_target_dependencies(test_parameter
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_parameter PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_parameter ${PROJECT_NAME})
   endif()
@@ -287,31 +239,21 @@ if(BUILD_TESTING)
   endif()
   ament_add_gtest(test_publisher test/test_publisher.cpp)
   if(TARGET test_publisher)
-    ament_target_dependencies(test_publisher
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_publisher PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_publisher ${PROJECT_NAME})
   endif()
-  ament_add_gtest(test_publisher_subscription_count_api test/test_publisher_subscription_count_api.cpp)
-  if(TARGET test_publisher_subscription_count_api)
-    ament_target_dependencies(test_publisher_subscription_count_api
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
-    )
-    target_link_libraries(test_publisher_subscription_count_api ${PROJECT_NAME})
-  endif()
   ament_add_gtest(test_rate test/test_rate.cpp)
   if(TARGET test_rate)
-    ament_target_dependencies(test_rate
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_rate PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_rate
       ${PROJECT_NAME}
@@ -319,55 +261,48 @@ if(BUILD_TESTING)
   endif()
   ament_add_gtest(test_serialized_message_allocator test/test_serialized_message_allocator.cpp)
   if(TARGET test_serialized_message_allocator)
-    ament_target_dependencies(test_serialized_message_allocator
-      test_msgs
+    target_include_directories(test_serialized_message_allocator PUBLIC
+      ${test_msgs_INCLUDE_DIRS}
     )
     target_link_libraries(test_serialized_message_allocator
       ${PROJECT_NAME}
+      ${test_msgs_LIBRARIES}
     )
   endif()
   ament_add_gtest(test_service test/test_service.cpp)
   if(TARGET test_service)
-    ament_target_dependencies(test_service
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_service PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_service ${PROJECT_NAME})
   endif()
   ament_add_gtest(test_subscription test/test_subscription.cpp)
   if(TARGET test_subscription)
-    ament_target_dependencies(test_subscription
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_subscription PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_subscription ${PROJECT_NAME})
-  endif()
-  ament_add_gtest(test_subscription_publisher_count_api test/test_subscription_publisher_count_api.cpp)
-  if(TARGET test_subscription_publisher_count_api)
-    ament_target_dependencies(test_subscription_publisher_count_api
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
-    )
-    target_link_libraries(test_subscription_publisher_count_api ${PROJECT_NAME})
   endif()
   find_package(test_msgs REQUIRED)
   ament_add_gtest(test_subscription_traits test/test_subscription_traits.cpp)
   if(TARGET test_subscription_traits)
-    ament_target_dependencies(test_subscription_traits
-      "rcl"
-      "test_msgs"
+    target_include_directories(test_subscription_traits PUBLIC
+      ${rcl_INCLUDE_DIRS}
     )
+  ament_target_dependencies(test_subscription_traits
+    "test_msgs"
+  )
   endif()
   ament_add_gtest(test_find_weak_nodes test/test_find_weak_nodes.cpp)
   if(TARGET test_find_weak_nodes)
-    ament_target_dependencies(test_find_weak_nodes
-      "rcl"
+    target_include_directories(test_find_weak_nodes PUBLIC
+      ${rcl_INCLUDE_DIRS}
     )
     target_link_libraries(test_find_weak_nodes ${PROJECT_NAME})
   endif()
@@ -391,8 +326,8 @@ if(BUILD_TESTING)
   ament_add_gtest(test_externally_defined_services test/test_externally_defined_services.cpp
     APPEND_LIBRARY_DIRS "${append_library_dirs}")
   if(TARGET test_externally_defined_services)
-    ament_target_dependencies(test_externally_defined_services
-      "rcl"
+    target_include_directories(test_externally_defined_services PUBLIC
+      ${rcl_INCLUDE_DIRS}
     )
     target_link_libraries(test_externally_defined_services ${PROJECT_NAME})
     foreach(typesupport_impl_cpp ${typesupport_impls_cpp})
@@ -435,14 +370,6 @@ if(BUILD_TESTING)
     target_link_libraries(test_time ${PROJECT_NAME})
   endif()
 
-  ament_add_gtest(test_timer test/test_timer.cpp
-    APPEND_LIBRARY_DIRS "${append_library_dirs}")
-  if(TARGET test_timer)
-    ament_target_dependencies(test_timer
-      "rcl")
-    target_link_libraries(test_timer ${PROJECT_NAME})
-  endif()
-
   ament_add_gtest(test_time_source test/test_time_source.cpp
     APPEND_LIBRARY_DIRS "${append_library_dirs}")
   if(TARGET test_time_source)
@@ -477,17 +404,24 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_local_parameters test/test_local_parameters.cpp)
   if(TARGET test_local_parameters)
-    ament_target_dependencies(test_local_parameters
-      "rcl_interfaces"
-      "rmw"
-      "rosidl_generator_cpp"
-      "rosidl_typesupport_cpp"
+    target_include_directories(test_local_parameters PUBLIC
+      ${rcl_interfaces_INCLUDE_DIRS}
+      ${rmw_INCLUDE_DIRS}
+      ${rosidl_generator_cpp_INCLUDE_DIRS}
+      ${rosidl_typesupport_cpp_INCLUDE_DIRS}
     )
     target_link_libraries(test_local_parameters ${PROJECT_NAME})
   endif()
 endif()
 
-ament_package()
+ament_package(
+  CONFIG_EXTRAS rclcpp-extras.cmake
+)
+
+install(
+  DIRECTORY cmake
+  DESTINATION share/${PROJECT_NAME}
+)
 
 install(
   DIRECTORY include/ ${CMAKE_CURRENT_BINARY_DIR}/include/

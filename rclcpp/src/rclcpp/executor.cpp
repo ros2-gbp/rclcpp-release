@@ -60,12 +60,9 @@ Executor::Executor(const ExecutorArgs & args)
   // Store the context for later use.
   context_ = args.context;
 
-  ret = rcl_wait_set_init(
-    &wait_set_,
-    0, 2, 0, 0, 0, 0,
-    context_->get_rcl_context().get(),
-    allocator);
-  if (RCL_RET_OK != ret) {
+  if (rcl_wait_set_init(
+      &wait_set_, 0, 2, 0, 0, 0, allocator) != RCL_RET_OK)
+  {
     RCUTILS_LOG_ERROR_NAMED(
       "rclcpp",
       "failed to create wait set: %s", rcl_get_error_string().str);
@@ -91,10 +88,6 @@ Executor::~Executor()
     }
   }
   weak_nodes_.clear();
-  for (auto & guard_condition : guard_conditions_) {
-    memory_strategy_->remove_guard_condition(guard_condition);
-  }
-  guard_conditions_.clear();
 
   // Finalize the wait set.
   if (rcl_wait_set_fini(&wait_set_) != RCL_RET_OK) {
@@ -132,7 +125,6 @@ Executor::add_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_pt
     }
   }
   weak_nodes_.push_back(node_ptr);
-  guard_conditions_.push_back(node_ptr->get_notify_guard_condition());
   if (notify) {
     // Interrupt waiting to handle new node
     if (rcl_trigger_guard_condition(&interrupt_guard_condition_) != RCL_RET_OK) {
@@ -140,7 +132,6 @@ Executor::add_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_pt
     }
   }
   // Add the node's notify condition to the guard condition handles
-  std::unique_lock<std::mutex> lock(memory_strategy_mutex_);
   memory_strategy_->add_guard_condition(node_ptr->get_notify_guard_condition());
 }
 
@@ -154,21 +145,17 @@ void
 Executor::remove_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr, bool notify)
 {
   bool node_removed = false;
-  {
-    auto node_it = weak_nodes_.begin();
-    auto gc_it = guard_conditions_.begin();
-    while (node_it != weak_nodes_.end()) {
-      bool matched = (node_it->lock() == node_ptr);
-      if (matched) {
-        node_it = weak_nodes_.erase(node_it);
-        gc_it = guard_conditions_.erase(gc_it);
-        node_removed = true;
-      } else {
-        ++node_it;
-        ++gc_it;
+  weak_nodes_.erase(
+    std::remove_if(
+      weak_nodes_.begin(), weak_nodes_.end(),
+      [&](rclcpp::node_interfaces::NodeBaseInterface::WeakPtr & i)
+      {
+        bool matched = (i.lock() == node_ptr);
+        node_removed |= matched;
+        return matched;
       }
-    }
-  }
+    )
+  );
   std::atomic_bool & has_executor = node_ptr->get_associated_with_executor_atomic();
   has_executor.store(false);
   if (notify) {
@@ -179,7 +166,6 @@ Executor::remove_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node
       }
     }
   }
-  std::unique_lock<std::mutex> lock(memory_strategy_mutex_);
   memory_strategy_->remove_guard_condition(node_ptr->get_notify_guard_condition());
 }
 
@@ -319,7 +305,7 @@ Executor::execute_subscription(
     auto serialized_msg = subscription->create_serialized_message();
     auto ret = rcl_take_serialized_message(
       subscription->get_subscription_handle().get(),
-      serialized_msg.get(), &message_info, nullptr);
+      serialized_msg.get(), &message_info);
     if (RCL_RET_OK == ret) {
       auto void_serialized_msg = std::static_pointer_cast<void>(serialized_msg);
       subscription->handle_message(void_serialized_msg, message_info);
@@ -335,7 +321,7 @@ Executor::execute_subscription(
     std::shared_ptr<void> message = subscription->create_message();
     auto ret = rcl_take(
       subscription->get_subscription_handle().get(),
-      message.get(), &message_info, nullptr);
+      message.get(), &message_info);
     if (RCL_RET_OK == ret) {
       subscription->handle_message(message, message_info);
     } else if (RCL_RET_SUBSCRIPTION_TAKE_FAILED != ret) {
@@ -358,8 +344,7 @@ Executor::execute_intra_process_subscription(
   rcl_ret_t status = rcl_take(
     subscription->get_intra_process_subscription_handle().get(),
     &ipm,
-    &message_info,
-    nullptr);
+    &message_info);
 
   if (status == RCL_RET_OK) {
     message_info.from_intra_process = true;
@@ -425,47 +410,39 @@ Executor::execute_client(
 void
 Executor::wait_for_work(std::chrono::nanoseconds timeout)
 {
-  {
-    std::unique_lock<std::mutex> lock(memory_strategy_mutex_);
+  // Collect the subscriptions and timers to be waited on
+  memory_strategy_->clear_handles();
+  bool has_invalid_weak_nodes = memory_strategy_->collect_entities(weak_nodes_);
 
-    // Collect the subscriptions and timers to be waited on
-    memory_strategy_->clear_handles();
-    bool has_invalid_weak_nodes = memory_strategy_->collect_entities(weak_nodes_);
-
-    // Clean up any invalid nodes, if they were detected
-    if (has_invalid_weak_nodes) {
-      auto node_it = weak_nodes_.begin();
-      auto gc_it = guard_conditions_.begin();
-      while (node_it != weak_nodes_.end()) {
-        if (node_it->expired()) {
-          node_it = weak_nodes_.erase(node_it);
-          memory_strategy_->remove_guard_condition(*gc_it);
-          gc_it = guard_conditions_.erase(gc_it);
-        } else {
-          ++node_it;
-          ++gc_it;
+  // Clean up any invalid nodes, if they were detected
+  if (has_invalid_weak_nodes) {
+    weak_nodes_.erase(
+      remove_if(
+        weak_nodes_.begin(), weak_nodes_.end(),
+        [](rclcpp::node_interfaces::NodeBaseInterface::WeakPtr i)
+        {
+          return i.expired();
         }
-      }
-    }
-    // clear wait set
-    if (rcl_wait_set_clear(&wait_set_) != RCL_RET_OK) {
-      throw std::runtime_error("Couldn't clear wait set");
-    }
+      )
+    );
+  }
+  // clear wait set
+  if (rcl_wait_set_clear(&wait_set_) != RCL_RET_OK) {
+    throw std::runtime_error("Couldn't clear wait set");
+  }
 
-    // The size of waitables are accounted for in size of the other entities
-    rcl_ret_t ret = rcl_wait_set_resize(
-      &wait_set_, memory_strategy_->number_of_ready_subscriptions(),
-      memory_strategy_->number_of_guard_conditions(), memory_strategy_->number_of_ready_timers(),
-      memory_strategy_->number_of_ready_clients(), memory_strategy_->number_of_ready_services(),
-      memory_strategy_->number_of_ready_events());
-    if (RCL_RET_OK != ret) {
-      throw std::runtime_error(
-              std::string("Couldn't resize the wait set : ") + rcl_get_error_string().str);
-    }
+  // The size of waitables are accounted for in size of the other entities
+  rcl_ret_t ret = rcl_wait_set_resize(
+    &wait_set_, memory_strategy_->number_of_ready_subscriptions(),
+    memory_strategy_->number_of_guard_conditions(), memory_strategy_->number_of_ready_timers(),
+    memory_strategy_->number_of_ready_clients(), memory_strategy_->number_of_ready_services());
+  if (RCL_RET_OK != ret) {
+    throw std::runtime_error(
+            std::string("Couldn't resize the wait set : ") + rcl_get_error_string().str);
+  }
 
-    if (!memory_strategy_->add_handles_to_wait_set(&wait_set_)) {
-      throw std::runtime_error("Couldn't fill wait set");
-    }
+  if (!memory_strategy_->add_handles_to_wait_set(&wait_set_)) {
+    throw std::runtime_error("Couldn't fill wait set");
   }
   rcl_ret_t status =
     rcl_wait(&wait_set_, std::chrono::duration_cast<std::chrono::nanoseconds>(timeout).count());

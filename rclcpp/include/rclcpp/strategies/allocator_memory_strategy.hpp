@@ -150,7 +150,7 @@ public:
     );
   }
 
-  bool collect_entities(const WeakNodeList & weak_nodes)
+  bool collect_entities(const WeakNodeVector & weak_nodes)
   {
     bool has_invalid_weak_nodes = false;
     for (auto & weak_node : weak_nodes) {
@@ -265,7 +265,7 @@ public:
   virtual void
   get_next_subscription(
     executor::AnyExecutable & any_exec,
-    const WeakNodeList & weak_nodes)
+    const WeakNodeVector & weak_nodes)
   {
     auto it = subscription_handles_.begin();
     while (it != subscription_handles_.end()) {
@@ -309,7 +309,7 @@ public:
   virtual void
   get_next_service(
     executor::AnyExecutable & any_exec,
-    const WeakNodeList & weak_nodes)
+    const WeakNodeVector & weak_nodes)
   {
     auto it = service_handles_.begin();
     while (it != service_handles_.end()) {
@@ -342,7 +342,7 @@ public:
   }
 
   virtual void
-  get_next_client(executor::AnyExecutable & any_exec, const WeakNodeList & weak_nodes)
+  get_next_client(executor::AnyExecutable & any_exec, const WeakNodeVector & weak_nodes)
   {
     auto it = client_handles_.begin();
     while (it != client_handles_.end()) {
@@ -375,7 +375,7 @@ public:
   }
 
   virtual void
-  get_next_waitable(executor::AnyExecutable & any_exec, const WeakNodeList & weak_nodes)
+  get_next_waitable(executor::AnyExecutable & any_exec, const WeakNodeVector & weak_nodes)
   {
     auto it = waitable_handles_.begin();
     while (it != waitable_handles_.end()) {
@@ -428,15 +428,6 @@ public:
       number_of_services += waitable->get_number_of_ready_services();
     }
     return number_of_services;
-  }
-
-  size_t number_of_ready_events() const
-  {
-    size_t number_of_events = 0;
-    for (auto waitable : waitable_handles_) {
-      number_of_events += waitable->get_number_of_ready_events();
-    }
-    return number_of_events;
   }
 
   size_t number_of_ready_clients() const

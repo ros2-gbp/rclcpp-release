@@ -14,6 +14,14 @@
 
 #include "rclcpp/clock.hpp"
 
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "builtin_interfaces/msg/time.hpp"
+
+#include "rcl/time.h"
+
 #include "rclcpp/exceptions.hpp"
 
 #include "rcutils/logging_macros.h"
@@ -22,8 +30,8 @@ namespace rclcpp
 {
 
 JumpHandler::JumpHandler(
-  pre_callback_t pre_callback,
-  post_callback_t post_callback,
+  std::function<void()> pre_callback,
+  std::function<void(const rcl_time_jump_t &)> post_callback,
   const rcl_jump_threshold_t & threshold)
 : pre_callback(pre_callback),
   post_callback(post_callback),
@@ -35,7 +43,8 @@ Clock::Clock(rcl_clock_type_t clock_type)
   allocator_ = rcl_get_default_allocator();
   auto ret = rcl_clock_init(clock_type, &rcl_clock_, &allocator_);
   if (ret != RCL_RET_OK) {
-    exceptions::throw_from_rcl_error(ret, "could not get current time stamp");
+    rclcpp::exceptions::throw_from_rcl_error(
+      ret, "could not get current time stamp");
   }
 }
 
@@ -54,7 +63,8 @@ Clock::now()
 
   auto ret = rcl_clock_get_now(&rcl_clock_, &now.rcl_time_.nanoseconds);
   if (ret != RCL_RET_OK) {
-    exceptions::throw_from_rcl_error(ret, "could not get current time stamp");
+    rclcpp::exceptions::throw_from_rcl_error(
+      ret, "could not get current time stamp");
   }
 
   return now;
@@ -68,23 +78,23 @@ Clock::ros_time_is_active()
     return false;
   }
 
-  bool is_enabled = false;
+  bool is_enabled;
   auto ret = rcl_is_enabled_ros_time_override(&rcl_clock_, &is_enabled);
   if (ret != RCL_RET_OK) {
-    exceptions::throw_from_rcl_error(
+    rclcpp::exceptions::throw_from_rcl_error(
       ret, "Failed to check ros_time_override_status");
   }
   return is_enabled;
 }
 
 rcl_clock_t *
-Clock::get_clock_handle() noexcept
+Clock::get_clock_handle()
 {
   return &rcl_clock_;
 }
 
 rcl_clock_type_t
-Clock::get_clock_type() const noexcept
+Clock::get_clock_type()
 {
   return rcl_clock_.type;
 }
@@ -95,10 +105,7 @@ Clock::on_time_jump(
   bool before_jump,
   void * user_data)
 {
-  const auto * handler = static_cast<JumpHandler *>(user_data);
-  if (nullptr == handler) {
-    return;
-  }
+  rclcpp::JumpHandler * handler = static_cast<rclcpp::JumpHandler *>(user_data);
   if (before_jump && handler->pre_callback) {
     handler->pre_callback();
   } else if (!before_jump && handler->post_callback) {
@@ -106,30 +113,31 @@ Clock::on_time_jump(
   }
 }
 
-JumpHandler::SharedPtr
+rclcpp::JumpHandler::SharedPtr
 Clock::create_jump_callback(
-  JumpHandler::pre_callback_t pre_callback,
-  JumpHandler::post_callback_t post_callback,
+  std::function<void()> pre_callback,
+  std::function<void(const rcl_time_jump_t &)> post_callback,
   const rcl_jump_threshold_t & threshold)
 {
   // Allocate a new jump handler
-  JumpHandler::UniquePtr handler(new JumpHandler(pre_callback, post_callback, threshold));
+  auto handler = new rclcpp::JumpHandler(pre_callback, post_callback, threshold);
   if (nullptr == handler) {
-    throw std::bad_alloc{};
+    rclcpp::exceptions::throw_from_rcl_error(RCL_RET_BAD_ALLOC, "Failed to allocate jump handler");
   }
 
   // Try to add the jump callback to the clock
   rcl_ret_t ret = rcl_clock_add_jump_callback(&rcl_clock_, threshold,
-      Clock::on_time_jump, handler.get());
+      rclcpp::Clock::on_time_jump, handler);
   if (RCL_RET_OK != ret) {
-    exceptions::throw_from_rcl_error(ret, "Failed to add time jump callback");
+    delete handler;
+    handler = NULL;
+    rclcpp::exceptions::throw_from_rcl_error(ret, "Failed to add time jump callback");
   }
 
   // *INDENT-OFF*
   // create shared_ptr that removes the callback automatically when all copies are destructed
-  // TODO(dorezyuk) UB, if the clock leaves scope before the JumpHandler
-  return JumpHandler::SharedPtr(handler.release(), [this](JumpHandler * handler) noexcept {
-    rcl_ret_t ret = rcl_clock_remove_jump_callback(&rcl_clock_, Clock::on_time_jump,
+  return rclcpp::JumpHandler::SharedPtr(handler, [this](rclcpp::JumpHandler * handler) noexcept {
+    rcl_ret_t ret = rcl_clock_remove_jump_callback(&rcl_clock_, rclcpp::Clock::on_time_jump,
         handler);
     delete handler;
     handler = NULL;

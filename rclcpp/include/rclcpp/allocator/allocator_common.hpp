@@ -65,8 +65,7 @@ void * retyped_reallocate(void * untyped_pointer, size_t size, void * untyped_al
 
 // Convert a std::allocator_traits-formatted Allocator into an rcl allocator
 template<
-  typename T,
-  typename Alloc,
+  typename T, typename Alloc,
   typename std::enable_if<!std::is_same<Alloc, std::allocator<void>>::value>::type * = nullptr>
 rcl_allocator_t get_rcl_allocator(Alloc & allocator)
 {
@@ -84,8 +83,7 @@ rcl_allocator_t get_rcl_allocator(Alloc & allocator)
 
 // TODO(jacquelinekay) Workaround for an incomplete implementation of std::allocator<void>
 template<
-  typename T,
-  typename Alloc,
+  typename T, typename Alloc,
   typename std::enable_if<std::is_same<Alloc, std::allocator<void>>::value>::type * = nullptr>
 rcl_allocator_t get_rcl_allocator(Alloc & allocator)
 {

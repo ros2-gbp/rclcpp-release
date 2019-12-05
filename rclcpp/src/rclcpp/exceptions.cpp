@@ -39,8 +39,8 @@ NameValidationError::format_error(
   return msg;
 }
 
-std::exception_ptr
-from_rcl_error(
+void
+throw_from_rcl_error(
   rcl_ret_t ret,
   const std::string & prefix,
   const rcl_error_state_t * error_state,
@@ -55,9 +55,9 @@ from_rcl_error(
   if (!error_state) {
     throw std::runtime_error("rcl error state is not set");
   }
-  std::string formatted_prefix = prefix;
+  std::string formated_prefix = prefix;
   if (!prefix.empty()) {
-    formatted_prefix += ": ";
+    formated_prefix += ": ";
   }
   RCLErrorBase base_exc(ret, error_state);
   if (reset_error) {
@@ -65,26 +65,12 @@ from_rcl_error(
   }
   switch (ret) {
     case RCL_RET_BAD_ALLOC:
-      return std::make_exception_ptr(RCLBadAlloc(base_exc));
+      throw RCLBadAlloc(base_exc);
     case RCL_RET_INVALID_ARGUMENT:
-      return std::make_exception_ptr(RCLInvalidArgument(base_exc, formatted_prefix));
+      throw RCLInvalidArgument(base_exc, formated_prefix);
     default:
-      return std::make_exception_ptr(RCLError(base_exc, formatted_prefix));
+      throw RCLError(base_exc, formated_prefix);
   }
-}
-
-void
-throw_from_rcl_error(
-  rcl_ret_t ret,
-  const std::string & prefix,
-  const rcl_error_state_t * error_state,
-  void (* reset_error)())
-{
-  // We expect this to either throw a standard error,
-  // or to generate an error pointer (which is caught
-  // in err, and immediately thrown)
-  auto err = from_rcl_error(ret, prefix, error_state, reset_error);
-  std::rethrow_exception(err);
 }
 
 RCLErrorBase::RCLErrorBase(rcl_ret_t ret, const rcl_error_state_t * error_state)

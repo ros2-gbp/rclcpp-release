@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "rclcpp/publisher_base.hpp"
+#include "rclcpp/publisher.hpp"
 
 #include <rmw/error_handling.h>
 #include <rmw/rmw.h>
@@ -22,7 +22,6 @@
 #include <mutex>
 #include <sstream>
 #include <string>
-#include <vector>
 
 #include "rcl_interfaces/msg/intra_process_message.hpp"
 #include "rcutils/logging_macros.h"
@@ -31,10 +30,9 @@
 #include "rclcpp/allocator/allocator_common.hpp"
 #include "rclcpp/allocator/allocator_deleter.hpp"
 #include "rclcpp/exceptions.hpp"
-#include "rclcpp/expand_topic_or_service_name.hpp"
-#include "rclcpp/intra_process_manager.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node.hpp"
+#include "rclcpp/expand_topic_or_service_name.hpp"
 
 using rclcpp::PublisherBase;
 
@@ -44,7 +42,7 @@ PublisherBase::PublisherBase(
   const rosidl_message_type_support_t & type_support,
   const rcl_publisher_options_t & publisher_options)
 : rcl_node_handle_(node_base->get_shared_rcl_node_handle()),
-  intra_process_is_enabled_(false), intra_process_publisher_id_(0)
+  intra_process_publisher_id_(0), store_intra_process_message_(nullptr)
 {
   rcl_ret_t ret = rcl_publisher_init(
     &publisher_handle_,
@@ -81,9 +79,6 @@ PublisherBase::PublisherBase(
 
 PublisherBase::~PublisherBase()
 {
-  // must fini the events before fini-ing the publisher
-  event_handlers_.clear();
-
   if (rcl_publisher_fini(&intra_process_publisher_handle_, rcl_node_handle_.get()) != RCL_RET_OK) {
     RCUTILS_LOG_ERROR_NAMED(
       "rclcpp",
@@ -99,20 +94,6 @@ PublisherBase::~PublisherBase()
       rcl_get_error_string().str);
     rcl_reset_error();
   }
-
-  auto ipm = weak_ipm_.lock();
-
-  if (!intra_process_is_enabled_) {
-    return;
-  }
-  if (!ipm) {
-    // TODO(ivanpauno): should this raise an error?
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp"),
-      "Intra process manager died before than a publisher.");
-    return;
-  }
-  ipm->remove_publisher(intra_process_publisher_id_);
 }
 
 const char *
@@ -157,72 +138,6 @@ PublisherBase::get_publisher_handle() const
   return &publisher_handle_;
 }
 
-const std::vector<std::shared_ptr<rclcpp::QOSEventHandlerBase>> &
-PublisherBase::get_event_handlers() const
-{
-  return event_handlers_;
-}
-
-size_t
-PublisherBase::get_subscription_count() const
-{
-  size_t inter_process_subscription_count = 0;
-
-  rcl_ret_t status = rcl_publisher_get_subscription_count(
-    &publisher_handle_,
-    &inter_process_subscription_count);
-
-  if (RCL_RET_PUBLISHER_INVALID == status) {
-    rcl_reset_error();  /* next call will reset error message if not context */
-    if (rcl_publisher_is_valid_except_context(&publisher_handle_)) {
-      rcl_context_t * context = rcl_publisher_get_context(&publisher_handle_);
-      if (nullptr != context && !rcl_context_is_valid(context)) {
-        /* publisher is invalid due to context being shutdown */
-        return 0;
-      }
-    }
-  }
-  if (RCL_RET_OK != status) {
-    rclcpp::exceptions::throw_from_rcl_error(status, "failed to get get subscription count");
-  }
-  return inter_process_subscription_count;
-}
-
-size_t
-PublisherBase::get_intra_process_subscription_count() const
-{
-  auto ipm = weak_ipm_.lock();
-  if (!intra_process_is_enabled_) {
-    return 0;
-  }
-  if (!ipm) {
-    // TODO(ivanpauno): should this just return silently? Or maybe return with a warning?
-    //                  Same as wjwwood comment in publisher_factory create_shared_publish_callback.
-    throw std::runtime_error(
-            "intra process subscriber count called after "
-            "destruction of intra process manager");
-  }
-  return ipm->get_subscription_count(intra_process_publisher_id_);
-}
-
-rmw_qos_profile_t
-PublisherBase::get_actual_qos() const
-{
-  const rmw_qos_profile_t * qos = rcl_publisher_get_actual_qos(&publisher_handle_);
-  if (!qos) {
-    auto msg = std::string("failed to get qos settings: ") + rcl_get_error_string().str;
-    rcl_reset_error();
-    throw std::runtime_error(msg);
-  }
-  return *qos;
-}
-
-bool
-PublisherBase::assert_liveliness() const
-{
-  return RCL_RET_OK == rcl_publisher_assert_liveliness(&publisher_handle_);
-}
-
 bool
 PublisherBase::operator==(const rmw_gid_t & gid) const
 {
@@ -250,24 +165,12 @@ PublisherBase::operator==(const rmw_gid_t * gid) const
   return result;
 }
 
-rclcpp::mapped_ring_buffer::MappedRingBufferBase::SharedPtr
-PublisherBase::make_mapped_ring_buffer(size_t size) const
-{
-  (void)size;
-  return nullptr;
-}
-
 void
 PublisherBase::setup_intra_process(
   uint64_t intra_process_publisher_id,
-  IntraProcessManagerSharedPtr ipm,
+  StoreMessageCallbackT callback,
   const rcl_publisher_options_t & intra_process_options)
 {
-  // Intraprocess configuration is not allowed with "durability" qos policy non "volatile".
-  if (this->get_actual_qos().durability != RMW_QOS_POLICY_DURABILITY_VOLATILE) {
-    throw std::invalid_argument(
-            "intraprocess communication is not allowed with durability qos policy non-volatile");
-  }
   const char * topic_name = this->get_topic_name();
   if (!topic_name) {
     throw std::runtime_error("failed to get topic name");
@@ -296,9 +199,7 @@ PublisherBase::setup_intra_process(
   }
 
   intra_process_publisher_id_ = intra_process_publisher_id;
-  weak_ipm_ = ipm;
-  intra_process_is_enabled_ = true;
-
+  store_intra_process_message_ = callback;
   // Life time of this object is tied to the publisher handle.
   rmw_publisher_t * publisher_rmw_handle = rcl_publisher_get_rmw_handle(
     &intra_process_publisher_handle_);

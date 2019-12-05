@@ -28,8 +28,7 @@
 
 namespace rclcpp
 {
-
-enum ParameterType : uint8_t
+enum ParameterType
 {
   PARAMETER_NOT_SET = rcl_interfaces::msg::ParameterType::PARAMETER_NOT_SET,
   PARAMETER_BOOL = rcl_interfaces::msg::ParameterType::PARAMETER_BOOL,
@@ -46,11 +45,11 @@ enum ParameterType : uint8_t
 /// Return the name of a parameter type
 RCLCPP_PUBLIC
 std::string
-to_string(ParameterType type);
+to_string(const ParameterType type);
 
 RCLCPP_PUBLIC
 std::ostream &
-operator<<(std::ostream & os, ParameterType type);
+operator<<(std::ostream & os, const ParameterType type);
 
 /// Indicate the parameter type does not match the expected type.
 class ParameterTypeException : public std::runtime_error
@@ -130,21 +129,10 @@ public:
   rcl_interfaces::msg::ParameterValue
   to_value_msg() const;
 
-  /// Equal operator.
-  RCLCPP_PUBLIC
-  bool
-  operator==(const ParameterValue & rhs) const;
-
-  /// Not equal operator.
-  RCLCPP_PUBLIC
-  bool
-  operator!=(const ParameterValue & rhs) const;
-
   // The following get() variants require the use of ParameterType
 
   template<ParameterType type>
-  constexpr
-  typename std::enable_if<type == ParameterType::PARAMETER_BOOL, const bool &>::type
+  typename std::enable_if<type == ParameterType::PARAMETER_BOOL, bool>::type
   get() const
   {
     if (value_.type != rcl_interfaces::msg::ParameterType::PARAMETER_BOOL) {
@@ -154,8 +142,7 @@ public:
   }
 
   template<ParameterType type>
-  constexpr
-  typename std::enable_if<type == ParameterType::PARAMETER_INTEGER, const int64_t &>::type
+  typename std::enable_if<type == ParameterType::PARAMETER_INTEGER, int64_t>::type
   get() const
   {
     if (value_.type != rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER) {
@@ -165,8 +152,7 @@ public:
   }
 
   template<ParameterType type>
-  constexpr
-  typename std::enable_if<type == ParameterType::PARAMETER_DOUBLE, const double &>::type
+  typename std::enable_if<type == ParameterType::PARAMETER_DOUBLE, double>::type
   get() const
   {
     if (value_.type != rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE) {
@@ -176,7 +162,6 @@ public:
   }
 
   template<ParameterType type>
-  constexpr
   typename std::enable_if<type == ParameterType::PARAMETER_STRING, const std::string &>::type
   get() const
   {
@@ -187,7 +172,6 @@ public:
   }
 
   template<ParameterType type>
-  constexpr
   typename std::enable_if<
     type == ParameterType::PARAMETER_BYTE_ARRAY, const std::vector<uint8_t> &>::type
   get() const
@@ -199,7 +183,6 @@ public:
   }
 
   template<ParameterType type>
-  constexpr
   typename std::enable_if<
     type == ParameterType::PARAMETER_BOOL_ARRAY, const std::vector<bool> &>::type
   get() const
@@ -211,7 +194,6 @@ public:
   }
 
   template<ParameterType type>
-  constexpr
   typename std::enable_if<
     type == ParameterType::PARAMETER_INTEGER_ARRAY, const std::vector<int64_t> &>::type
   get() const
@@ -223,7 +205,6 @@ public:
   }
 
   template<ParameterType type>
-  constexpr
   typename std::enable_if<
     type == ParameterType::PARAMETER_DOUBLE_ARRAY, const std::vector<double> &>::type
   get() const
@@ -235,7 +216,6 @@ public:
   }
 
   template<ParameterType type>
-  constexpr
   typename std::enable_if<
     type == ParameterType::PARAMETER_STRING_ARRAY, const std::vector<std::string> &>::type
   get() const
@@ -249,32 +229,28 @@ public:
   // The following get() variants allow the use of primitive types
 
   template<typename type>
-  constexpr
-  typename std::enable_if<std::is_same<type, bool>::value, const bool &>::type
+  typename std::enable_if<std::is_same<type, bool>::value, bool>::type
   get() const
   {
     return get<ParameterType::PARAMETER_BOOL>();
   }
 
   template<typename type>
-  constexpr
   typename std::enable_if<
-    std::is_integral<type>::value && !std::is_same<type, bool>::value, const int64_t &>::type
+    std::is_integral<type>::value && !std::is_same<type, bool>::value, int64_t>::type
   get() const
   {
     return get<ParameterType::PARAMETER_INTEGER>();
   }
 
   template<typename type>
-  constexpr
-  typename std::enable_if<std::is_floating_point<type>::value, const double &>::type
+  typename std::enable_if<std::is_floating_point<type>::value, double>::type
   get() const
   {
     return get<ParameterType::PARAMETER_DOUBLE>();
   }
 
   template<typename type>
-  constexpr
   typename std::enable_if<std::is_convertible<type, std::string>::value, const std::string &>::type
   get() const
   {
@@ -282,7 +258,6 @@ public:
   }
 
   template<typename type>
-  constexpr
   typename std::enable_if<
     std::is_convertible<
       type, const std::vector<uint8_t> &>::value, const std::vector<uint8_t> &>::type
@@ -292,7 +267,6 @@ public:
   }
 
   template<typename type>
-  constexpr
   typename std::enable_if<
     std::is_convertible<
       type, const std::vector<bool> &>::value, const std::vector<bool> &>::type
@@ -302,7 +276,6 @@ public:
   }
 
   template<typename type>
-  constexpr
   typename std::enable_if<
     std::is_convertible<
       type, const std::vector<int64_t> &>::value, const std::vector<int64_t> &>::type
@@ -312,7 +285,6 @@ public:
   }
 
   template<typename type>
-  constexpr
   typename std::enable_if<
     std::is_convertible<
       type, const std::vector<double> &>::value, const std::vector<double> &>::type
@@ -322,7 +294,6 @@ public:
   }
 
   template<typename type>
-  constexpr
   typename std::enable_if<
     std::is_convertible<
       type, const std::vector<std::string> &>::value, const std::vector<std::string> &>::type

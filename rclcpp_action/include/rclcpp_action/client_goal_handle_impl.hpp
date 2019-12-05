@@ -28,11 +28,8 @@ namespace rclcpp_action
 
 template<typename ActionT>
 ClientGoalHandle<ActionT>::ClientGoalHandle(
-  const GoalInfo & info, FeedbackCallback feedback_callback, ResultCallback result_callback)
-: info_(info),
-  result_future_(result_promise_.get_future()),
-  feedback_callback_(feedback_callback),
-  result_callback_(result_callback)
+  const GoalInfo & info, FeedbackCallback callback)
+: info_(info), result_future_(result_promise_.get_future()), feedback_callback_(callback)
 {
 }
 
@@ -42,9 +39,10 @@ ClientGoalHandle<ActionT>::~ClientGoalHandle()
 }
 
 template<typename ActionT>
-const GoalUUID &
+const GoalID &
 ClientGoalHandle<ActionT>::get_goal_id() const
 {
+  // return info_.goal_id;
   return info_.goal_id.uuid;
 }
 
@@ -56,7 +54,7 @@ ClientGoalHandle<ActionT>::get_goal_stamp() const
 }
 
 template<typename ActionT>
-std::shared_future<typename ClientGoalHandle<ActionT>::WrappedResult>
+std::shared_future<typename ClientGoalHandle<ActionT>::Result>
 ClientGoalHandle<ActionT>::async_result()
 {
   std::lock_guard<std::mutex> guard(handle_mutex_);
@@ -68,14 +66,11 @@ ClientGoalHandle<ActionT>::async_result()
 
 template<typename ActionT>
 void
-ClientGoalHandle<ActionT>::set_result(const WrappedResult & wrapped_result)
+ClientGoalHandle<ActionT>::set_result(const Result & result)
 {
   std::lock_guard<std::mutex> guard(handle_mutex_);
-  status_ = static_cast<int8_t>(wrapped_result.code);
-  result_promise_.set_value(wrapped_result);
-  if (result_callback_) {
-    result_callback_(wrapped_result);
-  }
+  status_ = static_cast<int8_t>(result.code);
+  result_promise_.set_value(result);
 }
 
 template<typename ActionT>
@@ -84,14 +79,6 @@ ClientGoalHandle<ActionT>::set_feedback_callback(FeedbackCallback callback)
 {
   std::lock_guard<std::mutex> guard(handle_mutex_);
   feedback_callback_ = callback;
-}
-
-template<typename ActionT>
-void
-ClientGoalHandle<ActionT>::set_result_callback(ResultCallback callback)
-{
-  std::lock_guard<std::mutex> guard(handle_mutex_);
-  result_callback_ = callback;
 }
 
 template<typename ActionT>

@@ -110,60 +110,38 @@ public:
 
   template<
     typename CallbackT,
-    typename AllocatorT = std::allocator<void>>
+    typename Alloc = std::allocator<void>,
+    typename SubscriptionT =
+    rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent, Alloc>>
   typename rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr
-  on_parameter_event(
-    CallbackT && callback,
-    const rclcpp::QoS & qos = (
-      rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_parameter_events))
-    ),
-    const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options = (
-      rclcpp::SubscriptionOptionsWithAllocator<AllocatorT>()
-  ))
+  on_parameter_event(CallbackT && callback)
   {
-    return this->on_parameter_event(
-      this->node_topics_interface_,
-      callback,
-      qos,
-      options);
-  }
+    using rclcpp::message_memory_strategy::MessageMemoryStrategy;
+    auto msg_mem_strat =
+      MessageMemoryStrategy<rcl_interfaces::msg::ParameterEvent, Alloc>::create_default();
 
-  /**
-   * The NodeT type only needs to have a method called get_node_topics_interface()
-   * which returns a shared_ptr to a NodeTopicsInterface, or be a
-   * NodeTopicsInterface pointer itself.
-   */
-  template<
-    typename CallbackT,
-    typename NodeT,
-    typename AllocatorT = std::allocator<void>>
-  static typename rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr
-  on_parameter_event(
-    NodeT && node,
-    CallbackT && callback,
-    const rclcpp::QoS & qos = (
-      rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_parameter_events))
-    ),
-    const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options = (
-      rclcpp::SubscriptionOptionsWithAllocator<AllocatorT>()
-  ))
-  {
-    return rclcpp::create_subscription<rcl_interfaces::msg::ParameterEvent>(
-      node,
+    using rcl_interfaces::msg::ParameterEvent;
+    return rclcpp::create_subscription<
+      ParameterEvent, CallbackT, Alloc, ParameterEvent, SubscriptionT>(
+      this->node_topics_interface_.get(),
       "parameter_events",
-      qos,
       std::forward<CallbackT>(callback),
-      options);
+      rmw_qos_profile_default,
+      nullptr,  // group,
+      false,  // ignore_local_publications,
+      false,  // use_intra_process_comms_,
+      msg_mem_strat,
+      std::make_shared<Alloc>());
   }
 
   RCLCPP_PUBLIC
   bool
   service_is_ready() const;
 
-  template<typename RepT = int64_t, typename RatioT = std::milli>
+  template<typename RatioT = std::milli>
   bool
   wait_for_service(
-    std::chrono::duration<RepT, RatioT> timeout = std::chrono::duration<RepT, RatioT>(-1))
+    std::chrono::duration<int64_t, RatioT> timeout = std::chrono::duration<int64_t, RatioT>(-1))
   {
     return wait_for_service_nanoseconds(
       std::chrono::duration_cast<std::chrono::nanoseconds>(timeout)
@@ -176,7 +154,7 @@ protected:
   wait_for_service_nanoseconds(std::chrono::nanoseconds timeout);
 
 private:
-  rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_interface_;
+  const rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_interface_;
   rclcpp::Client<rcl_interfaces::srv::GetParameters>::SharedPtr get_parameters_client_;
   rclcpp::Client<rcl_interfaces::srv::GetParameterTypes>::SharedPtr
     get_parameter_types_client_;
@@ -204,29 +182,6 @@ public:
   SyncParametersClient(
     rclcpp::executor::Executor::SharedPtr executor,
     rclcpp::Node::SharedPtr node,
-    const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
-
-  RCLCPP_PUBLIC
-  explicit SyncParametersClient(
-    rclcpp::Node * node,
-    const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
-
-  RCLCPP_PUBLIC
-  SyncParametersClient(
-    rclcpp::executor::Executor::SharedPtr executor,
-    rclcpp::Node * node,
-    const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
-
-  RCLCPP_PUBLIC
-  SyncParametersClient(
-    rclcpp::executor::Executor::SharedPtr executor,
-    const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_interface,
-    const rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_interface,
-    const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_interface,
-    const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services_interface,
     const std::string & remote_node_name = "",
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
@@ -293,26 +248,7 @@ public:
   typename rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr
   on_parameter_event(CallbackT && callback)
   {
-    return async_parameters_client_->on_parameter_event(
-      std::forward<CallbackT>(callback));
-  }
-
-  /**
-   * The NodeT type only needs to have a method called get_node_topics_interface()
-   * which returns a shared_ptr to a NodeTopicsInterface, or be a
-   * NodeTopicsInterface pointer itself.
-   */
-  template<
-    typename CallbackT,
-    typename NodeT>
-  static typename rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr
-  on_parameter_event(
-    NodeT && node,
-    CallbackT && callback)
-  {
-    return AsyncParametersClient::on_parameter_event(
-      node,
-      std::forward<CallbackT>(callback));
+    return async_parameters_client_->on_parameter_event(std::forward<CallbackT>(callback));
   }
 
   RCLCPP_PUBLIC
@@ -322,17 +258,17 @@ public:
     return async_parameters_client_->service_is_ready();
   }
 
-  template<typename RepT = int64_t, typename RatioT = std::milli>
+  template<typename RatioT = std::milli>
   bool
   wait_for_service(
-    std::chrono::duration<RepT, RatioT> timeout = std::chrono::duration<RepT, RatioT>(-1))
+    std::chrono::duration<int64_t, RatioT> timeout = std::chrono::duration<int64_t, RatioT>(-1))
   {
     return async_parameters_client_->wait_for_service(timeout);
   }
 
 private:
   rclcpp::executor::Executor::SharedPtr executor_;
-  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_interface_;
+  rclcpp::Node::SharedPtr node_;
   AsyncParametersClient::SharedPtr async_parameters_client_;
 };
 

@@ -25,15 +25,14 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
-#include <utility>
 #include <set>
 
 #include "rclcpp/allocator/allocator_deleter.hpp"
 #include "rclcpp/intra_process_manager_impl.hpp"
 #include "rclcpp/mapped_ring_buffer.hpp"
 #include "rclcpp/macros.hpp"
-#include "rclcpp/publisher_base.hpp"
-#include "rclcpp/subscription_base.hpp"
+#include "rclcpp/publisher.hpp"
+#include "rclcpp/subscription.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
@@ -185,11 +184,21 @@ public:
    * \param buffer_size if 0 (default) a size is calculated based on the QoS.
    * \return an unsigned 64-bit integer which is the publisher's unique id.
    */
-  RCLCPP_PUBLIC
+  template<typename MessageT, typename Alloc>
   uint64_t
   add_publisher(
-    rclcpp::PublisherBase::SharedPtr publisher,
-    size_t buffer_size = 0);
+    typename Publisher<MessageT, Alloc>::SharedPtr publisher,
+    size_t buffer_size = 0)
+  {
+    auto id = IntraProcessManager::get_next_unique_id();
+    size_t size = buffer_size > 0 ? buffer_size : publisher->get_queue_size();
+    auto mrb = mapped_ring_buffer::MappedRingBuffer<
+      MessageT,
+      typename Publisher<MessageT, Alloc>::MessageAlloc
+      >::make_shared(size, publisher->get_allocator());
+    impl_->add_publisher(id, publisher, mrb, size);
+    return id;
+  }
 
   /// Unregister a publisher using the publisher's unique id.
   /**
@@ -233,11 +242,12 @@ public:
    * \return the message sequence number.
    */
   template<
-    typename MessageT, typename Alloc = std::allocator<void>>
+    typename MessageT, typename Alloc = std::allocator<void>,
+    typename Deleter = std::default_delete<MessageT>>
   uint64_t
   store_intra_process_message(
     uint64_t intra_process_publisher_id,
-    std::shared_ptr<const MessageT> message)
+    std::unique_ptr<MessageT, Deleter> & message)
   {
     using MRBMessageAlloc = typename std::allocator_traits<Alloc>::template rebind_alloc<MessageT>;
     using TypedMRB = typename mapped_ring_buffer::MappedRingBuffer<MessageT, MRBMessageAlloc>;
@@ -251,35 +261,6 @@ public:
 
     // Insert the message into the ring buffer using the message_seq to identify it.
     bool did_replace = typed_buffer->push_and_replace(message_seq, message);
-    // TODO(wjwwood): do something when a message was displaced. log debug?
-    (void)did_replace;  // Avoid unused variable warning.
-
-    impl_->store_intra_process_message(intra_process_publisher_id, message_seq);
-
-    // Return the message sequence which is sent to the subscription.
-    return message_seq;
-  }
-
-  template<
-    typename MessageT, typename Alloc = std::allocator<void>,
-    typename Deleter = std::default_delete<MessageT>>
-  uint64_t
-  store_intra_process_message(
-    uint64_t intra_process_publisher_id,
-    std::unique_ptr<MessageT, Deleter> message)
-  {
-    using MRBMessageAlloc = typename std::allocator_traits<Alloc>::template rebind_alloc<MessageT>;
-    using TypedMRB = typename mapped_ring_buffer::MappedRingBuffer<MessageT, MRBMessageAlloc>;
-    uint64_t message_seq = 0;
-    mapped_ring_buffer::MappedRingBufferBase::SharedPtr buffer = impl_->get_publisher_info_for_id(
-      intra_process_publisher_id, message_seq);
-    typename TypedMRB::SharedPtr typed_buffer = std::static_pointer_cast<TypedMRB>(buffer);
-    if (!typed_buffer) {
-      throw std::runtime_error("Typecast failed due to incorrect message type");
-    }
-
-    // Insert the message into the ring buffer using the message_seq to identify it.
-    bool did_replace = typed_buffer->push_and_replace(message_seq, std::move(message));
     // TODO(wjwwood): do something when a message was displaced. log debug?
     (void)did_replace;  // Avoid unused variable warning.
 
@@ -353,45 +334,10 @@ public:
     // Return a copy or the unique_ptr (ownership) depending on how many subscriptions are left.
     if (target_subs_size) {
       // There are more subscriptions to serve, return a copy.
-      typed_buffer->get(message_sequence_number, message);
+      typed_buffer->get_copy_at_key(message_sequence_number, message);
     } else {
       // This is the last one to be returned, transfer ownership.
-      typed_buffer->pop(message_sequence_number, message);
-    }
-  }
-
-  template<
-    typename MessageT, typename Alloc = std::allocator<void>>
-  void
-  take_intra_process_message(
-    uint64_t intra_process_publisher_id,
-    uint64_t message_sequence_number,
-    uint64_t requesting_subscriptions_intra_process_id,
-    std::shared_ptr<const MessageT> & message)
-  {
-    using MRBMessageAlloc = typename std::allocator_traits<Alloc>::template rebind_alloc<MessageT>;
-    using TypedMRB = mapped_ring_buffer::MappedRingBuffer<MessageT, MRBMessageAlloc>;
-    message = nullptr;
-
-    size_t target_subs_size = 0;
-    std::lock_guard<std::mutex> lock(take_mutex_);
-    mapped_ring_buffer::MappedRingBufferBase::SharedPtr buffer = impl_->take_intra_process_message(
-      intra_process_publisher_id,
-      message_sequence_number,
-      requesting_subscriptions_intra_process_id,
-      target_subs_size
-    );
-    typename TypedMRB::SharedPtr typed_buffer = std::static_pointer_cast<TypedMRB>(buffer);
-    if (!typed_buffer) {
-      return;
-    }
-    // Return a copy or the unique_ptr (ownership) depending on how many subscriptions are left.
-    if (target_subs_size) {
-      // There are more subscriptions to serve, return a copy.
-      typed_buffer->get(message_sequence_number, message);
-    } else {
-      // This is the last one to be returned, transfer ownership.
-      typed_buffer->pop(message_sequence_number, message);
+      typed_buffer->pop_at_key(message_sequence_number, message);
     }
   }
 
@@ -399,11 +345,6 @@ public:
   RCLCPP_PUBLIC
   bool
   matches_any_publishers(const rmw_gid_t * id) const;
-
-  /// Return the number of intraprocess subscriptions to a topic, given the publisher id.
-  RCLCPP_PUBLIC
-  size_t
-  get_subscription_count(uint64_t intra_process_publisher_id) const;
 
 private:
   RCLCPP_PUBLIC
