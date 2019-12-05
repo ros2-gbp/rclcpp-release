@@ -1,3 +1,29 @@
+## rclcpp (crystal) - 0.6.5-1
+
+The packages in the `rclcpp` repository were released into the `crystal` distro by running `/home/jacob/.local/bin/bloom-release rclcpp -r crystal` on `Thu, 05 Dec 2019 22:10:01 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `0.6.4-0`
+- old version: `0.6.4-0`
+- new version: `0.6.5-1`
+
+Versions of tools used:
+
+- bloom version: `0.9.0`
+- catkin_pkg version: `0.4.13`
+- rosdep version: `0.16.1`
+- rosdistro version: `0.7.5`
+- vcstools version: `0.1.42`
+
+
 ## rclcpp (dashing) - 0.7.12-1
 
 The packages in the `rclcpp` repository were released into the `dashing` distro by running `/usr/bin/bloom-release --ros-distro dashing --track dashing rclcpp` on `Thu, 05 Dec 2019 19:17:58 -0000`
