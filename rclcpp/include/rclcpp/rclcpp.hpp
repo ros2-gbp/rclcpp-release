@@ -48,8 +48,7 @@
  *   - rclcpp::Node::get_parameter()
  *   - rclcpp::Node::describe_parameters()
  *   - rclcpp::Node::list_parameters()
- *   - rclcpp::Node::add_on_set_parameters_callback()
- *   - rclcpp::Node::remove_on_set_parameters_callback()
+ *   - rclcpp::Node::register_param_change_callback()
  *   - rclcpp::Parameter
  *   - rclcpp::ParameterValue
  *   - rclcpp::AsyncParametersClient

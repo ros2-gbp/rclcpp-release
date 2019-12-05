@@ -23,7 +23,6 @@
 #include "rclcpp/function_traits.hpp"
 #include "rclcpp/visibility_control.hpp"
 #include "rmw/types.h"
-#include "tracetools/tracetools.h"
 
 namespace rclcpp
 {
@@ -87,7 +86,6 @@ public:
     std::shared_ptr<typename ServiceT::Request> request,
     std::shared_ptr<typename ServiceT::Response> response)
   {
-    TRACEPOINT(callback_start, (const void *)this, false);
     if (shared_ptr_callback_ != nullptr) {
       (void)request_header;
       shared_ptr_callback_(request, response);
@@ -96,7 +94,6 @@ public:
     } else {
       throw std::runtime_error("unexpected request without any callback set");
     }
-    TRACEPOINT(callback_end, (const void *)this);
   }
 };
 

@@ -42,6 +42,7 @@ struct AnyExecutable
 
   // Only one of the following pointers will be set.
   rclcpp::SubscriptionBase::SharedPtr subscription;
+  rclcpp::SubscriptionBase::SharedPtr subscription_intra_process;
   rclcpp::TimerBase::SharedPtr timer;
   rclcpp::ServiceBase::SharedPtr service;
   rclcpp::ClientBase::SharedPtr client;

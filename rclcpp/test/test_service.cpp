@@ -78,8 +78,7 @@ TEST_F(TestService, construction_and_destruction) {
   }
 
   {
-    ASSERT_THROW(
-    {
+    ASSERT_THROW({
       auto service = node->create_service<ListParameters>("invalid_service?", callback);
     }, rclcpp::exceptions::InvalidServiceNameError);
   }
@@ -99,8 +98,7 @@ TEST_F(TestServiceSub, construction_and_destruction) {
   }
 
   {
-    ASSERT_THROW(
-    {
+    ASSERT_THROW({
       auto service = node->create_service<ListParameters>("invalid_service?", callback);
     }, rclcpp::exceptions::InvalidServiceNameError);
   }

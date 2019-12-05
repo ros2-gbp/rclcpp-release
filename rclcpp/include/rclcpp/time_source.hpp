@@ -25,7 +25,6 @@
 #include "rcl_interfaces/msg/parameter_event.hpp"
 
 #include "rclcpp/node.hpp"
-#include "rclcpp/node_interfaces/node_parameters_interface.hpp"
 
 
 namespace rclcpp
@@ -134,8 +133,6 @@ private:
   std::mutex clock_list_lock_;
   // A vector to store references to associated clocks.
   std::vector<rclcpp::Clock::SharedPtr> associated_clocks_;
-  // A handler for the use_sim_time parameter callback.
-  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr sim_time_cb_handler_ = nullptr;
 };
 
 }  // namespace rclcpp
