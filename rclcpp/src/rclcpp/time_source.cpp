@@ -25,9 +25,10 @@
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/node.hpp"
+#include "rclcpp/parameter_client.hpp"
+#include "rclcpp/parameter_events_filter.hpp"
 #include "rclcpp/time.hpp"
 #include "rclcpp/time_source.hpp"
-
 
 namespace rclcpp
 {
@@ -78,45 +79,67 @@ void TimeSource::attachNode(
 
   logger_ = node_logging_->get_logger();
 
-  rclcpp::Parameter use_sim_time_param;
-  if (node_parameters_->get_parameter("use_sim_time", use_sim_time_param)) {
-    if (use_sim_time_param.get_type() == rclcpp::PARAMETER_BOOL) {
-      if (use_sim_time_param.get_value<bool>() == true) {
-        parameter_state_ = SET_TRUE;
-        enable_ros_time();
-        create_clock_sub();
-      }
-    } else {
-      RCLCPP_ERROR(logger_, "Invalid type for parameter 'use_sim_time' %s should be bool",
-        use_sim_time_param.get_type_name().c_str());
+  // Though this defaults to false, it can be overridden by initial parameter values for the node,
+  // which may be given by the user at the node's construction or even by command-line arguments.
+  rclcpp::ParameterValue use_sim_time_param;
+  const std::string use_sim_time_name = "use_sim_time";
+  if (!node_parameters_->has_parameter(use_sim_time_name)) {
+    use_sim_time_param = node_parameters_->declare_parameter(
+      use_sim_time_name,
+      rclcpp::ParameterValue(false),
+      rcl_interfaces::msg::ParameterDescriptor());
+  } else {
+    use_sim_time_param = node_parameters_->get_parameter(use_sim_time_name).get_parameter_value();
+  }
+  if (use_sim_time_param.get_type() == rclcpp::PARAMETER_BOOL) {
+    if (use_sim_time_param.get<bool>()) {
+      parameter_state_ = SET_TRUE;
+      enable_ros_time();
+      create_clock_sub();
     }
   } else {
-    RCLCPP_DEBUG(logger_, "'use_sim_time' parameter not set, using wall time by default.");
+    RCLCPP_ERROR(
+      logger_, "Invalid type '%s' for parameter 'use_sim_time', should be 'bool'",
+      rclcpp::to_string(use_sim_time_param.get_type()).c_str());
   }
+  sim_time_cb_handler_ = node_parameters_->add_on_set_parameters_callback(
+    [use_sim_time_name](const std::vector<rclcpp::Parameter> & parameters) {
+      rcl_interfaces::msg::SetParametersResult result;
+      result.successful = true;
+      for (const auto & parameter : parameters) {
+        if (
+          parameter.get_name() == use_sim_time_name &&
+          parameter.get_type() != rclcpp::PARAMETER_BOOL)
+        {
+          result.successful = false;
+          result.reason = "'" + use_sim_time_name + "' must be a bool";
+          break;
+        }
+      }
+      return result;
+    });
 
   // TODO(tfoote) use parameters interface not subscribe to events via topic ticketed #609
-  parameter_client_ = std::make_shared<rclcpp::AsyncParametersClient>(
-    node_base_,
+  parameter_subscription_ = rclcpp::AsyncParametersClient::on_parameter_event(
     node_topics_,
-    node_graph_,
-    node_services_
-  );
-  parameter_subscription_ =
-    parameter_client_->on_parameter_event(std::bind(&TimeSource::on_parameter_event,
-      this, std::placeholders::_1));
+    std::bind(&TimeSource::on_parameter_event, this, std::placeholders::_1));
 }
 
 void TimeSource::detachNode()
 {
   this->ros_time_active_ = false;
   clock_subscription_.reset();
-  parameter_client_.reset();
+  parameter_subscription_.reset();
   node_base_.reset();
   node_topics_.reset();
   node_graph_.reset();
   node_services_.reset();
   node_logging_.reset();
   node_clock_.reset();
+  if (sim_time_cb_handler_ && node_parameters_) {
+    node_parameters_->remove_on_set_parameters_callback(sim_time_cb_handler_.get());
+  }
+  sim_time_cb_handler_.reset();
   node_parameters_.reset();
   disable_ros_time();
 }
@@ -150,7 +173,8 @@ void TimeSource::detachClock(std::shared_ptr<rclcpp::Clock> clock)
 
 TimeSource::~TimeSource()
 {
-  if (node_base_ || node_topics_ || node_graph_ || node_services_ ||
+  if (
+    node_base_ || node_topics_ || node_graph_ || node_services_ ||
     node_logging_ || node_clock_ || node_parameters_)
   {
     this->detachNode();
@@ -199,26 +223,13 @@ void TimeSource::create_clock_sub()
     // Subscription already created.
     return;
   }
-  const std::string topic_name = "/clock";
 
-  rclcpp::callback_group::CallbackGroup::SharedPtr group;
-  using rclcpp::message_memory_strategy::MessageMemoryStrategy;
-  auto msg_mem_strat = MessageMemoryStrategy<MessageT, Alloc>::create_default();
-  auto allocator = std::make_shared<Alloc>();
-  auto cb = std::bind(&TimeSource::clock_cb, this, std::placeholders::_1);
-
-  clock_subscription_ = rclcpp::create_subscription<
-    MessageT, decltype(cb), Alloc, MessageT, SubscriptionT
-    >(
-    node_topics_.get(),
-    topic_name,
-    std::move(cb),
-    rmw_qos_profile_default,
-    group,
-    false,
-    false,
-    msg_mem_strat,
-    allocator);
+  clock_subscription_ = rclcpp::create_subscription<rosgraph_msgs::msg::Clock>(
+    node_topics_,
+    "/clock",
+    rclcpp::QoS(QoSInitialization::from_rmw(rmw_qos_profile_default)),
+    std::bind(&TimeSource::clock_cb, this, std::placeholders::_1)
+  );
 }
 
 void TimeSource::destroy_clock_sub()
@@ -229,13 +240,17 @@ void TimeSource::destroy_clock_sub()
 
 void TimeSource::on_parameter_event(const rcl_interfaces::msg::ParameterEvent::SharedPtr event)
 {
+  // Filter out events on 'use_sim_time' parameter instances in other nodes.
+  if (event->node != node_base_->get_fully_qualified_name()) {
+    return;
+  }
   // Filter for only 'use_sim_time' being added or changed.
   rclcpp::ParameterEventsFilter filter(event, {"use_sim_time"},
     {rclcpp::ParameterEventsFilter::EventType::NEW,
       rclcpp::ParameterEventsFilter::EventType::CHANGED});
   for (auto & it : filter.get_events()) {
     if (it.second->value.type != ParameterType::PARAMETER_BOOL) {
-      RCLCPP_ERROR(logger_, "use_sim_time parameter set to something besides a bool");
+      RCLCPP_ERROR(logger_, "use_sim_time parameter cannot be set to anything but a bool");
       continue;
     }
     if (it.second->value.bool_value) {

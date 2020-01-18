@@ -65,10 +65,6 @@ Duration::Duration(const rcl_duration_t & duration)
   // noop
 }
 
-Duration::~Duration()
-{
-}
-
 Duration::operator builtin_interfaces::msg::Duration() const
 {
   builtin_interfaces::msg::Duration msg_duration;
@@ -224,6 +220,23 @@ double
 Duration::seconds() const
 {
   return std::chrono::duration<double>(std::chrono::nanoseconds(rcl_duration_.nanoseconds)).count();
+}
+
+rmw_time_t
+Duration::to_rmw_time() const
+{
+  // reuse conversion logic from msg creation
+  builtin_interfaces::msg::Duration msg = *this;
+  rmw_time_t result;
+  result.sec = msg.sec;
+  result.nsec = msg.nanosec;
+  return result;
+}
+
+Duration
+Duration::from_seconds(double seconds)
+{
+  return Duration(static_cast<int64_t>(RCL_S_TO_NS(seconds)));
 }
 
 }  // namespace rclcpp

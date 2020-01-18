@@ -15,8 +15,8 @@
 #ifndef RCLCPP__MEMORY_STRATEGY_HPP_
 #define RCLCPP__MEMORY_STRATEGY_HPP_
 
+#include <list>
 #include <memory>
-#include <vector>
 
 #include "rcl/allocator.h"
 #include "rcl/wait.h"
@@ -42,15 +42,16 @@ class RCLCPP_PUBLIC MemoryStrategy
 {
 public:
   RCLCPP_SMART_PTR_DEFINITIONS_NOT_COPYABLE(MemoryStrategy)
-  using WeakNodeVector = std::vector<rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>;
+  using WeakNodeList = std::list<rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>;
 
   virtual ~MemoryStrategy() = default;
 
-  virtual bool collect_entities(const WeakNodeVector & weak_nodes) = 0;
+  virtual bool collect_entities(const WeakNodeList & weak_nodes) = 0;
 
   virtual size_t number_of_ready_subscriptions() const = 0;
   virtual size_t number_of_ready_services() const = 0;
   virtual size_t number_of_ready_clients() const = 0;
+  virtual size_t number_of_ready_events() const = 0;
   virtual size_t number_of_ready_timers() const = 0;
   virtual size_t number_of_guard_conditions() const = 0;
   virtual size_t number_of_waitables() const = 0;
@@ -66,22 +67,27 @@ public:
   virtual void
   get_next_subscription(
     rclcpp::executor::AnyExecutable & any_exec,
-    const WeakNodeVector & weak_nodes) = 0;
+    const WeakNodeList & weak_nodes) = 0;
 
   virtual void
   get_next_service(
     rclcpp::executor::AnyExecutable & any_exec,
-    const WeakNodeVector & weak_nodes) = 0;
+    const WeakNodeList & weak_nodes) = 0;
 
   virtual void
   get_next_client(
     rclcpp::executor::AnyExecutable & any_exec,
-    const WeakNodeVector & weak_nodes) = 0;
+    const WeakNodeList & weak_nodes) = 0;
+
+  virtual void
+  get_next_timer(
+    rclcpp::executor::AnyExecutable & any_exec,
+    const WeakNodeList & weak_nodes) = 0;
 
   virtual void
   get_next_waitable(
     rclcpp::executor::AnyExecutable & any_exec,
-    const WeakNodeVector & weak_nodes) = 0;
+    const WeakNodeList & weak_nodes) = 0;
 
   virtual rcl_allocator_t
   get_allocator() = 0;
@@ -89,42 +95,52 @@ public:
   static rclcpp::SubscriptionBase::SharedPtr
   get_subscription_by_handle(
     std::shared_ptr<const rcl_subscription_t> subscriber_handle,
-    const WeakNodeVector & weak_nodes);
+    const WeakNodeList & weak_nodes);
 
   static rclcpp::ServiceBase::SharedPtr
   get_service_by_handle(
     std::shared_ptr<const rcl_service_t> service_handle,
-    const WeakNodeVector & weak_nodes);
+    const WeakNodeList & weak_nodes);
 
   static rclcpp::ClientBase::SharedPtr
   get_client_by_handle(
     std::shared_ptr<const rcl_client_t> client_handle,
-    const WeakNodeVector & weak_nodes);
+    const WeakNodeList & weak_nodes);
+
+  static rclcpp::TimerBase::SharedPtr
+  get_timer_by_handle(
+    std::shared_ptr<const rcl_timer_t> timer_handle,
+    const WeakNodeList & weak_nodes);
 
   static rclcpp::node_interfaces::NodeBaseInterface::SharedPtr
   get_node_by_group(
     rclcpp::callback_group::CallbackGroup::SharedPtr group,
-    const WeakNodeVector & weak_nodes);
+    const WeakNodeList & weak_nodes);
 
   static rclcpp::callback_group::CallbackGroup::SharedPtr
   get_group_by_subscription(
     rclcpp::SubscriptionBase::SharedPtr subscription,
-    const WeakNodeVector & weak_nodes);
+    const WeakNodeList & weak_nodes);
 
   static rclcpp::callback_group::CallbackGroup::SharedPtr
   get_group_by_service(
     rclcpp::ServiceBase::SharedPtr service,
-    const WeakNodeVector & weak_nodes);
+    const WeakNodeList & weak_nodes);
 
   static rclcpp::callback_group::CallbackGroup::SharedPtr
   get_group_by_client(
     rclcpp::ClientBase::SharedPtr client,
-    const WeakNodeVector & weak_nodes);
+    const WeakNodeList & weak_nodes);
+
+  static rclcpp::callback_group::CallbackGroup::SharedPtr
+  get_group_by_timer(
+    rclcpp::TimerBase::SharedPtr timer,
+    const WeakNodeList & weak_nodes);
 
   static rclcpp::callback_group::CallbackGroup::SharedPtr
   get_group_by_waitable(
     rclcpp::Waitable::SharedPtr waitable,
-    const WeakNodeVector & weak_nodes);
+    const WeakNodeList & weak_nodes);
 };
 
 }  // namespace memory_strategy

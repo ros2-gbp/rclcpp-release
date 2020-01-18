@@ -46,18 +46,38 @@ dispatch_semaphore_t SignalHandler::signal_handler_sem_;
 sem_t SignalHandler::signal_handler_sem_;
 #endif
 
-SignalHandler &
-SignalHandler::get_global_signal_handler()
-{
-  static SignalHandler signal_handler;
-  return signal_handler;
-}
+// The logger must be initialized before the local static variable signal_handler,
+// from the method get_global_signal_handler(), so that it is destructed after
+// it, because the destructor of SignalHandler uses this logger object.
+static rclcpp::Logger g_logger = rclcpp::get_logger("rclcpp");
 
 rclcpp::Logger &
 SignalHandler::get_logger()
 {
-  static rclcpp::Logger logger = rclcpp::get_logger("rclcpp");
-  return logger;
+  return g_logger;
+}
+
+SignalHandler &
+SignalHandler::get_global_signal_handler()
+{
+  // This is initialized after the g_logger static global, ensuring
+  // SignalHandler::get_logger() may be called from the destructor of
+  // SignalHandler, according to this:
+  //
+  //   Variables declared at block scope with the specifier static have static
+  //   storage duration but are initialized the first time control passes
+  //   through their declaration (unless their initialization is zero- or
+  //   constant-initialization, which can be performed before the block is
+  //   first entered). On all further calls, the declaration is skipped.
+  //
+  // -- https://en.cppreference.com/w/cpp/language/storage_duration#Static_local_variables
+  //
+  // Which is guaranteed to occur after static initialization for global (see:
+  // https://en.cppreference.com/w/cpp/language/initialization#Static_initialization),
+  // which is when g_logger will be initialized.
+  // And destruction will occur in the reverse order.
+  static SignalHandler signal_handler;
+  return signal_handler;
 }
 
 bool
@@ -145,13 +165,15 @@ __safe_strerror(int errnum, char * buffer, size_t buffer_length)
 {
 #if defined(_WIN32)
   strerror_s(buffer, buffer_length, errnum);
-#elif (defined(_GNU_SOURCE) && !defined(ANDROID))
+#elif defined(_GNU_SOURCE) && (!defined(ANDROID) || __ANDROID_API__ >= 23)
+  /* GNU-specific */
   char * msg = strerror_r(errnum, buffer, buffer_length);
   if (msg != buffer) {
     strncpy(buffer, msg, buffer_length);
     buffer[buffer_length - 1] = '\0';
   }
 #else
+  /* XSI-compliant */
   int error_status = strerror_r(errnum, buffer, buffer_length);
   if (error_status != 0) {
     throw std::runtime_error("Failed to get error string for errno: " + std::to_string(errnum));

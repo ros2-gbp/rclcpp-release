@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <functional>
 #include <string>
+#include <vector>
 
 using namespace std::string_literals;
 
@@ -39,8 +40,8 @@ NameValidationError::format_error(
   return msg;
 }
 
-void
-throw_from_rcl_error(
+std::exception_ptr
+from_rcl_error(
   rcl_ret_t ret,
   const std::string & prefix,
   const rcl_error_state_t * error_state,
@@ -55,9 +56,9 @@ throw_from_rcl_error(
   if (!error_state) {
     throw std::runtime_error("rcl error state is not set");
   }
-  std::string formated_prefix = prefix;
+  std::string formatted_prefix = prefix;
   if (!prefix.empty()) {
-    formated_prefix += ": ";
+    formatted_prefix += ": ";
   }
   RCLErrorBase base_exc(ret, error_state);
   if (reset_error) {
@@ -65,12 +66,28 @@ throw_from_rcl_error(
   }
   switch (ret) {
     case RCL_RET_BAD_ALLOC:
-      throw RCLBadAlloc(base_exc);
+      return std::make_exception_ptr(RCLBadAlloc(base_exc));
     case RCL_RET_INVALID_ARGUMENT:
-      throw RCLInvalidArgument(base_exc, formated_prefix);
+      return std::make_exception_ptr(RCLInvalidArgument(base_exc, formatted_prefix));
+    case RCL_RET_INVALID_ROS_ARGS:
+      return std::make_exception_ptr(RCLInvalidROSArgsError(base_exc, formatted_prefix));
     default:
-      throw RCLError(base_exc, formated_prefix);
+      return std::make_exception_ptr(RCLError(base_exc, formatted_prefix));
   }
+}
+
+void
+throw_from_rcl_error(
+  rcl_ret_t ret,
+  const std::string & prefix,
+  const rcl_error_state_t * error_state,
+  void (* reset_error)())
+{
+  // We expect this to either throw a standard error,
+  // or to generate an error pointer (which is caught
+  // in err, and immediately thrown)
+  auto err = from_rcl_error(ret, prefix, error_state, reset_error);
+  std::rethrow_exception(err);
 }
 
 RCLErrorBase::RCLErrorBase(rcl_ret_t ret, const rcl_error_state_t * error_state)
@@ -110,6 +127,19 @@ RCLInvalidArgument::RCLInvalidArgument(
   const RCLErrorBase & base_exc,
   const std::string & prefix)
 : RCLErrorBase(base_exc), std::invalid_argument(prefix + base_exc.formatted_message)
+{}
+
+RCLInvalidROSArgsError::RCLInvalidROSArgsError(
+  rcl_ret_t ret,
+  const rcl_error_state_t * error_state,
+  const std::string & prefix)
+: RCLInvalidROSArgsError(RCLErrorBase(ret, error_state), prefix)
+{}
+
+RCLInvalidROSArgsError::RCLInvalidROSArgsError(
+  const RCLErrorBase & base_exc,
+  const std::string & prefix)
+: RCLErrorBase(base_exc), std::runtime_error(prefix + base_exc.formatted_message)
 {}
 
 }  // namespace exceptions

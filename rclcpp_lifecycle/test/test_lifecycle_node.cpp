@@ -143,15 +143,20 @@ TEST_F(TestDefaultStateMachine, trigger_transition) {
   auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
 
   EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->get_current_state().id());
-  ASSERT_EQ(State::PRIMARY_STATE_INACTIVE, test_node->trigger_transition(
+  ASSERT_EQ(
+    State::PRIMARY_STATE_INACTIVE, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_CONFIGURE)).id());
-  ASSERT_EQ(State::PRIMARY_STATE_ACTIVE, test_node->trigger_transition(
+  ASSERT_EQ(
+    State::PRIMARY_STATE_ACTIVE, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_ACTIVATE)).id());
-  ASSERT_EQ(State::PRIMARY_STATE_INACTIVE, test_node->trigger_transition(
+  ASSERT_EQ(
+    State::PRIMARY_STATE_INACTIVE, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_DEACTIVATE)).id());
-  ASSERT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->trigger_transition(
+  ASSERT_EQ(
+    State::PRIMARY_STATE_UNCONFIGURED, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_CLEANUP)).id());
-  ASSERT_EQ(State::PRIMARY_STATE_FINALIZED, test_node->trigger_transition(
+  ASSERT_EQ(
+    State::PRIMARY_STATE_FINALIZED, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_UNCONFIGURED_SHUTDOWN)).id());
 }
 
@@ -187,15 +192,20 @@ TEST_F(TestDefaultStateMachine, good_mood) {
   auto test_node = std::make_shared<MoodyLifecycleNode<GoodMood>>("testnode");
 
   EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->get_current_state().id());
-  EXPECT_EQ(State::PRIMARY_STATE_INACTIVE, test_node->trigger_transition(
+  EXPECT_EQ(
+    State::PRIMARY_STATE_INACTIVE, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_CONFIGURE)).id());
-  EXPECT_EQ(State::PRIMARY_STATE_ACTIVE, test_node->trigger_transition(
+  EXPECT_EQ(
+    State::PRIMARY_STATE_ACTIVE, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_ACTIVATE)).id());
-  EXPECT_EQ(State::PRIMARY_STATE_INACTIVE, test_node->trigger_transition(
+  EXPECT_EQ(
+    State::PRIMARY_STATE_INACTIVE, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_DEACTIVATE)).id());
-  EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->trigger_transition(
+  EXPECT_EQ(
+    State::PRIMARY_STATE_UNCONFIGURED, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_CLEANUP)).id());
-  EXPECT_EQ(State::PRIMARY_STATE_FINALIZED, test_node->trigger_transition(
+  EXPECT_EQ(
+    State::PRIMARY_STATE_FINALIZED, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_UNCONFIGURED_SHUTDOWN)).id());
 
   // check if all callbacks were successfully overwritten
@@ -206,7 +216,8 @@ TEST_F(TestDefaultStateMachine, bad_mood) {
   auto test_node = std::make_shared<MoodyLifecycleNode<BadMood>>("testnode");
 
   EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->get_current_state().id());
-  EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->trigger_transition(
+  EXPECT_EQ(
+    State::PRIMARY_STATE_UNCONFIGURED, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_CONFIGURE)).id());
 
   // check if all callbacks were successfully overwritten
@@ -217,7 +228,8 @@ TEST_F(TestDefaultStateMachine, lifecycle_subscriber) {
   auto test_node = std::make_shared<MoodyLifecycleNode<GoodMood>>("testnode");
 
   auto cb = [](const std::shared_ptr<lifecycle_msgs::msg::State> msg) {(void) msg;};
-  auto lifecycle_sub = test_node->create_subscription<lifecycle_msgs::msg::State>("~/empty", cb);
+  auto lifecycle_sub =
+    test_node->create_subscription<lifecycle_msgs::msg::State>("~/empty", 10, cb);
 
   SUCCEED();
 }

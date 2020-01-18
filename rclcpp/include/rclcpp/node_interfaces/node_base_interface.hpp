@@ -56,6 +56,13 @@ public:
   const char *
   get_namespace() const = 0;
 
+  /// Return the fully qualified name of the node.
+  /** \return The fully qualified name of the node. */
+  RCLCPP_PUBLIC
+  virtual
+  const char *
+  get_fully_qualified_name() const = 0;
+
   /// Return the context of the node.
   /** \return SharedPtr to the node's context. */
   RCLCPP_PUBLIC
@@ -94,6 +101,12 @@ public:
   virtual
   std::shared_ptr<const rcl_node_t>
   get_shared_rcl_node_handle() const = 0;
+
+  /// Manually assert that this Node is alive (for RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_NODE).
+  RCLCPP_PUBLIC
+  virtual
+  bool
+  assert_liveliness() const = 0;
 
   /// Create and return a callback group.
   RCLCPP_PUBLIC
@@ -142,6 +155,12 @@ public:
   virtual
   std::unique_lock<std::recursive_mutex>
   acquire_notify_guard_condition_lock() const = 0;
+
+  /// Return the default preference for using intra process communication.
+  RCLCPP_PUBLIC
+  virtual
+  bool
+  get_use_intra_process_default() const = 0;
 };
 
 }  // namespace node_interfaces

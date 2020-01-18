@@ -33,6 +33,7 @@
 #include "rclcpp/node_interfaces/node_logging.hpp"
 #include "rclcpp/node_interfaces/node_parameters.hpp"
 #include "rclcpp/node_interfaces/node_services.hpp"
+#include "rclcpp/node_interfaces/node_time_source.hpp"
 #include "rclcpp/node_interfaces/node_timers.hpp"
 #include "rclcpp/node_interfaces/node_topics.hpp"
 #include "rclcpp/node_interfaces/node_waitables.hpp"
@@ -45,30 +46,23 @@ namespace rclcpp_lifecycle
 
 LifecycleNode::LifecycleNode(
   const std::string & node_name,
-  const std::string & namespace_,
-  bool use_intra_process_comms)
+  const rclcpp::NodeOptions & options)
 : LifecycleNode(
     node_name,
-    namespace_,
-    rclcpp::contexts::default_context::get_global_default_context(),
-    {},
-    {},
-    true,
-    use_intra_process_comms,
-    true)
+    "",
+    options)
 {}
 
 LifecycleNode::LifecycleNode(
   const std::string & node_name,
   const std::string & namespace_,
-  rclcpp::Context::SharedPtr context,
-  const std::vector<std::string> & arguments,
-  const std::vector<rclcpp::Parameter> & initial_parameters,
-  bool use_global_arguments,
-  bool use_intra_process_comms,
-  bool start_parameter_services)
+  const rclcpp::NodeOptions & options)
 : node_base_(new rclcpp::node_interfaces::NodeBase(
-      node_name, namespace_, context, arguments, use_global_arguments)),
+      node_name,
+      namespace_,
+      options.context(),
+      *(options.get_rcl_node_options()),
+      options.use_intra_process_comms())),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),
   node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_.get())),
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
@@ -83,28 +77,50 @@ LifecycleNode::LifecycleNode(
     )),
   node_parameters_(new rclcpp::node_interfaces::NodeParameters(
       node_base_,
+      node_logging_,
       node_topics_,
       node_services_,
       node_clock_,
-      initial_parameters,
-      use_intra_process_comms,
-      start_parameter_services
+      options.parameter_overrides(),
+      options.start_parameter_services(),
+      options.start_parameter_event_publisher(),
+      options.parameter_event_qos(),
+      options.parameter_event_publisher_options(),
+      options.allow_undeclared_parameters(),
+      options.automatically_declare_parameters_from_overrides()
+    )),
+  node_time_source_(new rclcpp::node_interfaces::NodeTimeSource(
+      node_base_,
+      node_topics_,
+      node_graph_,
+      node_services_,
+      node_logging_,
+      node_clock_,
+      node_parameters_
     )),
   node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
-  use_intra_process_comms_(use_intra_process_comms),
+  node_options_(options),
   impl_(new LifecycleNodeInterfaceImpl(node_base_, node_services_))
 {
   impl_->init();
 
-  register_on_configure(std::bind(&LifecycleNodeInterface::on_configure, this,
-    std::placeholders::_1));
+  register_on_configure(
+    std::bind(
+      &LifecycleNodeInterface::on_configure, this,
+      std::placeholders::_1));
   register_on_cleanup(std::bind(&LifecycleNodeInterface::on_cleanup, this, std::placeholders::_1));
-  register_on_shutdown(std::bind(&LifecycleNodeInterface::on_shutdown, this,
-    std::placeholders::_1));
-  register_on_activate(std::bind(&LifecycleNodeInterface::on_activate, this,
-    std::placeholders::_1));
-  register_on_deactivate(std::bind(&LifecycleNodeInterface::on_deactivate, this,
-    std::placeholders::_1));
+  register_on_shutdown(
+    std::bind(
+      &LifecycleNodeInterface::on_shutdown, this,
+      std::placeholders::_1));
+  register_on_activate(
+    std::bind(
+      &LifecycleNodeInterface::on_activate, this,
+      std::placeholders::_1));
+  register_on_deactivate(
+    std::bind(
+      &LifecycleNodeInterface::on_deactivate, this,
+      std::placeholders::_1));
   register_on_error(std::bind(&LifecycleNodeInterface::on_error, this, std::placeholders::_1));
 }
 
@@ -134,6 +150,33 @@ LifecycleNode::create_callback_group(
   rclcpp::callback_group::CallbackGroupType group_type)
 {
   return node_base_->create_callback_group(group_type);
+}
+
+const rclcpp::ParameterValue &
+LifecycleNode::declare_parameter(
+  const std::string & name,
+  const rclcpp::ParameterValue & default_value,
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor)
+{
+  return this->node_parameters_->declare_parameter(name, default_value, parameter_descriptor);
+}
+
+void
+LifecycleNode::undeclare_parameter(const std::string & name)
+{
+  this->node_parameters_->undeclare_parameter(name);
+}
+
+bool
+LifecycleNode::has_parameter(const std::string & name) const
+{
+  return this->node_parameters_->has_parameter(name);
+}
+
+rcl_interfaces::msg::SetParametersResult
+LifecycleNode::set_parameter(const rclcpp::Parameter & parameter)
+{
+  return this->set_parameters_atomically({parameter});
 }
 
 bool
@@ -169,11 +212,25 @@ LifecycleNode::get_parameter(const std::string & name) const
   return node_parameters_->get_parameter(name);
 }
 
-bool LifecycleNode::get_parameter(
+bool
+LifecycleNode::get_parameter(
   const std::string & name,
   rclcpp::Parameter & parameter) const
 {
   return node_parameters_->get_parameter(name, parameter);
+}
+
+rcl_interfaces::msg::ParameterDescriptor
+LifecycleNode::describe_parameter(const std::string & name) const
+{
+  auto result = node_parameters_->describe_parameters({name});
+  if (0 == result.size()) {
+    throw rclcpp::exceptions::ParameterNotDeclaredException(name);
+  }
+  if (result.size() > 1) {
+    throw std::runtime_error("number of described parameters unexpectedly more than one");
+  }
+  return result.front();
 }
 
 std::vector<rcl_interfaces::msg::ParameterDescriptor>
@@ -195,6 +252,12 @@ LifecycleNode::list_parameters(
   const std::vector<std::string> & prefixes, uint64_t depth) const
 {
   return node_parameters_->list_parameters(prefixes, depth);
+}
+
+rclcpp::Node::OnParametersSetCallbackType
+LifecycleNode::set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback)
+{
+  return node_parameters_->set_on_parameters_set_callback(callback);
 }
 
 std::vector<std::string>
@@ -277,6 +340,18 @@ LifecycleNode::get_node_graph_interface()
   return node_graph_;
 }
 
+rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr
+LifecycleNode::get_node_logging_interface()
+{
+  return node_logging_;
+}
+
+rclcpp::node_interfaces::NodeTimeSourceInterface::SharedPtr
+LifecycleNode::get_node_time_source_interface()
+{
+  return node_time_source_;
+}
+
 rclcpp::node_interfaces::NodeTimersInterface::SharedPtr
 LifecycleNode::get_node_timers_interface()
 {
@@ -307,6 +382,11 @@ LifecycleNode::get_node_waitables_interface()
   return node_waitables_;
 }
 
+const rclcpp::NodeOptions &
+LifecycleNode::get_node_options() const
+{
+  return node_options_;
+}
 
 ////
 bool

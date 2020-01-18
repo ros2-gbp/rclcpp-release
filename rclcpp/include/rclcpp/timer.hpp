@@ -30,6 +30,8 @@
 #include "rclcpp/rate.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/visibility_control.hpp"
+#include "tracetools/tracetools.h"
+#include "tracetools/utils.hpp"
 
 #include "rcl/error_handling.h"
 #include "rcl/timer.h"
@@ -57,6 +59,16 @@ public:
   RCLCPP_PUBLIC
   void
   cancel();
+
+  /// Return the timer cancellation state.
+  /**
+   * \return true if the timer has been cancelled, false otherwise
+   * \throws std::runtime_error if the rcl_get_error_state returns 0
+   * \throws RCLErrorBase some child class exception based on ret
+   */
+  RCLCPP_PUBLIC
+  bool
+  is_canceled();
 
   RCLCPP_PUBLIC
   void
@@ -123,6 +135,14 @@ public:
   )
   : TimerBase(clock, period, context), callback_(std::forward<FunctorT>(callback))
   {
+    TRACEPOINT(
+      rclcpp_timer_callback_added,
+      (const void *)get_timer_handle().get(),
+      (const void *)&callback_);
+    TRACEPOINT(
+      rclcpp_callback_register,
+      (const void *)&callback_,
+      get_symbol(callback_));
   }
 
   /// Default destructor.
@@ -142,7 +162,9 @@ public:
     if (ret != RCL_RET_OK) {
       throw std::runtime_error("Failed to notify timer that callback occurred");
     }
+    TRACEPOINT(callback_start, (const void *)&callback_, false);
     execute_callback_delegate<>();
+    TRACEPOINT(callback_end, (const void *)&callback_);
   }
 
   // void specialization

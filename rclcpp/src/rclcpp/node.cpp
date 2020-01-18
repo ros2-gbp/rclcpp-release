@@ -34,35 +34,76 @@
 #include "rclcpp/node_interfaces/node_topics.hpp"
 #include "rclcpp/node_interfaces/node_waitables.hpp"
 
+#include "rmw/validate_namespace.h"
+
 using rclcpp::Node;
+using rclcpp::NodeOptions;
 using rclcpp::exceptions::throw_from_rcl_error;
 
+RCLCPP_LOCAL
+std::string
+extend_sub_namespace(const std::string & existing_sub_namespace, const std::string & extension)
+{
+  // Assumption is that the existing_sub_namespace does not need checking
+  // because it would be checked already when it was set with this function.
+
+  // check if the new sub-namespace extension is absolute
+  if (extension.front() == '/') {
+    throw rclcpp::exceptions::NameValidationError(
+            "sub_namespace",
+            extension.c_str(),
+            "a sub-namespace should not have a leading /",
+            0);
+  }
+
+  std::string new_sub_namespace;
+  if (existing_sub_namespace.empty()) {
+    new_sub_namespace = extension;
+  } else {
+    new_sub_namespace = existing_sub_namespace + "/" + extension;
+  }
+
+  // remove any trailing `/` so that new extensions do no result in `//`
+  if (new_sub_namespace.back() == '/') {
+    new_sub_namespace = new_sub_namespace.substr(0, new_sub_namespace.size() - 1);
+  }
+
+  return new_sub_namespace;
+}
+
+RCLCPP_LOCAL
+std::string
+create_effective_namespace(const std::string & node_namespace, const std::string & sub_namespace)
+{
+  // Assumption is that both the node_namespace and sub_namespace are conforming
+  // and do not need trimming of `/` and other things, as they were validated
+  // in other functions already.
+
+  if (node_namespace.back() == '/') {
+    // this is the special case where node_namespace is just `/`
+    return node_namespace + sub_namespace;
+  } else {
+    return node_namespace + "/" + sub_namespace;
+  }
+}
+
 Node::Node(
   const std::string & node_name,
-  const std::string & namespace_,
-  bool use_intra_process_comms)
-: Node(
-    node_name,
-    namespace_,
-    rclcpp::contexts::default_context::get_global_default_context(),
-    {},
-    {},
-    true,
-    use_intra_process_comms,
-    true)
-{}
+  const NodeOptions & options)
+: Node(node_name, "", options)
+{
+}
 
 Node::Node(
   const std::string & node_name,
   const std::string & namespace_,
-  rclcpp::Context::SharedPtr context,
-  const std::vector<std::string> & arguments,
-  const std::vector<rclcpp::Parameter> & initial_parameters,
-  bool use_global_arguments,
-  bool use_intra_process_comms,
-  bool start_parameter_services)
+  const NodeOptions & options)
 : node_base_(new rclcpp::node_interfaces::NodeBase(
-      node_name, namespace_, context, arguments, use_global_arguments)),
+      node_name,
+      namespace_,
+      options.context(),
+      *(options.get_rcl_node_options()),
+      options.use_intra_process_comms())),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),
   node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_.get())),
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
@@ -77,12 +118,17 @@ Node::Node(
     )),
   node_parameters_(new rclcpp::node_interfaces::NodeParameters(
       node_base_,
+      node_logging_,
       node_topics_,
       node_services_,
       node_clock_,
-      initial_parameters,
-      use_intra_process_comms,
-      start_parameter_services
+      options.parameter_overrides(),
+      options.start_parameter_services(),
+      options.start_parameter_event_publisher(),
+      options.parameter_event_qos(),
+      options.parameter_event_publisher_options(),
+      options.allow_undeclared_parameters(),
+      options.automatically_declare_parameters_from_overrides()
     )),
   node_time_source_(new rclcpp::node_interfaces::NodeTimeSource(
       node_base_,
@@ -94,8 +140,46 @@ Node::Node(
       node_parameters_
     )),
   node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
-  use_intra_process_comms_(use_intra_process_comms)
+  node_options_(options),
+  sub_namespace_(""),
+  effective_namespace_(create_effective_namespace(this->get_namespace(), sub_namespace_))
 {
+}
+
+Node::Node(
+  const Node & other,
+  const std::string & sub_namespace)
+: node_base_(other.node_base_),
+  node_graph_(other.node_graph_),
+  node_logging_(other.node_logging_),
+  node_timers_(other.node_timers_),
+  node_topics_(other.node_topics_),
+  node_services_(other.node_services_),
+  node_clock_(other.node_clock_),
+  node_parameters_(other.node_parameters_),
+  node_options_(other.node_options_),
+  sub_namespace_(extend_sub_namespace(other.get_sub_namespace(), sub_namespace)),
+  effective_namespace_(create_effective_namespace(other.get_namespace(), sub_namespace_))
+{
+  // Validate new effective namespace.
+  int validation_result;
+  size_t invalid_index;
+  rmw_ret_t rmw_ret =
+    rmw_validate_namespace(effective_namespace_.c_str(), &validation_result, &invalid_index);
+
+  if (rmw_ret != RMW_RET_OK) {
+    if (rmw_ret == RMW_RET_INVALID_ARGUMENT) {
+      throw_from_rcl_error(RCL_RET_INVALID_ARGUMENT, "failed to validate subnode namespace");
+    }
+    throw_from_rcl_error(RCL_RET_ERROR, "failed to validate subnode namespace");
+  }
+
+  if (validation_result != RMW_NAMESPACE_VALID) {
+    throw rclcpp::exceptions::InvalidNamespaceError(
+            effective_namespace_.c_str(),
+            rmw_namespace_validation_result_string(validation_result),
+            invalid_index);
+  }
 }
 
 Node::~Node()
@@ -111,6 +195,12 @@ const char *
 Node::get_namespace() const
 {
   return node_base_->get_namespace();
+}
+
+const char *
+Node::get_fully_qualified_name() const
+{
+  return node_base_->get_fully_qualified_name();
 }
 
 rclcpp::Logger
@@ -132,18 +222,60 @@ Node::group_in_node(rclcpp::callback_group::CallbackGroup::SharedPtr group)
   return node_base_->callback_group_in_node(group);
 }
 
+const rclcpp::ParameterValue &
+Node::declare_parameter(
+  const std::string & name,
+  const rclcpp::ParameterValue & default_value,
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+  bool ignore_override)
+{
+  return this->node_parameters_->declare_parameter(
+    name,
+    default_value,
+    parameter_descriptor,
+    ignore_override);
+}
+
+void
+Node::undeclare_parameter(const std::string & name)
+{
+  this->node_parameters_->undeclare_parameter(name);
+}
+
+bool
+Node::has_parameter(const std::string & name) const
+{
+  return this->node_parameters_->has_parameter(name);
+}
+
+rcl_interfaces::msg::SetParametersResult
+Node::set_parameter(const rclcpp::Parameter & parameter)
+{
+  return this->set_parameters_atomically({parameter});
+}
+
 std::vector<rcl_interfaces::msg::SetParametersResult>
-Node::set_parameters(
-  const std::vector<rclcpp::Parameter> & parameters)
+Node::set_parameters(const std::vector<rclcpp::Parameter> & parameters)
 {
   return node_parameters_->set_parameters(parameters);
 }
 
 rcl_interfaces::msg::SetParametersResult
-Node::set_parameters_atomically(
-  const std::vector<rclcpp::Parameter> & parameters)
+Node::set_parameters_atomically(const std::vector<rclcpp::Parameter> & parameters)
 {
   return node_parameters_->set_parameters_atomically(parameters);
+}
+
+rclcpp::Parameter
+Node::get_parameter(const std::string & name) const
+{
+  return node_parameters_->get_parameter(name);
+}
+
+bool
+Node::get_parameter(const std::string & name, rclcpp::Parameter & parameter) const
+{
+  return node_parameters_->get_parameter(name, parameter);
 }
 
 std::vector<rclcpp::Parameter>
@@ -153,38 +285,53 @@ Node::get_parameters(
   return node_parameters_->get_parameters(names);
 }
 
-rclcpp::Parameter
-Node::get_parameter(const std::string & name) const
+rcl_interfaces::msg::ParameterDescriptor
+Node::describe_parameter(const std::string & name) const
 {
-  return node_parameters_->get_parameter(name);
-}
-
-bool Node::get_parameter(
-  const std::string & name,
-  rclcpp::Parameter & parameter) const
-{
-  return node_parameters_->get_parameter(name, parameter);
+  auto result = node_parameters_->describe_parameters({name});
+  if (0 == result.size()) {
+    throw rclcpp::exceptions::ParameterNotDeclaredException(name);
+  }
+  if (result.size() > 1) {
+    throw std::runtime_error("number of described parameters unexpectedly more than one");
+  }
+  return result.front();
 }
 
 std::vector<rcl_interfaces::msg::ParameterDescriptor>
-Node::describe_parameters(
-  const std::vector<std::string> & names) const
+Node::describe_parameters(const std::vector<std::string> & names) const
 {
   return node_parameters_->describe_parameters(names);
 }
 
 std::vector<uint8_t>
-Node::get_parameter_types(
-  const std::vector<std::string> & names) const
+Node::get_parameter_types(const std::vector<std::string> & names) const
 {
   return node_parameters_->get_parameter_types(names);
 }
 
 rcl_interfaces::msg::ListParametersResult
-Node::list_parameters(
-  const std::vector<std::string> & prefixes, uint64_t depth) const
+Node::list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const
 {
   return node_parameters_->list_parameters(prefixes, depth);
+}
+
+rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
+Node::add_on_set_parameters_callback(OnParametersSetCallbackType callback)
+{
+  return node_parameters_->add_on_set_parameters_callback(callback);
+}
+
+void
+Node::remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const callback)
+{
+  return node_parameters_->remove_on_set_parameters_callback(callback);
+}
+
+rclcpp::Node::OnParametersSetCallbackType
+Node::set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback)
+{
+  return node_parameters_->set_on_parameters_set_callback(callback);
 }
 
 std::vector<std::string>
@@ -307,4 +454,36 @@ rclcpp::node_interfaces::NodeWaitablesInterface::SharedPtr
 Node::get_node_waitables_interface()
 {
   return node_waitables_;
+}
+
+const std::string &
+Node::get_sub_namespace() const
+{
+  return this->sub_namespace_;
+}
+
+const std::string &
+Node::get_effective_namespace() const
+{
+  return this->effective_namespace_;
+}
+
+Node::SharedPtr
+Node::create_sub_node(const std::string & sub_namespace)
+{
+  // Cannot use make_shared<Node>() here as it requires the constructor to be
+  // public, and this constructor is intentionally protected instead.
+  return std::shared_ptr<Node>(new Node(*this, sub_namespace));
+}
+
+const NodeOptions &
+Node::get_node_options() const
+{
+  return this->node_options_;
+}
+
+bool
+Node::assert_liveliness() const
+{
+  return node_base_->assert_liveliness();
 }

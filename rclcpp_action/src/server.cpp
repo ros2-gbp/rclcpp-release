@@ -28,7 +28,7 @@
 #include <vector>
 
 using rclcpp_action::ServerBase;
-using rclcpp_action::GoalID;
+using rclcpp_action::GoalUUID;
 
 namespace rclcpp_action
 {
@@ -62,11 +62,11 @@ public:
   bool goal_expired_ = false;
 
   // Results to be kept until the goal expires after reaching a terminal state
-  std::unordered_map<GoalID, std::shared_ptr<void>> goal_results_;
+  std::unordered_map<GoalUUID, std::shared_ptr<void>> goal_results_;
   // Requests for results are kept until a result becomes available
-  std::unordered_map<GoalID, std::vector<rmw_request_id_t>> result_requests_;
+  std::unordered_map<GoalUUID, std::vector<rmw_request_id_t>> result_requests_;
   // rcl goal handles are kept so api to send result doesn't try to access freed memory
-  std::unordered_map<GoalID, std::shared_ptr<rcl_action_goal_handle_t>> goal_handles_;
+  std::unordered_map<GoalUUID, std::shared_ptr<rcl_action_goal_handle_t>> goal_handles_;
 
   rclcpp::Logger logger_;
 };
@@ -89,7 +89,8 @@ ServerBase::ServerBase(
         rcl_node_t * rcl_node = node_base->get_rcl_node_handle();
         rcl_ret_t ret = rcl_action_server_fini(ptr, rcl_node);
         (void)ret;
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp_action"),
+        RCLCPP_DEBUG(
+          rclcpp::get_logger("rclcpp_action"),
           "failed to fini rcl_action_server_t in deleter");
       }
       delete ptr;
@@ -228,7 +229,7 @@ ServerBase::execute_goal_request_received()
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
 
-  GoalID uuid = get_goal_id_from_goal_request(message.get());
+  GoalUUID uuid = get_goal_id_from_goal_request(message.get());
   convert(uuid, &goal_info);
 
   // Call user's callback, getting the user's response and a ros message to send back
@@ -254,7 +255,8 @@ ServerBase::execute_goal_request_received()
         if (nullptr != ptr) {
           rcl_ret_t fail_ret = rcl_action_goal_handle_fini(ptr);
           (void)fail_ret;
-          RCLCPP_DEBUG(rclcpp::get_logger("rclcpp_action"),
+          RCLCPP_DEBUG(
+            rclcpp::get_logger("rclcpp_action"),
             "failed to fini rcl_action_goal_handle_t in deleter");
           delete ptr;
         }
@@ -325,8 +327,12 @@ ServerBase::execute_cancel_request_received()
     pimpl_->action_server_.get(),
     &cancel_request,
     &cancel_response);
+  if (RCL_RET_OK != ret) {
+    rclcpp::exceptions::throw_from_rcl_error(ret);
+  }
 
-  RCLCPP_SCOPE_EXIT({
+  RCLCPP_SCOPE_EXIT(
+  {
     ret = rcl_action_cancel_response_fini(&cancel_response);
     if (RCL_RET_OK != ret) {
       RCLCPP_ERROR(pimpl_->logger_, "Failed to fini cancel response");
@@ -335,11 +341,12 @@ ServerBase::execute_cancel_request_received()
 
   auto response = std::make_shared<action_msgs::srv::CancelGoal::Response>();
 
+  response->return_code = cancel_response.msg.return_code;
   auto & goals = cancel_response.msg.goals_canceling;
   // For each canceled goal, call cancel callback
   for (size_t i = 0; i < goals.size; ++i) {
     const rcl_action_goal_info_t & goal_info = goals.data[i];
-    GoalID uuid;
+    GoalUUID uuid;
     convert(goal_info, &uuid);
     auto response_code = call_handle_cancel_callback(uuid);
     if (CancelResponse::ACCEPT == response_code) {
@@ -349,6 +356,12 @@ ServerBase::execute_cancel_request_received()
       cpp_info.stamp.nanosec = goal_info.stamp.nanosec;
       response->goals_canceling.push_back(cpp_info);
     }
+  }
+
+  // If the user rejects all individual requests to cancel goals,
+  // then we consider the top-level cancel request as rejected.
+  if (goals.size >= 1u && 0u == response->goals_canceling.size()) {
+    response->return_code = action_msgs::srv::CancelGoal::Response::ERROR_REJECTED;
   }
 
   if (!response->goals_canceling.empty()) {
@@ -388,7 +401,7 @@ ServerBase::execute_result_request_received()
   std::shared_ptr<void> result_response;
 
   // check if the goal exists
-  GoalID uuid = get_goal_id_from_result_request(result_request.get());
+  GoalUUID uuid = get_goal_id_from_result_request(result_request.get());
   rcl_action_goal_info_t goal_info;
   convert(uuid, &goal_info);
   bool goal_exists;
@@ -433,7 +446,7 @@ ServerBase::execute_check_expired_goals()
       rclcpp::exceptions::throw_from_rcl_error(ret);
     } else if (num_expired) {
       // A goal expired!
-      GoalID uuid;
+      GoalUUID uuid;
       convert(expired_goals[0], &uuid);
       RCLCPP_DEBUG(pimpl_->logger_, "Expired goal %s", to_string(uuid).c_str());
       pimpl_->goal_results_.erase(uuid);
@@ -468,7 +481,8 @@ ServerBase::publish_status()
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
 
-  RCLCPP_SCOPE_EXIT({
+  RCLCPP_SCOPE_EXIT(
+  {
     ret = rcl_action_goal_status_array_fini(&c_status_array);
     if (RCL_RET_OK != ret) {
       RCLCPP_ERROR(pimpl_->logger_, "Failed to fini status array message");
@@ -497,7 +511,7 @@ ServerBase::publish_status()
 }
 
 void
-ServerBase::publish_result(const GoalID & uuid, std::shared_ptr<void> result_msg)
+ServerBase::publish_result(const GoalUUID & uuid, std::shared_ptr<void> result_msg)
 {
   // Check that the goal exists
   rcl_action_goal_info_t goal_info;

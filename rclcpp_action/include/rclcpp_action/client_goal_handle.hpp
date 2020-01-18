@@ -45,6 +45,15 @@ enum class ResultCode : int8_t
 template<typename ActionT>
 class Client;
 
+/// Class for interacting with goals sent from action clients.
+/**
+ * Use this class to check the status of a goal as well as get the result.
+ *
+ * This class is not meant to be created by a user, instead it is created when a goal has been
+ * accepted.
+ * A `Client` will create an instance and return it to the user (via a future) after calling
+ * `Client::async_send_goal`.
+ */
 template<typename ActionT>
 class ClientGoalHandle
 {
@@ -52,38 +61,56 @@ public:
   RCLCPP_SMART_PTR_DEFINITIONS_NOT_COPYABLE(ClientGoalHandle)
 
   // A wrapper that defines the result of an action
-  typedef struct Result
+  typedef struct WrappedResult
   {
     /// The unique identifier of the goal
-    GoalID goal_id;
+    GoalUUID goal_id;
     /// A status to indicate if the goal was canceled, aborted, or suceeded
     ResultCode code;
     /// User defined fields sent back with an action
-    typename ActionT::Result::SharedPtr response;
-  } Result;
+    typename ActionT::Result::SharedPtr result;
+  } WrappedResult;
 
   using Feedback = typename ActionT::Feedback;
+  using Result = typename ActionT::Result;
   using FeedbackCallback =
     std::function<void (
-        typename ClientGoalHandle<ActionT>::SharedPtr, const std::shared_ptr<const Feedback>)>;
+        typename ClientGoalHandle<ActionT>::SharedPtr,
+        const std::shared_ptr<const Feedback>)>;
+  using ResultCallback = std::function<void (const WrappedResult & result)>;
 
   virtual ~ClientGoalHandle();
 
-  const GoalID &
+  /// Get the unique ID for the goal.
+  const GoalUUID &
   get_goal_id() const;
 
+  /// Get the time when the goal was accepted.
   rclcpp::Time
   get_goal_stamp() const;
 
-  std::shared_future<Result>
+  /// Get a future to the goal result.
+  /**
+   * This method should not be called if the `ignore_result` flag was set when
+   * sending the original goal request (see Client::async_send_goal).
+   *
+   * `is_result_aware()` can be used to check if it is safe to call this method.
+   *
+   * \throws exceptions::UnawareGoalHandleError If the the goal handle is unaware of the result.
+   * \return A future to the result.
+   */
+  std::shared_future<WrappedResult>
   async_result();
 
+  /// Get the goal status code.
   int8_t
   get_status();
 
+  /// Check if an action client has subscribed to feedback for the goal.
   bool
   is_feedback_aware();
 
+  /// Check if an action client has requested the result for the goal.
   bool
   is_result_aware();
 
@@ -91,24 +118,31 @@ private:
   // The templated Client creates goal handles
   friend Client<ActionT>;
 
-  ClientGoalHandle(const GoalInfo & info, FeedbackCallback callback);
+  ClientGoalHandle(
+    const GoalInfo & info,
+    FeedbackCallback feedback_callback,
+    ResultCallback result_callback);
 
   void
   set_feedback_callback(FeedbackCallback callback);
+
+  void
+  set_result_callback(ResultCallback callback);
 
   void
   call_feedback_callback(
     typename ClientGoalHandle<ActionT>::SharedPtr shared_this,
     typename std::shared_ptr<const Feedback> feedback_message);
 
-  void
+  /// Returns the previous value of awareness
+  bool
   set_result_awareness(bool awareness);
 
   void
   set_status(int8_t status);
 
   void
-  set_result(const Result & result);
+  set_result(const WrappedResult & wrapped_result);
 
   void
   invalidate();
@@ -116,10 +150,11 @@ private:
   GoalInfo info_;
 
   bool is_result_aware_{false};
-  std::promise<Result> result_promise_;
-  std::shared_future<Result> result_future_;
+  std::promise<WrappedResult> result_promise_;
+  std::shared_future<WrappedResult> result_future_;
 
   FeedbackCallback feedback_callback_{nullptr};
+  ResultCallback result_callback_{nullptr};
   int8_t status_{GoalStatus::STATUS_ACCEPTED};
 
   std::mutex handle_mutex_;

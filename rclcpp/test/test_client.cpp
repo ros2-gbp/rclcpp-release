@@ -43,6 +43,28 @@ protected:
   rclcpp::Node::SharedPtr node;
 };
 
+class TestClientSub : public ::testing::Test
+{
+protected:
+  static void SetUpTestCase()
+  {
+  }
+
+  void SetUp()
+  {
+    node = std::make_shared<rclcpp::Node>("my_node", "/ns");
+    subnode = node->create_sub_node("sub_ns");
+  }
+
+  void TearDown()
+  {
+    node.reset();
+  }
+
+  rclcpp::Node::SharedPtr node;
+  rclcpp::Node::SharedPtr subnode;
+};
+
 /*
    Testing client construction and destruction.
  */
@@ -53,7 +75,50 @@ TEST_F(TestClient, construction_and_destruction) {
   }
 
   {
-    ASSERT_THROW({
+    ASSERT_THROW(
+    {
+      auto client = node->create_client<ListParameters>("invalid_service?");
+    }, rclcpp::exceptions::InvalidServiceNameError);
+  }
+}
+
+TEST_F(TestClient, construction_with_free_function) {
+  {
+    auto client = rclcpp::create_client<rcl_interfaces::srv::ListParameters>(
+      node->get_node_base_interface(),
+      node->get_node_graph_interface(),
+      node->get_node_services_interface(),
+      "service",
+      rmw_qos_profile_services_default,
+      nullptr);
+  }
+  {
+    ASSERT_THROW(
+    {
+      auto client = rclcpp::create_client<rcl_interfaces::srv::ListParameters>(
+        node->get_node_base_interface(),
+        node->get_node_graph_interface(),
+        node->get_node_services_interface(),
+        "invalid_?service",
+        rmw_qos_profile_services_default,
+        nullptr);
+    }, rclcpp::exceptions::InvalidServiceNameError);
+  }
+}
+
+/*
+   Testing client construction and destruction for subnodes.
+ */
+TEST_F(TestClientSub, construction_and_destruction) {
+  using rcl_interfaces::srv::ListParameters;
+  {
+    auto client = subnode->create_client<ListParameters>("service");
+    EXPECT_STREQ(client->get_service_name(), "/ns/sub_ns/service");
+  }
+
+  {
+    ASSERT_THROW(
+    {
       auto client = node->create_client<ListParameters>("invalid_service?");
     }, rclcpp::exceptions::InvalidServiceNameError);
   }

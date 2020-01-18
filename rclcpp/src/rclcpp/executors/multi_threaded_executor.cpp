@@ -27,8 +27,11 @@ using rclcpp::executors::MultiThreadedExecutor;
 MultiThreadedExecutor::MultiThreadedExecutor(
   const rclcpp::executor::ExecutorArgs & args,
   size_t number_of_threads,
-  bool yield_before_execute)
-: executor::Executor(args), yield_before_execute_(yield_before_execute)
+  bool yield_before_execute,
+  std::chrono::nanoseconds next_exec_timeout)
+: executor::Executor(args),
+  yield_before_execute_(yield_before_execute),
+  next_exec_timeout_(next_exec_timeout)
 {
   number_of_threads_ = number_of_threads ? number_of_threads : std::thread::hardware_concurrency();
   if (number_of_threads_ == 0) {
@@ -77,13 +80,17 @@ MultiThreadedExecutor::run(size_t)
       if (!rclcpp::ok(this->context_) || !spinning.load()) {
         return;
       }
-      if (!get_next_executable(any_exec)) {
+      if (!get_next_executable(any_exec, next_exec_timeout_)) {
         continue;
       }
       if (any_exec.timer) {
         // Guard against multiple threads getting the same timer.
-        std::lock_guard<std::mutex> lock(scheduled_timers_mutex_);
         if (scheduled_timers_.count(any_exec.timer) != 0) {
+          // Make sure that any_exec's callback group is reset before
+          // the lock is released.
+          if (any_exec.callback_group) {
+            any_exec.callback_group->can_be_taken_from().store(true);
+          }
           continue;
         }
         scheduled_timers_.insert(any_exec.timer);
@@ -96,11 +103,14 @@ MultiThreadedExecutor::run(size_t)
     execute_any_executable(any_exec);
 
     if (any_exec.timer) {
-      std::lock_guard<std::mutex> lock(scheduled_timers_mutex_);
+      std::lock_guard<std::mutex> wait_lock(wait_mutex_);
       auto it = scheduled_timers_.find(any_exec.timer);
       if (it != scheduled_timers_.end()) {
         scheduled_timers_.erase(it);
       }
     }
+    // Clear the callback_group to prevent the AnyExecutable destructor from
+    // resetting the callback group `can_be_taken_from`
+    any_exec.callback_group.reset();
   }
 }

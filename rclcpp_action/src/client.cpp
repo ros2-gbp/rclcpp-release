@@ -165,11 +165,11 @@ ClientBase::wait_for_action_server_nanoseconds(std::chrono::nanoseconds timeout)
   if (!node_ptr) {
     throw rclcpp::exceptions::InvalidNodeError();
   }
-  auto event = node_ptr->get_graph_event();
   // check to see if the server is ready immediately
   if (this->action_server_is_ready()) {
     return true;
   }
+  auto event = node_ptr->get_graph_event();
   if (timeout == std::chrono::nanoseconds(0)) {
     // check was non-blocking, return immediately
     return false;
@@ -366,10 +366,10 @@ ClientBase::send_cancel_request(std::shared_ptr<void> request, ResponseCallback 
   pimpl_->pending_cancel_responses[sequence_number] = callback;
 }
 
-GoalID
+GoalUUID
 ClientBase::generate_goal_id()
 {
-  GoalID goal_id;
+  GoalUUID goal_id;
   // TODO(hidmic): Do something better than this for UUID generation.
   // std::generate(
   //   goal_id.uuid.begin(), goal_id.uuid.end(),

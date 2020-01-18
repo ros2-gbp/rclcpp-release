@@ -25,8 +25,7 @@
 #include "rcl_interfaces/msg/parameter_event.hpp"
 
 #include "rclcpp/node.hpp"
-#include "rclcpp/parameter_client.hpp"
-#include "rclcpp/parameter_events_filter.hpp"
+#include "rclcpp/node_interfaces/node_parameters_interface.hpp"
 
 
 namespace rclcpp
@@ -100,9 +99,6 @@ private:
   // Destroy the subscription for the clock topic
   void destroy_clock_sub();
 
-  // Parameter Client pointer
-  std::shared_ptr<rclcpp::AsyncParametersClient> parameter_client_;
-
   // Parameter Event subscription
   using ParamMessageT = rcl_interfaces::msg::ParameterEvent;
   using ParamSubscriptionT = rclcpp::Subscription<ParamMessageT, Alloc>;
@@ -138,6 +134,8 @@ private:
   std::mutex clock_list_lock_;
   // A vector to store references to associated clocks.
   std::vector<rclcpp::Clock::SharedPtr> associated_clocks_;
+  // A handler for the use_sim_time parameter callback.
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr sim_time_cb_handler_ = nullptr;
 };
 
 }  // namespace rclcpp

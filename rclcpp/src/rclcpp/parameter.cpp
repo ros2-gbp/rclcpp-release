@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "rclcpp/parameter.hpp"
+
 #include <ostream>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include "rclcpp/parameter.hpp"
+#include "rclcpp/node_interfaces/node_parameters.hpp"
 #include "rclcpp/utilities.hpp"
 
 using rclcpp::ParameterType;
@@ -28,9 +30,31 @@ Parameter::Parameter()
 {
 }
 
+Parameter::Parameter(const std::string & name)
+: name_(name), value_()
+{
+}
+
 Parameter::Parameter(const std::string & name, const rclcpp::ParameterValue & value)
 : name_(name), value_(value)
 {
+}
+
+Parameter::Parameter(const rclcpp::node_interfaces::ParameterInfo & parameter_info)
+: Parameter(parameter_info.descriptor.name, parameter_info.value)
+{
+}
+
+bool
+Parameter::operator==(const Parameter & rhs) const
+{
+  return this->name_ == rhs.name_ && this->value_ == rhs.value_;
+}
+
+bool
+Parameter::operator!=(const Parameter & rhs) const
+{
+  return !(*this == rhs);
 }
 
 ParameterType
@@ -55,6 +79,12 @@ rcl_interfaces::msg::ParameterValue
 Parameter::get_value_message() const
 {
   return value_.to_value_msg();
+}
+
+const rclcpp::ParameterValue &
+Parameter::get_parameter_value() const
+{
+  return value_;
 }
 
 bool
