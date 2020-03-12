@@ -2,79 +2,47 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-0.8.4 (2020-01-17)
-------------------
-* Intra-process subscriber should use RMW actual qos (ros2`#913 <https://github.com/ros2/rclcpp/issues/913>`_) (`#914 <https://github.com/ros2/rclcpp/issues/914>`_) (`#965 <https://github.com/ros2/rclcpp/issues/965>`_)
-* Contributors: Todd Malsbary
+0.7.13 (2020-03-12)
+-------------------
+* Don't specify calling convention in std::_Binder template. (`#1015 <https://github.com/ros2/rclcpp/issues/1015>`_)
+* Contributors: Jacob Perron, Sean Kelly
 
-0.8.3 (2019-11-19)
+0.7.12 (2019-12-05)
+-------------------
+
+0.7.11 (2019-10-11)
+-------------------
+* Fix `get_node_*_interface` functions taking a pointer (`#870 <https://github.com/ros2/rclcpp/pull/870>`_).
+* Fix hang with timers in `MultiThreadedExecutor` (`#869 <https://github.com/ros2/rclcpp/pull/869>`_).
+* Contributors: Todd Malsbary, ivanpauno
+
+0.7.10 (2019-09-23)
+-------------------
+
+0.7.9 (2019-09-20)
+------------------
+* add mutex in add/remove_node and wait_for_work to protect concurrent use/change of memory_strategy\_ (`#837 <https://github.com/ros2/rclcpp/issues/837>`_) (`#857 <https://github.com/ros2/rclcpp/issues/857>`_)
+* Contributors: Zachary Michaels
+
+0.7.8 (2019-09-06)
 ------------------
 
-0.8.2 (2019-11-18)
+0.7.7 (2019-07-31)
 ------------------
-* Updated tracing logic to match changes in rclcpp's intra-process system (`#918 <https://github.com/ros2/rclcpp/issues/918>`_)
-* Fixed a bug that prevented the ``shutdown_on_sigint`` option to not work correctly (`#850 <https://github.com/ros2/rclcpp/issues/850>`_)
-* Added support for STREAM logging macros (`#926 <https://github.com/ros2/rclcpp/issues/926>`_)
-* Relaxed multithreaded test constraint (`#907 <https://github.com/ros2/rclcpp/issues/907>`_)
-* Contributors: Anas Abou Allaban, Christophe Bedard, Dirk Thomas, alexfneves
+* Enabled the creation of a parameter YAML file which is applied to each node. (`#805 <https://github.com/ros2/rclcpp/issues/805>`_)
+* Fixed a signed/unsigned integer comparison compiler warning. (`#804 <https://github.com/ros2/rclcpp/issues/804>`_)
+* Changed the QoS profile used when subscribing to parameter events to match the publishing side, i.e. ``rmw_qos_profile_parameter_events``. (`#798 <https://github.com/ros2/rclcpp/issues/798>`_)
+* Changed the logic in TimeSource to ignore use_sim_time parameter events coming from other nodes. (`#803 <https://github.com/ros2/rclcpp/issues/803>`_)
+* Added missing default values in the NodeParametersInterface. (`#794 <https://github.com/ros2/rclcpp/issues/794>`_)
+* Added support for const member callback functions. (`#763 <https://github.com/ros2/rclcpp/issues/763>`_)
+* Contributors: Esteve Fernandez, Gonzo, Karsten Knese, Michel Hidalgo, Scott K Logan
 
-0.8.1 (2019-10-23)
+0.7.6 (2019-06-12)
 ------------------
-* De-flake tests for rmw_connext (`#899 <https://github.com/ros2/rclcpp/issues/899>`_)
-* rename return functions for loaned messages (`#896 <https://github.com/ros2/rclcpp/issues/896>`_)
-* Enable throttling logs (`#879 <https://github.com/ros2/rclcpp/issues/879>`_)
-* New Intra-Process Communication (`#778 <https://github.com/ros2/rclcpp/issues/778>`_)
-* Instrumentation update (`#789 <https://github.com/ros2/rclcpp/issues/789>`_)
-* Zero copy api (`#864 <https://github.com/ros2/rclcpp/issues/864>`_)
-* Drop rclcpp remove_ros_arguments_null test case. (`#894 <https://github.com/ros2/rclcpp/issues/894>`_)
-* add mechanism to pass rmw impl specific payloads during pub/sub creation (`#882 <https://github.com/ros2/rclcpp/issues/882>`_)
-* make get_actual_qos return a rclcpp::QoS (`#883 <https://github.com/ros2/rclcpp/issues/883>`_)
-* Fix Compiler Warning (`#881 <https://github.com/ros2/rclcpp/issues/881>`_)
-* Add callback handler for use_sim_time parameter `#802 <https://github.com/ros2/rclcpp/issues/802>`_ (`#875 <https://github.com/ros2/rclcpp/issues/875>`_)
-* Contributors: Alberto Soragna, Brian Marchi, Hunter L. Allen, Ingo Lütkebohle, Karsten Knese, Michael Carroll, Michel Hidalgo, William Woodall
-
-0.8.0 (2019-09-26)
-------------------
-* clean up publisher and subscription creation logic (`#867 <https://github.com/ros2/rclcpp/issues/867>`_)
-* Take parameter overrides provided through the CLI. (`#865 <https://github.com/ros2/rclcpp/issues/865>`_)
-* add more context to exception message (`#858 <https://github.com/ros2/rclcpp/issues/858>`_)
-* remove features and related code which were deprecated in dashing (`#852 <https://github.com/ros2/rclcpp/issues/852>`_)
-* check valid timer handler 1st to reduce the time window for scan. (`#841 <https://github.com/ros2/rclcpp/issues/841>`_)
-* Add throwing parameter name if parameter is not set (`#833 <https://github.com/ros2/rclcpp/issues/833>`_)
-* Fix typo in deprecated warning. (`#848 <https://github.com/ros2/rclcpp/issues/848>`_)
-* Fail on invalid and unknown ROS specific arguments (`#842 <https://github.com/ros2/rclcpp/issues/842>`_)
-* Force explicit --ros-args in NodeOptions::arguments(). (`#845 <https://github.com/ros2/rclcpp/issues/845>`_)
-* Use of -r/--remap flags where appropriate. (`#834 <https://github.com/ros2/rclcpp/issues/834>`_)
-* Fix hang with timers in MultiThreadedExecutor (`#835 <https://github.com/ros2/rclcpp/issues/835>`_) (`#836 <https://github.com/ros2/rclcpp/issues/836>`_)
-* add mutex in add/remove_node and wait_for_work to protect concurrent use/change of memory_strategy\_ (`#837 <https://github.com/ros2/rclcpp/issues/837>`_)
-* Crash in callback group pointer vector iterator (`#814 <https://github.com/ros2/rclcpp/issues/814>`_)
-* Wrap documentation examples in code blocks (`#830 <https://github.com/ros2/rclcpp/issues/830>`_)
-* add callback group as member variable and constructor arg (`#811 <https://github.com/ros2/rclcpp/issues/811>`_)
-* Fix get_node_interfaces functions taking a pointer (`#821 <https://github.com/ros2/rclcpp/issues/821>`_)
-* Delete unnecessary call for get_node_by_group (`#823 <https://github.com/ros2/rclcpp/issues/823>`_)
-* Allow passing logger by const ref (`#820 <https://github.com/ros2/rclcpp/issues/820>`_)
-* Explain return value of spin_until_future_complete (`#792 <https://github.com/ros2/rclcpp/issues/792>`_)
-* Adapt to '--ros-args ... [--]'-based ROS args extraction (`#816 <https://github.com/ros2/rclcpp/issues/816>`_)
-* Add line break after first open paren in multiline function call (`#785 <https://github.com/ros2/rclcpp/issues/785>`_)
-* remove mock msgs from rclcpp (`#800 <https://github.com/ros2/rclcpp/issues/800>`_)
-* Make TimeSource ignore use_sim_time events coming from other nodes. (`#799 <https://github.com/ros2/rclcpp/issues/799>`_)
-* Allow registering multiple on_parameters_set_callback (`#772 <https://github.com/ros2/rclcpp/issues/772>`_)
-* Add free function for creating service clients (`#788 <https://github.com/ros2/rclcpp/issues/788>`_)
-* Include missing rcl headers in use. (`#782 <https://github.com/ros2/rclcpp/issues/782>`_)
-* Switch the NodeParameters lock to recursive. (`#781 <https://github.com/ros2/rclcpp/issues/781>`_)
-* changed on_parameter_event qos profile to rmw_qos_profile_parameter_events (`#774 <https://github.com/ros2/rclcpp/issues/774>`_)
-* Adding a factory method to create a Duration from seconds (`#567 <https://github.com/ros2/rclcpp/issues/567>`_)
-* Fix a comparison with a sign mismatch (`#771 <https://github.com/ros2/rclcpp/issues/771>`_)
-* delete superfluous spaces (`#770 <https://github.com/ros2/rclcpp/issues/770>`_)
-* Use params from node '/\*\*' from parameter YAML file (`#762 <https://github.com/ros2/rclcpp/issues/762>`_)
-* Add ignore override argument to declare parameter (`#767 <https://github.com/ros2/rclcpp/issues/767>`_)
-* use default parameter descriptor in parameters interface (`#765 <https://github.com/ros2/rclcpp/issues/765>`_)
-* Added support for const member functions (`#763 <https://github.com/ros2/rclcpp/issues/763>`_)
-* add get_actual_qos() feature to subscriptions (`#754 <https://github.com/ros2/rclcpp/issues/754>`_)
 * Ignore parameters overrides in set parameter methods when allowing undeclared parameters (`#756 <https://github.com/ros2/rclcpp/issues/756>`_)
 * Add rclcpp::create_timer() (`#757 <https://github.com/ros2/rclcpp/issues/757>`_)
 * checking origin of intra-process msg before taking them (`#753 <https://github.com/ros2/rclcpp/issues/753>`_)
-* Contributors: Alberto Soragna, Carl Delsey, Chris Lalancette, Dan Rose, Dirk Thomas, Esteve Fernandez, Guillaume Autran, Jacob Perron, Karsten Knese, Luca Della Vedova, M. M, Michel Hidalgo, Scott K Logan, Shane Loretz, Todd Malsbary, William Woodall, bpwilcox, fujitatomoya, ivanpauno
+* Contributors: Alberto Soragna, Shane Loretz, ivanpauno
 
 0.7.5 (2019-05-30)
 ------------------

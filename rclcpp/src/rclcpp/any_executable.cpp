@@ -18,6 +18,7 @@ using rclcpp::executor::AnyExecutable;
 
 AnyExecutable::AnyExecutable()
 : subscription(nullptr),
+  subscription_intra_process(nullptr),
   timer(nullptr),
   service(nullptr),
   client(nullptr),

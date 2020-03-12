@@ -89,9 +89,10 @@ TEST_F(TestMultiThreadedExecutor, timer_over_take) {
         double diff = std::abs((now - last).nanoseconds()) / 1.0e9;
         last = now;
 
-        if (diff < PERIOD - TOLERANCE) {
+        if (diff < PERIOD - TOLERANCE || diff > PERIOD + TOLERANCE) {
           executor.cancel();
           ASSERT_GT(diff, PERIOD - TOLERANCE);
+          ASSERT_LT(diff, PERIOD + TOLERANCE);
         }
       }
     };

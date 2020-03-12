@@ -68,7 +68,7 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 
-  ament_add_gtest(test_client test/test_client.cpp TIMEOUT 120)
+  ament_add_gtest(test_client test/test_client.cpp)
   if(TARGET test_client)
     ament_target_dependencies(test_client
       "test_msgs"
@@ -88,15 +88,6 @@ if(BUILD_TESTING)
     )
   endif()
 
-  ament_add_gtest(test_traits test/test_traits.cpp)
-  if(TARGET test_traits)
-    ament_target_dependencies(test_traits
-      "test_msgs"
-    )
-    target_link_libraries(test_traits
-      ${PROJECT_NAME}
-    )
-  endif()
 endif()
 
 ament_package()

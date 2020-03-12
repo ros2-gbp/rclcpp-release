@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
-#include <rcl/allocator.h>
 #include <rcl_yaml_param_parser/parser.h>
 #include <rcutils/strdup.h>
 

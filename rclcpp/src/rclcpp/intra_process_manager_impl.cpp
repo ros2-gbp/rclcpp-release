@@ -1,4 +1,4 @@
-// Copyright 2019 Open Source Robotics Foundation, Inc.
+// Copyright 2015 Open Source Robotics Foundation, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,24 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rclcpp/detail/rmw_implementation_specific_payload.hpp>
+#include "rclcpp/intra_process_manager_impl.hpp"
 
-namespace rclcpp
-{
-namespace detail
-{
+#include <memory>
 
-bool
-RMWImplementationSpecificPayload::has_been_customized() const
+rclcpp::intra_process_manager::IntraProcessManagerImplBase::SharedPtr
+rclcpp::intra_process_manager::create_default_impl()
 {
-  return nullptr != this->get_implementation_identifier();
+  return std::make_shared<IntraProcessManagerImpl<>>();
 }
-
-const char *
-RMWImplementationSpecificPayload::get_implementation_identifier() const
-{
-  return nullptr;
-}
-
-}  // namespace detail
-}  // namespace rclcpp

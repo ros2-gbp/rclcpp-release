@@ -22,8 +22,6 @@
 #include "rclcpp/visibility_control.hpp"
 
 #include "rcl/time.h"
-#include "rcutils/time.h"
-#include "rcutils/types/rcutils_ret.h"
 
 namespace rclcpp
 {
