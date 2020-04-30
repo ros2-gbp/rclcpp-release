@@ -15,62 +15,29 @@
 #ifndef RCLCPP__CREATE_SUBSCRIPTION_HPP_
 #define RCLCPP__CREATE_SUBSCRIPTION_HPP_
 
+#include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 
+#include "rclcpp/detail/resolve_enable_topic_statistics.hpp"
+
+#include "rclcpp/node_interfaces/get_node_timers_interface.hpp"
 #include "rclcpp/node_interfaces/get_node_topics_interface.hpp"
+#include "rclcpp/node_interfaces/node_timers_interface.hpp"
 #include "rclcpp/node_interfaces/node_topics_interface.hpp"
+
+#include "rclcpp/create_timer.hpp"
+#include "rclcpp/qos.hpp"
 #include "rclcpp/subscription_factory.hpp"
 #include "rclcpp/subscription_options.hpp"
-#include "rclcpp/qos.hpp"
+#include "rclcpp/timer.hpp"
+#include "rclcpp/topic_statistics/subscription_topic_statistics.hpp"
 #include "rmw/qos_profiles.h"
 
 namespace rclcpp
 {
-
-template<
-  typename MessageT,
-  typename CallbackT,
-  typename AllocatorT,
-  typename CallbackMessageT,
-  typename SubscriptionT = rclcpp::Subscription<CallbackMessageT, AllocatorT>>
-// cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
-[[deprecated("use alternative rclcpp::create_subscription() signatures")]]
-typename std::shared_ptr<SubscriptionT>
-create_subscription(
-  rclcpp::node_interfaces::NodeTopicsInterface * node_topics,
-  const std::string & topic_name,
-  CallbackT && callback,
-  const rmw_qos_profile_t & qos_profile,
-  const SubscriptionEventCallbacks & event_callbacks,
-  rclcpp::callback_group::CallbackGroup::SharedPtr group,
-  bool ignore_local_publications,
-  bool use_intra_process_comms,
-  typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
-    CallbackMessageT, AllocatorT>::SharedPtr
-  msg_mem_strat,
-  typename std::shared_ptr<AllocatorT> allocator)
-{
-  auto subscription_options = rcl_subscription_get_default_options();
-  subscription_options.qos = qos_profile;
-  subscription_options.ignore_local_publications = ignore_local_publications;
-
-  auto factory = rclcpp::create_subscription_factory
-    <MessageT, CallbackT, AllocatorT, CallbackMessageT, SubscriptionT>(
-    std::forward<CallbackT>(callback),
-    event_callbacks,
-    msg_mem_strat,
-    allocator);
-
-  auto sub = node_topics->create_subscription(
-    topic_name,
-    factory,
-    subscription_options,
-    use_intra_process_comms);
-  node_topics->add_subscription(sub, group);
-  return std::dynamic_pointer_cast<SubscriptionT>(sub);
-}
 
 /// Create and return a subscription of the given MessageT type.
 /**
@@ -85,6 +52,10 @@ template<
   typename CallbackMessageT =
   typename rclcpp::subscription_traits::has_message_type<CallbackT>::type,
   typename SubscriptionT = rclcpp::Subscription<CallbackMessageT, AllocatorT>,
+  typename MessageMemoryStrategyT = rclcpp::message_memory_strategy::MessageMemoryStrategy<
+    CallbackMessageT,
+    AllocatorT
+  >,
   typename NodeT>
 typename std::shared_ptr<SubscriptionT>
 create_subscription(
@@ -95,49 +66,59 @@ create_subscription(
   const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options = (
     rclcpp::SubscriptionOptionsWithAllocator<AllocatorT>()
   ),
-  typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
-    CallbackMessageT, AllocatorT>::SharedPtr
-  msg_mem_strat = nullptr)
+  typename MessageMemoryStrategyT::SharedPtr msg_mem_strat = (
+    MessageMemoryStrategyT::create_default()
+  )
+)
 {
   using rclcpp::node_interfaces::get_node_topics_interface;
   auto node_topics = get_node_topics_interface(std::forward<NodeT>(node));
 
-  if (!msg_mem_strat) {
-    using rclcpp::message_memory_strategy::MessageMemoryStrategy;
-    msg_mem_strat = MessageMemoryStrategy<CallbackMessageT, AllocatorT>::create_default();
+  std::shared_ptr<rclcpp::topic_statistics::SubscriptionTopicStatistics<CallbackMessageT>>
+  subscription_topic_stats = nullptr;
+
+  if (rclcpp::detail::resolve_enable_topic_statistics(
+      options,
+      *node_topics->get_node_base_interface()))
+  {
+    std::shared_ptr<Publisher<statistics_msgs::msg::MetricsMessage>> publisher =
+      create_publisher<statistics_msgs::msg::MetricsMessage>(
+      node,
+      options.topic_stats_options.publish_topic,
+      qos);
+
+    subscription_topic_stats = std::make_shared<
+      rclcpp::topic_statistics::SubscriptionTopicStatistics<CallbackMessageT>
+      >(node_topics->get_node_base_interface()->get_name(), publisher);
+
+    auto sub_call_back = [subscription_topic_stats]() {
+        subscription_topic_stats->publish_message();
+      };
+
+    auto node_timer_interface = node_topics->get_node_timers_interface();
+
+    auto timer = create_wall_timer(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+        options.topic_stats_options.publish_period),
+      sub_call_back,
+      options.callback_group,
+      node_topics->get_node_base_interface(),
+      node_timer_interface
+    );
+
+    subscription_topic_stats->set_publisher_timer(timer);
   }
 
-  std::shared_ptr<AllocatorT> allocator = options.allocator;
-  if (!allocator) {
-    allocator = std::make_shared<AllocatorT>();
-  }
-  auto factory = rclcpp::create_subscription_factory
-    <MessageT, CallbackT, AllocatorT, CallbackMessageT, SubscriptionT>(
-    std::forward<CallbackT>(callback), options.event_callbacks, msg_mem_strat, allocator);
+  auto factory = rclcpp::create_subscription_factory<MessageT>(
+    std::forward<CallbackT>(callback),
+    options,
+    msg_mem_strat,
+    subscription_topic_stats
+  );
 
-  bool use_intra_process;
-  switch (options.use_intra_process_comm) {
-    case IntraProcessSetting::Enable:
-      use_intra_process = true;
-      break;
-    case IntraProcessSetting::Disable:
-      use_intra_process = false;
-      break;
-    case IntraProcessSetting::NodeDefault:
-      use_intra_process = node_topics->get_node_base_interface()->get_use_intra_process_default();
-      break;
-    default:
-      throw std::runtime_error("Unrecognized IntraProcessSetting value");
-      break;
-  }
-
-  // TODO(wjwwood): convert all of the interfaces to use QoS and SubscriptionOptionsBase
-  auto sub = node_topics->create_subscription(
-    topic_name,
-    factory,
-    options.template to_rcl_subscription_options<MessageT>(qos),
-    use_intra_process);
+  auto sub = node_topics->create_subscription(topic_name, factory, qos);
   node_topics->add_subscription(sub, options.callback_group);
+
   return std::dynamic_pointer_cast<SubscriptionT>(sub);
 }
 

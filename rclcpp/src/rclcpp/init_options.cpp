@@ -42,7 +42,22 @@ InitOptions::InitOptions(const rcl_init_options_t & init_options)
 
 InitOptions::InitOptions(const InitOptions & other)
 : InitOptions(*other.get_rcl_init_options())
-{}
+{
+  shutdown_on_sigint = other.shutdown_on_sigint;
+}
+
+bool
+InitOptions::auto_initialize_logging() const
+{
+  return initialize_logging_;
+}
+
+InitOptions &
+InitOptions::auto_initialize_logging(bool initialize_logging)
+{
+  initialize_logging_ = initialize_logging;
+  return *this;
+}
 
 InitOptions &
 InitOptions::operator=(const InitOptions & other)
@@ -53,6 +68,7 @@ InitOptions::operator=(const InitOptions & other)
     if (RCL_RET_OK != ret) {
       rclcpp::exceptions::throw_from_rcl_error(ret, "failed to copy rcl init options");
     }
+    this->shutdown_on_sigint = other.shutdown_on_sigint;
   }
   return *this;
 }

@@ -48,7 +48,8 @@
  *   - rclcpp::Node::get_parameter()
  *   - rclcpp::Node::describe_parameters()
  *   - rclcpp::Node::list_parameters()
- *   - rclcpp::Node::register_param_change_callback()
+ *   - rclcpp::Node::add_on_set_parameters_callback()
+ *   - rclcpp::Node::remove_on_set_parameters_callback()
  *   - rclcpp::Parameter
  *   - rclcpp::ParameterValue
  *   - rclcpp::AsyncParametersClient
@@ -80,7 +81,7 @@
  *   - rclcpp/executors/multi_threaded_executor.hpp
  * - CallbackGroups (mechanism for enforcing concurrency rules for callbacks):
  *   - rclcpp::Node::create_callback_group()
- *   - rclcpp::callback_group::CallbackGroup
+ *   - rclcpp::CallbackGroup
  *   - rclcpp/callback_group.hpp
  *
  * Additionally, there are some methods for introspecting the ROS graph:
@@ -142,6 +143,7 @@
 #include <memory>
 
 #include "rclcpp/executors.hpp"
+#include "rclcpp/guard_condition.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/parameter.hpp"
@@ -151,6 +153,7 @@
 #include "rclcpp/time.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/visibility_control.hpp"
+#include "rclcpp/wait_set.hpp"
 #include "rclcpp/waitable.hpp"
 
 #endif  // RCLCPP__RCLCPP_HPP_

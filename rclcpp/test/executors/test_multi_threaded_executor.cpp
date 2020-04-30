@@ -23,11 +23,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/executors.hpp"
 
-#include "rcl_interfaces/msg/intra_process_message.hpp"
-
 using namespace std::chrono_literals;
-
-using rcl_interfaces::msg::IntraProcessMessage;
 
 class TestMultiThreadedExecutor : public ::testing::Test
 {
@@ -55,14 +51,14 @@ TEST_F(TestMultiThreadedExecutor, timer_over_take) {
   bool yield_before_execute = true;
 
   rclcpp::executors::MultiThreadedExecutor executor(
-    rclcpp::executor::create_default_executor_arguments(), 2u, yield_before_execute);
+    rclcpp::ExecutorOptions(), 2u, yield_before_execute);
 
   ASSERT_GT(executor.get_number_of_threads(), 1u);
 
   std::shared_ptr<rclcpp::Node> node =
     std::make_shared<rclcpp::Node>("test_multi_threaded_executor_timer_over_take");
 
-  auto cbg = node->create_callback_group(rclcpp::callback_group::CallbackGroupType::Reentrant);
+  auto cbg = node->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
   rclcpp::Clock system_clock(RCL_STEADY_TIME);
   std::mutex last_mutex;
@@ -89,10 +85,9 @@ TEST_F(TestMultiThreadedExecutor, timer_over_take) {
         double diff = std::abs((now - last).nanoseconds()) / 1.0e9;
         last = now;
 
-        if (diff < PERIOD - TOLERANCE || diff > PERIOD + TOLERANCE) {
+        if (diff < PERIOD - TOLERANCE) {
           executor.cancel();
           ASSERT_GT(diff, PERIOD - TOLERANCE);
-          ASSERT_LT(diff, PERIOD + TOLERANCE);
         }
       }
     };

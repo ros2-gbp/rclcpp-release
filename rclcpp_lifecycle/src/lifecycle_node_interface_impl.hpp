@@ -105,8 +105,9 @@ public:
     }
 
     {  // change_state
-      auto cb = std::bind(&LifecycleNodeInterfaceImpl::on_change_state, this,
-          std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+      auto cb = std::bind(
+        &LifecycleNodeInterfaceImpl::on_change_state, this,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
       rclcpp::AnyServiceCallback<ChangeStateSrv> any_cb;
       any_cb.set(std::move(cb));
 
@@ -120,8 +121,9 @@ public:
     }
 
     {  // get_state
-      auto cb = std::bind(&LifecycleNodeInterfaceImpl::on_get_state, this,
-          std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+      auto cb = std::bind(
+        &LifecycleNodeInterfaceImpl::on_get_state, this,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
       rclcpp::AnyServiceCallback<GetStateSrv> any_cb;
       any_cb.set(std::move(cb));
 
@@ -135,8 +137,9 @@ public:
     }
 
     {  // get_available_states
-      auto cb = std::bind(&LifecycleNodeInterfaceImpl::on_get_available_states, this,
-          std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+      auto cb = std::bind(
+        &LifecycleNodeInterfaceImpl::on_get_available_states, this,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
       rclcpp::AnyServiceCallback<GetAvailableStatesSrv> any_cb;
       any_cb.set(std::move(cb));
 
@@ -150,8 +153,9 @@ public:
     }
 
     {  // get_available_transitions
-      auto cb = std::bind(&LifecycleNodeInterfaceImpl::on_get_available_transitions, this,
-          std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+      auto cb = std::bind(
+        &LifecycleNodeInterfaceImpl::on_get_available_transitions, this,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
       rclcpp::AnyServiceCallback<GetAvailableTransitionsSrv> any_cb;
       any_cb.set(std::move(cb));
 
@@ -166,8 +170,9 @@ public:
     }
 
     {  // get_transition_graph
-      auto cb = std::bind(&LifecycleNodeInterfaceImpl::on_get_transition_graph, this,
-          std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+      auto cb = std::bind(
+        &LifecycleNodeInterfaceImpl::on_get_transition_graph, this,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
       rclcpp::AnyServiceCallback<GetAvailableTransitionsSrv> any_cb;
       any_cb.set(std::move(cb));
 
@@ -219,7 +224,7 @@ public:
         resp->success = false;
         return;
       }
-      transition_id = rcl_transition->id;
+      transition_id = static_cast<std::uint8_t>(rcl_transition->id);
     }
 
     node_interfaces::LifecycleNodeInterface::CallbackReturn cb_return_code;
@@ -284,11 +289,11 @@ public:
     for (uint8_t i = 0; i < state_machine_.current_state->valid_transition_size; ++i) {
       auto rcl_transition = state_machine_.current_state->valid_transitions[i];
       lifecycle_msgs::msg::TransitionDescription trans_desc;
-      trans_desc.transition.id = rcl_transition.id;
+      trans_desc.transition.id = static_cast<uint8_t>(rcl_transition.id);
       trans_desc.transition.label = rcl_transition.label;
-      trans_desc.start_state.id = rcl_transition.start->id;
+      trans_desc.start_state.id = static_cast<uint8_t>(rcl_transition.start->id);
       trans_desc.start_state.label = rcl_transition.start->label;
-      trans_desc.goal_state.id = rcl_transition.goal->id;
+      trans_desc.goal_state.id = static_cast<uint8_t>(rcl_transition.goal->id);
       trans_desc.goal_state.label = rcl_transition.goal->label;
       resp->available_transitions.push_back(trans_desc);
     }
@@ -310,11 +315,11 @@ public:
     for (uint8_t i = 0; i < state_machine_.transition_map.transitions_size; ++i) {
       auto rcl_transition = state_machine_.transition_map.transitions[i];
       lifecycle_msgs::msg::TransitionDescription trans_desc;
-      trans_desc.transition.id = rcl_transition.id;
+      trans_desc.transition.id = static_cast<uint8_t>(rcl_transition.id);
       trans_desc.transition.label = rcl_transition.label;
-      trans_desc.start_state.id = rcl_transition.start->id;
+      trans_desc.start_state.id = static_cast<uint8_t>(rcl_transition.start->id);
       trans_desc.start_state.label = rcl_transition.start->label;
-      trans_desc.goal_state.id = rcl_transition.goal->id;
+      trans_desc.goal_state.id = static_cast<uint8_t>(rcl_transition.goal->id);
       trans_desc.goal_state.label = rcl_transition.goal->label;
       resp->available_transitions.push_back(trans_desc);
     }
@@ -355,7 +360,8 @@ public:
   change_state(std::uint8_t transition_id, LifecycleNodeInterface::CallbackReturn & cb_return_code)
   {
     if (rcl_lifecycle_state_machine_is_initialized(&state_machine_) != RCL_RET_OK) {
-      RCUTILS_LOG_ERROR("Unable to change state for state machine for %s: %s",
+      RCUTILS_LOG_ERROR(
+        "Unable to change state for state machine for %s: %s",
         node_base_interface_->get_name(), rcl_get_error_string().str);
       return RCL_RET_ERROR;
     }
@@ -364,10 +370,12 @@ public:
     // keep the initial state to pass to a transition callback
     State initial_state(state_machine_.current_state);
 
-    if (rcl_lifecycle_trigger_transition_by_id(
+    if (
+      rcl_lifecycle_trigger_transition_by_id(
         &state_machine_, transition_id, publish_update) != RCL_RET_OK)
     {
-      RCUTILS_LOG_ERROR("Unable to start transition %u from current state %s: %s",
+      RCUTILS_LOG_ERROR(
+        "Unable to start transition %u from current state %s: %s",
         transition_id, state_machine_.current_state->label, rcl_get_error_string().str);
       rcutils_reset_error();
       return RCL_RET_ERROR;
@@ -387,7 +395,8 @@ public:
     cb_return_code = execute_callback(state_machine_.current_state->id, initial_state);
     auto transition_label = get_label_for_return_code(cb_return_code);
 
-    if (rcl_lifecycle_trigger_transition_by_label(
+    if (
+      rcl_lifecycle_trigger_transition_by_label(
         &state_machine_, transition_label, publish_update) != RCL_RET_OK)
     {
       RCUTILS_LOG_ERROR(
@@ -404,7 +413,8 @@ public:
 
       auto error_cb_code = execute_callback(state_machine_.current_state->id, initial_state);
       auto error_cb_label = get_label_for_return_code(error_cb_code);
-      if (rcl_lifecycle_trigger_transition_by_label(
+      if (
+        rcl_lifecycle_trigger_transition_by_label(
           &state_machine_, error_cb_label, publish_update) != RCL_RET_OK)
       {
         RCUTILS_LOG_ERROR("Failed to call cleanup on error state: %s", rcl_get_error_string().str);
@@ -424,7 +434,7 @@ public:
     // in case no callback was attached, we forward directly
     auto cb_success = node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
 
-    auto it = cb_map_.find(cb_id);
+    auto it = cb_map_.find(static_cast<uint8_t>(cb_id));
     if (it != cb_map_.end()) {
       auto callback = it->second;
       try {
@@ -450,7 +460,7 @@ public:
     auto transition =
       rcl_lifecycle_get_transition_by_label(state_machine_.current_state, transition_label);
     if (transition) {
-      change_state(transition->id, cb_return_code);
+      change_state(static_cast<uint8_t>(transition->id), cb_return_code);
     }
     return get_current_state();
   }

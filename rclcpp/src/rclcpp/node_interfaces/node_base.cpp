@@ -34,9 +34,11 @@ NodeBase::NodeBase(
   const std::string & namespace_,
   rclcpp::Context::SharedPtr context,
   const rcl_node_options_t & rcl_node_options,
-  bool use_intra_process_default)
+  bool use_intra_process_default,
+  bool enable_topic_statistics_default)
 : context_(context),
   use_intra_process_default_(use_intra_process_default),
+  enable_topic_statistics_default_(enable_topic_statistics_default),
   node_handle_(nullptr),
   default_callback_group_(nullptr),
   associated_with_executor_(false),
@@ -131,7 +133,7 @@ NodeBase::NodeBase(
     });
 
   // Create the default callback group.
-  using rclcpp::callback_group::CallbackGroupType;
+  using rclcpp::CallbackGroupType;
   default_callback_group_ = create_callback_group(CallbackGroupType::MutuallyExclusive);
 
   // Indicate the notify_guard_condition is now valid.
@@ -206,24 +208,24 @@ NodeBase::assert_liveliness() const
   return RCL_RET_OK == rcl_node_assert_liveliness(get_rcl_node_handle());
 }
 
-rclcpp::callback_group::CallbackGroup::SharedPtr
-NodeBase::create_callback_group(rclcpp::callback_group::CallbackGroupType group_type)
+rclcpp::CallbackGroup::SharedPtr
+NodeBase::create_callback_group(rclcpp::CallbackGroupType group_type)
 {
-  using rclcpp::callback_group::CallbackGroup;
-  using rclcpp::callback_group::CallbackGroupType;
+  using rclcpp::CallbackGroup;
+  using rclcpp::CallbackGroupType;
   auto group = CallbackGroup::SharedPtr(new CallbackGroup(group_type));
   callback_groups_.push_back(group);
   return group;
 }
 
-rclcpp::callback_group::CallbackGroup::SharedPtr
+rclcpp::CallbackGroup::SharedPtr
 NodeBase::get_default_callback_group()
 {
   return default_callback_group_;
 }
 
 bool
-NodeBase::callback_group_in_node(rclcpp::callback_group::CallbackGroup::SharedPtr group)
+NodeBase::callback_group_in_node(rclcpp::CallbackGroup::SharedPtr group)
 {
   bool group_belongs_to_this_node = false;
   for (auto & weak_group : this->callback_groups_) {
@@ -235,7 +237,7 @@ NodeBase::callback_group_in_node(rclcpp::callback_group::CallbackGroup::SharedPt
   return group_belongs_to_this_node;
 }
 
-const std::vector<rclcpp::callback_group::CallbackGroup::WeakPtr> &
+const std::vector<rclcpp::CallbackGroup::WeakPtr> &
 NodeBase::get_callback_groups() const
 {
   return callback_groups_;
@@ -267,4 +269,10 @@ bool
 NodeBase::get_use_intra_process_default() const
 {
   return use_intra_process_default_;
+}
+
+bool
+NodeBase::get_enable_topic_statistics_default() const
+{
+  return enable_topic_statistics_default_;
 }

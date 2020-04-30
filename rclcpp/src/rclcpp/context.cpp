@@ -16,10 +16,14 @@
 
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "rcl/init.h"
+#include "rcl/logging.h"
+#include "rclcpp/detail/utilities.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/logging.hpp"
 #include "rmw/impl/cpp/demangle.hpp"
@@ -31,8 +35,27 @@ static std::vector<std::weak_ptr<rclcpp::Context>> g_contexts;
 
 using rclcpp::Context;
 
+static
+std::shared_ptr<std::mutex>
+get_global_logging_configure_mutex()
+{
+  static auto mutex = std::make_shared<std::mutex>();
+  return mutex;
+}
+
+static
+size_t &
+get_logging_reference_count()
+{
+  static size_t ref_count = 0;
+  return ref_count;
+}
+
 Context::Context()
-: rcl_context_(nullptr), shutdown_reason_("") {}
+: rcl_context_(nullptr),
+  shutdown_reason_(""),
+  logging_configure_mutex_(nullptr)
+{}
 
 Context::~Context()
 {
@@ -91,10 +114,52 @@ Context::init(
     rcl_context_.reset();
     rclcpp::exceptions::throw_from_rcl_error(ret, "failed to initialize rcl");
   }
-  init_options_ = init_options;
 
-  std::lock_guard<std::mutex> lock(g_contexts_mutex);
-  g_contexts.push_back(this->shared_from_this());
+  if (init_options.auto_initialize_logging()) {
+    logging_configure_mutex_ = get_global_logging_configure_mutex();
+    if (!logging_configure_mutex_) {
+      throw std::runtime_error("global logging configure mutex is 'nullptr'");
+    }
+    std::lock_guard<std::mutex> guard(*logging_configure_mutex_);
+    size_t & count = get_logging_reference_count();
+    if (0u == count) {
+      ret = rcl_logging_configure(
+        &rcl_context_->global_arguments,
+        rcl_init_options_get_allocator(init_options_.get_rcl_init_options()));
+      if (RCL_RET_OK != ret) {
+        rcl_context_.reset();
+        rclcpp::exceptions::throw_from_rcl_error(ret, "failed to configure logging");
+      }
+    } else {
+      RCLCPP_WARN(
+        rclcpp::get_logger("rclcpp"),
+        "logging was initialized more than once");
+    }
+    ++count;
+  }
+
+  try {
+    std::vector<std::string> unparsed_ros_arguments = detail::get_unparsed_ros_arguments(
+      argc, argv, &(rcl_context_->global_arguments), rcl_get_default_allocator());
+    if (!unparsed_ros_arguments.empty()) {
+      throw exceptions::UnknownROSArgsError(std::move(unparsed_ros_arguments));
+    }
+
+    init_options_ = init_options;
+
+    std::lock_guard<std::mutex> lock(g_contexts_mutex);
+    g_contexts.push_back(this->shared_from_this());
+  } catch (const std::exception & e) {
+    ret = rcl_shutdown(rcl_context_.get());
+    rcl_context_.reset();
+    if (RCL_RET_OK != ret) {
+      std::ostringstream oss;
+      oss << "While handling: " << e.what() << std::endl <<
+        "    another exception was thrown";
+      rclcpp::exceptions::throw_from_rcl_error(ret, oss.str());
+    }
+    throw;
+  }
 }
 
 bool
@@ -160,6 +225,22 @@ Context::shutdown(const std::string & reason)
       break;
     } else {
       ++it;
+    }
+  }
+  // shutdown logger
+  if (logging_configure_mutex_) {
+    // logging was initialized by this context
+    std::lock_guard<std::mutex> guard(*logging_configure_mutex_);
+    size_t & count = get_logging_reference_count();
+    if (0u == --count) {
+      rcl_ret_t rcl_ret = rcl_logging_fini();
+      if (RCL_RET_OK != rcl_ret) {
+        RCUTILS_SAFE_FWRITE_TO_STDERR(
+          RCUTILS_STRINGIFY(__file__) ":"
+          RCUTILS_STRINGIFY(__LINE__)
+          " failed to fini logging");
+        rcl_reset_error();
+      }
     }
   }
   return true;
@@ -288,6 +369,7 @@ Context::clean_up()
 {
   shutdown_reason_ = "";
   rcl_context_.reset();
+  sub_contexts_.clear();
 }
 
 std::vector<Context::SharedPtr>

@@ -159,7 +159,7 @@ public:
    *
    * \param[in] reason the description of why shutdown happened
    * \return true if shutdown was successful, false if context was already shutdown
-   * \throw various exceptions derived from RCLErrorBase, if rcl_shutdown fails
+   * \throw various exceptions derived from rclcpp::exceptions::RCLError, if rcl_shutdown fails
    */
   RCLCPP_PUBLIC
   virtual
@@ -337,6 +337,9 @@ private:
   std::shared_ptr<rcl_context_t> rcl_context_;
   rclcpp::InitOptions init_options_;
   std::string shutdown_reason_;
+
+  // Keep shared ownership of global logging configure mutex.
+  std::shared_ptr<std::mutex> logging_configure_mutex_;
 
   std::unordered_map<std::type_index, std::shared_ptr<void>> sub_contexts_;
   // This mutex is recursive so that the constructor of a sub context may

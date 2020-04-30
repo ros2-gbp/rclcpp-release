@@ -27,17 +27,7 @@
 #include "rclcpp/node_interfaces/node_clock.hpp"
 #include "rclcpp/node_interfaces/node_graph.hpp"
 #include "rclcpp/node_interfaces/node_logging.hpp"
-// When compiling this file, Windows produces a deprecation warning for the
-// deprecated function prototype of NodeParameters::register_param_change_callback().
-// Other compilers do not.
-#if defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
 #include "rclcpp/node_interfaces/node_parameters.hpp"
-#if defined(_WIN32)
-# pragma warning(pop)
-#endif
 #include "rclcpp/node_interfaces/node_services.hpp"
 #include "rclcpp/node_interfaces/node_time_source.hpp"
 #include "rclcpp/node_interfaces/node_timers.hpp"
@@ -113,11 +103,12 @@ Node::Node(
       namespace_,
       options.context(),
       *(options.get_rcl_node_options()),
-      options.use_intra_process_comms())),
+      options.use_intra_process_comms(),
+      options.enable_topic_statistics())),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),
   node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_.get())),
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
-  node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get())),
+  node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get(), node_timers_.get())),
   node_services_(new rclcpp::node_interfaces::NodeServices(node_base_.get())),
   node_clock_(new rclcpp::node_interfaces::NodeClock(
       node_base_,
@@ -219,15 +210,14 @@ Node::get_logger() const
   return node_logging_->get_logger();
 }
 
-rclcpp::callback_group::CallbackGroup::SharedPtr
-Node::create_callback_group(
-  rclcpp::callback_group::CallbackGroupType group_type)
+rclcpp::CallbackGroup::SharedPtr
+Node::create_callback_group(rclcpp::CallbackGroupType group_type)
 {
   return node_base_->create_callback_group(group_type);
 }
 
 bool
-Node::group_in_node(rclcpp::callback_group::CallbackGroup::SharedPtr group)
+Node::group_in_node(rclcpp::CallbackGroup::SharedPtr group)
 {
   return node_base_->callback_group_in_node(group);
 }
@@ -236,9 +226,14 @@ const rclcpp::ParameterValue &
 Node::declare_parameter(
   const std::string & name,
   const rclcpp::ParameterValue & default_value,
-  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor)
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+  bool ignore_override)
 {
-  return this->node_parameters_->declare_parameter(name, default_value, parameter_descriptor);
+  return this->node_parameters_->declare_parameter(
+    name,
+    default_value,
+    parameter_descriptor,
+    ignore_override);
 }
 
 void
@@ -321,6 +316,18 @@ Node::list_parameters(const std::vector<std::string> & prefixes, uint64_t depth)
   return node_parameters_->list_parameters(prefixes, depth);
 }
 
+rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
+Node::add_on_set_parameters_callback(OnParametersSetCallbackType callback)
+{
+  return node_parameters_->add_on_set_parameters_callback(callback);
+}
+
+void
+Node::remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const callback)
+{
+  return node_parameters_->remove_on_set_parameters_callback(callback);
+}
+
 rclcpp::Node::OnParametersSetCallbackType
 Node::set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback)
 {
@@ -357,7 +364,19 @@ Node::count_subscribers(const std::string & topic_name) const
   return node_graph_->count_subscribers(topic_name);
 }
 
-const std::vector<rclcpp::callback_group::CallbackGroup::WeakPtr> &
+std::vector<rclcpp::TopicEndpointInfo>
+Node::get_publishers_info_by_topic(const std::string & topic_name, bool no_mangle) const
+{
+  return node_graph_->get_publishers_info_by_topic(topic_name, no_mangle);
+}
+
+std::vector<rclcpp::TopicEndpointInfo>
+Node::get_subscriptions_info_by_topic(const std::string & topic_name, bool no_mangle) const
+{
+  return node_graph_->get_subscriptions_info_by_topic(topic_name, no_mangle);
+}
+
+const std::vector<rclcpp::CallbackGroup::WeakPtr> &
 Node::get_callback_groups() const
 {
   return node_base_->get_callback_groups();
@@ -383,8 +402,14 @@ Node::get_clock()
   return node_clock_->get_clock();
 }
 
+rclcpp::Clock::ConstSharedPtr
+Node::get_clock() const
+{
+  return node_clock_->get_clock();
+}
+
 rclcpp::Time
-Node::now()
+Node::now() const
 {
   return node_clock_->get_clock()->now();
 }

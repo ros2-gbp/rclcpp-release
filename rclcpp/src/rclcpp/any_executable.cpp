@@ -14,11 +14,10 @@
 
 #include "rclcpp/any_executable.hpp"
 
-using rclcpp::executor::AnyExecutable;
+using rclcpp::AnyExecutable;
 
 AnyExecutable::AnyExecutable()
 : subscription(nullptr),
-  subscription_intra_process(nullptr),
   timer(nullptr),
   service(nullptr),
   client(nullptr),
