@@ -12,7 +12,6 @@ find_package(rcpputils REQUIRED)
 find_package(rcutils REQUIRED)
 find_package(rmw REQUIRED)
 find_package(rosgraph_msgs REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
 find_package(rosidl_runtime_cpp REQUIRED)
 find_package(rosidl_typesupport_c REQUIRED)
 find_package(rosidl_typesupport_cpp REQUIRED)
@@ -217,6 +216,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 
   find_package(rmw_implementation_cmake REQUIRED)
+  find_package(rosidl_default_generators REQUIRED)
 
   find_package(test_msgs REQUIRED)
 
@@ -604,6 +604,7 @@ if(BUILD_TESTING)
     ament_target_dependencies(test_multi_threaded_executor
       "rcl")
     target_link_libraries(test_multi_threaded_executor ${PROJECT_NAME})
+    ament_add_test_label(test_multi_threaded_executor xfail)
   endif()
 
   ament_add_gtest(test_guard_condition test/test_guard_condition.cpp
