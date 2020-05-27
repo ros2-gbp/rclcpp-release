@@ -54,6 +54,7 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/init_options.cpp
   src/rclcpp/intra_process_manager.cpp
   src/rclcpp/logger.cpp
+  src/rclcpp/logging_mutex.cpp
   src/rclcpp/memory_strategies.cpp
   src/rclcpp/memory_strategy.cpp
   src/rclcpp/message_info.cpp
@@ -604,7 +605,6 @@ if(BUILD_TESTING)
     ament_target_dependencies(test_multi_threaded_executor
       "rcl")
     target_link_libraries(test_multi_threaded_executor ${PROJECT_NAME})
-    ament_add_test_label(test_multi_threaded_executor xfail)
   endif()
 
   ament_add_gtest(test_guard_condition test/test_guard_condition.cpp
