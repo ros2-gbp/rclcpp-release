@@ -1,4 +1,4 @@
-This document is a declaration of software quality for the `rclcpp_action` package, based on the guidelines in [REP-2004](https://github.com/ros-infrastructure/rep/blob/rep-2004/rep-2004.rst).
+This document is a declaration of software quality for the `rclcpp_action` package, based on the guidelines in [REP-2004](https://www.ros.org/reps/rep-2004.html).
 
 # `rclcpp_action` Quality Declaration
 
@@ -14,7 +14,7 @@ Below are the rationales, notes, and caveats for this claim, organized by each r
 
 ### Version Stability [1.ii]
 
-`rclcpp_action` is not yet at a stable version, i.e. `>= 1.0.0`.
+`rclcpp_action` is at a stable version, i.e. `>= 1.0.0`.
 The current version can be found in its [package.xml](package.xml), and its change history can be found in its [CHANGELOG](CHANGELOG.rst).
 
 ### Public API Declaration [1.iii]
@@ -135,15 +135,33 @@ Currently nightly test results can be seen here:
 
 ## Dependencies [5]
 
+Below are evaluations of each of `rclcpp_action`'s run-time and build-time dependencies that have been determined to influence the quality.
+
+It has several "buildtool" dependencies, which do not affect the resulting quality of the package, because they do not contribute to the public library API.
+
+It also has several test dependencies, which do not affect the resulting quality of the package, because they are only used to build and run the test code.
+
 ### Direct and Optional Runtime ROS Dependencies [5.i]/[5.ii]
 
 `rclcpp_action` has the following runtime ROS dependencies:
-  - action_msgs
-  - rclcpp
-  - rcl_action
 
-It has several "buildtool" dependencies, which do not affect the resulting quality of the package, because they do not contribute to the public library API.
-It also has several test dependencies, which do not affect the resulting quality of the package, because they are only used to build and run the test code.
+#### `action_msgs`
+
+`action_msgs` provides messages and services for ROS 2 actions.
+
+It is **Quality Level 4**, see its [Quality Declaration document](https://github.com/ros2/rcl_interfaces/blob/master/action_msgs/QUALITY_DECLARATION.md).
+
+#### `rclcpp`
+
+The `rclcpp` package provides the ROS client library in C++.
+
+It is **Quality Level 4**, see its [Quality Declaration document](https://github.com/ros2/rclcpp/blob/master/rclcpp/QUALITY_DECLARATION.md).
+
+#### `rcl_action`
+
+The `rcl_action` package provides C-based ROS action implementation.
+
+It is **Quality Level 4**, see its [Quality Declaration document](https://github.com/ros2/rcl/blob/master/rcl_action/QUALITY_DECLARATION.md).
 
 ### Direct Runtime non-ROS Dependency [5.iii]
 
