@@ -160,7 +160,7 @@ public:
   void
   spin_node_some(std::shared_ptr<rclcpp::Node> node);
 
-  /// Collect work once and execute all available work, optionally within a duration.
+  /// Complete all available queued work without blocking.
   /**
    * This function can be overridden. The default implementation is suitable for a
    * single-threaded model of execution.
@@ -174,23 +174,6 @@ public:
   RCLCPP_PUBLIC
   virtual void
   spin_some(std::chrono::nanoseconds max_duration = std::chrono::nanoseconds(0));
-
-  /// Collect and execute work repeatedly within a duration or until no more work is available.
-  /**
-   * This function can be overridden. The default implementation is suitable for a
-   * single-threaded model of execution.
-   * Adding subscriptions, timers, services, etc. with blocking callbacks will cause this function
-   * to block (which may have unintended consequences).
-   * If the time that waitables take to be executed is longer than the period on which new waitables
-   * become ready, this method will execute work repeatedly until `max_duration` has elapsed.
-   *
-   * \param[in] max_duration The maximum amount of time to spend executing work. Must be positive.
-   * Note that spin_all() may take longer than this time as it only returns once max_duration has
-   * been exceeded.
-   */
-  RCLCPP_PUBLIC
-  virtual void
-  spin_all(std::chrono::nanoseconds max_duration);
 
   RCLCPP_PUBLIC
   virtual void
@@ -206,10 +189,10 @@ public:
    *   code.
    * \return The return code, one of `SUCCESS`, `INTERRUPTED`, or `TIMEOUT`.
    */
-  template<typename FutureT, typename TimeRepT = int64_t, typename TimeT = std::milli>
+  template<typename ResponseT, typename TimeRepT = int64_t, typename TimeT = std::milli>
   FutureReturnCode
   spin_until_future_complete(
-    const FutureT & future,
+    const std::shared_future<ResponseT> & future,
     std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
   {
     // TODO(wjwwood): does not work recursively; can't call spin_node_until_future_complete
@@ -287,10 +270,6 @@ protected:
     rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node,
     std::chrono::nanoseconds timeout);
 
-  RCLCPP_PUBLIC
-  void
-  spin_some_impl(std::chrono::nanoseconds max_duration, bool exhaustive);
-
   /// Find the next available executable and do the work associated with it.
   /**
    * \param[in] any_exec Union structure that can hold any executable type (timer, subscription,
@@ -363,12 +342,13 @@ protected:
 
   RCLCPP_DISABLE_COPY(Executor)
 
+  std::list<rclcpp::node_interfaces::NodeBaseInterface::WeakPtr> weak_nodes_;
+  std::list<const rcl_guard_condition_t *> guard_conditions_;
+
+private:
   RCLCPP_PUBLIC
   void
   spin_once_impl(std::chrono::nanoseconds timeout);
-
-  std::list<rclcpp::node_interfaces::NodeBaseInterface::WeakPtr> weak_nodes_;
-  std::list<const rcl_guard_condition_t *> guard_conditions_;
 };
 
 namespace executor
