@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RCLCPP__NODE_INTERFACES__NODE_WRAPPER_HPP_
-#define RCLCPP__NODE_INTERFACES__NODE_WRAPPER_HPP_
+#ifndef NODE_INTERFACES__NODE_WRAPPER_HPP_
+#define NODE_INTERFACES__NODE_WRAPPER_HPP_
 
 #include <memory>
 #include <string>
@@ -61,4 +61,4 @@ private:
   rclcpp::Node::SharedPtr node;
 };
 
-#endif  // RCLCPP__NODE_INTERFACES__NODE_WRAPPER_HPP_
+#endif  // NODE_INTERFACES__NODE_WRAPPER_HPP_
