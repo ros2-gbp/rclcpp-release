@@ -3,9 +3,9 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-3.0.0 (2020-06-18)
+2.0.1 (2020-06-23)
 ------------------
-* Fix doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_)
+* Fixed doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_) (`#1191 <https://github.com/ros2/rclcpp/issues/1191>`_)
 * Contributors: Alejandro Hernández Cordero
 
 2.0.0 (2020-06-01)
