@@ -2,20 +2,16 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-3.0.0 (2020-06-18)
+2.0.1 (2020-06-23)
 ------------------
-* Check period duration in create_wall_timer (`#1178 <https://github.com/ros2/rclcpp/issues/1178>`_)
-* Fix get_node_time_source_interface() docstring (`#988 <https://github.com/ros2/rclcpp/issues/988>`_)
-* Add message lost subscription event (`#1164 <https://github.com/ros2/rclcpp/issues/1164>`_)
-* Add spin_all method to Executor (`#1156 <https://github.com/ros2/rclcpp/issues/1156>`_)
-* Reorganize test directory and split CMakeLists.txt (`#1173 <https://github.com/ros2/rclcpp/issues/1173>`_)
+* Add create_publisher include to create_subscription (`#1180 <https://github.com/ros2/rclcpp/issues/1180>`_) (`#1192 <https://github.com/ros2/rclcpp/issues/1192>`_)
+* Fix get_node_time_source_interface() docstring (`#988 <https://github.com/ros2/rclcpp/issues/988>`_) (`#1185 <https://github.com/ros2/rclcpp/issues/1185>`_)
+* Fixed doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_) (`#1191 <https://github.com/ros2/rclcpp/issues/1191>`_)
 * Check if context is valid when looping in spin_some (`#1167 <https://github.com/ros2/rclcpp/issues/1167>`_)
-* Add check for invalid topic statistics publish period (`#1151 <https://github.com/ros2/rclcpp/issues/1151>`_)
 * Fix spin_until_future_complete: check spinning value (`#1023 <https://github.com/ros2/rclcpp/issues/1023>`_)
-* Fix doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_)
-* Fix reference to rclcpp in its Quality declaration (`#1161 <https://github.com/ros2/rclcpp/issues/1161>`_)
-* Allow spin_until_future_complete to accept any future like object (`#1113 <https://github.com/ros2/rclcpp/issues/1113>`_)
-* Contributors: Alejandro Hernández Cordero, Christophe Bedard, Devin Bonnie, Dirk Thomas, DongheeYe, Ivan Santiago Paunovic, Jacob Perron, Sarthak Mittal, brawner, tomoya
+  Make Executor::spin_once_impl private before backporting, to avoid API compatibility issues
+* Add check for invalid topic statistics publish period (`#1151 <https://github.com/ros2/rclcpp/issues/1151>`_) (`#1172 <https://github.com/ros2/rclcpp/issues/1172>`_)
+* Contributors: Alejandro Hernández Cordero, Devin Bonnie, DongheeYe, Ivan Santiago Paunovic, Jacob Perron, Stephen Brawner
 
 2.0.0 (2020-06-01)
 ------------------
