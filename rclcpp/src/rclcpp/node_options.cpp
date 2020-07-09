@@ -79,6 +79,7 @@ NodeOptions::operator=(const NodeOptions & other)
     this->allow_undeclared_parameters_ = other.allow_undeclared_parameters_;
     this->automatically_declare_parameters_from_overrides_ =
       other.automatically_declare_parameters_from_overrides_;
+    this->node_options_.reset();
   }
   return *this;
 }
@@ -92,7 +93,6 @@ NodeOptions::get_rcl_node_options() const
     *node_options_ = rcl_node_get_default_options();
     node_options_->allocator = this->allocator_;
     node_options_->use_global_arguments = this->use_global_arguments_;
-    node_options_->domain_id = this->get_domain_id_from_env();
     node_options_->enable_rosout = this->enable_rosout_;
 
     int c_argc = 0;
@@ -176,7 +176,7 @@ NodeOptions::parameter_overrides(const std::vector<rclcpp::Parameter> & paramete
 bool
 NodeOptions::use_global_arguments() const
 {
-  return this->node_options_->use_global_arguments;
+  return this->use_global_arguments_;
 }
 
 NodeOptions &
@@ -320,38 +320,6 @@ NodeOptions::allocator(rcl_allocator_t allocator)
   this->node_options_.reset();  // reset node options to make it be recreated on next access.
   this->allocator_ = allocator;
   return *this;
-}
-
-// TODO(wjwwood): reuse rcutils_get_env() to avoid code duplication.
-//   See also: https://github.com/ros2/rcl/issues/119
-size_t
-NodeOptions::get_domain_id_from_env() const
-{
-  // Determine the domain id based on the options and the ROS_DOMAIN_ID env variable.
-  size_t domain_id = std::numeric_limits<size_t>::max();
-  char * ros_domain_id = nullptr;
-  const char * env_var = "ROS_DOMAIN_ID";
-#ifndef _WIN32
-  ros_domain_id = getenv(env_var);
-#else
-  size_t ros_domain_id_size;
-  _dupenv_s(&ros_domain_id, &ros_domain_id_size, env_var);
-#endif
-  if (ros_domain_id) {
-    uint32_t number = strtoul(ros_domain_id, NULL, 0);
-    if (number == (std::numeric_limits<uint32_t>::max)()) {
-#ifdef _WIN32
-      // free the ros_domain_id before throwing, if getenv was used on Windows
-      free(ros_domain_id);
-#endif
-      throw std::runtime_error("failed to interpret ROS_DOMAIN_ID as integral number");
-    }
-    domain_id = static_cast<size_t>(number);
-#ifdef _WIN32
-    free(ros_domain_id);
-#endif
-  }
-  return domain_id;
 }
 
 }  // namespace rclcpp

@@ -3,13 +3,17 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-2.0.2 (2020-07-07)
+4.0.0 (2020-07-09)
 ------------------
-
-2.0.1 (2020-06-23)
-------------------
-* Fixed doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_) (`#1191 <https://github.com/ros2/rclcpp/issues/1191>`_)
+* Bump to QD to level 3 and fixed links (`#1158 <https://github.com/ros2/rclcpp/issues/1158>`_)
 * Contributors: Alejandro Hernández Cordero
+
+3.0.0 (2020-06-18)
+------------------
+* Add rcl_action_client_options when creating action client. (`#1133 <https://github.com/ros2/rclcpp/issues/1133>`_)
+* Fix doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_)
+* Increase rclcpp_action test coverage (`#1153 <https://github.com/ros2/rclcpp/issues/1153>`_)
+* Contributors: Alejandro Hernández Cordero, Michel Hidalgo, tomoya
 
 2.0.0 (2020-06-01)
 ------------------

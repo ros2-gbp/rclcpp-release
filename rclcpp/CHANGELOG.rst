@@ -2,22 +2,40 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-2.0.2 (2020-07-07)
+4.0.0 (2020-07-09)
 ------------------
-* Link against thread library where necessary (`#1210 <https://github.com/ros2/rclcpp/issues/1210>`_) (`#1214 <https://github.com/ros2/rclcpp/issues/1214>`_)
-* Fix exception message on rcl_clock_init (`#1182 <https://github.com/ros2/rclcpp/issues/1182>`_) (`#1193 <https://github.com/ros2/rclcpp/issues/1193>`_)
-* Contributors: Dirk Thomas, tomoya
+* Fix rclcpp::NodeOptions::operator= (`#1211 <https://github.com/ros2/rclcpp/issues/1211>`_)
+* Link against thread library where necessary (`#1210 <https://github.com/ros2/rclcpp/issues/1210>`_)
+* Unit tests for node interfaces (`#1202 <https://github.com/ros2/rclcpp/issues/1202>`_)
+* Remove usage of domain id in node options (`#1205 <https://github.com/ros2/rclcpp/issues/1205>`_)
+* Remove deprecated set_on_parameters_set_callback function (`#1199 <https://github.com/ros2/rclcpp/issues/1199>`_)
+* Fix conversion of negative durations to messages (`#1188 <https://github.com/ros2/rclcpp/issues/1188>`_)
+* Fix implementation of NodeOptions::use_global_arguments() (`#1176 <https://github.com/ros2/rclcpp/issues/1176>`_)
+* Bump to QD to level 3 and fixed links (`#1158 <https://github.com/ros2/rclcpp/issues/1158>`_)
+* Fix pub/sub count API tests (`#1203 <https://github.com/ros2/rclcpp/issues/1203>`_)
+* Update tracetools' QL to 2 in rclcpp's QD (`#1187 <https://github.com/ros2/rclcpp/issues/1187>`_)
+* Fix exception message on rcl_clock_init (`#1182 <https://github.com/ros2/rclcpp/issues/1182>`_)
+* Throw exception if rcl_timer_init fails (`#1179 <https://github.com/ros2/rclcpp/issues/1179>`_)
+* Unit tests for some header-only functions/classes (`#1181 <https://github.com/ros2/rclcpp/issues/1181>`_)
+* Callback should be perfectly-forwarded (`#1183 <https://github.com/ros2/rclcpp/issues/1183>`_)
+* Add unit tests for logging functionality (`#1184 <https://github.com/ros2/rclcpp/issues/1184>`_)
+* Add create_publisher include to create_subscription (`#1180 <https://github.com/ros2/rclcpp/issues/1180>`_)
+* Contributors: Alejandro Hernández Cordero, Christophe Bedard, Claire Wang, Dirk Thomas, Ivan Santiago Paunovic, Johannes Meyer, Michel Hidalgo, Stephen Brawner, tomoya
 
-2.0.1 (2020-06-23)
+3.0.0 (2020-06-18)
 ------------------
-* Add create_publisher include to create_subscription (`#1180 <https://github.com/ros2/rclcpp/issues/1180>`_) (`#1192 <https://github.com/ros2/rclcpp/issues/1192>`_)
-* Fix get_node_time_source_interface() docstring (`#988 <https://github.com/ros2/rclcpp/issues/988>`_) (`#1185 <https://github.com/ros2/rclcpp/issues/1185>`_)
-* Fixed doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_) (`#1191 <https://github.com/ros2/rclcpp/issues/1191>`_)
+* Check period duration in create_wall_timer (`#1178 <https://github.com/ros2/rclcpp/issues/1178>`_)
+* Fix get_node_time_source_interface() docstring (`#988 <https://github.com/ros2/rclcpp/issues/988>`_)
+* Add message lost subscription event (`#1164 <https://github.com/ros2/rclcpp/issues/1164>`_)
+* Add spin_all method to Executor (`#1156 <https://github.com/ros2/rclcpp/issues/1156>`_)
+* Reorganize test directory and split CMakeLists.txt (`#1173 <https://github.com/ros2/rclcpp/issues/1173>`_)
 * Check if context is valid when looping in spin_some (`#1167 <https://github.com/ros2/rclcpp/issues/1167>`_)
+* Add check for invalid topic statistics publish period (`#1151 <https://github.com/ros2/rclcpp/issues/1151>`_)
 * Fix spin_until_future_complete: check spinning value (`#1023 <https://github.com/ros2/rclcpp/issues/1023>`_)
-  Make Executor::spin_once_impl private before backporting, to avoid API compatibility issues
-* Add check for invalid topic statistics publish period (`#1151 <https://github.com/ros2/rclcpp/issues/1151>`_) (`#1172 <https://github.com/ros2/rclcpp/issues/1172>`_)
-* Contributors: Alejandro Hernández Cordero, Devin Bonnie, DongheeYe, Ivan Santiago Paunovic, Jacob Perron, Stephen Brawner
+* Fix doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_)
+* Fix reference to rclcpp in its Quality declaration (`#1161 <https://github.com/ros2/rclcpp/issues/1161>`_)
+* Allow spin_until_future_complete to accept any future like object (`#1113 <https://github.com/ros2/rclcpp/issues/1113>`_)
+* Contributors: Alejandro Hernández Cordero, Christophe Bedard, Devin Bonnie, Dirk Thomas, DongheeYe, Ivan Santiago Paunovic, Jacob Perron, Sarthak Mittal, brawner, tomoya
 
 2.0.0 (2020-06-01)
 ------------------

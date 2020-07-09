@@ -3,12 +3,16 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-2.0.2 (2020-07-07)
+4.0.0 (2020-07-09)
 ------------------
+* Remove deprecated set_on_parameters_set_callback function (`#1199 <https://github.com/ros2/rclcpp/issues/1199>`_)
+* Bump to QD to level 3 and fixed links (`#1158 <https://github.com/ros2/rclcpp/issues/1158>`_)
+* Fix race in test_lifecycle_service_client (`#1204 <https://github.com/ros2/rclcpp/issues/1204>`_)
+* Contributors: Alejandro Hernández Cordero, Claire Wang, Dirk Thomas
 
-2.0.1 (2020-06-23)
+3.0.0 (2020-06-18)
 ------------------
-* Fixed doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_) (`#1191 <https://github.com/ros2/rclcpp/issues/1191>`_)
+* Fix doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_)
 * Contributors: Alejandro Hernández Cordero
 
 2.0.0 (2020-06-01)

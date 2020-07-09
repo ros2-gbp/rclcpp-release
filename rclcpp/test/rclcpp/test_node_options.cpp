@@ -105,6 +105,38 @@ TEST(TestNodeOptions, bad_ros_args) {
     rclcpp::exceptions::UnknownROSArgsError);
 }
 
+TEST(TestNodeOptions, use_global_arguments) {
+  {
+    auto options = rclcpp::NodeOptions();
+    EXPECT_TRUE(options.use_global_arguments());
+    EXPECT_TRUE(options.get_rcl_node_options()->use_global_arguments);
+  }
+
+  {
+    auto options = rclcpp::NodeOptions().use_global_arguments(false);
+    EXPECT_FALSE(options.use_global_arguments());
+    EXPECT_FALSE(options.get_rcl_node_options()->use_global_arguments);
+  }
+
+  {
+    auto options = rclcpp::NodeOptions().use_global_arguments(true);
+    EXPECT_TRUE(options.use_global_arguments());
+    EXPECT_TRUE(options.get_rcl_node_options()->use_global_arguments);
+  }
+
+  {
+    auto options = rclcpp::NodeOptions();
+    EXPECT_TRUE(options.use_global_arguments());
+    EXPECT_TRUE(options.get_rcl_node_options()->use_global_arguments);
+    options.use_global_arguments(false);
+    EXPECT_FALSE(options.use_global_arguments());
+    EXPECT_FALSE(options.get_rcl_node_options()->use_global_arguments);
+    options.use_global_arguments(true);
+    EXPECT_TRUE(options.use_global_arguments());
+    EXPECT_TRUE(options.get_rcl_node_options()->use_global_arguments);
+  }
+}
+
 TEST(TestNodeOptions, enable_rosout) {
   {
     auto options = rclcpp::NodeOptions();
@@ -134,5 +166,35 @@ TEST(TestNodeOptions, enable_rosout) {
     options.enable_rosout(true);
     EXPECT_TRUE(options.enable_rosout());
     EXPECT_TRUE(options.get_rcl_node_options()->enable_rosout);
+  }
+}
+
+TEST(TestNodeOptions, copy) {
+  std::vector<std::string> expected_args{"--unknown-flag", "arg"};
+  auto options = rclcpp::NodeOptions().arguments(expected_args).use_global_arguments(false);
+  const rcl_node_options_t * rcl_options = options.get_rcl_node_options();
+
+  {
+    rclcpp::NodeOptions copied_options = options;
+    EXPECT_FALSE(copied_options.use_global_arguments());
+    EXPECT_EQ(expected_args, copied_options.arguments());
+    const rcl_node_options_t * copied_rcl_options = copied_options.get_rcl_node_options();
+    EXPECT_EQ(copied_rcl_options->use_global_arguments, rcl_options->use_global_arguments);
+    EXPECT_EQ(
+      rcl_arguments_get_count_unparsed(&copied_rcl_options->arguments),
+      rcl_arguments_get_count_unparsed(&rcl_options->arguments));
+  }
+
+  {
+    auto other_options = rclcpp::NodeOptions().use_global_arguments(true);
+    (void)other_options.get_rcl_node_options();  // force C structure initialization
+    other_options = options;
+    EXPECT_FALSE(other_options.use_global_arguments());
+    EXPECT_EQ(expected_args, other_options.arguments());
+    const rcl_node_options_t * other_rcl_options = other_options.get_rcl_node_options();
+    EXPECT_EQ(other_rcl_options->use_global_arguments, rcl_options->use_global_arguments);
+    EXPECT_EQ(
+      rcl_arguments_get_count_unparsed(&other_rcl_options->arguments),
+      rcl_arguments_get_count_unparsed(&rcl_options->arguments));
   }
 }

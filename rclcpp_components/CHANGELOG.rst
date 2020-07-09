@@ -2,16 +2,19 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-2.0.2 (2020-07-07)
+4.0.0 (2020-07-09)
 ------------------
+* Bump to QD to level 3 and fixed links (`#1158 <https://github.com/ros2/rclcpp/issues/1158>`_)
+* Include original exception in ComponentManagerException (`#1157 <https://github.com/ros2/rclcpp/issues/1157>`_)
+* Contributors: Alejandro Hernández Cordero, Martijn Buijs, tomoya
 
-2.0.1 (2020-06-23)
+3.0.0 (2020-06-18)
 ------------------
 
 2.0.0 (2020-06-01)
 ------------------
-* Added missing virtual destructors (`#1149 <https://github.com/ros2/rclcpp/issues/1149>`_)
-* Add Security Vulnerability Policy pointing to REP-2006 (`#1130 <https://github.com/ros2/rclcpp/issues/1130>`_)
+* Added missing virtual destructors. (`#1149 <https://github.com/ros2/rclcpp/issues/1149>`_)
+* Add Security Vulnerability Policy pointing to REP-2006. (`#1130 <https://github.com/ros2/rclcpp/issues/1130>`_)
 * Contributors: Chris Lalancette, Ivan Santiago Paunovic
 
 1.1.0 (2020-05-26)
