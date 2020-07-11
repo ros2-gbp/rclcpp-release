@@ -44,9 +44,6 @@ public:
   : std::runtime_error("context is already initialized") {}
 };
 
-/// Forward declare WeakContextsWrapper
-class WeakContextsWrapper;
-
 /// Context which encapsulates shared state between nodes and other similar entities.
 /**
  * A context also represents the lifecycle between init and shutdown of rclcpp.
@@ -103,9 +100,6 @@ public:
    * \param[in] argv argument array which may contain arguments intended for ROS
    * \param[in] init_options initialization options for rclcpp and underlying layers
    * \throw ContextAlreadyInitialized if called if init is called more than once
-   * \throws anything rclcpp::exceptions::throw_from_rcl_error can throw.
-   * \throws std::runtime_error if the global logging configure mutex is NULL
-   * \throws exceptions::UnknownROSArgsError if there are unknown ROS arguments
    */
   RCLCPP_PUBLIC
   virtual
@@ -165,7 +159,7 @@ public:
    *
    * \param[in] reason the description of why shutdown happened
    * \return true if shutdown was successful, false if context was already shutdown
-   * \throw various exceptions derived from rclcpp::exceptions::RCLError, if rcl_shutdown fails
+   * \throw various exceptions derived from RCLErrorBase, if rcl_shutdown fails
    */
   RCLCPP_PUBLIC
   virtual
@@ -266,7 +260,6 @@ public:
    * \param[in] wait_set Pointer to the rcl_wait_set_t that will be using the
    *   resulting guard condition.
    * \return Pointer to the guard condition.
-   * \throws anything rclcpp::exceptions::throw_from_rcl_error can throw.
    */
   RCLCPP_PUBLIC
   rcl_guard_condition_t *
@@ -286,8 +279,6 @@ public:
    *
    * \param[in] wait_set Pointer to the rcl_wait_set_t that was using the
    *   resulting guard condition.
-   * \throws anything rclcpp::exceptions::throw_from_rcl_error can throw.
-   * \throws std::runtime_error if a nonexistent wait set is trying to release sigint guard condition.
    */
   RCLCPP_PUBLIC
   void
@@ -347,9 +338,6 @@ private:
   rclcpp::InitOptions init_options_;
   std::string shutdown_reason_;
 
-  // Keep shared ownership of the global logging mutex.
-  std::shared_ptr<std::recursive_mutex> logging_mutex_;
-
   std::unordered_map<std::type_index, std::shared_ptr<void>> sub_contexts_;
   // This mutex is recursive so that the constructor of a sub context may
   // attempt to acquire another sub context.
@@ -367,9 +355,6 @@ private:
   std::mutex interrupt_guard_cond_handles_mutex_;
   /// Guard conditions for interrupting of associated wait sets on interrupt_all_wait_sets().
   std::unordered_map<rcl_wait_set_t *, rcl_guard_condition_t> interrupt_guard_cond_handles_;
-
-  /// Keep shared ownership of global vector of weak contexts
-  std::shared_ptr<WeakContextsWrapper> weak_contexts_;
 };
 
 /// Return a copy of the list of context shared pointers.

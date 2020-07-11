@@ -18,9 +18,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <utility>
 
-#include "rclcpp/detail/utilities.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/publisher_options.hpp"
@@ -71,15 +69,12 @@ NodeOptions::operator=(const NodeOptions & other)
     this->arguments_ = other.arguments_;
     this->parameter_overrides_ = other.parameter_overrides_;
     this->use_global_arguments_ = other.use_global_arguments_;
-    this->enable_rosout_ = other.enable_rosout_;
     this->use_intra_process_comms_ = other.use_intra_process_comms_;
-    this->enable_topic_statistics_ = other.enable_topic_statistics_;
     this->start_parameter_services_ = other.start_parameter_services_;
     this->allocator_ = other.allocator_;
     this->allow_undeclared_parameters_ = other.allow_undeclared_parameters_;
     this->automatically_declare_parameters_from_overrides_ =
       other.automatically_declare_parameters_from_overrides_;
-    this->node_options_.reset();
   }
   return *this;
 }
@@ -93,34 +88,26 @@ NodeOptions::get_rcl_node_options() const
     *node_options_ = rcl_node_get_default_options();
     node_options_->allocator = this->allocator_;
     node_options_->use_global_arguments = this->use_global_arguments_;
-    node_options_->enable_rosout = this->enable_rosout_;
+    node_options_->domain_id = this->get_domain_id_from_env();
 
-    int c_argc = 0;
-    std::unique_ptr<const char *[]> c_argv;
+    std::unique_ptr<const char *[]> c_args;
     if (!this->arguments_.empty()) {
-      if (this->arguments_.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
-        throw_from_rcl_error(RCL_RET_INVALID_ARGUMENT, "Too many args");
-      }
-
-      c_argc = static_cast<int>(this->arguments_.size());
-      c_argv.reset(new const char *[c_argc]);
-
+      c_args.reset(new const char *[this->arguments_.size()]);
       for (std::size_t i = 0; i < this->arguments_.size(); ++i) {
-        c_argv[i] = this->arguments_[i].c_str();
+        c_args[i] = this->arguments_[i].c_str();
       }
     }
 
-    rcl_ret_t ret = rcl_parse_arguments(
-      c_argc, c_argv.get(), this->allocator_, &(node_options_->arguments));
+    if (this->arguments_.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+      throw_from_rcl_error(RCL_RET_INVALID_ARGUMENT, "Too many args");
+    }
+
+    rmw_ret_t ret = rcl_parse_arguments(
+      static_cast<int>(this->arguments_.size()), c_args.get(), this->allocator_,
+      &(node_options_->arguments));
 
     if (RCL_RET_OK != ret) {
       throw_from_rcl_error(ret, "failed to parse arguments");
-    }
-
-    std::vector<std::string> unparsed_ros_arguments = detail::get_unparsed_ros_arguments(
-      c_argc, c_argv.get(), &(node_options_->arguments), this->allocator_);
-    if (!unparsed_ros_arguments.empty()) {
-      throw exceptions::UnknownROSArgsError(std::move(unparsed_ros_arguments));
     }
   }
 
@@ -176,7 +163,7 @@ NodeOptions::parameter_overrides(const std::vector<rclcpp::Parameter> & paramete
 bool
 NodeOptions::use_global_arguments() const
 {
-  return this->use_global_arguments_;
+  return this->node_options_->use_global_arguments;
 }
 
 NodeOptions &
@@ -184,20 +171,6 @@ NodeOptions::use_global_arguments(bool use_global_arguments)
 {
   this->node_options_.reset();  // reset node options to make it be recreated on next access.
   this->use_global_arguments_ = use_global_arguments;
-  return *this;
-}
-
-bool
-NodeOptions::enable_rosout() const
-{
-  return this->enable_rosout_;
-}
-
-NodeOptions &
-NodeOptions::enable_rosout(bool enable_rosout)
-{
-  this->node_options_.reset();  // reset node options to make it be recreated on next access.
-  this->enable_rosout_ = enable_rosout;
   return *this;
 }
 
@@ -211,19 +184,6 @@ NodeOptions &
 NodeOptions::use_intra_process_comms(bool use_intra_process_comms)
 {
   this->use_intra_process_comms_ = use_intra_process_comms;
-  return *this;
-}
-
-bool
-NodeOptions::enable_topic_statistics() const
-{
-  return this->enable_topic_statistics_;
-}
-
-NodeOptions &
-NodeOptions::enable_topic_statistics(bool enable_topic_statistics)
-{
-  this->enable_topic_statistics_ = enable_topic_statistics;
   return *this;
 }
 
@@ -320,6 +280,38 @@ NodeOptions::allocator(rcl_allocator_t allocator)
   this->node_options_.reset();  // reset node options to make it be recreated on next access.
   this->allocator_ = allocator;
   return *this;
+}
+
+// TODO(wjwwood): reuse rcutils_get_env() to avoid code duplication.
+//   See also: https://github.com/ros2/rcl/issues/119
+size_t
+NodeOptions::get_domain_id_from_env() const
+{
+  // Determine the domain id based on the options and the ROS_DOMAIN_ID env variable.
+  size_t domain_id = std::numeric_limits<size_t>::max();
+  char * ros_domain_id = nullptr;
+  const char * env_var = "ROS_DOMAIN_ID";
+#ifndef _WIN32
+  ros_domain_id = getenv(env_var);
+#else
+  size_t ros_domain_id_size;
+  _dupenv_s(&ros_domain_id, &ros_domain_id_size, env_var);
+#endif
+  if (ros_domain_id) {
+    uint32_t number = strtoul(ros_domain_id, NULL, 0);
+    if (number == (std::numeric_limits<uint32_t>::max)()) {
+#ifdef _WIN32
+      // free the ros_domain_id before throwing, if getenv was used on Windows
+      free(ros_domain_id);
+#endif
+      throw std::runtime_error("failed to interpret ROS_DOMAIN_ID as integral number");
+    }
+    domain_id = static_cast<size_t>(number);
+#ifdef _WIN32
+    free(ros_domain_id);
+#endif
+  }
+  return domain_id;
 }
 
 }  // namespace rclcpp

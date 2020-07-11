@@ -30,7 +30,7 @@ namespace rclcpp
 void
 init(int argc, char const * const argv[], const InitOptions & init_options)
 {
-  using rclcpp::contexts::get_global_default_context;
+  using contexts::default_context::get_global_default_context;
   get_global_default_context()->init(argc, argv, init_options);
   // Install the signal handlers.
   install_signal_handlers();
@@ -103,9 +103,9 @@ remove_ros_arguments(int argc, char const * const argv[])
     throw exceptions::RCLError(base_exc, "");
   }
 
-  std::vector<std::string> return_arguments(static_cast<size_t>(nonros_argc));
+  std::vector<std::string> return_arguments(nonros_argc);
 
-  for (size_t ii = 0; ii < static_cast<size_t>(nonros_argc); ++ii) {
+  for (int ii = 0; ii < nonros_argc; ++ii) {
     return_arguments[ii] = std::string(nonros_argv[ii]);
   }
 
@@ -125,7 +125,7 @@ remove_ros_arguments(int argc, char const * const argv[])
 bool
 ok(Context::SharedPtr context)
 {
-  using rclcpp::contexts::get_global_default_context;
+  using contexts::default_context::get_global_default_context;
   if (nullptr == context) {
     context = get_global_default_context();
   }
@@ -141,7 +141,7 @@ is_initialized(Context::SharedPtr context)
 bool
 shutdown(Context::SharedPtr context, const std::string & reason)
 {
-  using rclcpp::contexts::get_global_default_context;
+  using contexts::default_context::get_global_default_context;
   auto default_context = get_global_default_context();
   if (nullptr == context) {
     context = default_context;
@@ -156,7 +156,7 @@ shutdown(Context::SharedPtr context, const std::string & reason)
 void
 on_shutdown(std::function<void()> callback, Context::SharedPtr context)
 {
-  using rclcpp::contexts::get_global_default_context;
+  using contexts::default_context::get_global_default_context;
   if (nullptr == context) {
     context = get_global_default_context();
   }
@@ -166,7 +166,7 @@ on_shutdown(std::function<void()> callback, Context::SharedPtr context)
 bool
 sleep_for(const std::chrono::nanoseconds & nanoseconds, Context::SharedPtr context)
 {
-  using rclcpp::contexts::get_global_default_context;
+  using contexts::default_context::get_global_default_context;
   if (nullptr == context) {
     context = get_global_default_context();
   }

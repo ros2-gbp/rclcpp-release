@@ -15,18 +15,14 @@
 #ifndef RCLCPP__QOS_HPP_
 #define RCLCPP__QOS_HPP_
 
-#include <string>
+#include <rmw/qos_profiles.h>
+#include <rmw/types.h>
 
 #include "rclcpp/duration.hpp"
 #include "rclcpp/visibility_control.hpp"
-#include "rmw/incompatible_qos_events_statuses.h"
-#include "rmw/qos_profiles.h"
-#include "rmw/types.h"
 
 namespace rclcpp
 {
-
-std::string qos_policy_name_from_kind(rmw_qos_policy_kind_t policy_kind);
 
 /// QoS initialization values, cannot be created directly, use KeepAll or KeepLast instead.
 struct RCLCPP_PUBLIC QoSInitialization
@@ -155,24 +151,6 @@ private:
   rmw_qos_profile_t rmw_qos_profile_;
 };
 
-/// Check if two QoS profiles are exactly equal in all policy values.
-RCLCPP_PUBLIC
-bool operator==(const QoS & left, const QoS & right);
-RCLCPP_PUBLIC
-bool operator!=(const QoS & left, const QoS & right);
-
-/**
- * Sensor Data QoS class
- *    - History: Keep last,
- *    - Depth: 5,
- *    - Reliability: Best effort,
- *    - Durability: Volatile,
- *    - Deadline: Default,
- *    - Lifespan: Default,
- *    - Liveliness: System default,
- *    - Liveliness lease duration: default,
- *    - avoid ros namespace conventions: false
- */
 class RCLCPP_PUBLIC SensorDataQoS : public QoS
 {
 public:
@@ -183,18 +161,6 @@ public:
   ));
 };
 
-/**
- * Parameters QoS class
- *    - History: Keep last,
- *    - Depth: 1000,
- *    - Reliability: Reliable,
- *    - Durability: Volatile,
- *    - Deadline: Default,
- *    - Lifespan: Default,
- *    - Liveliness: System default,
- *    - Liveliness lease duration: default,
- *    - Avoid ros namespace conventions: false
- */
 class RCLCPP_PUBLIC ParametersQoS : public QoS
 {
 public:
@@ -205,18 +171,6 @@ public:
   ));
 };
 
-/**
- * Services QoS class
- *    - History: Keep last,
- *    - Depth: 10,
- *    - Reliability: Reliable,
- *    - Durability: Volatile,
- *    - Deadline: Default,
- *    - Lifespan: Default,
- *    - Liveliness: System default,
- *    - Liveliness lease duration: default,
- *    - Avoid ros namespace conventions: false
- */
 class RCLCPP_PUBLIC ServicesQoS : public QoS
 {
 public:
@@ -227,18 +181,6 @@ public:
   ));
 };
 
-/**
- * Parameter events QoS class
- *    - History: Keep last,
- *    - Depth: 1000,
- *    - Reliability: Reliable,
- *    - Durability: Volatile,
- *    - Deadline: Default,
- *    - Lifespan: Default,
- *    - Liveliness: System default,
- *    - Liveliness lease duration: default,
- *    - Avoid ros namespace conventions: false
- */
 class RCLCPP_PUBLIC ParameterEventsQoS : public QoS
 {
 public:
@@ -249,18 +191,6 @@ public:
   ));
 };
 
-/**
- * System defaults QoS class
- *    - History: System default,
- *    - Depth: System default,
- *    - Reliability: System default,
- *    - Durability: System default,
- *    - Deadline: Default,
- *    - Lifespan: Default,
- *    - Liveliness: System default,
- *    - Liveliness lease duration: System default,
- *    - Avoid ros namespace conventions: false
- */
 class RCLCPP_PUBLIC SystemDefaultsQoS : public QoS
 {
 public:

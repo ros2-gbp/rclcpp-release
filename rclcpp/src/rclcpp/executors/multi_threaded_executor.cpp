@@ -25,13 +25,10 @@
 using rclcpp::executors::MultiThreadedExecutor;
 
 MultiThreadedExecutor::MultiThreadedExecutor(
-  const rclcpp::ExecutorOptions & options,
+  const rclcpp::executor::ExecutorArgs & args,
   size_t number_of_threads,
-  bool yield_before_execute,
-  std::chrono::nanoseconds next_exec_timeout)
-: rclcpp::Executor(options),
-  yield_before_execute_(yield_before_execute),
-  next_exec_timeout_(next_exec_timeout)
+  bool yield_before_execute)
+: executor::Executor(args), yield_before_execute_(yield_before_execute)
 {
   number_of_threads_ = number_of_threads ? number_of_threads : std::thread::hardware_concurrency();
   if (number_of_threads_ == 0) {
@@ -74,13 +71,13 @@ void
 MultiThreadedExecutor::run(size_t)
 {
   while (rclcpp::ok(this->context_) && spinning.load()) {
-    rclcpp::AnyExecutable any_exec;
+    executor::AnyExecutable any_exec;
     {
       std::lock_guard<std::mutex> wait_lock(wait_mutex_);
       if (!rclcpp::ok(this->context_) || !spinning.load()) {
         return;
       }
-      if (!get_next_executable(any_exec, next_exec_timeout_)) {
+      if (!get_next_executable(any_exec)) {
         continue;
       }
       if (any_exec.timer) {

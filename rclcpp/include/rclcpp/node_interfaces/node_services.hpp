@@ -42,16 +42,18 @@ public:
   ~NodeServices();
 
   RCLCPP_PUBLIC
+  virtual
   void
   add_client(
     rclcpp::ClientBase::SharedPtr client_base_ptr,
-    rclcpp::CallbackGroup::SharedPtr group) override;
+    rclcpp::callback_group::CallbackGroup::SharedPtr group);
 
   RCLCPP_PUBLIC
+  virtual
   void
   add_service(
     rclcpp::ServiceBase::SharedPtr service_base_ptr,
-    rclcpp::CallbackGroup::SharedPtr group) override;
+    rclcpp::callback_group::CallbackGroup::SharedPtr group);
 
 private:
   RCLCPP_DISABLE_COPY(NodeServices)
