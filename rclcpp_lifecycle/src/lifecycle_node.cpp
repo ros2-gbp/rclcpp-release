@@ -31,17 +31,7 @@
 #include "rclcpp/node_interfaces/node_clock.hpp"
 #include "rclcpp/node_interfaces/node_graph.hpp"
 #include "rclcpp/node_interfaces/node_logging.hpp"
-// When compiling this file, Windows produces a deprecation warning for the
-// deprecated function prototype of NodeParameters::register_param_change_callback().
-// Other compilers do not.
-#if defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
 #include "rclcpp/node_interfaces/node_parameters.hpp"
-#if defined(_WIN32)
-# pragma warning(pop)
-#endif
 #include "rclcpp/node_interfaces/node_services.hpp"
 #include "rclcpp/node_interfaces/node_time_source.hpp"
 #include "rclcpp/node_interfaces/node_timers.hpp"
@@ -72,11 +62,12 @@ LifecycleNode::LifecycleNode(
       namespace_,
       options.context(),
       *(options.get_rcl_node_options()),
-      options.use_intra_process_comms())),
+      options.use_intra_process_comms(),
+      options.enable_topic_statistics())),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),
   node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_.get())),
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
-  node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get())),
+  node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get(), node_timers_.get())),
   node_services_(new rclcpp::node_interfaces::NodeServices(node_base_.get())),
   node_clock_(new rclcpp::node_interfaces::NodeClock(
       node_base_,
@@ -114,15 +105,23 @@ LifecycleNode::LifecycleNode(
 {
   impl_->init();
 
-  register_on_configure(std::bind(&LifecycleNodeInterface::on_configure, this,
-    std::placeholders::_1));
+  register_on_configure(
+    std::bind(
+      &LifecycleNodeInterface::on_configure, this,
+      std::placeholders::_1));
   register_on_cleanup(std::bind(&LifecycleNodeInterface::on_cleanup, this, std::placeholders::_1));
-  register_on_shutdown(std::bind(&LifecycleNodeInterface::on_shutdown, this,
-    std::placeholders::_1));
-  register_on_activate(std::bind(&LifecycleNodeInterface::on_activate, this,
-    std::placeholders::_1));
-  register_on_deactivate(std::bind(&LifecycleNodeInterface::on_deactivate, this,
-    std::placeholders::_1));
+  register_on_shutdown(
+    std::bind(
+      &LifecycleNodeInterface::on_shutdown, this,
+      std::placeholders::_1));
+  register_on_activate(
+    std::bind(
+      &LifecycleNodeInterface::on_activate, this,
+      std::placeholders::_1));
+  register_on_deactivate(
+    std::bind(
+      &LifecycleNodeInterface::on_deactivate, this,
+      std::placeholders::_1));
   register_on_error(std::bind(&LifecycleNodeInterface::on_error, this, std::placeholders::_1));
 }
 
@@ -147,9 +146,9 @@ LifecycleNode::get_logger() const
   return node_logging_->get_logger();
 }
 
-rclcpp::callback_group::CallbackGroup::SharedPtr
+rclcpp::CallbackGroup::SharedPtr
 LifecycleNode::create_callback_group(
-  rclcpp::callback_group::CallbackGroupType group_type)
+  rclcpp::CallbackGroupType group_type)
 {
   return node_base_->create_callback_group(group_type);
 }
@@ -182,7 +181,7 @@ LifecycleNode::set_parameter(const rclcpp::Parameter & parameter)
 }
 
 bool
-LifecycleNode::group_in_node(rclcpp::callback_group::CallbackGroup::SharedPtr group)
+LifecycleNode::group_in_node(rclcpp::CallbackGroup::SharedPtr group)
 {
   return node_base_->callback_group_in_node(group);
 }
@@ -256,11 +255,40 @@ LifecycleNode::list_parameters(
   return node_parameters_->list_parameters(prefixes, depth);
 }
 
+rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
+LifecycleNode::add_on_set_parameters_callback(OnParametersSetCallbackType callback)
+{
+  return node_parameters_->add_on_set_parameters_callback(callback);
+}
+
+void
+LifecycleNode::remove_on_set_parameters_callback(
+  const OnSetParametersCallbackHandle * const callback)
+{
+  node_parameters_->remove_on_set_parameters_callback(callback);
+}
+
+// suppress deprecated function warning
+#if !defined(_WIN32)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#else  // !defined(_WIN32)
+# pragma warning(push)
+# pragma warning(disable: 4996)
+#endif
+
 rclcpp::Node::OnParametersSetCallbackType
 LifecycleNode::set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback)
 {
   return node_parameters_->set_on_parameters_set_callback(callback);
 }
+
+// remove warning suppression
+#if !defined(_WIN32)
+# pragma GCC diagnostic pop
+#else  // !defined(_WIN32)
+# pragma warning(pop)
+#endif
 
 std::vector<std::string>
 LifecycleNode::get_node_names() const
@@ -280,6 +308,15 @@ LifecycleNode::get_service_names_and_types() const
   return node_graph_->get_service_names_and_types();
 }
 
+std::map<std::string, std::vector<std::string>>
+LifecycleNode::get_service_names_and_types_by_node(
+  const std::string & node_name,
+  const std::string & namespace_) const
+{
+  return node_graph_->get_service_names_and_types_by_node(
+    node_name, namespace_);
+}
+
 size_t
 LifecycleNode::count_publishers(const std::string & topic_name) const
 {
@@ -292,7 +329,19 @@ LifecycleNode::count_subscribers(const std::string & topic_name) const
   return node_graph_->count_subscribers(topic_name);
 }
 
-const std::vector<rclcpp::callback_group::CallbackGroup::WeakPtr> &
+std::vector<rclcpp::TopicEndpointInfo>
+LifecycleNode::get_publishers_info_by_topic(const std::string & topic_name, bool no_mangle) const
+{
+  return node_graph_->get_publishers_info_by_topic(topic_name, no_mangle);
+}
+
+std::vector<rclcpp::TopicEndpointInfo>
+LifecycleNode::get_subscriptions_info_by_topic(const std::string & topic_name, bool no_mangle) const
+{
+  return node_graph_->get_subscriptions_info_by_topic(topic_name, no_mangle);
+}
+
+const std::vector<rclcpp::CallbackGroup::WeakPtr> &
 LifecycleNode::get_callback_groups() const
 {
   return node_base_->get_callback_groups();
@@ -318,8 +367,14 @@ LifecycleNode::get_clock()
   return node_clock_->get_clock();
 }
 
+rclcpp::Clock::ConstSharedPtr
+LifecycleNode::get_clock() const
+{
+  return node_clock_->get_clock();
+}
+
 rclcpp::Time
-LifecycleNode::now()
+LifecycleNode::now() const
 {
   return node_clock_->get_clock()->now();
 }

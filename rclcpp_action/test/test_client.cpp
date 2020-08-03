@@ -219,7 +219,7 @@ protected:
     ASSERT_EQ(RCL_RET_OK, rcl_set_ros_time_override(clock.get_clock_handle(), RCL_S_TO_NS(1)));
   }
 
-  void Teardown()
+  void TearDown()
   {
     status_publisher.reset();
     feedback_publisher.reset();
@@ -270,6 +270,21 @@ TEST_F(TestClient, construction_and_destruction)
   ASSERT_NO_THROW(rclcpp_action::create_client<ActionType>(client_node, action_name).reset());
 }
 
+TEST_F(TestClient, construction_and_destruction_callback_group)
+{
+  auto group = client_node->create_callback_group(
+    rclcpp::CallbackGroupType::MutuallyExclusive);
+  ASSERT_NO_THROW(
+    rclcpp_action::create_client<ActionType>(
+      client_node->get_node_base_interface(),
+      client_node->get_node_graph_interface(),
+      client_node->get_node_logging_interface(),
+      client_node->get_node_waitables_interface(),
+      action_name,
+      group
+    ).reset());
+}
+
 TEST_F(TestClient, async_send_goal_no_callbacks)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
@@ -289,7 +304,6 @@ TEST_F(TestClient, async_send_goal_no_callbacks)
   EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_ACCEPTED, goal_handle->get_status());
   EXPECT_FALSE(goal_handle->is_feedback_aware());
   EXPECT_FALSE(goal_handle->is_result_aware());
-  EXPECT_THROW(goal_handle->async_result(), rclcpp_action::exceptions::UnawareGoalHandleError);
 }
 
 TEST_F(TestClient, async_send_goal_no_callbacks_wait_for_result)
@@ -396,7 +410,8 @@ TEST_F(TestClient, async_send_goal_with_result_callback_wait_for_result)
     [&result_callback_received](
     const typename ActionGoalHandle::WrappedResult & result) mutable
     {
-      if (rclcpp_action::ResultCode::SUCCEEDED == result.code &&
+      if (
+        rclcpp_action::ResultCode::SUCCEEDED == result.code &&
         result.result->sequence.size() == 5u)
       {
         result_callback_received = true;

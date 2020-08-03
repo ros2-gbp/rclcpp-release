@@ -1,4 +1,4 @@
-// Copyright 2015 Open Source Robotics Foundation, Inc.
+// Copyright 2015-2020 Open Source Robotics Foundation, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,23 +16,138 @@
 
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "rcl/init.h"
+#include "rcl/logging.h"
+
+#include "rclcpp/detail/utilities.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/logging.hpp"
+
+#include "rcutils/error_handling.h"
+#include "rcutils/macros.h"
+
 #include "rmw/impl/cpp/demangle.hpp"
 
-/// Mutex to protect initialized contexts.
-static std::mutex g_contexts_mutex;
-/// Weak list of context to be shutdown by the signal handler.
-static std::vector<std::weak_ptr<rclcpp::Context>> g_contexts;
+#include "./logging_mutex.hpp"
 
 using rclcpp::Context;
 
+namespace rclcpp
+{
+/// Class to manage vector of weak pointers to all created contexts
+class WeakContextsWrapper
+{
+public:
+  RCLCPP_SMART_PTR_DEFINITIONS(WeakContextsWrapper)
+
+  void
+  add_context(const Context::SharedPtr & context)
+  {
+    std::lock_guard<std::mutex> guard(mutex_);
+    weak_contexts_.push_back(context);
+  }
+
+  void
+  remove_context(const Context * context)
+  {
+    std::lock_guard<std::mutex> guard(mutex_);
+    weak_contexts_.erase(
+      std::remove_if(
+        weak_contexts_.begin(),
+        weak_contexts_.end(),
+        [context](const Context::WeakPtr weak_context) {
+          auto locked_context = weak_context.lock();
+          if (!locked_context) {
+            // take advantage and removed expired contexts
+            return true;
+          }
+          return locked_context.get() == context;
+        }
+      ),
+      weak_contexts_.end());
+  }
+
+  std::vector<Context::SharedPtr>
+  get_contexts()
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<Context::SharedPtr> shared_contexts;
+    for (auto it = weak_contexts_.begin(); it != weak_contexts_.end(); /* noop */) {
+      auto context_ptr = it->lock();
+      if (!context_ptr) {
+        // remove invalid weak context pointers
+        it = weak_contexts_.erase(it);
+      } else {
+        ++it;
+        shared_contexts.push_back(context_ptr);
+      }
+    }
+    return shared_contexts;
+  }
+
+private:
+  std::vector<std::weak_ptr<rclcpp::Context>> weak_contexts_;
+  std::mutex mutex_;
+};
+}  // namespace rclcpp
+
+using rclcpp::WeakContextsWrapper;
+
+/// Global vector of weak pointers to all contexts
+static
+WeakContextsWrapper::SharedPtr
+get_weak_contexts()
+{
+  static WeakContextsWrapper::SharedPtr weak_contexts = WeakContextsWrapper::make_shared();
+  if (!weak_contexts) {
+    throw std::runtime_error("weak contexts vector is not valid");
+  }
+  return weak_contexts;
+}
+
+/// Count of contexts that wanted to initialize the logging system.
+static
+size_t &
+get_logging_reference_count()
+{
+  static size_t ref_count = 0;
+  return ref_count;
+}
+
+extern "C"
+{
+static
+void
+rclcpp_logging_output_handler(
+  const rcutils_log_location_t * location,
+  int severity, const char * name, rcutils_time_point_value_t timestamp,
+  const char * format, va_list * args)
+{
+  try {
+    std::shared_ptr<std::recursive_mutex> logging_mutex;
+    logging_mutex = get_global_logging_mutex();
+    std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
+    return rcl_logging_multiple_output_handler(
+      location, severity, name, timestamp, format, args);
+  } catch (std::exception & ex) {
+    RCUTILS_SAFE_FWRITE_TO_STDERR(ex.what());
+    RCUTILS_SAFE_FWRITE_TO_STDERR("\n");
+  } catch (...) {
+    RCUTILS_SAFE_FWRITE_TO_STDERR("failed to take global rclcpp logging mutex\n");
+  }
+}
+}  // extern "C"
+
 Context::Context()
-: rcl_context_(nullptr), shutdown_reason_("") {}
+: rcl_context_(nullptr),
+  shutdown_reason_(""),
+  logging_mutex_(nullptr)
+{}
 
 Context::~Context()
 {
@@ -91,10 +206,50 @@ Context::init(
     rcl_context_.reset();
     rclcpp::exceptions::throw_from_rcl_error(ret, "failed to initialize rcl");
   }
-  init_options_ = init_options;
 
-  std::lock_guard<std::mutex> lock(g_contexts_mutex);
-  g_contexts.push_back(this->shared_from_this());
+  if (init_options.auto_initialize_logging()) {
+    logging_mutex_ = get_global_logging_mutex();
+    std::lock_guard<std::recursive_mutex> guard(*logging_mutex_);
+    size_t & count = get_logging_reference_count();
+    if (0u == count) {
+      ret = rcl_logging_configure_with_output_handler(
+        &rcl_context_->global_arguments,
+        rcl_init_options_get_allocator(init_options_.get_rcl_init_options()),
+        rclcpp_logging_output_handler);
+      if (RCL_RET_OK != ret) {
+        rcl_context_.reset();
+        rclcpp::exceptions::throw_from_rcl_error(ret, "failed to configure logging");
+      }
+    } else {
+      RCLCPP_WARN(
+        rclcpp::get_logger("rclcpp"),
+        "logging was initialized more than once");
+    }
+    ++count;
+  }
+
+  try {
+    std::vector<std::string> unparsed_ros_arguments = detail::get_unparsed_ros_arguments(
+      argc, argv, &(rcl_context_->global_arguments), rcl_get_default_allocator());
+    if (!unparsed_ros_arguments.empty()) {
+      throw exceptions::UnknownROSArgsError(std::move(unparsed_ros_arguments));
+    }
+
+    init_options_ = init_options;
+
+    weak_contexts_ = get_weak_contexts();
+    weak_contexts_->add_context(this->shared_from_this());
+  } catch (const std::exception & e) {
+    ret = rcl_shutdown(rcl_context_.get());
+    rcl_context_.reset();
+    if (RCL_RET_OK != ret) {
+      std::ostringstream oss;
+      oss << "While handling: " << e.what() << std::endl <<
+        "    another exception was thrown";
+      rclcpp::exceptions::throw_from_rcl_error(ret, oss.str());
+    }
+    throw;
+  }
 }
 
 bool
@@ -152,14 +307,21 @@ Context::shutdown(const std::string & reason)
   this->interrupt_all_sleep_for();
   this->interrupt_all_wait_sets();
   // remove self from the global contexts
-  std::lock_guard<std::mutex> context_lock(g_contexts_mutex);
-  for (auto it = g_contexts.begin(); it != g_contexts.end(); ) {
-    auto shared_context = it->lock();
-    if (shared_context.get() == this) {
-      it = g_contexts.erase(it);
-      break;
-    } else {
-      ++it;
+  weak_contexts_->remove_context(this);
+  // shutdown logger
+  if (logging_mutex_) {
+    // logging was initialized by this context
+    std::lock_guard<std::recursive_mutex> guard(*logging_mutex_);
+    size_t & count = get_logging_reference_count();
+    if (0u == --count) {
+      rcl_ret_t rcl_ret = rcl_logging_fini();
+      if (RCL_RET_OK != rcl_ret) {
+        RCUTILS_SAFE_FWRITE_TO_STDERR(
+          RCUTILS_STRINGIFY(__file__) ":"
+          RCUTILS_STRINGIFY(__LINE__)
+          " failed to fini logging");
+        rcl_reset_error();
+      }
     }
   }
   return true;
@@ -288,22 +450,12 @@ Context::clean_up()
 {
   shutdown_reason_ = "";
   rcl_context_.reset();
+  sub_contexts_.clear();
 }
 
 std::vector<Context::SharedPtr>
 rclcpp::get_contexts()
 {
-  std::lock_guard<std::mutex> lock(g_contexts_mutex);
-  std::vector<Context::SharedPtr> shared_contexts;
-  for (auto it = g_contexts.begin(); it != g_contexts.end(); /* noop */) {
-    auto context_ptr = it->lock();
-    if (!context_ptr) {
-      // remove invalid weak context pointers
-      it = g_contexts.erase(it);
-    } else {
-      ++it;
-      shared_contexts.push_back(context_ptr);
-    }
-  }
-  return shared_contexts;
+  WeakContextsWrapper::SharedPtr weak_contexts = get_weak_contexts();
+  return weak_contexts->get_contexts();
 }

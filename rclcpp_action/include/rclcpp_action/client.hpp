@@ -23,7 +23,7 @@
 #include <rclcpp/time.hpp>
 #include <rclcpp/waitable.hpp>
 
-#include <rosidl_generator_c/action_type_support_struct.h>
+#include <rosidl_runtime_c/action_type_support_struct.h>
 #include <rosidl_typesupport_cpp/action_type_support.hpp>
 
 #include <algorithm>
@@ -331,7 +331,9 @@ public:
    * If the goal is accepted by an action server, the returned future is set to a `ClientGoalHandle`.
    * If the goal is rejected by an action server, then the future is set to a `nullptr`.
    *
-   * The goal handle is used to monitor the status of the goal and get the final result.
+   * The returned goal handle is used to monitor the status of the goal and get the final result.
+   * It is valid as long as you hold a reference to the shared pointer or until the
+   * rclcpp_action::Client is destroyed at which point the goal status will become UNKNOWN.
    *
    * \param[in] goal The goal request.
    * \param[in] options Options for sending the goal request. Contains references to callbacks for
@@ -386,6 +388,26 @@ public:
           }
         }
       });
+
+    // TODO(jacobperron): Encapsulate into it's own function and
+    //                    consider exposing an option to disable this cleanup
+    // To prevent the list from growing out of control, forget about any goals
+    // with no more user references
+    {
+      std::lock_guard<std::mutex> guard(goal_handles_mutex_);
+      auto goal_handle_it = goal_handles_.begin();
+      while (goal_handle_it != goal_handles_.end()) {
+        if (!goal_handle_it->second.lock()) {
+          RCLCPP_DEBUG(
+            this->get_logger(),
+            "Dropping weak reference to goal handle during send_goal()");
+          goal_handle_it = goal_handles_.erase(goal_handle_it);
+        } else {
+          ++goal_handle_it;
+        }
+      }
+    }
+
     return future;
   }
 
@@ -410,11 +432,8 @@ public:
       // This will override any previously registered callback
       goal_handle->set_result_callback(result_callback);
     }
-    // If the user chose to ignore the result before, then ask the server for the result now.
-    if (!goal_handle->is_result_aware()) {
-      this->make_result_aware(goal_handle);
-    }
-    return goal_handle->async_result();
+    this->make_result_aware(goal_handle);
+    return goal_handle->async_get_result();
   }
 
   /// Asynchronously request a goal be canceled.
@@ -497,7 +516,10 @@ public:
     std::lock_guard<std::mutex> guard(goal_handles_mutex_);
     auto it = goal_handles_.begin();
     while (it != goal_handles_.end()) {
-      it->second->invalidate();
+      typename GoalHandle::SharedPtr goal_handle = it->second.lock();
+      if (goal_handle) {
+        goal_handle->invalidate();
+      }
       it = goal_handles_.erase(it);
     }
   }
@@ -549,7 +571,15 @@ private:
         "Received feedback for unknown goal. Ignoring...");
       return;
     }
-    typename GoalHandle::SharedPtr goal_handle = goal_handles_[goal_id];
+    typename GoalHandle::SharedPtr goal_handle = goal_handles_[goal_id].lock();
+    // Forget about the goal if there are no more user references
+    if (!goal_handle) {
+      RCLCPP_DEBUG(
+        this->get_logger(),
+        "Dropping weak reference to goal handle during feedback callback");
+      goal_handles_.erase(goal_id);
+      return;
+    }
     auto feedback = std::make_shared<Feedback>();
     *feedback = feedback_message->feedback;
     goal_handle->call_feedback_callback(goal_handle, feedback);
@@ -578,16 +608,16 @@ private:
           "Received status for unknown goal. Ignoring...");
         continue;
       }
-      typename GoalHandle::SharedPtr goal_handle = goal_handles_[goal_id];
-      goal_handle->set_status(status.status);
-      const int8_t goal_status = goal_handle->get_status();
-      if (
-        goal_status == GoalStatus::STATUS_SUCCEEDED ||
-        goal_status == GoalStatus::STATUS_CANCELED ||
-        goal_status == GoalStatus::STATUS_ABORTED)
-      {
+      typename GoalHandle::SharedPtr goal_handle = goal_handles_[goal_id].lock();
+      // Forget about the goal if there are no more user references
+      if (!goal_handle) {
+        RCLCPP_DEBUG(
+          this->get_logger(),
+          "Dropping weak reference to goal handle during status callback");
         goal_handles_.erase(goal_id);
+        continue;
       }
+      goal_handle->set_status(status.status);
     }
   }
 
@@ -595,6 +625,10 @@ private:
   void
   make_result_aware(typename GoalHandle::SharedPtr goal_handle)
   {
+    // Avoid making more than one request
+    if (goal_handle->set_result_awareness(true)) {
+      return;
+    }
     using GoalResultRequest = typename ActionT::Impl::GetResultService::Request;
     auto goal_result_request = std::make_shared<GoalResultRequest>();
     goal_result_request->goal_id.uuid = goal_handle->get_goal_id();
@@ -614,7 +648,6 @@ private:
         std::lock_guard<std::mutex> lock(goal_handles_mutex_);
         goal_handles_.erase(goal_handle->get_goal_id());
       });
-    goal_handle->set_result_awareness(true);
   }
 
   /// \internal
@@ -639,7 +672,7 @@ private:
     return future;
   }
 
-  std::map<GoalUUID, typename GoalHandle::SharedPtr> goal_handles_;
+  std::map<GoalUUID, typename GoalHandle::WeakPtr> goal_handles_;
   std::mutex goal_handles_mutex_;
 };
 }  // namespace rclcpp_action

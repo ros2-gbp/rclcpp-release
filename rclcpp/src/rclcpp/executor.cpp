@@ -26,23 +26,21 @@
 #include "rclcpp/scope_exit.hpp"
 #include "rclcpp/utilities.hpp"
 
-#include "rcl_interfaces/msg/intra_process_message.hpp"
-
 #include "rcutils/logging_macros.h"
 
 using rclcpp::exceptions::throw_from_rcl_error;
-using rclcpp::executor::AnyExecutable;
-using rclcpp::executor::Executor;
-using rclcpp::executor::ExecutorArgs;
-using rclcpp::executor::FutureReturnCode;
+using rclcpp::AnyExecutable;
+using rclcpp::Executor;
+using rclcpp::ExecutorOptions;
+using rclcpp::FutureReturnCode;
 
-Executor::Executor(const ExecutorArgs & args)
+Executor::Executor(const rclcpp::ExecutorOptions & options)
 : spinning(false),
-  memory_strategy_(args.memory_strategy)
+  memory_strategy_(options.memory_strategy)
 {
   rcl_guard_condition_options_t guard_condition_options = rcl_guard_condition_get_default_options();
   rcl_ret_t ret = rcl_guard_condition_init(
-    &interrupt_guard_condition_, args.context->get_rcl_context().get(), guard_condition_options);
+    &interrupt_guard_condition_, options.context->get_rcl_context().get(), guard_condition_options);
   if (RCL_RET_OK != ret) {
     throw_from_rcl_error(ret, "Failed to create interrupt guard condition in Executor constructor");
   }
@@ -51,14 +49,14 @@ Executor::Executor(const ExecutorArgs & args)
   // and one for the executor's guard cond (interrupt_guard_condition_)
 
   // Put the global ctrl-c guard condition in
-  memory_strategy_->add_guard_condition(args.context->get_interrupt_guard_condition(&wait_set_));
+  memory_strategy_->add_guard_condition(options.context->get_interrupt_guard_condition(&wait_set_));
 
   // Put the executor's guard condition in
   memory_strategy_->add_guard_condition(&interrupt_guard_condition_);
   rcl_allocator_t allocator = memory_strategy_->get_allocator();
 
   // Store the context for later use.
-  context_ = args.context;
+  context_ = options.context;
 
   ret = rcl_wait_set_init(
     &wait_set_,
@@ -234,9 +232,11 @@ Executor::spin_some(std::chrono::nanoseconds max_duration)
     throw std::runtime_error("spin_some() called while already spinning");
   }
   RCLCPP_SCOPE_EXIT(this->spinning.store(false); );
+  // non-blocking call to pre-load all available work
+  wait_for_work(std::chrono::milliseconds::zero());
   while (rclcpp::ok(context_) && spinning.load() && max_duration_not_elapsed()) {
     AnyExecutable any_exec;
-    if (get_next_executable(any_exec, std::chrono::milliseconds::zero())) {
+    if (get_next_ready_executable(any_exec)) {
       execute_any_executable(any_exec);
     } else {
       break;
@@ -293,9 +293,6 @@ Executor::execute_any_executable(AnyExecutable & any_exec)
   if (any_exec.subscription) {
     execute_subscription(any_exec.subscription);
   }
-  if (any_exec.subscription_intra_process) {
-    execute_intra_process_subscription(any_exec.subscription_intra_process);
-  }
   if (any_exec.service) {
     execute_service(any_exec.service);
   }
@@ -314,97 +311,126 @@ Executor::execute_any_executable(AnyExecutable & any_exec)
   }
 }
 
+static
 void
-Executor::execute_subscription(
-  rclcpp::SubscriptionBase::SharedPtr subscription)
+take_and_do_error_handling(
+  const char * action_description,
+  const char * topic_or_service_name,
+  std::function<bool()> take_action,
+  std::function<void()> handle_action)
 {
-  rmw_message_info_t message_info;
-  message_info.from_intra_process = false;
+  bool taken = false;
+  try {
+    taken = take_action();
+  } catch (const rclcpp::exceptions::RCLError & rcl_error) {
+    RCLCPP_ERROR(
+      rclcpp::get_logger("rclcpp"),
+      "executor %s '%s' unexpectedly failed: %s",
+      action_description,
+      topic_or_service_name,
+      rcl_error.what());
+  }
+  if (taken) {
+    handle_action();
+  } else {
+    // Message or Service was not taken for some reason.
+    // Note that this can be normal, if the underlying middleware needs to
+    // interrupt wait spuriously it is allowed.
+    // So in that case the executor cannot tell the difference in a
+    // spurious wake up and an entity actually having data until trying
+    // to take the data.
+    RCLCPP_DEBUG(
+      rclcpp::get_logger("rclcpp"),
+      "executor %s '%s' failed to take anything",
+      action_description,
+      topic_or_service_name);
+  }
+}
+
+void
+Executor::execute_subscription(rclcpp::SubscriptionBase::SharedPtr subscription)
+{
+  rclcpp::MessageInfo message_info;
+  message_info.get_rmw_message_info().from_intra_process = false;
 
   if (subscription->is_serialized()) {
-    auto serialized_msg = subscription->create_serialized_message();
-    auto ret = rcl_take_serialized_message(
-      subscription->get_subscription_handle().get(),
-      serialized_msg.get(), &message_info, nullptr);
-    if (RCL_RET_OK == ret) {
-      auto void_serialized_msg = std::static_pointer_cast<void>(serialized_msg);
-      subscription->handle_message(void_serialized_msg, message_info);
-    } else if (RCL_RET_SUBSCRIPTION_TAKE_FAILED != ret) {
-      RCUTILS_LOG_ERROR_NAMED(
-        "rclcpp",
-        "take_serialized failed for subscription on topic '%s': %s",
-        subscription->get_topic_name(), rcl_get_error_string().str);
-      rcl_reset_error();
-    }
+    // This is the case where a copy of the serialized message is taken from
+    // the middleware via inter-process communication.
+    std::shared_ptr<SerializedMessage> serialized_msg = subscription->create_serialized_message();
+    take_and_do_error_handling(
+      "taking a serialized message from topic",
+      subscription->get_topic_name(),
+      [&]() {return subscription->take_serialized(*serialized_msg.get(), message_info);},
+      [&]()
+      {
+        auto void_serialized_msg = std::static_pointer_cast<void>(serialized_msg);
+        subscription->handle_message(void_serialized_msg, message_info);
+      });
     subscription->return_serialized_message(serialized_msg);
-  } else {
-    std::shared_ptr<void> message = subscription->create_message();
-    auto ret = rcl_take(
+  } else if (subscription->can_loan_messages()) {
+    // This is the case where a loaned message is taken from the middleware via
+    // inter-process communication, given to the user for their callback,
+    // and then returned.
+    void * loaned_msg = nullptr;
+    // TODO(wjwwood): refactor this into methods on subscription when LoanedMessage
+    //   is extened to support subscriptions as well.
+    take_and_do_error_handling(
+      "taking a loaned message from topic",
+      subscription->get_topic_name(),
+      [&]()
+      {
+        rcl_ret_t ret = rcl_take_loaned_message(
+          subscription->get_subscription_handle().get(),
+          &loaned_msg,
+          &message_info.get_rmw_message_info(),
+          nullptr);
+        if (RCL_RET_SUBSCRIPTION_TAKE_FAILED == ret) {
+          return false;
+        } else if (RCL_RET_OK != ret) {
+          rclcpp::exceptions::throw_from_rcl_error(ret);
+        }
+        return true;
+      },
+      [&]() {subscription->handle_loaned_message(loaned_msg, message_info);});
+    rcl_ret_t ret = rcl_return_loaned_message_from_subscription(
       subscription->get_subscription_handle().get(),
-      message.get(), &message_info, nullptr);
-    if (RCL_RET_OK == ret) {
-      subscription->handle_message(message, message_info);
-    } else if (RCL_RET_SUBSCRIPTION_TAKE_FAILED != ret) {
-      RCUTILS_LOG_ERROR_NAMED(
-        "rclcpp",
-        "could not deserialize serialized message on topic '%s': %s",
+      loaned_msg);
+    if (RCL_RET_OK != ret) {
+      RCLCPP_ERROR(
+        rclcpp::get_logger("rclcpp"),
+        "rcl_return_loaned_message_from_subscription() failed for subscription on topic '%s': %s",
         subscription->get_topic_name(), rcl_get_error_string().str);
-      rcl_reset_error();
     }
+    loaned_msg = nullptr;
+  } else {
+    // This case is taking a copy of the message data from the middleware via
+    // inter-process communication.
+    std::shared_ptr<void> message = subscription->create_message();
+    take_and_do_error_handling(
+      "taking a message from topic",
+      subscription->get_topic_name(),
+      [&]() {return subscription->take_type_erased(message.get(), message_info);},
+      [&]() {subscription->handle_message(message, message_info);});
     subscription->return_message(message);
   }
 }
 
 void
-Executor::execute_intra_process_subscription(
-  rclcpp::SubscriptionBase::SharedPtr subscription)
-{
-  rcl_interfaces::msg::IntraProcessMessage ipm;
-  rmw_message_info_t message_info;
-  rcl_ret_t status = rcl_take(
-    subscription->get_intra_process_subscription_handle().get(),
-    &ipm,
-    &message_info,
-    nullptr);
-
-  if (status == RCL_RET_OK) {
-    message_info.from_intra_process = true;
-    subscription->handle_intra_process_message(ipm, message_info);
-  } else if (status != RCL_RET_SUBSCRIPTION_TAKE_FAILED) {
-    RCUTILS_LOG_ERROR_NAMED(
-      "rclcpp",
-      "take failed for intra process subscription on topic '%s': %s",
-      subscription->get_topic_name(), rcl_get_error_string().str);
-    rcl_reset_error();
-  }
-}
-
-void
-Executor::execute_timer(
-  rclcpp::TimerBase::SharedPtr timer)
+Executor::execute_timer(rclcpp::TimerBase::SharedPtr timer)
 {
   timer->execute_callback();
 }
 
 void
-Executor::execute_service(
-  rclcpp::ServiceBase::SharedPtr service)
+Executor::execute_service(rclcpp::ServiceBase::SharedPtr service)
 {
   auto request_header = service->create_request_header();
   std::shared_ptr<void> request = service->create_request();
-  rcl_ret_t status = rcl_take_request(
-    service->get_service_handle().get(),
-    request_header.get(),
-    request.get());
-  if (status == RCL_RET_OK) {
-    service->handle_request(request_header, request);
-  } else if (status != RCL_RET_SERVICE_TAKE_FAILED) {
-    RCUTILS_LOG_ERROR_NAMED(
-      "rclcpp",
-      "take request failed for server of service '%s': %s",
-      service->get_service_name(), rcl_get_error_string().str);
-    rcl_reset_error();
-  }
+  take_and_do_error_handling(
+    "taking a service server request from service",
+    service->get_service_name(),
+    [&]() {return service->take_type_erased_request(request.get(), *request_header);},
+    [&]() {service->handle_request(request_header, request);});
 }
 
 void
@@ -413,19 +439,11 @@ Executor::execute_client(
 {
   auto request_header = client->create_request_header();
   std::shared_ptr<void> response = client->create_response();
-  rcl_ret_t status = rcl_take_response(
-    client->get_client_handle().get(),
-    request_header.get(),
-    response.get());
-  if (status == RCL_RET_OK) {
-    client->handle_response(request_header, response);
-  } else if (status != RCL_RET_CLIENT_TAKE_FAILED) {
-    RCUTILS_LOG_ERROR_NAMED(
-      "rclcpp",
-      "take response failed for client of service '%s': %s",
-      client->get_service_name(), rcl_get_error_string().str);
-    rcl_reset_error();
-  }
+  take_and_do_error_handling(
+    "taking a service client response from service",
+    client->get_service_name(),
+    [&]() {return client->take_type_erased_response(response.get(), *request_header);},
+    [&]() {client->handle_response(request_header, response);});
 }
 
 void
@@ -490,7 +508,7 @@ Executor::wait_for_work(std::chrono::nanoseconds timeout)
 }
 
 rclcpp::node_interfaces::NodeBaseInterface::SharedPtr
-Executor::get_node_by_group(rclcpp::callback_group::CallbackGroup::SharedPtr group)
+Executor::get_node_by_group(rclcpp::CallbackGroup::SharedPtr group)
 {
   if (!group) {
     return nullptr;
@@ -510,7 +528,7 @@ Executor::get_node_by_group(rclcpp::callback_group::CallbackGroup::SharedPtr gro
   return nullptr;
 }
 
-rclcpp::callback_group::CallbackGroup::SharedPtr
+rclcpp::CallbackGroup::SharedPtr
 Executor::get_group_by_timer(rclcpp::TimerBase::SharedPtr timer)
 {
   for (auto & weak_node : weak_nodes_) {
@@ -523,91 +541,54 @@ Executor::get_group_by_timer(rclcpp::TimerBase::SharedPtr timer)
       if (!group) {
         continue;
       }
-      for (auto & weak_timer : group->get_timer_ptrs()) {
-        auto t = weak_timer.lock();
-        if (t == timer) {
-          return group;
-        }
+      auto timer_ref = group->find_timer_ptrs_if(
+        [timer](const rclcpp::TimerBase::SharedPtr & timer_ptr) -> bool {
+          return timer_ptr == timer;
+        });
+      if (timer_ref) {
+        return group;
       }
     }
   }
-  return rclcpp::callback_group::CallbackGroup::SharedPtr();
-}
-
-void
-Executor::get_next_timer(AnyExecutable & any_exec)
-{
-  for (auto & weak_node : weak_nodes_) {
-    auto node = weak_node.lock();
-    if (!node) {
-      continue;
-    }
-    for (auto & weak_group : node->get_callback_groups()) {
-      auto group = weak_group.lock();
-      if (!group || !group->can_be_taken_from().load()) {
-        continue;
-      }
-      for (auto & timer_ref : group->get_timer_ptrs()) {
-        auto timer = timer_ref.lock();
-        if (timer && timer->is_ready()) {
-          any_exec.timer = timer;
-          any_exec.callback_group = group;
-          node = get_node_by_group(group);
-          return;
-        }
-      }
-    }
-  }
+  return rclcpp::CallbackGroup::SharedPtr();
 }
 
 bool
 Executor::get_next_ready_executable(AnyExecutable & any_executable)
 {
-  // Check the timers to see if there are any that are ready, if so return
-  get_next_timer(any_executable);
-  if (any_executable.timer) {
-    return true;
-  }
-  // Check the subscriptions to see if there are any that are ready
-  memory_strategy_->get_next_subscription(any_executable, weak_nodes_);
-  if (any_executable.subscription || any_executable.subscription_intra_process) {
-    return true;
-  }
-  // Check the services to see if there are any that are ready
-  memory_strategy_->get_next_service(any_executable, weak_nodes_);
-  if (any_executable.service) {
-    return true;
-  }
-  // Check the clients to see if there are any that are ready
-  memory_strategy_->get_next_client(any_executable, weak_nodes_);
-  if (any_executable.client) {
-    return true;
-  }
-  // Check the waitables to see if there are any that are ready
-  memory_strategy_->get_next_waitable(any_executable, weak_nodes_);
-  if (any_executable.waitable) {
-    return true;
-  }
-  // If there is no ready executable, return a null ptr
-  return false;
-}
-
-bool
-Executor::get_next_executable(AnyExecutable & any_executable, std::chrono::nanoseconds timeout)
-{
   bool success = false;
-  // Check to see if there are any subscriptions or timers needing service
-  // TODO(wjwwood): improve run to run efficiency of this function
-  success = get_next_ready_executable(any_executable);
-  // If there are none
+  // Check the timers to see if there are any that are ready
+  memory_strategy_->get_next_timer(any_executable, weak_nodes_);
+  if (any_executable.timer) {
+    success = true;
+  }
   if (!success) {
-    // Wait for subscriptions or timers to work on
-    wait_for_work(timeout);
-    if (!spinning.load()) {
-      return false;
+    // Check the subscriptions to see if there are any that are ready
+    memory_strategy_->get_next_subscription(any_executable, weak_nodes_);
+    if (any_executable.subscription) {
+      success = true;
     }
-    // Try again
-    success = get_next_ready_executable(any_executable);
+  }
+  if (!success) {
+    // Check the services to see if there are any that are ready
+    memory_strategy_->get_next_service(any_executable, weak_nodes_);
+    if (any_executable.service) {
+      success = true;
+    }
+  }
+  if (!success) {
+    // Check the clients to see if there are any that are ready
+    memory_strategy_->get_next_client(any_executable, weak_nodes_);
+    if (any_executable.client) {
+      success = true;
+    }
+  }
+  if (!success) {
+    // Check the waitables to see if there are any that are ready
+    memory_strategy_->get_next_waitable(any_executable, weak_nodes_);
+    if (any_executable.waitable) {
+      success = true;
+    }
   }
   // At this point any_exec should be valid with either a valid subscription
   // or a valid timer, or it should be a null shared_ptr
@@ -627,31 +608,26 @@ Executor::get_next_executable(AnyExecutable & any_executable, std::chrono::nanos
       any_executable.callback_group->can_be_taken_from().store(false);
     }
   }
+  // If there is no ready executable, return false
   return success;
 }
 
-std::ostream &
-rclcpp::executor::operator<<(std::ostream & os, const FutureReturnCode & future_return_code)
+bool
+Executor::get_next_executable(AnyExecutable & any_executable, std::chrono::nanoseconds timeout)
 {
-  return os << to_string(future_return_code);
-}
-
-std::string
-rclcpp::executor::to_string(const FutureReturnCode & future_return_code)
-{
-  using enum_type = std::underlying_type<FutureReturnCode>::type;
-  std::string prefix = "Unknown enum value (";
-  std::string ret_as_string = std::to_string(static_cast<enum_type>(future_return_code));
-  switch (future_return_code) {
-    case FutureReturnCode::SUCCESS:
-      prefix = "SUCCESS (";
-      break;
-    case FutureReturnCode::INTERRUPTED:
-      prefix = "INTERRUPTED (";
-      break;
-    case FutureReturnCode::TIMEOUT:
-      prefix = "TIMEOUT (";
-      break;
+  bool success = false;
+  // Check to see if there are any subscriptions or timers needing service
+  // TODO(wjwwood): improve run to run efficiency of this function
+  success = get_next_ready_executable(any_executable);
+  // If there are none
+  if (!success) {
+    // Wait for subscriptions or timers to work on
+    wait_for_work(timeout);
+    if (!spinning.load()) {
+      return false;
+    }
+    // Try again
+    success = get_next_ready_executable(any_executable);
   }
-  return prefix + ret_as_string + ")";
+  return success;
 }

@@ -25,6 +25,8 @@
 #include "rmw/validate_namespace.h"
 #include "rmw/validate_node_name.h"
 
+#include "../logging_mutex.hpp"
+
 using rclcpp::exceptions::throw_from_rcl_error;
 
 using rclcpp::node_interfaces::NodeBase;
@@ -34,9 +36,11 @@ NodeBase::NodeBase(
   const std::string & namespace_,
   rclcpp::Context::SharedPtr context,
   const rcl_node_options_t & rcl_node_options,
-  bool use_intra_process_default)
+  bool use_intra_process_default,
+  bool enable_topic_statistics_default)
 : context_(context),
   use_intra_process_default_(use_intra_process_default),
+  enable_topic_statistics_default_(enable_topic_statistics_default),
   node_handle_(nullptr),
   default_callback_group_(nullptr),
   associated_with_executor_(false),
@@ -63,10 +67,17 @@ NodeBase::NodeBase(
   // Create the rcl node and store it in a shared_ptr with a custom destructor.
   std::unique_ptr<rcl_node_t> rcl_node(new rcl_node_t(rcl_get_zero_initialized_node()));
 
-  ret = rcl_node_init(
-    rcl_node.get(),
-    node_name.c_str(), namespace_.c_str(),
-    context_->get_rcl_context().get(), &rcl_node_options);
+  std::shared_ptr<std::recursive_mutex> logging_mutex = get_global_logging_mutex();
+  {
+    std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
+    // TODO(ivanpauno): Instead of mutually excluding rcl_node_init with the global logger mutex,
+    // rcl_logging_rosout_init_publisher_for_node could be decoupled from there and be called
+    // here directly.
+    ret = rcl_node_init(
+      rcl_node.get(),
+      node_name.c_str(), namespace_.c_str(),
+      context_->get_rcl_context().get(), &rcl_node_options);
+  }
   if (ret != RCL_RET_OK) {
     // Finalize the interrupt guard condition.
     finalize_notify_guard_condition();
@@ -121,7 +132,11 @@ NodeBase::NodeBase(
 
   node_handle_.reset(
     rcl_node.release(),
-    [](rcl_node_t * node) -> void {
+    [logging_mutex](rcl_node_t * node) -> void {
+      std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
+      // TODO(ivanpauno): Instead of mutually excluding rcl_node_fini with the global logger mutex,
+      // rcl_logging_rosout_fini_publisher_for_node could be decoupled from there and be called
+      // here directly.
       if (rcl_node_fini(node) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
@@ -131,7 +146,7 @@ NodeBase::NodeBase(
     });
 
   // Create the default callback group.
-  using rclcpp::callback_group::CallbackGroupType;
+  using rclcpp::CallbackGroupType;
   default_callback_group_ = create_callback_group(CallbackGroupType::MutuallyExclusive);
 
   // Indicate the notify_guard_condition is now valid.
@@ -200,30 +215,24 @@ NodeBase::get_shared_rcl_node_handle() const
   return node_handle_;
 }
 
-bool
-NodeBase::assert_liveliness() const
+rclcpp::CallbackGroup::SharedPtr
+NodeBase::create_callback_group(rclcpp::CallbackGroupType group_type)
 {
-  return RCL_RET_OK == rcl_node_assert_liveliness(get_rcl_node_handle());
-}
-
-rclcpp::callback_group::CallbackGroup::SharedPtr
-NodeBase::create_callback_group(rclcpp::callback_group::CallbackGroupType group_type)
-{
-  using rclcpp::callback_group::CallbackGroup;
-  using rclcpp::callback_group::CallbackGroupType;
+  using rclcpp::CallbackGroup;
+  using rclcpp::CallbackGroupType;
   auto group = CallbackGroup::SharedPtr(new CallbackGroup(group_type));
   callback_groups_.push_back(group);
   return group;
 }
 
-rclcpp::callback_group::CallbackGroup::SharedPtr
+rclcpp::CallbackGroup::SharedPtr
 NodeBase::get_default_callback_group()
 {
   return default_callback_group_;
 }
 
 bool
-NodeBase::callback_group_in_node(rclcpp::callback_group::CallbackGroup::SharedPtr group)
+NodeBase::callback_group_in_node(rclcpp::CallbackGroup::SharedPtr group)
 {
   bool group_belongs_to_this_node = false;
   for (auto & weak_group : this->callback_groups_) {
@@ -235,7 +244,7 @@ NodeBase::callback_group_in_node(rclcpp::callback_group::CallbackGroup::SharedPt
   return group_belongs_to_this_node;
 }
 
-const std::vector<rclcpp::callback_group::CallbackGroup::WeakPtr> &
+const std::vector<rclcpp::CallbackGroup::WeakPtr> &
 NodeBase::get_callback_groups() const
 {
   return callback_groups_;
@@ -267,4 +276,10 @@ bool
 NodeBase::get_use_intra_process_default() const
 {
   return use_intra_process_default_;
+}
+
+bool
+NodeBase::get_enable_topic_statistics_default() const
+{
+  return enable_topic_statistics_default_;
 }

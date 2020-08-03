@@ -3,37 +3,76 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-0.7.14 (2020-07-10)
--------------------
-* Fixed doxygen warnings. (`#1208 <https://github.com/ros2/rclcpp/issues/1208>`_)
+2.1.0 (2020-08-03)
+------------------
+
+2.0.2 (2020-07-07)
+------------------
+
+2.0.1 (2020-06-23)
+------------------
+* Fixed doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_) (`#1191 <https://github.com/ros2/rclcpp/issues/1191>`_)
 * Contributors: Alejandro Hernández Cordero
 
-0.7.13 (2020-03-12)
--------------------
+2.0.0 (2020-06-01)
+------------------
+* Added missing virtual destructors. (`#1149 <https://github.com/ros2/rclcpp/issues/1149>`_)
+* Add Security Vulnerability Policy pointing to REP-2006. (`#1130 <https://github.com/ros2/rclcpp/issues/1130>`_)
+* Contributors: Chris Lalancette, Ivan Santiago Paunovic
 
-0.7.12 (2019-12-05)
--------------------
-* Fixed memory leak in action clients (`#934 <https://github.com/ros2/rclcpp/issues/934>`_)
-* Do not throw exception in action client if take fails (`#891 <https://github.com/ros2/rclcpp/issues/891>`_)
-* Contributors: Ivan Santiago Paunovic, Jacob Perron
+1.1.0 (2020-05-26)
+------------------
+* Action client holds weak pointers to goal handles (`#1122 <https://github.com/ros2/rclcpp/issues/1122>`_)
+* Deprecate ClientGoalHandle::async_result() (`#1120 <https://github.com/ros2/rclcpp/issues/1120>`_)
+* Improve documentation (`#1106 <https://github.com/ros2/rclcpp/issues/1106>`_)
+* Fixed rep links and added more details to dependencies in quality declaration (`#1116 <https://github.com/ros2/rclcpp/issues/1116>`_)
+* Update quality declaration to reflect version 1.0 (`#1115 <https://github.com/ros2/rclcpp/issues/1115>`_)
+* Contributors: Alejandro Hernández Cordero, Jacob Perron, Stephen Brawner
 
-0.7.11 (2019-10-11)
--------------------
-
-0.7.10 (2019-09-23)
--------------------
-
-0.7.9 (2019-09-20)
+1.0.0 (2020-05-12)
 ------------------
 
-0.7.8 (2019-09-06)
+0.9.1 (2020-05-08)
 ------------------
+* Added Quality declaration: rclcpp, rclpp_action, rclcpp_components andrclcpp_lifecycle (`#1100 <https://github.com/ros2/rclcpp/issues/1100>`_)
+* Contributors: Alejandro Hernández Cordero
 
-0.7.7 (2019-07-31)
+0.9.0 (2020-04-29)
 ------------------
+* Increasing test coverage of rclcpp_action (`#1043 <https://github.com/ros2/rclcpp/issues/1043>`_)
+* Export targets in addition to include directories / libraries (`#1096 <https://github.com/ros2/rclcpp/issues/1096>`_)
+* Deprecate redundant namespaces (`#1083 <https://github.com/ros2/rclcpp/issues/1083>`_)
+* Rename rosidl_generator_c namespace to rosidl_runtime_c (`#1062 <https://github.com/ros2/rclcpp/issues/1062>`_)
+* Changed rosidl_generator_c/cpp to rosidl_runtime_c/cpp (`#1014 <https://github.com/ros2/rclcpp/issues/1014>`_)
+* Fix unknown macro errors reported by cppcheck 1.90 (`#1000 <https://github.com/ros2/rclcpp/issues/1000>`_)
+* Removed rosidl_generator_c dependency (`#992 <https://github.com/ros2/rclcpp/issues/992>`_)
+* Fix typo in action client logger name (`#937 <https://github.com/ros2/rclcpp/issues/937>`_)
+* Contributors: Alejandro Hernández Cordero, Dirk Thomas, Jacob Perron, Stephen Brawner, William Woodall
 
-0.7.6 (2019-06-12)
+0.8.3 (2019-11-19)
 ------------------
+* issue-919 Fixed "memory leak" in action clients (`#920 <https://github.com/ros2/rclcpp/issues/920>`_)
+* Contributors: astere-cpr
+
+0.8.2 (2019-11-18)
+------------------
+* Increased a timeout for the ``test_client`` tests. (`#917 <https://github.com/ros2/rclcpp/issues/917>`_)
+* Contributors: Michel Hidalgo
+
+0.8.1 (2019-10-23)
+------------------
+* Template node type for rclcpp action server and clients (`#892 <https://github.com/ros2/rclcpp/issues/892>`_)
+* Trait tests for generated actions (`#853 <https://github.com/ros2/rclcpp/issues/853>`_)
+* Do not throw exception in action client if take fails (`#888 <https://github.com/ros2/rclcpp/issues/888>`_)
+* Contributors: Jacob Perron, Michael Carroll, Steven Macenski
+
+0.8.0 (2019-09-26)
+------------------
+* Fix UnknownGoalHandle error string. (`#856 <https://github.com/ros2/rclcpp/issues/856>`_)
+* Guard against making multiple result requests for a goal handle (`#808 <https://github.com/ros2/rclcpp/issues/808>`_)
+* Add line break after first open paren in multiline function call (`#785 <https://github.com/ros2/rclcpp/issues/785>`_)
+* Fix typo in test fixture tear down method name (`#787 <https://github.com/ros2/rclcpp/issues/787>`_)
+* Contributors: Chris Lalancette, Dan Rose, Jacob Perron
 
 0.7.5 (2019-05-30)
 ------------------
