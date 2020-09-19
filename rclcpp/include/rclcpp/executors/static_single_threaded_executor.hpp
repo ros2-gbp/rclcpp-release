@@ -78,15 +78,30 @@ public:
   void
   spin() override;
 
+  /// Add a callback group to an executor.
+  /**
+   * \sa rclcpp::Executor::add_callback_group
+   */
+  RCLCPP_PUBLIC
+  void
+  add_callback_group(
+    rclcpp::CallbackGroup::SharedPtr group_ptr,
+    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+    bool notify = true) override;
+
+  /// Remove callback group from the executor
+  /**
+   * \sa rclcpp::Executor::remove_callback_group
+   */
+  RCLCPP_PUBLIC
+  void
+  remove_callback_group(
+    rclcpp::CallbackGroup::SharedPtr group_ptr,
+    bool notify = true) override;
+
   /// Add a node to the executor.
   /**
-   * An executor can have zero or more nodes which provide work during `spin` functions.
-   * \param[in] node_ptr Shared pointer to the node to be added.
-   * \param[in] notify True to trigger the interrupt guard condition during this function. If
-   * the executor is blocked at the rmw layer while waiting for work and it is notified that a new
-   * node was added, it will wake up.
-   * \throw std::runtime_error if node was already added or if rcl_trigger_guard_condition
-   * return an error
+   * \sa rclcpp::Executor::add_node
    */
   RCLCPP_PUBLIC
   void
@@ -96,8 +111,7 @@ public:
 
   /// Convenience function which takes Node and forwards NodeBaseInterface.
   /**
-   * \throw std::runtime_error if node was already added or if rcl_trigger_guard_condition
-   * returns an error
+   * \sa rclcpp::StaticSingleThreadedExecutor::add_node
    */
   RCLCPP_PUBLIC
   void
@@ -105,11 +119,7 @@ public:
 
   /// Remove a node from the executor.
   /**
-   * \param[in] node_ptr Shared pointer to the node to remove.
-   * \param[in] notify True to trigger the interrupt guard condition and wake up the executor.
-   * This is useful if the last node was removed from the executor while the executor was blocked
-   * waiting for work in another thread, because otherwise the executor would never be notified.
-   * \throw std::runtime_error if rcl_trigger_guard_condition returns an error
+   * \sa rclcpp::Executor::remove_node
    */
   RCLCPP_PUBLIC
   void
@@ -119,11 +129,31 @@ public:
 
   /// Convenience function which takes Node and forwards NodeBaseInterface.
   /**
-   * \throw std::runtime_error if rcl_trigger_guard_condition returns an error
+   * \sa rclcpp::Executor::remove_node
    */
   RCLCPP_PUBLIC
   void
   remove_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify = true) override;
+
+  RCLCPP_PUBLIC
+  std::vector<rclcpp::CallbackGroup::WeakPtr>
+  get_all_callback_groups() override;
+
+  /// Get callback groups that belong to executor.
+  /**
+   * \sa rclcpp::Executor::get_manually_added_callback_groups()
+   */
+  RCLCPP_PUBLIC
+  std::vector<rclcpp::CallbackGroup::WeakPtr>
+  get_manually_added_callback_groups() override;
+
+  /// Get callback groups that belong to executor.
+  /**
+   * \sa rclcpp::Executor::get_automatically_added_callback_groups_from_nodes()
+   */
+  RCLCPP_PUBLIC
+  std::vector<rclcpp::CallbackGroup::WeakPtr>
+  get_automatically_added_callback_groups_from_nodes() override;
 
   /// Spin (blocking) until the future is complete, it times out waiting, or rclcpp is interrupted.
   /**
@@ -143,10 +173,10 @@ public:
    *  exec.add_node(node);
    *  exec.spin_until_future_complete(future);
    */
-  template<typename ResponseT, typename TimeRepT = int64_t, typename TimeT = std::milli>
+  template<typename FutureT, typename TimeRepT = int64_t, typename TimeT = std::milli>
   rclcpp::FutureReturnCode
   spin_until_future_complete(
-    std::shared_future<ResponseT> & future,
+    FutureT & future,
     std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
   {
     std::future_status status = future.wait_for(std::chrono::seconds(0));
@@ -188,6 +218,38 @@ public:
 
     // The future did not complete before ok() returned false, return INTERRUPTED.
     return rclcpp::FutureReturnCode::INTERRUPTED;
+  }
+
+  /// Not yet implemented, see https://github.com/ros2/rclcpp/issues/1219 for tracking
+  RCLCPP_PUBLIC
+  void
+  spin_some(std::chrono::nanoseconds max_duration = std::chrono::nanoseconds(0)) override
+  {
+    (void)max_duration;
+    throw rclcpp::exceptions::UnimplementedError(
+            "spin_some is not implemented for StaticSingleThreadedExecutor, use spin or "
+            "spin_until_future_complete");
+  }
+
+  /// Not yet implemented, see https://github.com/ros2/rclcpp/issues/1219 for tracking
+  RCLCPP_PUBLIC
+  void
+  spin_all(std::chrono::nanoseconds) override
+  {
+    throw rclcpp::exceptions::UnimplementedError(
+            "spin_all is not implemented for StaticSingleThreadedExecutor, use spin or "
+            "spin_until_future_complete");
+  }
+
+  /// Not yet implemented, see https://github.com/ros2/rclcpp/issues/1219 for tracking
+  RCLCPP_PUBLIC
+  void
+  spin_once(std::chrono::nanoseconds timeout = std::chrono::nanoseconds(-1)) override
+  {
+    (void)timeout;
+    throw rclcpp::exceptions::UnimplementedError(
+            "spin_once is not implemented for StaticSingleThreadedExecutor, use spin or "
+            "spin_until_future_complete");
   }
 
 protected:

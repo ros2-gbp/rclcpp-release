@@ -180,12 +180,6 @@ LifecycleNode::set_parameter(const rclcpp::Parameter & parameter)
   return this->set_parameters_atomically({parameter});
 }
 
-bool
-LifecycleNode::group_in_node(rclcpp::CallbackGroup::SharedPtr group)
-{
-  return node_base_->callback_group_in_node(group);
-}
-
 std::vector<rcl_interfaces::msg::SetParametersResult>
 LifecycleNode::set_parameters(
   const std::vector<rclcpp::Parameter> & parameters)
@@ -267,28 +261,6 @@ LifecycleNode::remove_on_set_parameters_callback(
 {
   node_parameters_->remove_on_set_parameters_callback(callback);
 }
-
-// suppress deprecated function warning
-#if !defined(_WIN32)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else  // !defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-
-rclcpp::Node::OnParametersSetCallbackType
-LifecycleNode::set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback)
-{
-  return node_parameters_->set_on_parameters_set_callback(callback);
-}
-
-// remove warning suppression
-#if !defined(_WIN32)
-# pragma GCC diagnostic pop
-#else  // !defined(_WIN32)
-# pragma warning(pop)
-#endif
 
 std::vector<std::string>
 LifecycleNode::get_node_names() const

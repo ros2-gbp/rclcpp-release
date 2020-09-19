@@ -159,7 +159,7 @@ __lockless_has_parameter(
 // see https://en.cppreference.com/w/cpp/types/numeric_limits/epsilon
 RCLCPP_LOCAL
 bool
-__are_doubles_equal(double x, double y, size_t ulp = 100)
+__are_doubles_equal(double x, double y, double ulp = 100.0)
 {
   return std::abs(x - y) <= std::numeric_limits<double>::epsilon() * std::abs(x + y) * ulp;
 }
@@ -872,18 +872,6 @@ NodeParameters::add_on_set_parameters_callback(OnParametersSetCallbackType callb
   // the last callback registered is executed first.
   on_parameters_set_callback_container_.emplace_front(handle);
   return handle;
-}
-
-NodeParameters::OnParametersSetCallbackType
-NodeParameters::set_on_parameters_set_callback(OnParametersSetCallbackType callback)
-{
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
-
-  ParameterMutationRecursionGuard guard(parameter_modification_enabled_);
-
-  auto existing_callback = on_parameters_set_callback_;
-  on_parameters_set_callback_ = callback;
-  return existing_callback;
 }
 
 const std::map<std::string, rclcpp::ParameterValue> &

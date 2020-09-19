@@ -92,7 +92,7 @@ public:
    * \param[in] topic_name Name of the topic to subscribe to.
    * \param[in] qos QoS profile for Subcription.
    * \param[in] callback User defined callback to call when a message is received.
-   * \param[in] options options for the subscription.
+   * \param[in] options Options for the subscription.
    * \param[in] message_memory_strategy The memory strategy to be used for managing message memory.
    * \param[in] subscription_topic_statistics Optional pointer to a topic statistics subcription.
    * \throws std::invalid_argument if the QoS is uncompatible with intra-process (if one
@@ -144,6 +144,11 @@ public:
         // pass
       }
     }
+    if (options.event_callbacks.message_lost_callback) {
+      this->add_event_handler(
+        options.event_callbacks.message_lost_callback,
+        RCL_SUBSCRIPTION_MESSAGE_LOST);
+    }
 
     // Setup intra process publishing if requested.
     if (rclcpp::detail::resolve_use_intra_process(options, *node_base)) {
@@ -179,8 +184,8 @@ public:
         resolve_intra_process_buffer_type(options.intra_process_buffer_type, callback));
       TRACEPOINT(
         rclcpp_subscription_init,
-        (const void *)get_subscription_handle().get(),
-        (const void *)subscription_intra_process.get());
+        static_cast<const void *>(get_subscription_handle().get()),
+        static_cast<const void *>(subscription_intra_process.get()));
 
       // Add it to the intra process manager.
       using rclcpp::experimental::IntraProcessManager;
@@ -195,12 +200,12 @@ public:
 
     TRACEPOINT(
       rclcpp_subscription_init,
-      (const void *)get_subscription_handle().get(),
-      (const void *)this);
+      static_cast<const void *>(get_subscription_handle().get()),
+      static_cast<const void *>(this));
     TRACEPOINT(
       rclcpp_subscription_callback_added,
-      (const void *)this,
-      (const void *)&any_callback_);
+      static_cast<const void *>(this),
+      static_cast<const void *>(&any_callback_));
     // The callback object gets copied, so if registration is done too early/before this point
     // (e.g. in `AnySubscriptionCallback::set()`), its address won't match any address used later
     // in subsequent tracepoints.
