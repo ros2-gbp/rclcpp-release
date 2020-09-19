@@ -23,6 +23,7 @@
 #include "rclcpp/node_interfaces/node_graph.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "test_msgs/msg/empty.hpp"
+#include "test_msgs/srv/empty.hpp"
 
 class TestNodeGraph : public ::testing::Test
 {
@@ -87,17 +88,39 @@ TEST_F(TestNodeGraph, get_service_names_and_types)
 TEST_F(TestNodeGraph, get_service_names_and_types_by_node)
 {
   auto node1 = std::make_shared<rclcpp::Node>("node1", "ns");
+  auto callback = [](
+    const test_msgs::srv::Empty::Request::SharedPtr,
+    test_msgs::srv::Empty::Response::SharedPtr) {};
+  auto service =
+    node1->create_service<test_msgs::srv::Empty>("node1_service", std::move(callback));
   auto node2 = std::make_shared<rclcpp::Node>("node2", "ns");
   const auto * node_graph =
     dynamic_cast<rclcpp::node_interfaces::NodeGraph *>(node1->get_node_graph_interface().get());
   ASSERT_NE(nullptr, node_graph);
 
+  // rcl_get_service_names_and_types_by_node() expects the node to exist, otherwise it fails
   EXPECT_THROW(
     node_graph->get_service_names_and_types_by_node("not_a_node", "not_absolute_namespace"),
     std::runtime_error);
-  auto service_names_and_types1 = node_graph->get_service_names_and_types_by_node("node1", "/ns");
-  auto service_names_and_types2 = node_graph->get_service_names_and_types_by_node("node2", "/ns");
-  EXPECT_EQ(service_names_and_types1.size(), service_names_and_types2.size());
+
+  // Check that node1_service exists for node1 but not node2. This shouldn't exercise graph
+  // discovery as node_graph belongs to node1 anyway. This is just to test the API itself.
+  auto services_of_node1 =
+    node_graph->get_service_names_and_types_by_node("node1", "/ns");
+  auto services_of_node2 =
+    node_graph->get_service_names_and_types_by_node("node2", "/ns");
+
+  auto start = std::chrono::steady_clock::now();
+  while (std::chrono::steady_clock::now() - start < std::chrono::seconds(1)) {
+    services_of_node1 = node_graph->get_service_names_and_types_by_node("node1", "/ns");
+    services_of_node2 = node_graph->get_service_names_and_types_by_node("node2", "/ns");
+    if (services_of_node1.find("/ns/node1_service") != services_of_node1.end()) {
+      break;
+    }
+  }
+
+  EXPECT_TRUE(services_of_node1.find("/ns/node1_service") != services_of_node1.end());
+  EXPECT_FALSE(services_of_node2.find("/ns/node1_service") != services_of_node2.end());
 }
 
 TEST_F(TestNodeGraph, get_node_names_and_namespaces)
@@ -170,10 +193,28 @@ TEST_F(TestNodeGraph, get_info_by_topic)
   EXPECT_EQ(rclcpp::EndpointType::Publisher, const_publisher_endpoint_info.endpoint_type());
 
   rclcpp::QoS actual_qos = publisher_endpoint_info.qos_profile();
-  EXPECT_EQ(0u, actual_qos.get_rmw_qos_profile().depth);
+  switch (actual_qos.get_rmw_qos_profile().history) {
+    case RMW_QOS_POLICY_HISTORY_KEEP_LAST:
+      EXPECT_EQ(1u, actual_qos.get_rmw_qos_profile().depth);
+      break;
+    case RMW_QOS_POLICY_HISTORY_UNKNOWN:
+      EXPECT_EQ(0u, actual_qos.get_rmw_qos_profile().depth);
+      break;
+    default:
+      ADD_FAILURE() << "unexpected history";
+  }
 
   rclcpp::QoS const_actual_qos = const_publisher_endpoint_info.qos_profile();
-  EXPECT_EQ(0u, const_actual_qos.get_rmw_qos_profile().depth);
+  switch (const_actual_qos.get_rmw_qos_profile().history) {
+    case RMW_QOS_POLICY_HISTORY_KEEP_LAST:
+      EXPECT_EQ(1u, const_actual_qos.get_rmw_qos_profile().depth);
+      break;
+    case RMW_QOS_POLICY_HISTORY_UNKNOWN:
+      EXPECT_EQ(0u, const_actual_qos.get_rmw_qos_profile().depth);
+      break;
+    default:
+      ADD_FAILURE() << "unexpected history";
+  }
 
   auto endpoint_gid = publisher_endpoint_info.endpoint_gid();
   auto const_endpoint_gid = const_publisher_endpoint_info.endpoint_gid();
