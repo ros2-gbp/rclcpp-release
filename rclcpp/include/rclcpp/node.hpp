@@ -26,6 +26,8 @@
 #include <utility>
 #include <vector>
 
+#include "rcutils/macros.h"
+
 #include "rcl/error_handling.h"
 #include "rcl/node.h"
 
@@ -139,7 +141,9 @@ public:
   /// Create and return a callback group.
   RCLCPP_PUBLIC
   rclcpp::CallbackGroup::SharedPtr
-  create_callback_group(rclcpp::CallbackGroupType group_type);
+  create_callback_group(
+    rclcpp::CallbackGroupType group_type,
+    bool automatically_add_to_executor_with_node = true);
 
   /// Return the list of callback groups in the node.
   RCLCPP_PUBLIC
@@ -812,6 +816,7 @@ public:
    * \throws std::bad_alloc if the allocation of the OnSetParametersCallbackHandle fails.
    */
   RCLCPP_PUBLIC
+  RCUTILS_WARN_UNUSED
   OnSetParametersCallbackHandle::SharedPtr
   add_on_set_parameters_callback(OnParametersSetCallbackType callback);
 
@@ -882,15 +887,21 @@ public:
     const std::string & node_name,
     const std::string & namespace_) const;
 
+  /// Return the number of publishers created for a given topic.
+  /**
+   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
+   * \return number of publishers that have been created for the given topic.
+   * \throws std::runtime_error if publishers could not be counted
+   */
   RCLCPP_PUBLIC
   size_t
   count_publishers(const std::string & topic_name) const;
 
-  /// Return the number of subscribers who have created a subscription for a given topic.
+  /// Return the number of subscribers created for a given topic.
   /**
-   * \param[in] topic_name the topic_name on which to count the subscribers.
-   * \return number of subscribers who have created a subscription for a given topic.
-   * \throws std::runtime_error if publishers could not be counted
+   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
+   * \return number of subscribers that have been created for the given topic.
+   * \throws std::runtime_error if subscribers could not be counted
    */
   RCLCPP_PUBLIC
   size_t
@@ -911,7 +922,7 @@ public:
    * A relative or private topic will be expanded using this node's namespace and name.
    * The queried `topic_name` is not remapped.
    *
-   * \param[in] topic_name the topic_name on which to find the publishers.
+   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
    * \param[in] no_mangle if `true`, `topic_name` needs to be a valid middleware topic name,
    *   otherwise it should be a valid ROS topic name. Defaults to `false`.
    * \return a list of TopicEndpointInfo representing all the publishers on this topic.
@@ -937,7 +948,7 @@ public:
    * A relative or private topic will be expanded using this node's namespace and name.
    * The queried `topic_name` is not remapped.
    *
-   * \param[in] topic_name the topic_name on which to find the subscriptions.
+   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
    * \param[in] no_mangle if `true`, `topic_name` needs to be a valid middleware topic name,
    *   otherwise it should be a valid ROS topic name. Defaults to `false`.
    * \return a list of TopicEndpointInfo representing all the subscriptions on this topic.
@@ -1170,10 +1181,6 @@ protected:
 
 private:
   RCLCPP_DISABLE_COPY(Node)
-
-  RCLCPP_PUBLIC
-  bool
-  group_in_node(CallbackGroup::SharedPtr group);
 
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_;
   rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_;
