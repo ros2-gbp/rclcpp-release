@@ -24,12 +24,8 @@
 #include "lifecycle_msgs/msg/state.hpp"
 #include "lifecycle_msgs/msg/transition.hpp"
 
-#include "rcl_lifecycle/rcl_lifecycle.h"
-
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
-
-#include "./mocking_utils/patch.hpp"
 
 using lifecycle_msgs::msg::State;
 using lifecycle_msgs::msg::Transition;
@@ -41,17 +37,13 @@ protected:
   {
     rclcpp::init(0, nullptr);
   }
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
-  }
 };
 
 class EmptyLifecycleNode : public rclcpp_lifecycle::LifecycleNode
 {
 public:
-  explicit EmptyLifecycleNode(const std::string & node_name)
-  : rclcpp_lifecycle::LifecycleNode(node_name)
+  explicit EmptyLifecycleNode(std::string node_name)
+  : rclcpp_lifecycle::LifecycleNode(std::move(node_name))
   {}
 };
 
@@ -150,22 +142,6 @@ TEST_F(TestDefaultStateMachine, empty_initializer) {
   EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->get_current_state().id());
 }
 
-TEST_F(TestDefaultStateMachine, empty_initializer_rcl_errors) {
-  {
-    auto patch = mocking_utils::patch_and_return(
-      "lib:rclcpp_lifecycle", rcl_lifecycle_state_machine_init, RCL_RET_ERROR);
-    EXPECT_THROW(
-      std::make_shared<EmptyLifecycleNode>("testnode").reset(),
-      std::runtime_error);
-  }
-  {
-    auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
-    auto patch = mocking_utils::inject_on_return(
-      "lib:rclcpp_lifecycle", rcl_lifecycle_state_machine_fini, RCL_RET_ERROR);
-    EXPECT_NO_THROW(test_node.reset());
-  }
-}
-
 TEST_F(TestDefaultStateMachine, trigger_transition) {
   auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
 
@@ -185,35 +161,6 @@ TEST_F(TestDefaultStateMachine, trigger_transition) {
   ASSERT_EQ(
     State::PRIMARY_STATE_FINALIZED, test_node->trigger_transition(
       rclcpp_lifecycle::Transition(Transition::TRANSITION_UNCONFIGURED_SHUTDOWN)).id());
-}
-
-TEST_F(TestDefaultStateMachine, trigger_transition_rcl_errors) {
-  auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
-
-  {
-    auto mock = mocking_utils::patch_and_return(
-      "lib:rclcpp_lifecycle", rcl_lifecycle_state_machine_is_initialized, RCL_RET_ERROR);
-    EXPECT_EQ(
-      State::PRIMARY_STATE_UNCONFIGURED,
-      test_node->trigger_transition(
-        rclcpp_lifecycle::Transition(Transition::TRANSITION_CONFIGURE)).id());
-  }
-  {
-    auto mock = mocking_utils::patch_and_return(
-      "lib:rclcpp_lifecycle", rcl_lifecycle_trigger_transition_by_id, RCL_RET_ERROR);
-    EXPECT_EQ(
-      State::PRIMARY_STATE_UNCONFIGURED,
-      test_node->trigger_transition(
-        rclcpp_lifecycle::Transition(Transition::TRANSITION_CONFIGURE)).id());
-  }
-  {
-    auto mock = mocking_utils::patch_and_return(
-      "lib:rclcpp_lifecycle", rcl_lifecycle_trigger_transition_by_label, RCL_RET_ERROR);
-    EXPECT_EQ(
-      State::TRANSITION_STATE_CONFIGURING,
-      test_node->trigger_transition(
-        rclcpp_lifecycle::Transition(Transition::TRANSITION_CONFIGURE)).id());
-  }
 }
 
 TEST_F(TestDefaultStateMachine, trigger_transition_with_error_code) {
@@ -434,8 +381,6 @@ TEST_F(TestDefaultStateMachine, check_parameters) {
   auto descriptors = test_node->describe_parameters(parameter_names);
   EXPECT_EQ(descriptors.size(), parameter_names.size());
 
-  // This actually throws inside NodeParameters::describe_parameters(), so it's not currently
-  // possible to cover this method 100%.
   EXPECT_THROW(
     test_node->describe_parameter("not_a_real_parameter"),
     rclcpp::exceptions::ParameterNotDeclaredException);
@@ -492,12 +437,6 @@ TEST_F(TestDefaultStateMachine, check_parameters) {
   test_node->set_parameters({int_parameter});
   EXPECT_EQ(parameters_set, 2u);
 
-  test_node->remove_on_set_parameters_callback(callback_handle.get());
-  rclcpp::Parameter bool_parameter2(bool_name, rclcpp::ParameterValue(true));
-  EXPECT_TRUE(test_node->set_parameter(bool_parameter2).successful);
-  EXPECT_EQ(parameters_set, 2u);
-
-
   // List parameters
   list_result = test_node->list_parameters({}, 0u);
   EXPECT_EQ(list_result.names.size(), 3u);
@@ -550,7 +489,7 @@ TEST_F(TestDefaultStateMachine, test_getters) {
   EXPECT_NE(nullptr, const_cast<const EmptyLifecycleNode *>(test_node.get())->get_clock());
 }
 
-TEST_F(TestDefaultStateMachine, test_graph_topics) {
+TEST_F(TestDefaultStateMachine, test_graph) {
   auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
   auto names = test_node->get_node_names();
 
@@ -564,19 +503,6 @@ TEST_F(TestDefaultStateMachine, test_graph_topics) {
   EXPECT_STREQ(
     topic_names_and_types["/testnode/transition_event"][0].c_str(),
     "lifecycle_msgs/msg/TransitionEvent");
-
-  EXPECT_EQ(1u, test_node->count_publishers("/testnode/transition_event"));
-  EXPECT_EQ(0u, test_node->count_subscribers("/testnode/transition_event"));
-
-  auto publishers_info = test_node->get_publishers_info_by_topic("/testnode/transition_event");
-  EXPECT_EQ(1u, publishers_info.size());
-  auto subscriptions_info =
-    test_node->get_subscriptions_info_by_topic("/testnode/transition_event");
-  EXPECT_EQ(0u, subscriptions_info.size());
-}
-
-TEST_F(TestDefaultStateMachine, test_graph_services) {
-  auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
 
   auto service_names_and_types = test_node->get_service_names_and_types();
   // These are specific to lifecycle nodes, other services are provided by rclcpp::Node
@@ -614,48 +540,15 @@ TEST_F(TestDefaultStateMachine, test_graph_services) {
   EXPECT_STREQ(
     service_names_and_types["/testnode/get_transition_graph"][0].c_str(),
     "lifecycle_msgs/srv/GetAvailableTransitions");
-}
 
-TEST_F(TestDefaultStateMachine, test_graph_services_by_node) {
-  auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
+  EXPECT_EQ(1u, test_node->count_publishers("/testnode/transition_event"));
+  EXPECT_EQ(0u, test_node->count_subscribers("/testnode/transition_event"));
 
-  auto service_names_and_types_by_node =
-    test_node->get_service_names_and_types_by_node("testnode", "");
-  // These are specific to lifecycle nodes, other services are provided by rclcpp::Node
-  ASSERT_NE(
-    service_names_and_types_by_node.end(),
-    service_names_and_types_by_node.find(std::string("/testnode/change_state")));
-  EXPECT_STREQ(
-    service_names_and_types_by_node["/testnode/change_state"][0].c_str(),
-    "lifecycle_msgs/srv/ChangeState");
-
-  ASSERT_NE(
-    service_names_and_types_by_node.end(),
-    service_names_and_types_by_node.find(std::string("/testnode/get_available_states")));
-  EXPECT_STREQ(
-    service_names_and_types_by_node["/testnode/get_available_states"][0].c_str(),
-    "lifecycle_msgs/srv/GetAvailableStates");
-
-  ASSERT_NE(
-    service_names_and_types_by_node.end(),
-    service_names_and_types_by_node.find(std::string("/testnode/get_available_transitions")));
-  EXPECT_STREQ(
-    service_names_and_types_by_node["/testnode/get_available_transitions"][0].c_str(),
-    "lifecycle_msgs/srv/GetAvailableTransitions");
-
-  ASSERT_NE(
-    service_names_and_types_by_node.end(),
-    service_names_and_types_by_node.find(std::string("/testnode/get_state")));
-  EXPECT_STREQ(
-    service_names_and_types_by_node["/testnode/get_state"][0].c_str(),
-    "lifecycle_msgs/srv/GetState");
-
-  ASSERT_NE(
-    service_names_and_types_by_node.end(),
-    service_names_and_types_by_node.find(std::string("/testnode/get_transition_graph")));
-  EXPECT_STREQ(
-    service_names_and_types_by_node["/testnode/get_transition_graph"][0].c_str(),
-    "lifecycle_msgs/srv/GetAvailableTransitions");
+  auto publishers_info = test_node->get_publishers_info_by_topic("/testnode/transition_event");
+  EXPECT_EQ(publishers_info.size(), 1u);
+  auto subscriptions_info =
+    test_node->get_subscriptions_info_by_topic("/testnode/transition_event");
+  EXPECT_EQ(subscriptions_info.size(), 0u);
 }
 
 TEST_F(TestDefaultStateMachine, test_callback_groups) {
@@ -670,17 +563,4 @@ TEST_F(TestDefaultStateMachine, test_callback_groups) {
   groups = test_node->get_callback_groups();
   EXPECT_EQ(groups.size(), 2u);
   EXPECT_EQ(groups[1].lock().get(), group.get());
-}
-
-TEST_F(TestDefaultStateMachine, wait_for_graph_change)
-{
-  auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
-  EXPECT_THROW(
-    test_node->wait_for_graph_change(nullptr, std::chrono::milliseconds(1)),
-    rclcpp::exceptions::InvalidEventError);
-
-  auto event = std::make_shared<rclcpp::Event>();
-  EXPECT_THROW(
-    test_node->wait_for_graph_change(event, std::chrono::milliseconds(0)),
-    rclcpp::exceptions::EventNotRegisteredError);
 }

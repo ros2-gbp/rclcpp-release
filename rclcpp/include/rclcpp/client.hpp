@@ -361,8 +361,7 @@ public:
     SharedPromiseWithRequest promise = std::make_shared<PromiseWithRequest>();
     SharedFutureWithRequest future_with_request(promise->get_future());
 
-    auto wrapping_cb = [future_with_request, promise, request,
-        cb = std::forward<CallbackWithRequestType>(cb)](SharedFuture future) {
+    auto wrapping_cb = [future_with_request, promise, request, &cb](SharedFuture future) {
         auto response = future.get();
         promise->set_value(std::make_pair(request, response));
         cb(future_with_request);

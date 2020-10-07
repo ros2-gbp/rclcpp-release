@@ -110,7 +110,7 @@ public:
 
   RCLCPP_PUBLIC
   size_t
-  count_graph_users() const override;
+  count_graph_users() override;
 
   RCLCPP_PUBLIC
   std::vector<rclcpp::TopicEndpointInfo>

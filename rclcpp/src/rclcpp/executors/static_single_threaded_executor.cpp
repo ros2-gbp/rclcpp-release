@@ -15,7 +15,6 @@
 #include "rclcpp/executors/static_single_threaded_executor.hpp"
 
 #include <memory>
-#include <vector>
 
 #include "rclcpp/scope_exit.hpp"
 
@@ -51,31 +50,23 @@ StaticSingleThreadedExecutor::spin()
 }
 
 void
-StaticSingleThreadedExecutor::add_callback_group(
-  rclcpp::CallbackGroup::SharedPtr group_ptr,
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
-  bool notify)
-{
-  bool is_new_node = entities_collector_->add_callback_group(group_ptr, node_ptr);
-  if (is_new_node && notify) {
-    // Interrupt waiting to handle new node
-    if (rcl_trigger_guard_condition(&interrupt_guard_condition_) != RCL_RET_OK) {
-      throw std::runtime_error(rcl_get_error_string().str);
-    }
-  }
-}
-
-void
 StaticSingleThreadedExecutor::add_node(
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr, bool notify)
 {
-  bool is_new_node = entities_collector_->add_node(node_ptr);
-  if (is_new_node && notify) {
+  // If the node already has an executor
+  std::atomic_bool & has_executor = node_ptr->get_associated_with_executor_atomic();
+  if (has_executor.exchange(true)) {
+    throw std::runtime_error("Node has already been added to an executor.");
+  }
+
+  if (notify) {
     // Interrupt waiting to handle new node
     if (rcl_trigger_guard_condition(&interrupt_guard_condition_) != RCL_RET_OK) {
       throw std::runtime_error(rcl_get_error_string().str);
     }
   }
+
+  entities_collector_->add_node(node_ptr);
 }
 
 void
@@ -85,50 +76,22 @@ StaticSingleThreadedExecutor::add_node(std::shared_ptr<rclcpp::Node> node_ptr, b
 }
 
 void
-StaticSingleThreadedExecutor::remove_callback_group(
-  rclcpp::CallbackGroup::SharedPtr group_ptr, bool notify)
-{
-  bool node_removed = entities_collector_->remove_callback_group(group_ptr);
-  // If the node was matched and removed, interrupt waiting
-  if (node_removed && notify) {
-    if (rcl_trigger_guard_condition(&interrupt_guard_condition_) != RCL_RET_OK) {
-      throw std::runtime_error(rcl_get_error_string().str);
-    }
-  }
-}
-
-void
 StaticSingleThreadedExecutor::remove_node(
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr, bool notify)
 {
   bool node_removed = entities_collector_->remove_node(node_ptr);
-  if (!node_removed) {
-    throw std::runtime_error("Node needs to be associated with this executor.");
-  }
-  // If the node was matched and removed, interrupt waiting
+
   if (notify) {
-    if (rcl_trigger_guard_condition(&interrupt_guard_condition_) != RCL_RET_OK) {
-      throw std::runtime_error(rcl_get_error_string().str);
+    // If the node was matched and removed, interrupt waiting
+    if (node_removed) {
+      if (rcl_trigger_guard_condition(&interrupt_guard_condition_) != RCL_RET_OK) {
+        throw std::runtime_error(rcl_get_error_string().str);
+      }
     }
   }
-}
 
-std::vector<rclcpp::CallbackGroup::WeakPtr>
-StaticSingleThreadedExecutor::get_all_callback_groups()
-{
-  return entities_collector_->get_all_callback_groups();
-}
-
-std::vector<rclcpp::CallbackGroup::WeakPtr>
-StaticSingleThreadedExecutor::get_manually_added_callback_groups()
-{
-  return entities_collector_->get_manually_added_callback_groups();
-}
-
-std::vector<rclcpp::CallbackGroup::WeakPtr>
-StaticSingleThreadedExecutor::get_automatically_added_callback_groups_from_nodes()
-{
-  return entities_collector_->get_automatically_added_callback_groups_from_nodes();
+  std::atomic_bool & has_executor = node_ptr->get_associated_with_executor_atomic();
+  has_executor.store(false);
 }
 
 void

@@ -32,7 +32,6 @@
 
 #include <test_msgs/action/fibonacci.hpp>
 
-#include <future>
 #include <map>
 #include <memory>
 #include <string>
@@ -74,7 +73,7 @@ protected:
     rclcpp::init(0, nullptr);
   }
 
-  void SetUpServer()
+  void SetUp()
   {
     rcl_allocator_t allocator = rcl_get_default_allocator();
 
@@ -212,10 +211,7 @@ protected:
     ASSERT_TRUE(status_publisher != nullptr);
     allocator.deallocate(status_topic_name, allocator.state);
     server_executor.add_node(server_node);
-  }
 
-  void SetUp() override
-  {
     client_node = std::make_shared<rclcpp::Node>(client_node_name, namespace_name);
     client_executor.add_node(client_node);
 
@@ -223,12 +219,7 @@ protected:
     ASSERT_EQ(RCL_RET_OK, rcl_set_ros_time_override(clock.get_clock_handle(), RCL_S_TO_NS(1)));
   }
 
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
-  }
-
-  void TearDownServer()
+  void TearDown()
   {
     status_publisher.reset();
     feedback_publisher.reset();
@@ -236,10 +227,6 @@ protected:
     result_service.reset();
     goal_service.reset();
     server_node.reset();
-  }
-
-  void TearDown() override
-  {
     client_node.reset();
   }
 
@@ -278,42 +265,15 @@ protected:
   typename rclcpp::Publisher<ActionStatusMessage>::SharedPtr status_publisher;
 };
 
-class TestClientAgainstServer : public TestClient
-{
-protected:
-  void SetUp() override
-  {
-    SetUpServer();
-    TestClient::SetUp();
-  }
-
-  void TearDown() override
-  {
-    TestClient::TearDown();
-    TearDownServer();
-  }
-};
-
-
 TEST_F(TestClient, construction_and_destruction)
 {
   ASSERT_NO_THROW(rclcpp_action::create_client<ActionType>(client_node, action_name).reset());
-}
-
-TEST_F(TestClient, construction_and_destruction_after_node)
-{
-  ASSERT_NO_THROW(
-  {
-    auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
-    client_node.reset();
-  });
 }
 
 TEST_F(TestClient, construction_and_destruction_callback_group)
 {
   auto group = client_node->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive);
-  const rcl_action_client_options_t & options = rcl_action_client_get_default_options();
   ASSERT_NO_THROW(
     rclcpp_action::create_client<ActionType>(
       client_node->get_node_base_interface(),
@@ -321,29 +281,11 @@ TEST_F(TestClient, construction_and_destruction_callback_group)
       client_node->get_node_logging_interface(),
       client_node->get_node_waitables_interface(),
       action_name,
-      group,
-      options
+      group
     ).reset());
 }
 
-TEST_F(TestClient, wait_for_action_server)
-{
-  auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
-  EXPECT_FALSE(action_client->wait_for_action_server(0ms));
-  EXPECT_FALSE(action_client->wait_for_action_server(100ms));
-  auto future = std::async(
-    std::launch::async, [&action_client]() {
-      return action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT);
-    });
-  SetUpServer();
-  EXPECT_TRUE(future.get());
-  TearDownServer();
-
-  client_node.reset();  // Drop node before action client
-  EXPECT_THROW(action_client->wait_for_action_server(0ms), rclcpp::exceptions::InvalidNodeError);
-}
-
-TEST_F(TestClientAgainstServer, async_send_goal_no_callbacks)
+TEST_F(TestClient, async_send_goal_no_callbacks)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
@@ -364,24 +306,7 @@ TEST_F(TestClientAgainstServer, async_send_goal_no_callbacks)
   EXPECT_FALSE(goal_handle->is_result_aware());
 }
 
-TEST_F(TestClientAgainstServer, bad_goal_handles)
-{
-  auto action_client0 = rclcpp_action::create_client<ActionType>(client_node, action_name);
-  ASSERT_TRUE(action_client0->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
-
-  ActionGoal goal;
-  goal.order = 0;
-  auto future_goal_handle = action_client0->async_send_goal(goal);
-  dual_spin_until_future_complete(future_goal_handle);
-  auto goal_handle = future_goal_handle.get();
-
-  auto action_client1 = rclcpp_action::create_client<ActionType>(client_node, action_name);
-  using rclcpp_action::exceptions::UnknownGoalHandleError;
-  EXPECT_THROW(action_client1->async_get_result(goal_handle), UnknownGoalHandleError);
-  EXPECT_THROW(action_client1->async_cancel_goal(goal_handle), UnknownGoalHandleError);
-}
-
-TEST_F(TestClientAgainstServer, async_send_goal_no_callbacks_wait_for_result)
+TEST_F(TestClient, async_send_goal_no_callbacks_wait_for_result)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
@@ -404,74 +329,41 @@ TEST_F(TestClientAgainstServer, async_send_goal_no_callbacks_wait_for_result)
   EXPECT_EQ(5, wrapped_result.result->sequence[5]);
 }
 
-TEST_F(TestClientAgainstServer, async_send_goal_no_callbacks_then_invalidate)
+TEST_F(TestClient, async_send_goal_with_goal_response_callback_wait_for_result)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
 
   ActionGoal goal;
-  goal.order = 5;
-  auto future_goal_handle = action_client->async_send_goal(goal);
-  dual_spin_until_future_complete(future_goal_handle);
-  auto goal_handle = future_goal_handle.get();
-  ASSERT_NE(nullptr, goal_handle);
-  EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_ACCEPTED, goal_handle->get_status());
-  auto future_result = action_client->async_get_result(goal_handle);
-  EXPECT_TRUE(goal_handle->is_result_aware());
-
-  action_client.reset();  // Ensure goal handle is invalidated once client goes out of scope
-
-  EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_UNKNOWN, goal_handle->get_status());
-  using rclcpp_action::exceptions::UnawareGoalHandleError;
-  EXPECT_THROW(future_result.get(), UnawareGoalHandleError);
-}
-
-TEST_F(TestClientAgainstServer, async_send_goal_with_goal_response_callback_wait_for_result)
-{
-  auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
-  ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
-
+  goal.order = 4;
   bool goal_response_received = false;
   auto send_goal_ops = rclcpp_action::Client<ActionType>::SendGoalOptions();
   send_goal_ops.goal_response_callback =
     [&goal_response_received]
-      (typename ActionGoalHandle::SharedPtr goal_handle) mutable
+      (std::shared_future<typename ActionGoalHandle::SharedPtr> future) mutable
     {
+      auto goal_handle = future.get();
       if (goal_handle) {
         goal_response_received = true;
       }
     };
+  auto future_goal_handle = action_client->async_send_goal(goal, send_goal_ops);
+  dual_spin_until_future_complete(future_goal_handle);
+  auto goal_handle = future_goal_handle.get();
+  EXPECT_TRUE(goal_response_received);
+  EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_ACCEPTED, goal_handle->get_status());
+  EXPECT_FALSE(goal_handle->is_feedback_aware());
+  EXPECT_FALSE(goal_handle->is_result_aware());
+  auto future_result = action_client->async_get_result(goal_handle);
+  EXPECT_TRUE(goal_handle->is_result_aware());
+  dual_spin_until_future_complete(future_result);
+  auto wrapped_result = future_result.get();
 
-  {
-    ActionGoal bad_goal;
-    bad_goal.order = -1;
-    auto future_goal_handle = action_client->async_send_goal(bad_goal, send_goal_ops);
-    dual_spin_until_future_complete(future_goal_handle);
-    auto goal_handle = future_goal_handle.get();
-    EXPECT_FALSE(goal_response_received);
-    EXPECT_EQ(nullptr, goal_handle);
-  }
-
-  {
-    ActionGoal goal;
-    goal.order = 4;
-    auto future_goal_handle = action_client->async_send_goal(goal, send_goal_ops);
-    dual_spin_until_future_complete(future_goal_handle);
-    auto goal_handle = future_goal_handle.get();
-    EXPECT_TRUE(goal_response_received);
-    EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_ACCEPTED, goal_handle->get_status());
-    EXPECT_FALSE(goal_handle->is_feedback_aware());
-    EXPECT_FALSE(goal_handle->is_result_aware());
-    auto future_result = action_client->async_get_result(goal_handle);
-    EXPECT_TRUE(goal_handle->is_result_aware());
-    dual_spin_until_future_complete(future_result);
-    auto wrapped_result = future_result.get();
-    ASSERT_EQ(5u, wrapped_result.result->sequence.size());
-    EXPECT_EQ(3, wrapped_result.result->sequence.back());
-  }
+  ASSERT_EQ(5u, wrapped_result.result->sequence.size());
+  EXPECT_EQ(3, wrapped_result.result->sequence.back());
 }
 
-TEST_F(TestClientAgainstServer, async_send_goal_with_feedback_callback_wait_for_result)
+TEST_F(TestClient, async_send_goal_with_feedback_callback_wait_for_result)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
@@ -505,7 +397,7 @@ TEST_F(TestClientAgainstServer, async_send_goal_with_feedback_callback_wait_for_
   EXPECT_EQ(5, feedback_count);
 }
 
-TEST_F(TestClientAgainstServer, async_send_goal_with_result_callback_wait_for_result)
+TEST_F(TestClient, async_send_goal_with_result_callback_wait_for_result)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
@@ -540,7 +432,7 @@ TEST_F(TestClientAgainstServer, async_send_goal_with_result_callback_wait_for_re
   EXPECT_EQ(3, wrapped_result.result->sequence.back());
 }
 
-TEST_F(TestClientAgainstServer, async_get_result_with_callback)
+TEST_F(TestClient, async_get_result_with_callback)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
@@ -575,7 +467,7 @@ TEST_F(TestClientAgainstServer, async_get_result_with_callback)
   EXPECT_EQ(3, wrapped_result.result->sequence.back());
 }
 
-TEST_F(TestClientAgainstServer, async_cancel_one_goal)
+TEST_F(TestClient, async_cancel_one_goal)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
@@ -593,7 +485,7 @@ TEST_F(TestClientAgainstServer, async_cancel_one_goal)
   EXPECT_EQ(ActionCancelGoalResponse::ERROR_NONE, cancel_response->return_code);
 }
 
-TEST_F(TestClientAgainstServer, async_cancel_one_goal_with_callback)
+TEST_F(TestClient, async_cancel_one_goal_with_callback)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
@@ -627,7 +519,7 @@ TEST_F(TestClientAgainstServer, async_cancel_one_goal_with_callback)
   EXPECT_TRUE(cancel_response_received);
 }
 
-TEST_F(TestClientAgainstServer, async_cancel_all_goals)
+TEST_F(TestClient, async_cancel_all_goals)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
@@ -663,7 +555,7 @@ TEST_F(TestClientAgainstServer, async_cancel_all_goals)
   EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_CANCELED, goal_handle1->get_status());
 }
 
-TEST_F(TestClientAgainstServer, async_cancel_all_goals_with_callback)
+TEST_F(TestClient, async_cancel_all_goals_with_callback)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
@@ -713,7 +605,7 @@ TEST_F(TestClientAgainstServer, async_cancel_all_goals_with_callback)
   EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_CANCELED, goal_handle1->get_status());
 }
 
-TEST_F(TestClientAgainstServer, async_cancel_some_goals)
+TEST_F(TestClient, async_cancel_some_goals)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
@@ -744,7 +636,7 @@ TEST_F(TestClientAgainstServer, async_cancel_some_goals)
   EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_CANCELED, goal_handle0->get_status());
 }
 
-TEST_F(TestClientAgainstServer, async_cancel_some_goals_with_callback)
+TEST_F(TestClient, async_cancel_some_goals_with_callback)
 {
   auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
   ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));

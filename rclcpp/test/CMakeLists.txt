@@ -17,42 +17,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}_test_msgs
   SKIP_INSTALL
 )
 
-# Increasing timeout because connext can take a long time to destroy nodes
-# TODO(brawner) remove when destroying Node for Connext is resolved. See:
-# https://github.com/ros2/rclcpp/issues/1250
-ament_add_gtest(
-  test_allocator_memory_strategy
-  rclcpp/strategies/test_allocator_memory_strategy.cpp
-  TIMEOUT 360)
-if(TARGET test_allocator_memory_strategy)
-  ament_target_dependencies(test_allocator_memory_strategy
-    "rcl"
-    "test_msgs"
-  )
-  target_link_libraries(test_allocator_memory_strategy ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_message_pool_memory_strategy rclcpp/strategies/test_message_pool_memory_strategy.cpp)
-if(TARGET test_message_pool_memory_strategy)
-  ament_target_dependencies(test_message_pool_memory_strategy
-    "rcl"
-    "test_msgs"
-  )
-  target_link_libraries(test_message_pool_memory_strategy ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_any_service_callback rclcpp/test_any_service_callback.cpp)
-if(TARGET test_any_service_callback)
-  ament_target_dependencies(test_any_service_callback
-    "test_msgs"
-  )
-  target_link_libraries(test_any_service_callback ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_any_subscription_callback rclcpp/test_any_subscription_callback.cpp)
-if(TARGET test_any_subscription_callback)
-  ament_target_dependencies(test_any_subscription_callback
-    "test_msgs"
-  )
-  target_link_libraries(test_any_subscription_callback ${PROJECT_NAME})
-endif()
 ament_add_gtest(test_client rclcpp/test_client.cpp)
 if(TARGET test_client)
   ament_target_dependencies(test_client
@@ -74,20 +38,6 @@ if(TARGET test_create_timer)
   )
   target_link_libraries(test_create_timer ${PROJECT_NAME})
   target_include_directories(test_create_timer PRIVATE rclcpp/)
-endif()
-ament_add_gtest(test_create_subscription rclcpp/test_create_subscription.cpp)
-if(TARGET test_create_subscription)
-  target_link_libraries(test_create_subscription ${PROJECT_NAME})
-  ament_target_dependencies(test_create_subscription
-    "test_msgs"
-  )
-endif()
-ament_add_gtest(test_add_callback_groups_to_executor rclcpp/test_add_callback_groups_to_executor.cpp)
-if(TARGET test_add_callback_groups_to_executor)
-  target_link_libraries(test_add_callback_groups_to_executor ${PROJECT_NAME})
-  ament_target_dependencies(test_add_callback_groups_to_executor
-    "test_msgs"
-  )
 endif()
 ament_add_gtest(test_expand_topic_or_service_name rclcpp/test_expand_topic_or_service_name.cpp)
 if(TARGET test_expand_topic_or_service_name)
@@ -147,18 +97,6 @@ ament_target_dependencies(test_loaned_message
 )
 target_link_libraries(test_loaned_message ${PROJECT_NAME})
 
-ament_add_gtest(test_memory_strategy rclcpp/test_memory_strategy.cpp)
-ament_target_dependencies(test_memory_strategy
-  "test_msgs"
-)
-target_link_libraries(test_memory_strategy ${PROJECT_NAME})
-
-ament_add_gtest(test_message_memory_strategy rclcpp/test_message_memory_strategy.cpp)
-ament_target_dependencies(test_message_memory_strategy
-  "test_msgs"
-)
-target_link_libraries(test_message_memory_strategy ${PROJECT_NAME})
-
 ament_add_gtest(test_node rclcpp/test_node.cpp TIMEOUT 240)
 if(TARGET test_node)
   ament_target_dependencies(test_node
@@ -176,52 +114,6 @@ ament_add_gtest(test_node_interfaces__get_node_interfaces
   rclcpp/node_interfaces/test_get_node_interfaces.cpp)
 if(TARGET test_node_interfaces__get_node_interfaces)
   target_link_libraries(test_node_interfaces__get_node_interfaces ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_node_interfaces__node_base
-  rclcpp/node_interfaces/test_node_base.cpp)
-if(TARGET test_node_interfaces__node_base)
-  target_link_libraries(test_node_interfaces__node_base ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_node_interfaces__node_clock
-  rclcpp/node_interfaces/test_node_clock.cpp)
-if(TARGET test_node_interfaces__node_clock)
-  target_link_libraries(test_node_interfaces__node_clock ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_node_interfaces__node_graph
-  rclcpp/node_interfaces/test_node_graph.cpp)
-if(TARGET test_node_interfaces__node_graph)
-  ament_target_dependencies(
-    test_node_interfaces__node_graph
-    "test_msgs")
-  target_link_libraries(test_node_interfaces__node_graph ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_node_interfaces__node_parameters
-  rclcpp/node_interfaces/test_node_parameters.cpp)
-if(TARGET test_node_interfaces__node_parameters)
-  target_link_libraries(test_node_interfaces__node_parameters ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_node_interfaces__node_services
-  rclcpp/node_interfaces/test_node_services.cpp)
-if(TARGET test_node_interfaces__node_services)
-  target_link_libraries(test_node_interfaces__node_services ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_node_interfaces__node_timers
-  rclcpp/node_interfaces/test_node_timers.cpp)
-if(TARGET test_node_interfaces__node_timers)
-  target_link_libraries(test_node_interfaces__node_timers ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_node_interfaces__node_topics
-  rclcpp/node_interfaces/test_node_topics.cpp)
-if(TARGET test_node_interfaces__node_topics)
-  ament_target_dependencies(
-    test_node_interfaces__node_topics
-    "test_msgs")
-  target_link_libraries(test_node_interfaces__node_topics ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_node_interfaces__node_waitables
-  rclcpp/node_interfaces/test_node_waitables.cpp)
-if(TARGET test_node_interfaces__node_waitables)
-  target_link_libraries(test_node_interfaces__node_waitables ${PROJECT_NAME})
 endif()
 
 # TODO(wjwwood): reenable these build failure tests when I can get Jenkins to ignore their output
@@ -259,11 +151,6 @@ ament_add_gtest(test_node_options rclcpp/test_node_options.cpp)
 if(TARGET test_node_options)
   ament_target_dependencies(test_node_options "rcl")
   target_link_libraries(test_node_options ${PROJECT_NAME})
-endif()
-ament_add_gtest(test_init_options rclcpp/test_init_options.cpp)
-if(TARGET test_init_options)
-  ament_target_dependencies(test_init_options "rcl")
-  target_link_libraries(test_init_options ${PROJECT_NAME})
 endif()
 ament_add_gtest(test_parameter_client rclcpp/test_parameter_client.cpp)
 if(TARGET test_parameter_client)
@@ -373,7 +260,6 @@ if(TARGET test_service)
     "rmw"
     "rosidl_runtime_cpp"
     "rosidl_typesupport_cpp"
-    "test_msgs"
   )
   target_link_libraries(test_service ${PROJECT_NAME})
 endif()
@@ -407,16 +293,6 @@ if(TARGET test_subscription_traits)
   )
   target_link_libraries(test_subscription_traits ${PROJECT_NAME})
 endif()
-ament_add_gtest(test_type_support rclcpp/test_type_support.cpp)
-if(TARGET test_type_support)
-  ament_target_dependencies(test_type_support
-    "rmw"
-    "rosidl_runtime_cpp"
-    "rosidl_typesupport_cpp"
-    "test_msgs"
-  )
-  target_link_libraries(test_type_support ${PROJECT_NAME})
-endif()
 ament_add_gtest(test_find_weak_nodes rclcpp/test_find_weak_nodes.cpp)
 if(TARGET test_find_weak_nodes)
   ament_target_dependencies(test_find_weak_nodes
@@ -443,6 +319,14 @@ if(TARGET test_duration)
   ament_target_dependencies(test_duration
     "rcl")
   target_link_libraries(test_duration ${PROJECT_NAME})
+endif()
+
+ament_add_gtest(test_executor rclcpp/test_executor.cpp
+  APPEND_LIBRARY_DIRS "${append_library_dirs}")
+if(TARGET test_executor)
+  ament_target_dependencies(test_executor
+    "rcl")
+  target_link_libraries(test_executor ${PROJECT_NAME})
 endif()
 
 ament_add_gtest(test_logger rclcpp/test_logger.cpp)
@@ -499,41 +383,12 @@ if(TARGET test_interface_traits)
   target_link_libraries(test_interface_traits ${PROJECT_NAME})
 endif()
 
-# TODO(brawner) remove when destroying Node for Connext is resolved. See:
-# https://github.com/ros2/rclcpp/issues/1250
-ament_add_gtest(
-  test_executors
-  rclcpp/executors/test_executors.cpp
-  APPEND_LIBRARY_DIRS "${append_library_dirs}"
-  TIMEOUT 180)
-if(TARGET test_executors)
-  ament_target_dependencies(test_executors
-    "rcl"
-    "test_msgs")
-  target_link_libraries(test_executors ${PROJECT_NAME})
-endif()
-
-ament_add_gtest(test_static_single_threaded_executor rclcpp/executors/test_static_single_threaded_executor.cpp
-  APPEND_LIBRARY_DIRS "${append_library_dirs}")
-if(TARGET test_static_single_threaded_executor)
-  target_link_libraries(test_static_single_threaded_executor ${PROJECT_NAME})
-endif()
-
 ament_add_gtest(test_multi_threaded_executor rclcpp/executors/test_multi_threaded_executor.cpp
   APPEND_LIBRARY_DIRS "${append_library_dirs}")
 if(TARGET test_multi_threaded_executor)
   ament_target_dependencies(test_multi_threaded_executor
     "rcl")
   target_link_libraries(test_multi_threaded_executor ${PROJECT_NAME})
-endif()
-
-ament_add_gtest(test_static_executor_entities_collector rclcpp/executors/test_static_executor_entities_collector.cpp
-  APPEND_LIBRARY_DIRS "${append_library_dirs}")
-if(TARGET test_static_executor_entities_collector)
-  ament_target_dependencies(test_static_executor_entities_collector
-    "rcl"
-    "test_msgs")
-  target_link_libraries(test_static_executor_entities_collector ${PROJECT_NAME})
 endif()
 
 ament_add_gtest(test_guard_condition rclcpp/test_guard_condition.cpp
@@ -571,35 +426,6 @@ ament_add_gtest(test_subscription_options rclcpp/test_subscription_options.cpp)
 if(TARGET test_subscription_options)
   ament_target_dependencies(test_subscription_options "rcl")
   target_link_libraries(test_subscription_options ${PROJECT_NAME})
-endif()
-
-ament_add_gtest(test_dynamic_storage rclcpp/wait_set_policies/test_dynamic_storage.cpp)
-if(TARGET test_dynamic_storage)
-  ament_target_dependencies(test_dynamic_storage "rcl" "test_msgs")
-  target_link_libraries(test_dynamic_storage ${PROJECT_NAME})
-endif()
-
-ament_add_gtest(test_storage_policy_common rclcpp/wait_set_policies/test_storage_policy_common.cpp)
-if(TARGET test_storage_policy_common)
-  ament_target_dependencies(test_storage_policy_common "rcl" "test_msgs")
-  target_link_libraries(test_storage_policy_common ${PROJECT_NAME} mimick)
-endif()
-
-ament_add_gtest(test_static_storage rclcpp/wait_set_policies/test_static_storage.cpp)
-if(TARGET test_static_storage)
-  ament_target_dependencies(test_static_storage "rcl" "test_msgs")
-  target_link_libraries(test_static_storage ${PROJECT_NAME})
-endif()
-
-ament_add_gtest(test_thread_safe_synchronization rclcpp/wait_set_policies/test_thread_safe_synchronization.cpp)
-if(TARGET test_thread_safe_synchronization)
-  ament_target_dependencies(test_thread_safe_synchronization "rcl" "test_msgs")
-  target_link_libraries(test_thread_safe_synchronization ${PROJECT_NAME})
-endif()
-
-ament_add_gtest(test_rclcpp_gtest_macros utils/test_rclcpp_gtest_macros.cpp)
-if(TARGET test_rclcpp_gtest_macros)
-  target_link_libraries(test_rclcpp_gtest_macros ${PROJECT_NAME})
 endif()
 
 # Install test resources

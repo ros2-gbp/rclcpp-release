@@ -92,8 +92,8 @@ public:
 
     TRACEPOINT(
       rclcpp_subscription_callback_added,
-      static_cast<const void *>(this),
-      static_cast<const void *>(&any_callback_));
+      (const void *)this,
+      (const void *)&any_callback_);
     // The callback object gets copied, so if registration is done too early/before this point
     // (e.g. in `AnySubscriptionCallback::set()`), its address won't match any address used later
     // in subsequent tracepoints.
