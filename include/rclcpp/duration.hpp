@@ -72,10 +72,13 @@ public:
   operator=(const Duration & rhs);
 
   Duration &
-  operator=(const builtin_interfaces::msg::Duration & Duration_msg);
+  operator=(const builtin_interfaces::msg::Duration & duration_msg);
 
   bool
   operator==(const rclcpp::Duration & rhs) const;
+
+  bool
+  operator!=(const rclcpp::Duration & rhs) const;
 
   bool
   operator<(const rclcpp::Duration & rhs) const;
