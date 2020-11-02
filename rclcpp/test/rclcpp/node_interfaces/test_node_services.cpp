@@ -16,11 +16,15 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "rcl/node_options.h"
 #include "rclcpp/node.hpp"
 #include "rclcpp/node_interfaces/node_services.hpp"
 #include "rclcpp/rclcpp.hpp"
+
+#include "../../mocking_utils/patch.hpp"
+#include "../../utils/rclcpp_gtest_macros.hpp"
 
 class TestService : public rclcpp::ServiceBase
 {
@@ -51,25 +55,31 @@ public:
   void SetUp()
   {
     rclcpp::init(0, nullptr);
+
+    rclcpp::NodeOptions options{};
+    options.arguments(std::vector<std::string>{"-r", "foo:=bar"});
+    node = std::make_shared<rclcpp::Node>("node", "ns", options);
+
+    // This dynamic cast is not necessary for the unittest itself, but instead is used to ensure
+    // the proper type is being tested and covered.
+    node_services =
+      dynamic_cast<rclcpp::node_interfaces::NodeServices *>(
+      node->get_node_services_interface().get());
+    ASSERT_NE(nullptr, node_services);
   }
 
   void TearDown()
   {
     rclcpp::shutdown();
   }
+
+protected:
+  std::shared_ptr<rclcpp::Node> node;
+  rclcpp::node_interfaces::NodeServices * node_services;
 };
 
 TEST_F(TestNodeService, add_service)
 {
-  std::shared_ptr<rclcpp::Node> node = std::make_shared<rclcpp::Node>("node", "ns");
-
-  // This dynamic cast is not necessary for the unittest itself, but instead is used to ensure
-  // the proper type is being tested and covered.
-  auto * node_services =
-    dynamic_cast<rclcpp::node_interfaces::NodeServices *>(
-    node->get_node_services_interface().get());
-  ASSERT_NE(nullptr, node_services);
-
   auto service = std::make_shared<TestService>(node.get());
   auto callback_group = node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   EXPECT_NO_THROW(
@@ -80,22 +90,24 @@ TEST_F(TestNodeService, add_service)
 
   auto callback_group_in_different_node =
     different_node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  EXPECT_THROW(
+  RCLCPP_EXPECT_THROW_EQ(
     node_services->add_service(service, callback_group_in_different_node),
-    std::runtime_error);
+    std::runtime_error("Cannot create service, group not in node."));
+}
+
+TEST_F(TestNodeService, add_service_rcl_trigger_guard_condition_error)
+{
+  auto service = std::make_shared<TestService>(node.get());
+  auto callback_group = node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  auto mock = mocking_utils::patch_and_return(
+    "lib:rclcpp", rcl_trigger_guard_condition, RCL_RET_ERROR);
+  RCLCPP_EXPECT_THROW_EQ(
+    node_services->add_service(service, callback_group),
+    std::runtime_error("Failed to notify wait set on service creation: error not set"));
 }
 
 TEST_F(TestNodeService, add_client)
 {
-  std::shared_ptr<rclcpp::Node> node = std::make_shared<rclcpp::Node>("node", "ns");
-
-  // This dynamic cast is not necessary for the unittest itself, but instead is used to ensure
-  // the proper type is being tested and covered.
-  auto * node_services =
-    dynamic_cast<rclcpp::node_interfaces::NodeServices *>(
-    node->get_node_services_interface().get());
-  ASSERT_NE(nullptr, node_services);
-
   auto client = std::make_shared<TestClient>(node.get());
   auto callback_group = node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   EXPECT_NO_THROW(node_services->add_client(client, callback_group));
@@ -105,7 +117,28 @@ TEST_F(TestNodeService, add_client)
 
   auto callback_group_in_different_node =
     different_node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  EXPECT_THROW(
+  RCLCPP_EXPECT_THROW_EQ(
     node_services->add_client(client, callback_group_in_different_node),
-    std::runtime_error);
+    std::runtime_error("Cannot create client, group not in node."));
+}
+
+TEST_F(TestNodeService, add_client_rcl_trigger_guard_condition_error)
+{
+  auto client = std::make_shared<TestClient>(node.get());
+  auto callback_group = node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  auto mock = mocking_utils::patch_and_return(
+    "lib:rclcpp", rcl_trigger_guard_condition, RCL_RET_ERROR);
+  RCLCPP_EXPECT_THROW_EQ(
+    node_services->add_client(client, callback_group),
+    std::runtime_error("Failed to notify wait set on client creation: error not set"));
+}
+
+TEST_F(TestNodeService, resolve_service_name)
+{
+  EXPECT_EQ("/ns/bar", node_services->resolve_service_name("foo", false));
+  EXPECT_EQ("/ns/foo", node_services->resolve_service_name("foo", true));
+  EXPECT_EQ("/foo", node_services->resolve_service_name("/foo", true));
+  EXPECT_THROW(
+    node_services->resolve_service_name("this is not a valid name!~>", true),
+    rclcpp::exceptions::RCLError);
 }
