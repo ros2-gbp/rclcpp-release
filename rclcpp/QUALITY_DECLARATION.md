@@ -123,6 +123,8 @@ Changes are required to make a best effort to keep or increase coverage before b
 
 Current coverage statistics can be viewed [here](https://ci.ros2.org/job/nightly_linux_coverage/lastSuccessfulBuild/cobertura/src_ros2_rclcpp_rclcpp_src_rclcpp/). A description of how coverage statistics are calculated is summarized in this page ["ROS 2 Onboarding Guide"](https://index.ros.org/doc/ros2/Contributing/ROS-2-On-boarding-Guide/#note-on-coverage-runs).
 
+`rclcpp` has a line coverage `>= 95%`, which is calculated over all directories within `rclcpp` with the exception of the `experimental` directory.
+
 ### Performance [4.iv]
 
 It is not yet defined if this package requires performance testing and how addresses this topic.
@@ -195,7 +197,7 @@ It is **Quality Level 3**, see its [Quality Declaration document](https://github
 
 The `tracetools` package provides utilities for instrumenting the code in `rclcpp` so that it may be traced for debugging and performance analysis.
 
-It is **Quality Level 2**, see its [Quality Declaration document](https://gitlab.com/micro-ROS/ros_tracing/ros2_tracing/-/blob/master/tracetools/QUALITY_DECLARATION.md).
+It is **Quality Level 1**, see its [Quality Declaration document](https://gitlab.com/ros-tracing/ros2_tracing/-/blob/master/tracetools/QUALITY_DECLARATION.md).
 
 ### Direct Runtime non-ROS Dependency [5.iii]
 
