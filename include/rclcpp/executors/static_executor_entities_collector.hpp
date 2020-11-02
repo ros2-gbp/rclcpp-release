@@ -64,28 +64,17 @@ public:
   void
   init(
     rcl_wait_set_t * p_wait_set,
-    rclcpp::memory_strategy::MemoryStrategy::SharedPtr & memory_strategy,
+    rclcpp::memory_strategy::MemoryStrategy::SharedPtr memory_strategy,
     rcl_guard_condition_t * executor_guard_condition);
+
+  /// Finalize StaticExecutorEntitiesCollector to clear resources
+  RCLCPP_PUBLIC
+  void
+  fini();
 
   RCLCPP_PUBLIC
   void
   execute() override;
-
-  RCLCPP_PUBLIC
-  void
-  fill_memory_strategy();
-
-  RCLCPP_PUBLIC
-  void
-  fill_executable_list();
-
-  /// Function to reallocate space for entities in the wait set.
-  /**
-   * \throws std::runtime_error if wait set couldn't be cleared or resized.
-   */
-  RCLCPP_PUBLIC
-  void
-  prepare_wait_set();
 
   /// Function to add_handles_to_wait_set and wait for work and
   /**
@@ -282,6 +271,20 @@ public:
   rclcpp::Waitable::SharedPtr
   get_waitable(size_t i) {return exec_list_.waitable[i];}
 
+private:
+  /// Function to reallocate space for entities in the wait set.
+  /**
+   * \throws std::runtime_error if wait set couldn't be cleared or resized.
+   */
+  void
+  prepare_wait_set();
+
+  void
+  fill_executable_list();
+
+  void
+  fill_memory_strategy();
+
   /// Return true if the node belongs to the collector
   /**
    * \param[in] group_ptr a node base interface shared pointer
@@ -290,22 +293,19 @@ public:
   bool
   has_node(
     const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
-    WeakCallbackGroupsToNodesMap weak_groups_to_nodes) const;
+    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) const;
 
-private:
   /// Add all callback groups that can be automatically added by any executor
   /// and is not already associated with an executor from nodes
   /// that are associated with executor
   /**
    * \see rclcpp::Executor::add_callback_groups_from_nodes_associated_to_executor()
    */
-  RCLCPP_PUBLIC
   void
   add_callback_groups_from_nodes_associated_to_executor();
 
-  RCLCPP_PUBLIC
   void
-  fill_executable_list_from_map(WeakCallbackGroupsToNodesMap weak_groups_to_nodes);
+  fill_executable_list_from_map(const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes);
 
   /// Memory strategy: an interface for handling user-defined memory allocation strategies.
   rclcpp::memory_strategy::MemoryStrategy::SharedPtr memory_strategy_;
