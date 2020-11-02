@@ -3,19 +3,33 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-2.2.0 (2020-10-07)
+5.1.0 (2020-11-02)
 ------------------
+* Benchmark rclcpp_action action_client (`#1429 <https://github.com/ros2/rclcpp/issues/1429>`_)
+* Add missing locking to the rclcpp_action::ServerBase. (`#1421 <https://github.com/ros2/rclcpp/issues/1421>`_)
+* Increase test timeouts of slow running tests with rmw_connext_cpp (`#1400 <https://github.com/ros2/rclcpp/issues/1400>`_)
+* Update maintainers (`#1384 <https://github.com/ros2/rclcpp/issues/1384>`_)
+* Increase coverage rclcpp_action to 95% (`#1290 <https://github.com/ros2/rclcpp/issues/1290>`_)
+* Contributors: Chris Lalancette, Ivan Santiago Paunovic, brawner
 
-2.1.0 (2020-08-03)
+5.0.0 (2020-09-18)
 ------------------
+* Pass goal handle to goal response callback instead of a future (`#1311 <https://github.com/ros2/rclcpp/issues/1311>`_)
+* Remove deprecated client goal handle method for getting result (`#1309 <https://github.com/ros2/rclcpp/issues/1309>`_)
+* Increase test timeout necessary for Connext (`#1256 <https://github.com/ros2/rclcpp/issues/1256>`_)
+* Contributors: Dirk Thomas, Jacob Perron
 
-2.0.2 (2020-07-07)
+4.0.0 (2020-07-09)
 ------------------
-
-2.0.1 (2020-06-23)
-------------------
-* Fixed doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_) (`#1191 <https://github.com/ros2/rclcpp/issues/1191>`_)
+* Bump to QD to level 3 and fixed links (`#1158 <https://github.com/ros2/rclcpp/issues/1158>`_)
 * Contributors: Alejandro Hernández Cordero
+
+3.0.0 (2020-06-18)
+------------------
+* Add rcl_action_client_options when creating action client. (`#1133 <https://github.com/ros2/rclcpp/issues/1133>`_)
+* Fix doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_)
+* Increase rclcpp_action test coverage (`#1153 <https://github.com/ros2/rclcpp/issues/1153>`_)
+* Contributors: Alejandro Hernández Cordero, Michel Hidalgo, tomoya
 
 2.0.0 (2020-06-01)
 ------------------

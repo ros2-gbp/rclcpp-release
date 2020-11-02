@@ -2,24 +2,28 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-2.2.0 (2020-10-07)
+5.1.0 (2020-11-02)
 ------------------
-* Include original exception in ComponentManagerException (`#1157 <https://github.com/ros2/rclcpp/issues/1157>`_) (`#1223 <https://github.com/ros2/rclcpp/issues/1223>`_)
-* Contributors: Dereck Wonnacott
+* Update maintainers (`#1384 <https://github.com/ros2/rclcpp/issues/1384>`_)
+* ComponentManager: switch off parameter services and event publisher (`#1333 <https://github.com/ros2/rclcpp/issues/1333>`_)
+* Contributors: Ivan Santiago Paunovic, Martijn Buijs
 
-2.1.0 (2020-08-03)
-------------------
-
-2.0.2 (2020-07-07)
+5.0.0 (2020-09-18)
 ------------------
 
-2.0.1 (2020-06-23)
+4.0.0 (2020-07-09)
+------------------
+* Bump to QD to level 3 and fixed links (`#1158 <https://github.com/ros2/rclcpp/issues/1158>`_)
+* Include original exception in ComponentManagerException (`#1157 <https://github.com/ros2/rclcpp/issues/1157>`_)
+* Contributors: Alejandro Hernández Cordero, Martijn Buijs, Tomoya Fujita
+
+3.0.0 (2020-06-18)
 ------------------
 
 2.0.0 (2020-06-01)
 ------------------
-* Added missing virtual destructors (`#1149 <https://github.com/ros2/rclcpp/issues/1149>`_)
-* Add Security Vulnerability Policy pointing to REP-2006 (`#1130 <https://github.com/ros2/rclcpp/issues/1130>`_)
+* Added missing virtual destructors. (`#1149 <https://github.com/ros2/rclcpp/issues/1149>`_)
+* Add Security Vulnerability Policy pointing to REP-2006. (`#1130 <https://github.com/ros2/rclcpp/issues/1130>`_)
 * Contributors: Chris Lalancette, Ivan Santiago Paunovic
 
 1.1.0 (2020-05-26)

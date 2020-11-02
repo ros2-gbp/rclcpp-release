@@ -74,23 +74,41 @@ if(BUILD_TESTING)
   set(ament_cmake_cppcheck_ADDITIONAL_INCLUDE_DIRS ${rclcpp_INCLUDE_DIRS})
   ament_lint_auto_find_test_dependencies()
 
-  ament_add_gtest(test_client test/test_client.cpp TIMEOUT 120)
+  add_subdirectory(test/benchmark)
+
+  ament_add_gtest(test_client test/test_client.cpp TIMEOUT 180)
   if(TARGET test_client)
     ament_target_dependencies(test_client
+      "rcutils"
       "test_msgs"
     )
     target_link_libraries(test_client
       ${PROJECT_NAME}
+      mimick
     )
   endif()
 
-  ament_add_gtest(test_server test/test_server.cpp)
+  ament_add_gtest(test_server test/test_server.cpp TIMEOUT 180)
   if(TARGET test_server)
     ament_target_dependencies(test_server
+      "rcutils"
       "test_msgs"
     )
     target_link_libraries(test_server
       ${PROJECT_NAME}
+      mimick
+    )
+  endif()
+
+  ament_add_gtest(test_server_goal_handle test/test_server_goal_handle.cpp)
+  if(TARGET test_server_goal_handle)
+    ament_target_dependencies(test_server_goal_handle
+      "rcutils"
+      "test_msgs"
+    )
+    target_link_libraries(test_server_goal_handle
+      ${PROJECT_NAME}
+      mimick
     )
   endif()
 

@@ -138,7 +138,8 @@ Node::Node(
       node_services_,
       node_logging_,
       node_clock_,
-      node_parameters_
+      node_parameters_,
+      options.clock_qos()
     )),
   node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
   node_options_(options),
@@ -211,15 +212,11 @@ Node::get_logger() const
 }
 
 rclcpp::CallbackGroup::SharedPtr
-Node::create_callback_group(rclcpp::CallbackGroupType group_type)
+Node::create_callback_group(
+  rclcpp::CallbackGroupType group_type,
+  bool automatically_add_to_executor_with_node)
 {
-  return node_base_->create_callback_group(group_type);
-}
-
-bool
-Node::group_in_node(rclcpp::CallbackGroup::SharedPtr group)
-{
-  return node_base_->callback_group_in_node(group);
+  return node_base_->create_callback_group(group_type, automatically_add_to_executor_with_node);
 }
 
 const rclcpp::ParameterValue &
@@ -327,28 +324,6 @@ Node::remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * co
 {
   return node_parameters_->remove_on_set_parameters_callback(callback);
 }
-
-// suppress deprecated function warning
-#if !defined(_WIN32)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else  // !defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-
-rclcpp::Node::OnParametersSetCallbackType
-Node::set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback)
-{
-  return node_parameters_->set_on_parameters_set_callback(callback);
-}
-
-// remove warning suppression
-#if !defined(_WIN32)
-# pragma GCC diagnostic pop
-#else  // !defined(_WIN32)
-# pragma warning(pop)
-#endif
 
 std::vector<std::string>
 Node::get_node_names() const

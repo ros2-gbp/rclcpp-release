@@ -38,6 +38,7 @@
 #include "rclcpp/node_interfaces/node_topics.hpp"
 #include "rclcpp/node_interfaces/node_waitables.hpp"
 #include "rclcpp/parameter_service.hpp"
+#include "rclcpp/qos.hpp"
 
 #include "lifecycle_node_interface_impl.hpp"  // implementation
 
@@ -97,7 +98,8 @@ LifecycleNode::LifecycleNode(
       node_services_,
       node_logging_,
       node_clock_,
-      node_parameters_
+      node_parameters_,
+      options.clock_qos()
     )),
   node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
   node_options_(options),
@@ -178,12 +180,6 @@ rcl_interfaces::msg::SetParametersResult
 LifecycleNode::set_parameter(const rclcpp::Parameter & parameter)
 {
   return this->set_parameters_atomically({parameter});
-}
-
-bool
-LifecycleNode::group_in_node(rclcpp::CallbackGroup::SharedPtr group)
-{
-  return node_base_->callback_group_in_node(group);
 }
 
 std::vector<rcl_interfaces::msg::SetParametersResult>
@@ -267,28 +263,6 @@ LifecycleNode::remove_on_set_parameters_callback(
 {
   node_parameters_->remove_on_set_parameters_callback(callback);
 }
-
-// suppress deprecated function warning
-#if !defined(_WIN32)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else  // !defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-
-rclcpp::Node::OnParametersSetCallbackType
-LifecycleNode::set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback)
-{
-  return node_parameters_->set_on_parameters_set_callback(callback);
-}
-
-// remove warning suppression
-#if !defined(_WIN32)
-# pragma GCC diagnostic pop
-#else  // !defined(_WIN32)
-# pragma warning(pop)
-#endif
 
 std::vector<std::string>
 LifecycleNode::get_node_names() const
