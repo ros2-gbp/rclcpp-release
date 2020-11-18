@@ -1,3 +1,30 @@
+## rclcpp (rolling) - 6.0.0-1
+
+The packages in the `rclcpp` repository were released into the `rolling` distro by running `/usr/bin/bloom-release --rosdistro rolling --track rolling rclcpp` on `Wed, 18 Nov 2020 21:54:22 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_components`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `5.1.0-1`
+- old version: `5.1.0-1`
+- new version: `6.0.0-1`
+
+Versions of tools used:
+
+- bloom version: `0.10.0`
+- catkin_pkg version: `0.4.22`
+- rosdep version: `0.19.0`
+- rosdistro version: `0.8.2`
+- vcstools version: `0.1.42`
+
+
 ## rclcpp (rolling) - 5.1.0-1
 
 The packages in the `rclcpp` repository were released into the `rolling` distro by running `/usr/bin/bloom-release --rosdistro rolling --track rolling rclcpp` on `Mon, 02 Nov 2020 20:12:12 -0000`
