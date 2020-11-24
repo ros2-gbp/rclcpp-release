@@ -163,7 +163,7 @@ NodeOptions::parameter_overrides(const std::vector<rclcpp::Parameter> & paramete
 bool
 NodeOptions::use_global_arguments() const
 {
-  return this->node_options_->use_global_arguments;
+  return this->use_global_arguments_;
 }
 
 NodeOptions &
@@ -298,7 +298,7 @@ NodeOptions::get_domain_id_from_env() const
   _dupenv_s(&ros_domain_id, &ros_domain_id_size, env_var);
 #endif
   if (ros_domain_id) {
-    uint32_t number = strtoul(ros_domain_id, NULL, 0);
+    uint32_t number = static_cast<uint32_t>(strtoul(ros_domain_id, NULL, 0));
     if (number == (std::numeric_limits<uint32_t>::max)()) {
 #ifdef _WIN32
       // free the ros_domain_id before throwing, if getenv was used on Windows
