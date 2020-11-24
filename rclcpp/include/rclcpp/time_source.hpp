@@ -25,7 +25,6 @@
 #include "rcl_interfaces/msg/parameter_event.hpp"
 
 #include "rclcpp/node.hpp"
-#include "rclcpp/node_interfaces/node_parameters_interface.hpp"
 
 
 namespace rclcpp
@@ -35,45 +34,15 @@ class Clock;
 class TimeSource
 {
 public:
-  /// Constructor
-  /**
-   * The node will be attached to the time source.
-   *
-   * \param node std::shared pointer to a initialized node
-   * \param qos QoS that will be used when creating a `/clock` subscription.
-   */
   RCLCPP_PUBLIC
-  explicit TimeSource(rclcpp::Node::SharedPtr node, const rclcpp::QoS & qos = rclcpp::ClockQoS());
+  explicit TimeSource(rclcpp::Node::SharedPtr node);
 
-  /// Empty constructor
-  /**
-   * An Empty TimeSource class
-   *
-   * \param qos QoS that will be used when creating a `/clock` subscription.
-   */
   RCLCPP_PUBLIC
-  explicit TimeSource(const rclcpp::QoS & qos = rclcpp::ClockQoS());
+  TimeSource();
 
-  /// Attack node to the time source.
-  /**
-   * \param node std::shared pointer to a initialized node
-   */
   RCLCPP_PUBLIC
   void attachNode(rclcpp::Node::SharedPtr node);
 
-  /// Attack node to the time source.
-  /**
-   * If the parameter `use_sim_time` is `true` then the source time is the simulation time,
-   * otherwise the source time is defined by the system.
-   *
-   * \param node_base_interface Node base interface.
-   * \param node_topics_interface Node topic base interface.
-   * \param node_graph_interface Node graph interface.
-   * \param node_services_interface Node service interface.
-   * \param node_logging_interface Node logging interface.
-   * \param node_clock_interface Node clock interface.
-   * \param node_parameters_interface Node parameters interface.
-   */
   RCLCPP_PUBLIC
   void attachNode(
     rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_interface,
@@ -84,23 +53,19 @@ public:
     rclcpp::node_interfaces::NodeClockInterface::SharedPtr node_clock_interface,
     rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters_interface);
 
-  /// Detach the node from the time source
   RCLCPP_PUBLIC
   void detachNode();
 
   /// Attach a clock to the time source to be updated
   /**
-   * \param[in] clock to attach to the time source
-   * \throws std::invalid_argument the time source must be a RCL_ROS_TIME otherwise throws an exception
+   * \throws std::invalid_argument if node is nullptr
    */
   RCLCPP_PUBLIC
   void attachClock(rclcpp::Clock::SharedPtr clock);
 
-  /// Detach a clock to the time source
   RCLCPP_PUBLIC
   void detachClock(rclcpp::Clock::SharedPtr clock);
 
-  /// TimeSource Destructor
   RCLCPP_PUBLIC
   ~TimeSource();
 
@@ -117,14 +82,11 @@ private:
   // Store (and update on node attach) logger for logging.
   Logger logger_;
 
-  // QoS of the clock subscription.
-  rclcpp::QoS qos_;
-
   // The subscription for the clock callback
   using MessageT = rosgraph_msgs::msg::Clock;
   using Alloc = std::allocator<void>;
   using SubscriptionT = rclcpp::Subscription<MessageT, Alloc>;
-  std::shared_ptr<SubscriptionT> clock_subscription_{nullptr};
+  std::shared_ptr<SubscriptionT> clock_subscription_;
   std::mutex clock_sub_lock_;
 
   // The clock callback itself
@@ -154,6 +116,8 @@ private:
   void disable_ros_time();
 
   // Internal helper functions used inside iterators
+  static void enable_ros_time(rclcpp::Clock::SharedPtr clock);
+  static void disable_ros_time(rclcpp::Clock::SharedPtr clock);
   static void set_clock(
     const builtin_interfaces::msg::Time::SharedPtr msg,
     bool set_ros_time_enabled,
@@ -161,7 +125,7 @@ private:
 
   // Local storage of validity of ROS time
   // This is needed when new clocks are added.
-  bool ros_time_active_{false};
+  bool ros_time_active_;
   // Last set message to be passed to newly registered clocks
   rosgraph_msgs::msg::Clock::SharedPtr last_msg_set_;
 
@@ -169,8 +133,6 @@ private:
   std::mutex clock_list_lock_;
   // A vector to store references to associated clocks.
   std::vector<rclcpp::Clock::SharedPtr> associated_clocks_;
-  // A handler for the use_sim_time parameter callback.
-  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr sim_time_cb_handler_{nullptr};
 };
 
 }  // namespace rclcpp

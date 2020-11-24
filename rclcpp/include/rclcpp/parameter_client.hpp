@@ -54,7 +54,6 @@ public:
    * \param[in] node_services_interface Node service interface.
    * \param[in] remote_node_name (optional) name of the remote node
    * \param[in] qos_profile (optional) The rmw qos profile to use to subscribe
-   * \param[in] group (optional) The async parameter client will be added to this callback group.
    */
   RCLCPP_PUBLIC
   AsyncParametersClient(
@@ -63,54 +62,31 @@ public:
     const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_interface,
     const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services_interface,
     const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
   /// Constructor
   /**
    * \param[in] node The async paramters client will be added to this node.
    * \param[in] remote_node_name (optional) name of the remote node
    * \param[in] qos_profile (optional) The rmw qos profile to use to subscribe
-   * \param[in] group (optional) The async parameter client will be added to this callback group.
    */
-  template<typename NodeT>
+  RCLCPP_PUBLIC
   AsyncParametersClient(
-    const std::shared_ptr<NodeT> node,
+    const rclcpp::Node::SharedPtr node,
     const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr)
-  : AsyncParametersClient(
-      node->get_node_base_interface(),
-      node->get_node_topics_interface(),
-      node->get_node_graph_interface(),
-      node->get_node_services_interface(),
-      remote_node_name,
-      qos_profile,
-      group)
-  {}
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
   /// Constructor
   /**
    * \param[in] node The  async paramters client will be added to this node.
    * \param[in] remote_node_name (optional) name of the remote node
    * \param[in] qos_profile (optional) The rmw qos profile to use to subscribe
-   * \param[in] group (optional) The async parameter client will be added to this callback group.
    */
-  template<typename NodeT>
+  RCLCPP_PUBLIC
   AsyncParametersClient(
-    NodeT * node,
+    rclcpp::Node * node,
     const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr)
-  : AsyncParametersClient(
-      node->get_node_base_interface(),
-      node->get_node_topics_interface(),
-      node->get_node_graph_interface(),
-      node->get_node_services_interface(),
-      remote_node_name,
-      qos_profile,
-      group)
-  {}
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
   RCLCPP_PUBLIC
   std::shared_future<std::vector<rclcpp::Parameter>>
@@ -195,32 +171,16 @@ public:
   {
     return rclcpp::create_subscription<rcl_interfaces::msg::ParameterEvent>(
       node,
-      "/parameter_events",
+      "parameter_events",
       qos,
       std::forward<CallbackT>(callback),
       options);
   }
 
-  /// Return if the parameter services are ready.
-  /**
-   * This method checks the following services:
-   *  - get parameter
-   *  - get parameter
-   *  - set parameters
-   *  - list parameters
-   *  - describe parameters
-   *
-   * \return `true` if the service is ready, `false` otherwise
-   */
   RCLCPP_PUBLIC
   bool
   service_is_ready() const;
 
-  /// Wait for the services to be ready.
-  /**
-   * \param timeout maximum time to wait
-   * \return `true` if the services are ready and the timeout is not over, `false` otherwise
-   */
   template<typename RepT = int64_t, typename RatioT = std::milli>
   bool
   wait_for_service(
@@ -255,82 +215,41 @@ class SyncParametersClient
 public:
   RCLCPP_SMART_PTR_DEFINITIONS(SyncParametersClient)
 
-  template<typename NodeT>
+  RCLCPP_PUBLIC
   explicit SyncParametersClient(
-    std::shared_ptr<NodeT> node,
+    rclcpp::Node::SharedPtr node,
     const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters)
-  : SyncParametersClient(
-      std::make_shared<rclcpp::executors::SingleThreadedExecutor>(),
-      node,
-      remote_node_name,
-      qos_profile)
-  {}
-
-  template<typename NodeT>
-  SyncParametersClient(
-    rclcpp::Executor::SharedPtr executor,
-    std::shared_ptr<NodeT> node,
-    const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters)
-  : SyncParametersClient(
-      executor,
-      node->get_node_base_interface(),
-      node->get_node_topics_interface(),
-      node->get_node_graph_interface(),
-      node->get_node_services_interface(),
-      remote_node_name,
-      qos_profile)
-  {}
-
-  template<typename NodeT>
-  SyncParametersClient(
-    NodeT * node,
-    const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters)
-  : SyncParametersClient(
-      std::make_shared<rclcpp::executors::SingleThreadedExecutor>(),
-      node,
-      remote_node_name,
-      qos_profile)
-  {}
-
-  template<typename NodeT>
-  SyncParametersClient(
-    rclcpp::Executor::SharedPtr executor,
-    NodeT * node,
-    const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters)
-  : SyncParametersClient(
-      executor,
-      node->get_node_base_interface(),
-      node->get_node_topics_interface(),
-      node->get_node_graph_interface(),
-      node->get_node_services_interface(),
-      remote_node_name,
-      qos_profile)
-  {}
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
   RCLCPP_PUBLIC
   SyncParametersClient(
-    rclcpp::Executor::SharedPtr executor,
+    rclcpp::executor::Executor::SharedPtr executor,
+    rclcpp::Node::SharedPtr node,
+    const std::string & remote_node_name = "",
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
+
+  RCLCPP_PUBLIC
+  explicit SyncParametersClient(
+    rclcpp::Node * node,
+    const std::string & remote_node_name = "",
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
+
+  RCLCPP_PUBLIC
+  SyncParametersClient(
+    rclcpp::executor::Executor::SharedPtr executor,
+    rclcpp::Node * node,
+    const std::string & remote_node_name = "",
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
+
+  RCLCPP_PUBLIC
+  SyncParametersClient(
+    rclcpp::executor::Executor::SharedPtr executor,
     const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_interface,
     const rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_interface,
     const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_interface,
     const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services_interface,
     const std::string & remote_node_name = "",
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters)
-  : executor_(executor), node_base_interface_(node_base_interface)
-  {
-    async_parameters_client_ =
-      std::make_shared<AsyncParametersClient>(
-      node_base_interface,
-      node_topics_interface,
-      node_graph_interface,
-      node_services_interface,
-      remote_node_name,
-      qos_profile);
-  }
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
 
   RCLCPP_PUBLIC
   std::vector<rclcpp::Parameter>
@@ -370,12 +289,7 @@ public:
   {
     return get_parameter_impl(
       parameter_name,
-      std::function<T()>(
-        [&parameter_name]() -> T
-        {
-          throw std::runtime_error("Parameter '" + parameter_name + "' is not set");
-        })
-    );
+      std::function<T()>([]() -> T {throw std::runtime_error("Parameter not set");}));
   }
 
   RCLCPP_PUBLIC
@@ -438,7 +352,7 @@ public:
   }
 
 private:
-  rclcpp::Executor::SharedPtr executor_;
+  rclcpp::executor::Executor::SharedPtr executor_;
   const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_interface_;
   AsyncParametersClient::SharedPtr async_parameters_client_;
 };

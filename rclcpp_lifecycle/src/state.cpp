@@ -21,7 +21,6 @@
 #include "rcl_lifecycle/rcl_lifecycle.h"
 
 #include "rclcpp/exceptions.hpp"
-#include "rclcpp/logging.hpp"
 
 #include "rcutils/allocator.h"
 
@@ -144,7 +143,7 @@ State::label() const
 }
 
 void
-State::reset() noexcept
+State::reset()
 {
   if (!owns_rcl_state_handle_) {
     state_handle_ = nullptr;
@@ -158,9 +157,7 @@ State::reset() noexcept
   allocator_.deallocate(state_handle_, allocator_.state);
   state_handle_ = nullptr;
   if (ret != RCL_RET_OK) {
-    RCLCPP_ERROR(
-      rclcpp::get_logger("rclcpp_lifecycle"),
-      "rcl_lifecycle_transition_fini did not complete successfully, leaking memory");
+    rclcpp::exceptions::throw_from_rcl_error(ret);
   }
 }
 

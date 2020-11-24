@@ -15,8 +15,6 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_SERVICES_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_SERVICES_HPP_
 
-#include <string>
-
 #include "rclcpp/callback_group.hpp"
 #include "rclcpp/client.hpp"
 #include "rclcpp/macros.hpp"
@@ -44,20 +42,18 @@ public:
   ~NodeServices();
 
   RCLCPP_PUBLIC
+  virtual
   void
   add_client(
     rclcpp::ClientBase::SharedPtr client_base_ptr,
-    rclcpp::CallbackGroup::SharedPtr group) override;
+    rclcpp::callback_group::CallbackGroup::SharedPtr group);
 
   RCLCPP_PUBLIC
+  virtual
   void
   add_service(
     rclcpp::ServiceBase::SharedPtr service_base_ptr,
-    rclcpp::CallbackGroup::SharedPtr group) override;
-
-  RCLCPP_PUBLIC
-  std::string
-  resolve_service_name(const std::string & name, bool only_expand = false) const override;
+    rclcpp::callback_group::CallbackGroup::SharedPtr group);
 
 private:
   RCLCPP_DISABLE_COPY(NodeServices)

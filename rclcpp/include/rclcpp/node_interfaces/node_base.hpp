@@ -23,6 +23,7 @@
 #include "rclcpp/context.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
+#include "rclcpp/node_options.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
@@ -42,97 +43,107 @@ public:
     const std::string & namespace_,
     rclcpp::Context::SharedPtr context,
     const rcl_node_options_t & rcl_node_options,
-    bool use_intra_process_default,
-    bool enable_topic_statistics_default);
+    bool use_intra_process_default);
 
   RCLCPP_PUBLIC
   virtual
   ~NodeBase();
 
   RCLCPP_PUBLIC
+  virtual
   const char *
-  get_name() const override;
+  get_name() const;
 
   RCLCPP_PUBLIC
+  virtual
   const char *
-  get_namespace() const override;
+  get_namespace() const;
 
   RCLCPP_PUBLIC
+  virtual
   const char *
-  get_fully_qualified_name() const override;
+  get_fully_qualified_name() const;
 
   RCLCPP_PUBLIC
+  virtual
   rclcpp::Context::SharedPtr
-  get_context() override;
+  get_context();
 
   RCLCPP_PUBLIC
+  virtual
   rcl_node_t *
-  get_rcl_node_handle() override;
+  get_rcl_node_handle();
 
   RCLCPP_PUBLIC
+  virtual
   const rcl_node_t *
-  get_rcl_node_handle() const override;
+  get_rcl_node_handle() const;
 
   RCLCPP_PUBLIC
+  virtual
   std::shared_ptr<rcl_node_t>
-  get_shared_rcl_node_handle() override;
+  get_shared_rcl_node_handle();
 
   RCLCPP_PUBLIC
+  virtual
   std::shared_ptr<const rcl_node_t>
-  get_shared_rcl_node_handle() const override;
+  get_shared_rcl_node_handle() const;
 
   RCLCPP_PUBLIC
-  rclcpp::CallbackGroup::SharedPtr
-  create_callback_group(
-    rclcpp::CallbackGroupType group_type,
-    bool automatically_add_to_executor_with_node = true) override;
-
-  RCLCPP_PUBLIC
-  rclcpp::CallbackGroup::SharedPtr
-  get_default_callback_group() override;
-
-  RCLCPP_PUBLIC
+  virtual
   bool
-  callback_group_in_node(rclcpp::CallbackGroup::SharedPtr group) override;
+  assert_liveliness() const;
 
   RCLCPP_PUBLIC
-  const std::vector<rclcpp::CallbackGroup::WeakPtr> &
-  get_callback_groups() const override;
+  virtual
+  rclcpp::callback_group::CallbackGroup::SharedPtr
+  create_callback_group(rclcpp::callback_group::CallbackGroupType group_type);
 
   RCLCPP_PUBLIC
+  virtual
+  rclcpp::callback_group::CallbackGroup::SharedPtr
+  get_default_callback_group();
+
+  RCLCPP_PUBLIC
+  virtual
+  bool
+  callback_group_in_node(rclcpp::callback_group::CallbackGroup::SharedPtr group);
+
+  RCLCPP_PUBLIC
+  virtual
+  const std::vector<rclcpp::callback_group::CallbackGroup::WeakPtr> &
+  get_callback_groups() const;
+
+  RCLCPP_PUBLIC
+  virtual
   std::atomic_bool &
-  get_associated_with_executor_atomic() override;
+  get_associated_with_executor_atomic();
 
   RCLCPP_PUBLIC
+  virtual
   rcl_guard_condition_t *
-  get_notify_guard_condition() override;
+  get_notify_guard_condition();
 
   RCLCPP_PUBLIC
+  virtual
   std::unique_lock<std::recursive_mutex>
-  acquire_notify_guard_condition_lock() const override;
+  acquire_notify_guard_condition_lock() const;
 
   RCLCPP_PUBLIC
+  virtual
   bool
-  get_use_intra_process_default() const override;
-
-  bool
-  get_enable_topic_statistics_default() const override;
-
-  std::string
-  resolve_topic_or_service_name(
-    const std::string & name, bool is_service, bool only_expand = false) const override;
+  get_use_intra_process_default() const;
 
 private:
   RCLCPP_DISABLE_COPY(NodeBase)
 
   rclcpp::Context::SharedPtr context_;
   bool use_intra_process_default_;
-  bool enable_topic_statistics_default_;
 
   std::shared_ptr<rcl_node_t> node_handle_;
 
-  rclcpp::CallbackGroup::SharedPtr default_callback_group_;
-  std::vector<rclcpp::CallbackGroup::WeakPtr> callback_groups_;
+  rclcpp::callback_group::CallbackGroup::SharedPtr default_callback_group_;
+  std::vector<rclcpp::callback_group::CallbackGroup::WeakPtr> callback_groups_;
 
   std::atomic_bool associated_with_executor_;
 

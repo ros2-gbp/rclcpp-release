@@ -16,7 +16,7 @@
 #define RCLCPP_ACTION__SERVER_HPP_
 
 #include <rcl_action/action_server.h>
-#include <rosidl_runtime_c/action_type_support_struct.h>
+#include <rosidl_generator_c/action_type_support_struct.h>
 #include <rosidl_typesupport_cpp/action_type_support.hpp>
 #include <rclcpp/node_interfaces/node_base_interface.hpp>
 #include <rclcpp/node_interfaces/node_clock_interface.hpp>
@@ -118,15 +118,11 @@ public:
   bool
   is_ready(rcl_wait_set_t *) override;
 
-  RCLCPP_ACTION_PUBLIC
-  std::shared_ptr<void>
-  take_data() override;
-
   /// Act on entities in the wait set which are ready to be acted upon.
   /// \internal
   RCLCPP_ACTION_PUBLIC
   void
-  execute(std::shared_ptr<void> & data) override;
+  execute() override;
 
   // End Waitables API
   // -----------------
@@ -233,19 +229,19 @@ private:
   /// \internal
   RCLCPP_ACTION_PUBLIC
   void
-  execute_goal_request_received(std::shared_ptr<void> & data);
+  execute_goal_request_received();
 
   /// Handle a request to cancel goals on the server
   /// \internal
   RCLCPP_ACTION_PUBLIC
   void
-  execute_cancel_request_received(std::shared_ptr<void> & data);
+  execute_cancel_request_received();
 
   /// Handle a request to get the result of an action
   /// \internal
   RCLCPP_ACTION_PUBLIC
   void
-  execute_result_request_received(std::shared_ptr<void> & data);
+  execute_result_request_received();
 
   /// Handle a timeout indicating a completed goal should be forgotten by the server
   /// \internal
@@ -300,7 +296,7 @@ public:
    * \param[in] name the name of an action.
    *  The same name and type must be used by both the action client and action server to
    *  communicate.
-   * \param[in] options Options to pass to the underlying `rcl_action_server_t`.
+   * \param[in] options options to pass to the underlying `rcl_action_server_t`.
    * \param[in] handle_goal a callback that decides if a goal should be accepted or rejected.
    * \param[in] handle_cancel a callback that decides if a goal should be attemted to be canceled.
    *  The return from this callback only indicates if the server will try to cancel a goal.

@@ -44,9 +44,6 @@ public:
   : std::runtime_error("context is already initialized") {}
 };
 
-/// Forward declare WeakContextsWrapper
-class WeakContextsWrapper;
-
 /// Context which encapsulates shared state between nodes and other similar entities.
 /**
  * A context also represents the lifecycle between init and shutdown of rclcpp.
@@ -103,9 +100,6 @@ public:
    * \param[in] argv argument array which may contain arguments intended for ROS
    * \param[in] init_options initialization options for rclcpp and underlying layers
    * \throw ContextAlreadyInitialized if called if init is called more than once
-   * \throws anything rclcpp::exceptions::throw_from_rcl_error can throw.
-   * \throws std::runtime_error if the global logging configure mutex is NULL
-   * \throws exceptions::UnknownROSArgsError if there are unknown ROS arguments
    */
   RCLCPP_PUBLIC
   virtual
@@ -139,11 +133,6 @@ public:
   rclcpp::InitOptions
   get_init_options();
 
-  /// Return actual domain id.
-  RCLCPP_PUBLIC
-  size_t
-  get_domain_id() const;
-
   /// Return the shutdown reason, or empty string if not shutdown.
   /**
    * This function is thread-safe.
@@ -170,7 +159,7 @@ public:
    *
    * \param[in] reason the description of why shutdown happened
    * \return true if shutdown was successful, false if context was already shutdown
-   * \throw various exceptions derived from rclcpp::exceptions::RCLError, if rcl_shutdown fails
+   * \throw various exceptions derived from RCLErrorBase, if rcl_shutdown fails
    */
   RCLCPP_PUBLIC
   virtual
@@ -248,6 +237,64 @@ public:
   void
   interrupt_all_sleep_for();
 
+  /// Get a handle to the guard condition which is triggered when interrupted.
+  /**
+   * This guard condition is triggered any time interrupt_all_wait_sets() is
+   * called, which may be called by the user, or shutdown().
+   * And in turn, shutdown() may be called by the user, the destructor of this
+   * context, or the signal handler if installed and shutdown_on_sigint is true
+   * for this context.
+   *
+   * The first time that this function is called for a given wait set a new guard
+   * condition will be created and returned; thereafter the same guard condition
+   * will be returned for the same wait set.
+   * This mechanism is designed to ensure that the same guard condition is not
+   * reused across wait sets (e.g., when using multiple executors in the same
+   * process).
+   * This method will throw an exception if initialization of the guard
+   * condition fails.
+   *
+   * The returned guard condition needs to be released with the
+   * release_interrupt_guard_condition() method in order to reclaim resources.
+   *
+   * \param[in] wait_set Pointer to the rcl_wait_set_t that will be using the
+   *   resulting guard condition.
+   * \return Pointer to the guard condition.
+   */
+  RCLCPP_PUBLIC
+  rcl_guard_condition_t *
+  get_interrupt_guard_condition(rcl_wait_set_t * wait_set);
+
+  /// Release the previously allocated guard condition which is triggered when interrupted.
+  /**
+   * If you previously called get_interrupt_guard_condition() for a given wait
+   * set to get a interrupt guard condition, then you should call
+   * release_interrupt_guard_condition() when you're done, to free that
+   * condition.
+   * Will throw an exception if get_interrupt_guard_condition() wasn't
+   * previously called for the given wait set.
+   *
+   * After calling this, the pointer returned by get_interrupt_guard_condition()
+   * for the given wait_set is invalid.
+   *
+   * \param[in] wait_set Pointer to the rcl_wait_set_t that was using the
+   *   resulting guard condition.
+   */
+  RCLCPP_PUBLIC
+  void
+  release_interrupt_guard_condition(rcl_wait_set_t * wait_set);
+
+  /// Nothrow version of release_interrupt_guard_condition(), logs to RCLCPP_ERROR instead.
+  RCLCPP_PUBLIC
+  void
+  release_interrupt_guard_condition(rcl_wait_set_t * wait_set, const std::nothrow_t &) noexcept;
+
+  /// Interrupt any blocking executors, or wait sets associated with this context.
+  RCLCPP_PUBLIC
+  virtual
+  void
+  interrupt_all_wait_sets();
+
   /// Return a singleton instance for the SubContext type, constructing one if necessary.
   template<typename SubContext, typename ... Args>
   std::shared_ptr<SubContext>
@@ -291,9 +338,6 @@ private:
   rclcpp::InitOptions init_options_;
   std::string shutdown_reason_;
 
-  // Keep shared ownership of the global logging mutex.
-  std::shared_ptr<std::recursive_mutex> logging_mutex_;
-
   std::unordered_map<std::type_index, std::shared_ptr<void>> sub_contexts_;
   // This mutex is recursive so that the constructor of a sub context may
   // attempt to acquire another sub context.
@@ -307,8 +351,10 @@ private:
   /// Mutex for protecting the global condition variable.
   std::mutex interrupt_mutex_;
 
-  /// Keep shared ownership of global vector of weak contexts
-  std::shared_ptr<WeakContextsWrapper> weak_contexts_;
+  /// Mutex to protect sigint_guard_cond_handles_.
+  std::mutex interrupt_guard_cond_handles_mutex_;
+  /// Guard conditions for interrupting of associated wait sets on interrupt_all_wait_sets().
+  std::unordered_map<rcl_wait_set_t *, rcl_guard_condition_t> interrupt_guard_cond_handles_;
 };
 
 /// Return a copy of the list of context shared pointers.

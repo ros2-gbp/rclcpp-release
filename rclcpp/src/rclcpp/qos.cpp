@@ -14,32 +14,10 @@
 
 #include "rclcpp/qos.hpp"
 
-#include <string>
-
-#include "rmw/types.h"
+#include <rmw/types.h>
 
 namespace rclcpp
 {
-
-std::string qos_policy_name_from_kind(rmw_qos_policy_kind_t policy_kind)
-{
-  switch (policy_kind) {
-    case RMW_QOS_POLICY_DURABILITY:
-      return "DURABILITY_QOS_POLICY";
-    case RMW_QOS_POLICY_DEADLINE:
-      return "DEADLINE_QOS_POLICY";
-    case RMW_QOS_POLICY_LIVELINESS:
-      return "LIVELINESS_QOS_POLICY";
-    case RMW_QOS_POLICY_RELIABILITY:
-      return "RELIABILITY_QOS_POLICY";
-    case RMW_QOS_POLICY_HISTORY:
-      return "HISTORY_QOS_POLICY";
-    case RMW_QOS_POLICY_LIFESPAN:
-      return "LIFESPAN_QOS_POLICY";
-    default:
-      return "INVALID_QOS_POLICY";
-  }
-}
 
 QoSInitialization::QoSInitialization(rmw_qos_history_policy_t history_policy_arg, size_t depth_arg)
 : history_policy(history_policy_arg), depth(depth_arg)
@@ -206,41 +184,6 @@ QoS::avoid_ros_namespace_conventions(bool avoid_ros_namespace_conventions)
   return *this;
 }
 
-namespace
-{
-/// Check if two rmw_time_t have the same values.
-bool operator==(const rmw_time_t & left, const rmw_time_t & right)
-{
-  return left.sec == right.sec && left.nsec == right.nsec;
-}
-}  // unnamed namespace
-
-bool operator==(const QoS & left, const QoS & right)
-{
-  const auto & pl = left.get_rmw_qos_profile();
-  const auto & pr = right.get_rmw_qos_profile();
-  return pl.history == pr.history &&
-         pl.depth == pr.depth &&
-         pl.reliability == pr.reliability &&
-         pl.durability == pr.durability &&
-         pl.deadline == pr.deadline &&
-         pl.lifespan == pr.lifespan &&
-         pl.liveliness == pr.liveliness &&
-         pl.liveliness_lease_duration == pr.liveliness_lease_duration &&
-         pl.avoid_ros_namespace_conventions == pr.avoid_ros_namespace_conventions;
-}
-
-bool operator!=(const QoS & left, const QoS & right)
-{
-  return !(left == right);
-}
-
-ClockQoS::ClockQoS(const QoSInitialization & qos_initialization)
-// Using `rmw_qos_profile_sensor_data` intentionally.
-// It's best effort and `qos_initialization` is overriding the depth to 1.
-: QoS(qos_initialization, rmw_qos_profile_sensor_data)
-{}
-
 SensorDataQoS::SensorDataQoS(const QoSInitialization & qos_initialization)
 : QoS(qos_initialization, rmw_qos_profile_sensor_data)
 {}
@@ -255,10 +198,6 @@ ServicesQoS::ServicesQoS(const QoSInitialization & qos_initialization)
 
 ParameterEventsQoS::ParameterEventsQoS(const QoSInitialization & qos_initialization)
 : QoS(qos_initialization, rmw_qos_profile_parameter_events)
-{}
-
-RosoutQoS::RosoutQoS(const QoSInitialization & rosout_initialization)
-: QoS(rosout_initialization, rcl_qos_profile_rosout_default)
 {}
 
 SystemDefaultsQoS::SystemDefaultsQoS(const QoSInitialization & qos_initialization)

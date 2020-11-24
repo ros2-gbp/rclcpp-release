@@ -37,7 +37,7 @@ Duration::Duration(int32_t seconds, uint32_t nanoseconds)
   rcl_duration_.nanoseconds += nanoseconds;
 }
 
-Duration::Duration(rcl_duration_value_t nanoseconds)
+Duration::Duration(int64_t nanoseconds)
 {
   rcl_duration_.nanoseconds = nanoseconds;
 }
@@ -148,7 +148,7 @@ Duration::operator+(const rclcpp::Duration & rhs) const
     this->rcl_duration_.nanoseconds,
     rhs.rcl_duration_.nanoseconds,
     std::numeric_limits<rcl_duration_value_t>::max());
-  return Duration::from_nanoseconds(
+  return Duration(
     rcl_duration_.nanoseconds + rhs.rcl_duration_.nanoseconds);
 }
 
@@ -177,7 +177,7 @@ Duration::operator-(const rclcpp::Duration & rhs) const
     rhs.rcl_duration_.nanoseconds,
     std::numeric_limits<rcl_duration_value_t>::max());
 
-  return Duration::from_nanoseconds(
+  return Duration(
     rcl_duration_.nanoseconds - rhs.rcl_duration_.nanoseconds);
 }
 
@@ -186,7 +186,8 @@ bounds_check_duration_scale(int64_t dns, double scale, uint64_t max)
 {
   auto abs_dns = static_cast<uint64_t>(std::abs(dns));
   auto abs_scale = std::abs(scale);
-  if (abs_scale > 1.0 && abs_dns >
+  if (abs_scale > 1.0 &&
+    abs_dns >
     static_cast<uint64_t>(static_cast<long double>(max) / static_cast<long double>(abs_scale)))
   {
     if ((dns > 0 && scale > 0) || (dns < 0 && scale < 0)) {
@@ -208,9 +209,8 @@ Duration::operator*(double scale) const
     scale,
     std::numeric_limits<rcl_duration_value_t>::max());
   long double scale_ld = static_cast<long double>(scale);
-  return Duration::from_nanoseconds(
-    static_cast<rcl_duration_value_t>(
-      static_cast<long double>(rcl_duration_.nanoseconds) * scale_ld));
+  return Duration(static_cast<rcl_duration_value_t>(
+             static_cast<long double>(rcl_duration_.nanoseconds) * scale_ld));
 }
 
 rcl_duration_value_t
@@ -244,22 +244,6 @@ Duration::to_rmw_time() const
   result.sec = static_cast<uint64_t>(msg.sec);
   result.nsec = static_cast<uint64_t>(msg.nanosec);
   return result;
-}
-
-Duration
-Duration::from_seconds(double seconds)
-{
-  Duration ret;
-  ret.rcl_duration_.nanoseconds = static_cast<int64_t>(RCL_S_TO_NS(seconds));
-  return ret;
-}
-
-Duration
-Duration::from_nanoseconds(rcl_duration_value_t nanoseconds)
-{
-  Duration ret;
-  ret.rcl_duration_.nanoseconds = nanoseconds;
-  return ret;
 }
 
 }  // namespace rclcpp

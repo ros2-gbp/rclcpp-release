@@ -26,7 +26,6 @@
 #include <memory>
 #include <mutex>
 
-#include "rclcpp_action/exceptions.hpp"
 #include "rclcpp_action/types.hpp"
 #include "rclcpp_action/visibility_control.hpp"
 
@@ -90,6 +89,19 @@ public:
   rclcpp::Time
   get_goal_stamp() const;
 
+  /// Get a future to the goal result.
+  /**
+   * This method should not be called if the `ignore_result` flag was set when
+   * sending the original goal request (see Client::async_send_goal).
+   *
+   * `is_result_aware()` can be used to check if it is safe to call this method.
+   *
+   * \throws exceptions::UnawareGoalHandleError If the the goal handle is unaware of the result.
+   * \return A future to the result.
+   */
+  std::shared_future<WrappedResult>
+  async_result();
+
   /// Get the goal status code.
   int8_t
   get_status();
@@ -122,21 +134,7 @@ private:
     typename ClientGoalHandle<ActionT>::SharedPtr shared_this,
     typename std::shared_ptr<const Feedback> feedback_message);
 
-  /// Get a future to the goal result.
-  /**
-   * This method should not be called if the `ignore_result` flag was set when
-   * sending the original goal request (see Client::async_send_goal).
-   *
-   * `is_result_aware()` can be used to check if it is safe to call this method.
-   *
-   * \throws exceptions::UnawareGoalHandleError If the the goal handle is unaware of the result.
-   * \return A future to the result.
-   */
-  std::shared_future<WrappedResult>
-  async_get_result();
-
-  /// Returns the previous value of awareness
-  bool
+  void
   set_result_awareness(bool awareness);
 
   void
@@ -146,14 +144,9 @@ private:
   set_result(const WrappedResult & wrapped_result);
 
   void
-  invalidate(const exceptions::UnawareGoalHandleError & ex);
-
-  bool
-  is_invalidated() const;
+  invalidate();
 
   GoalInfo info_;
-
-  std::exception_ptr invalidate_exception_{nullptr};
 
   bool is_result_aware_{false};
   std::promise<WrappedResult> result_promise_;
