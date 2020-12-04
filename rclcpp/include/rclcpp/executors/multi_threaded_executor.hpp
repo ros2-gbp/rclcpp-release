@@ -15,6 +15,7 @@
 #ifndef RCLCPP__EXECUTORS__MULTI_THREADED_EXECUTOR_HPP_
 #define RCLCPP__EXECUTORS__MULTI_THREADED_EXECUTOR_HPP_
 
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -48,13 +49,13 @@ public:
    * \param number_of_threads number of threads to have in the thread pool,
    *   the default 0 will use the number of cpu cores found instead
    * \param yield_before_execute if true std::this_thread::yield() is called
-   * \param timeout maximum time to wait
    */
   RCLCPP_PUBLIC
   MultiThreadedExecutor(
     const executor::ExecutorArgs & args = executor::ExecutorArgs(),
     size_t number_of_threads = 0,
-    bool yield_before_execute = false);
+    bool yield_before_execute = false,
+    std::chrono::nanoseconds timeout = std::chrono::nanoseconds(-1));
 
   RCLCPP_PUBLIC
   virtual ~MultiThreadedExecutor();
@@ -78,6 +79,7 @@ private:
   std::mutex wait_mutex_;
   size_t number_of_threads_;
   bool yield_before_execute_;
+  std::chrono::nanoseconds next_exec_timeout_;
 
   std::set<TimerBase::SharedPtr> scheduled_timers_;
 };

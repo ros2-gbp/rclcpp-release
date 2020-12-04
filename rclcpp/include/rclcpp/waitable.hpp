@@ -119,7 +119,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   bool
-  is_ready(rcl_wait_set_t * wait_set) = 0;
+  is_ready(rcl_wait_set_t *) = 0;
 
   /// Execute any entities of the Waitable that are ready.
   /**
@@ -128,7 +128,7 @@ public:
    *
    * Example usage:
    *
-   * ```
+   * ```cpp
    * // ... create a wait set and a Waitable
    * // Add the Waitable to the wait set
    * bool add_ret = waitable.add_to_wait_set(wait_set);

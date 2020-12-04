@@ -33,6 +33,7 @@
 #include "rclcpp/logging.hpp"
 #include "rmw/error_handling.h"
 #include "rmw/rmw.h"
+#include "tracetools/tracetools.h"
 
 namespace rclcpp
 {
@@ -154,18 +155,13 @@ public:
 
       rclcpp::exceptions::throw_from_rcl_error(ret, "could not create service");
     }
+    TRACEPOINT(
+      rclcpp_service_callback_added,
+      (const void *)get_service_handle().get(),
+      (const void *)&any_callback_);
+    any_callback_.register_callback_for_tracing();
   }
 
-  /// Default constructor.
-  /**
-   * The constructor for a Service is almost never called directly.
-   * Instead, services should be instantiated through the function
-   * rclcpp::create_service().
-   *
-   * \param[in] node_handle NodeBaseInterface pointer that is used in part of the setup.
-   * \param[in] service_handle service handle.
-   * \param[in] any_callback User defined callback to call when a client request is received.
-   */
   Service(
     std::shared_ptr<rcl_node_t> node_handle,
     std::shared_ptr<rcl_service_t> service_handle,
@@ -182,18 +178,13 @@ public:
     }
 
     service_handle_ = service_handle;
+    TRACEPOINT(
+      rclcpp_service_callback_added,
+      (const void *)get_service_handle().get(),
+      (const void *)&any_callback_);
+    any_callback_.register_callback_for_tracing();
   }
 
-  /// Default constructor.
-  /**
-   * The constructor for a Service is almost never called directly.
-   * Instead, services should be instantiated through the function
-   * rclcpp::create_service().
-   *
-   * \param[in] node_handle NodeBaseInterface pointer that is used in part of the setup.
-   * \param[in] service_handle service handle.
-   * \param[in] any_callback User defined callback to call when a client request is received.
-   */
   Service(
     std::shared_ptr<rcl_node_t> node_handle,
     rcl_service_t * service_handle,
@@ -212,6 +203,11 @@ public:
     // In this case, rcl owns the service handle memory
     service_handle_ = std::shared_ptr<rcl_service_t>(new rcl_service_t);
     service_handle_->impl = service_handle->impl;
+    TRACEPOINT(
+      rclcpp_service_callback_added,
+      (const void *)get_service_handle().get(),
+      (const void *)&any_callback_);
+    any_callback_.register_callback_for_tracing();
   }
 
   Service() = delete;
