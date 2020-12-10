@@ -91,7 +91,7 @@ TEST_F(TestNodeGraph, construct_from_node)
 
   // get_graph_event is non-const
   EXPECT_NE(nullptr, node()->get_node_graph_interface()->get_graph_event());
-  EXPECT_EQ(1u, node()->get_node_graph_interface()->count_graph_users());
+  EXPECT_EQ(1u, node_graph()->count_graph_users());
 }
 
 TEST_F(TestNodeGraph, get_topic_names_and_types)

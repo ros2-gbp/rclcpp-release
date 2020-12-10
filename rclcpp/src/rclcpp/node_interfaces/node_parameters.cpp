@@ -67,6 +67,7 @@ NodeParameters::NodeParameters(
   }
 
   if (start_parameter_event_publisher) {
+    // TODO(ivanpauno): Qos of the `/parameters_event` topic should be somehow overridable.
     events_publisher_ = rclcpp::create_publisher<MessageT, AllocatorT, PublisherT>(
       node_topics,
       "/parameter_events",
@@ -872,18 +873,6 @@ NodeParameters::add_on_set_parameters_callback(OnParametersSetCallbackType callb
   // the last callback registered is executed first.
   on_parameters_set_callback_container_.emplace_front(handle);
   return handle;
-}
-
-NodeParameters::OnParametersSetCallbackType
-NodeParameters::set_on_parameters_set_callback(OnParametersSetCallbackType callback)
-{
-  std::lock_guard<std::recursive_mutex> lock(mutex_);
-
-  ParameterMutationRecursionGuard guard(parameter_modification_enabled_);
-
-  auto existing_callback = on_parameters_set_callback_;
-  on_parameters_set_callback_ = callback;
-  return existing_callback;
 }
 
 const std::map<std::string, rclcpp::ParameterValue> &

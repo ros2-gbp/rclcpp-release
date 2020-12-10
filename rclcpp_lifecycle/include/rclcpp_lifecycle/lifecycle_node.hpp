@@ -472,17 +472,6 @@ public:
   remove_on_set_parameters_callback(
     const rclcpp_lifecycle::LifecycleNode::OnSetParametersCallbackHandle * const handler);
 
-  /// Register a callback to be called anytime a parameter is about to be changed.
-  /**
-   * \deprecated Use add_on_set_parameters_callback instead.
-   * \sa rclcpp::Node::set_on_parameters_set_callback
-   */
-  [[deprecated("use add_on_set_parameters_callback(OnParametersSetCallbackType callback) instead")]]
-  RCLCPP_LIFECYCLE_PUBLIC
-  rclcpp_lifecycle::LifecycleNode::OnParametersSetCallbackType
-  set_on_parameters_set_callback(
-    rclcpp_lifecycle::LifecycleNode::OnParametersSetCallbackType callback);
-
   /// Return a vector of existing node names (string).
   /**
    * \sa rclcpp::Node::get_node_names
@@ -705,13 +694,21 @@ public:
   std::vector<State>
   get_available_states();
 
-  /// Return a list with the available transitions.
+  /// Return a list with the current available transitions.
   /**
-   * \return list with the available transitions.
+   * \return list with the current available transitions.
    */
   RCLCPP_LIFECYCLE_PUBLIC
   std::vector<Transition>
   get_available_transitions();
+
+  /// Return a list with all the transitions.
+  /**
+   * \return list with all the transitions in the transition graph.
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  std::vector<Transition>
+  get_transition_graph();
 
   /// Trigger the specified transition.
   /*
@@ -906,10 +903,6 @@ protected:
 
 private:
   RCLCPP_DISABLE_COPY(LifecycleNode)
-
-  RCLCPP_LIFECYCLE_PUBLIC
-  bool
-  group_in_node(rclcpp::CallbackGroup::SharedPtr group);
 
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_;
   rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_;

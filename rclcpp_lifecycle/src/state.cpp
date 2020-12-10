@@ -144,7 +144,7 @@ State::label() const
 }
 
 void
-State::reset()
+State::reset() noexcept
 {
   if (!owns_rcl_state_handle_) {
     state_handle_ = nullptr;

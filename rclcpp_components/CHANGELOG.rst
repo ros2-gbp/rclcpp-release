@@ -2,30 +2,39 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-2.3.0 (2020-12-09)
+6.1.0 (2020-12-10)
 ------------------
-* Update QD to QL 1 (`#1480 <https://github.com/ros2/rclcpp/issues/1480>`_)
-* Add benchmarks for components (`#1479 <https://github.com/ros2/rclcpp/issues/1479>`_)
-* Contributors: Alejandro Hernández Cordero, Louise Poubel, Scott K Logan, Stephen Brawner
+* Update QDs to QL 1 (`#1477 <https://github.com/ros2/rclcpp/issues/1477>`_)
+* Add benchmarks for components (`#1476 <https://github.com/ros2/rclcpp/issues/1476>`_)
+* Contributors: Scott K Logan, Stephen Brawner
 
-2.2.0 (2020-10-07)
+6.0.0 (2020-11-18)
 ------------------
-* Include original exception in ComponentManagerException (`#1157 <https://github.com/ros2/rclcpp/issues/1157>`_) (`#1223 <https://github.com/ros2/rclcpp/issues/1223>`_)
-* Contributors: Dereck Wonnacott
+* Bump rclcpp packages to Quality Level 2 (`#1445 <https://github.com/ros2/rclcpp/issues/1445>`_)
+* Contributors: Louise Poubel
 
-2.1.0 (2020-08-03)
+5.1.0 (2020-11-02)
+------------------
+* Update maintainers (`#1384 <https://github.com/ros2/rclcpp/issues/1384>`_)
+* ComponentManager: switch off parameter services and event publisher (`#1333 <https://github.com/ros2/rclcpp/issues/1333>`_)
+* Contributors: Ivan Santiago Paunovic, Martijn Buijs
+
+5.0.0 (2020-09-18)
 ------------------
 
-2.0.2 (2020-07-07)
+4.0.0 (2020-07-09)
 ------------------
+* Bump to QD to level 3 and fixed links (`#1158 <https://github.com/ros2/rclcpp/issues/1158>`_)
+* Include original exception in ComponentManagerException (`#1157 <https://github.com/ros2/rclcpp/issues/1157>`_)
+* Contributors: Alejandro Hernández Cordero, Martijn Buijs, Tomoya Fujita
 
-2.0.1 (2020-06-23)
+3.0.0 (2020-06-18)
 ------------------
 
 2.0.0 (2020-06-01)
 ------------------
-* Added missing virtual destructors (`#1149 <https://github.com/ros2/rclcpp/issues/1149>`_)
-* Add Security Vulnerability Policy pointing to REP-2006 (`#1130 <https://github.com/ros2/rclcpp/issues/1130>`_)
+* Added missing virtual destructors. (`#1149 <https://github.com/ros2/rclcpp/issues/1149>`_)
+* Add Security Vulnerability Policy pointing to REP-2006. (`#1130 <https://github.com/ros2/rclcpp/issues/1130>`_)
 * Contributors: Chris Lalancette, Ivan Santiago Paunovic
 
 1.1.0 (2020-05-26)

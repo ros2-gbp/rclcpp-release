@@ -316,6 +316,7 @@ TEST_F(TestClient, construction_and_destruction_callback_group)
 {
   auto group = client_node->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive);
+  const rcl_action_client_options_t & options = rcl_action_client_get_default_options();
   ASSERT_NO_THROW(
     rclcpp_action::create_client<ActionType>(
       client_node->get_node_base_interface(),
@@ -323,14 +324,15 @@ TEST_F(TestClient, construction_and_destruction_callback_group)
       client_node->get_node_logging_interface(),
       client_node->get_node_waitables_interface(),
       action_name,
-      group
+      group,
+      options
     ).reset());
 }
 
 TEST_F(TestClient, construction_and_destruction_rcl_errors)
 {
   {
-    auto mock = mocking_utils::inject_on_return(
+    auto mock = mocking_utils::patch_and_return(
       "lib:rclcpp_action", rcl_action_client_fini, RCL_RET_ERROR);
     // It just logs an error message and continues
     EXPECT_NO_THROW(
@@ -498,9 +500,8 @@ TEST_F(TestClientAgainstServer, async_send_goal_with_goal_response_callback_wait
   auto send_goal_ops = rclcpp_action::Client<ActionType>::SendGoalOptions();
   send_goal_ops.goal_response_callback =
     [&goal_response_received]
-      (std::shared_future<typename ActionGoalHandle::SharedPtr> future) mutable
+      (typename ActionGoalHandle::SharedPtr goal_handle)
     {
-      auto goal_handle = future.get();
       if (goal_handle) {
         goal_response_received = true;
       }
@@ -871,16 +872,15 @@ TEST_F(TestClientAgainstServer, send_rcl_errors)
       action_client->async_send_goal(goal, send_goal_ops),
       rclcpp::exceptions::RCLError);
   }
-  // TODO(anyone): Review this test
-  // {
-  //   ActionGoal goal;
-  //   auto mock = mocking_utils::patch_and_return(
-  //     "lib:rclcpp_action", rcl_action_send_result_request, RCL_RET_ERROR);
-  //   auto future_goal_handle = action_client->async_send_goal(goal, send_goal_ops);
-  //   dual_spin_until_future_complete(future_goal_handle);
-  //   auto goal_handle = future_goal_handle.get();
-  //   EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_UNKNOWN, goal_handle->get_status());
-  // }
+  {
+    ActionGoal goal;
+    auto mock = mocking_utils::patch_and_return(
+      "lib:rclcpp_action", rcl_action_send_result_request, RCL_RET_ERROR);
+    auto future_goal_handle = action_client->async_send_goal(goal, send_goal_ops);
+    dual_spin_until_future_complete(future_goal_handle);
+    auto goal_handle = future_goal_handle.get();
+    EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_UNKNOWN, goal_handle->get_status());
+  }
   {
     ActionGoal goal;
     auto mock = mocking_utils::patch_and_return(

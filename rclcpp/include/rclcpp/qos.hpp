@@ -19,6 +19,7 @@
 
 #include "rclcpp/duration.hpp"
 #include "rclcpp/visibility_control.hpp"
+#include "rcl/logging_rosout.h"
 #include "rmw/incompatible_qos_events_statuses.h"
 #include "rmw/qos_profiles.h"
 #include "rmw/types.h"
@@ -28,6 +29,38 @@ namespace rclcpp
 
 RCLCPP_PUBLIC
 std::string qos_policy_name_from_kind(rmw_qos_policy_kind_t policy_kind);
+
+enum class HistoryPolicy
+{
+  KeepLast = RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+  KeepAll = RMW_QOS_POLICY_HISTORY_KEEP_ALL,
+  SystemDefault = RMW_QOS_POLICY_HISTORY_SYSTEM_DEFAULT,
+  Unknown = RMW_QOS_POLICY_HISTORY_UNKNOWN,
+};
+
+enum class ReliabilityPolicy
+{
+  BestEffort = RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT,
+  Reliable = RMW_QOS_POLICY_RELIABILITY_RELIABLE,
+  SystemDefault = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT,
+  Unknown = RMW_QOS_POLICY_RELIABILITY_UNKNOWN,
+};
+
+enum class DurabilityPolicy
+{
+  Volatile = RMW_QOS_POLICY_DURABILITY_VOLATILE,
+  TransientLocal = RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL,
+  SystemDefault = RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT,
+  Unknown = RMW_QOS_POLICY_DURABILITY_UNKNOWN,
+};
+
+enum class LivelinessPolicy
+{
+  Automatic = RMW_QOS_POLICY_LIVELINESS_AUTOMATIC,
+  ManualByTopic = RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_TOPIC,
+  SystemDefault = RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
+  Unknown = RMW_QOS_POLICY_LIVELINESS_UNKNOWN,
+};
 
 /// QoS initialization values, cannot be created directly, use KeepAll or KeepLast instead.
 struct RCLCPP_PUBLIC QoSInitialization
@@ -83,6 +116,10 @@ public:
 
   /// Set the history policy.
   QoS &
+  history(HistoryPolicy history);
+
+  /// Set the history policy.
+  QoS &
   history(rmw_qos_history_policy_t history);
 
   /// Set the history to keep last.
@@ -97,6 +134,10 @@ public:
   QoS &
   reliability(rmw_qos_reliability_policy_t reliability);
 
+  /// Set the reliability setting.
+  QoS &
+  reliability(ReliabilityPolicy reliability);
+
   /// Set the reliability setting to reliable.
   QoS &
   reliable();
@@ -108,6 +149,10 @@ public:
   /// Set the durability setting.
   QoS &
   durability(rmw_qos_durability_policy_t durability);
+
+  /// Set the durability setting.
+  QoS &
+  durability(DurabilityPolicy durability);
 
   /// Set the durability setting to volatile.
   /**
@@ -140,6 +185,10 @@ public:
   QoS &
   liveliness(rmw_qos_liveliness_policy_t liveliness);
 
+  /// Set the liveliness setting.
+  QoS &
+  liveliness(LivelinessPolicy liveliness);
+
   /// Set the liveliness_lease_duration setting.
   QoS &
   liveliness_lease_duration(rmw_time_t liveliness_lease_duration);
@@ -152,6 +201,42 @@ public:
   QoS &
   avoid_ros_namespace_conventions(bool avoid_ros_namespace_conventions);
 
+  /// Get the history qos policy.
+  HistoryPolicy
+  history() const;
+
+  /// Get the history depth.
+  size_t
+  depth() const;
+
+  /// Get the reliability policy.
+  ReliabilityPolicy
+  reliability() const;
+
+  /// Get the durability policy.
+  DurabilityPolicy
+  durability() const;
+
+  /// Get the deadline duration setting.
+  rclcpp::Duration
+  deadline() const;
+
+  /// Get the lifespan duration setting.
+  rclcpp::Duration
+  lifespan() const;
+
+  /// Get the liveliness policy.
+  LivelinessPolicy
+  liveliness() const;
+
+  /// Get the liveliness lease duration setting.
+  rclcpp::Duration
+  liveliness_lease_duration() const;
+
+  /// Get the `avoid ros namespace convention` setting.
+  bool
+  avoid_ros_namespace_conventions() const;
+
 private:
   rmw_qos_profile_t rmw_qos_profile_;
 };
@@ -161,6 +246,26 @@ RCLCPP_PUBLIC
 bool operator==(const QoS & left, const QoS & right);
 RCLCPP_PUBLIC
 bool operator!=(const QoS & left, const QoS & right);
+
+/**
+ * Clock QoS class
+ *    - History: Keep last,
+ *    - Depth: 1,
+ *    - Reliability: Best effort,
+ *    - Durability: Volatile,
+ *    - Deadline: Default,
+ *    - Lifespan: Default,
+ *    - Liveliness: System default,
+ *    - Liveliness lease duration: default,
+ *    - avoid ros namespace conventions: false
+ */
+class RCLCPP_PUBLIC ClockQoS : public QoS
+{
+public:
+  explicit
+  ClockQoS(
+    const QoSInitialization & qos_initialization = KeepLast(1));
+};
 
 /**
  * Sensor Data QoS class
@@ -247,6 +352,28 @@ public:
   ParameterEventsQoS(
     const QoSInitialization & qos_initialization = (
       QoSInitialization::from_rmw(rmw_qos_profile_parameter_events)
+  ));
+};
+
+/**
+ * Rosout QoS class
+ *    - History: Keep last,
+ *    - Depth: 1000,
+ *    - Reliability: Reliable,
+ *    - Durability: TRANSIENT_LOCAL,
+ *    - Deadline: Default,
+ *    - Lifespan: {10, 0},
+ *    - Liveliness: System default,
+ *    - Liveliness lease duration: default,
+ *    - Avoid ros namespace conventions: false
+ */
+class RCLCPP_PUBLIC RosoutQoS : public QoS
+{
+public:
+  explicit
+  RosoutQoS(
+    const QoSInitialization & rosout_qos_initialization = (
+      QoSInitialization::from_rmw(rcl_qos_profile_rosout_default)
   ));
 };
 
