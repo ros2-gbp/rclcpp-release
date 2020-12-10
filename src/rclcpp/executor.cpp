@@ -22,6 +22,7 @@
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/executor.hpp"
+#include "rclcpp/executors/static_single_threaded_executor.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/scope_exit.hpp"
 #include "rclcpp/utilities.hpp"
@@ -74,7 +75,7 @@ Executor::Executor(const rclcpp::ExecutorOptions & options)
         "failed to destroy guard condition: %s", rcl_get_error_string().str);
       rcl_reset_error();
     }
-    throw std::runtime_error("Failed to create wait set in Executor constructor");
+    throw_from_rcl_error(ret, "Failed to create wait set in Executor constructor");
   }
 }
 
@@ -215,6 +216,12 @@ Executor::spin_node_some(std::shared_ptr<rclcpp::Node> node)
 void
 Executor::spin_some(std::chrono::nanoseconds max_duration)
 {
+  if (nullptr != dynamic_cast<executors::StaticSingleThreadedExecutor *>(this)) {
+    throw rclcpp::exceptions::UnimplementedError(
+            "spin_some is not implemented for StaticSingleThreadedExecutor, use spin or "
+            "spin_until_future_complete");
+  }
+
   auto start = std::chrono::steady_clock::now();
   auto max_duration_not_elapsed = [max_duration, start]() {
       if (std::chrono::nanoseconds(0) == max_duration) {
@@ -256,6 +263,11 @@ Executor::spin_once_impl(std::chrono::nanoseconds timeout)
 void
 Executor::spin_once(std::chrono::nanoseconds timeout)
 {
+  if (nullptr != dynamic_cast<executors::StaticSingleThreadedExecutor *>(this)) {
+    throw rclcpp::exceptions::UnimplementedError(
+            "spin_once is not implemented for StaticSingleThreadedExecutor, use spin or "
+            "spin_until_future_complete");
+  }
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin_once() called while already spinning");
   }
@@ -267,8 +279,9 @@ void
 Executor::cancel()
 {
   spinning.store(false);
-  if (rcl_trigger_guard_condition(&interrupt_guard_condition_) != RCL_RET_OK) {
-    throw std::runtime_error(rcl_get_error_string().str);
+  rcl_ret_t ret = rcl_trigger_guard_condition(&interrupt_guard_condition_);
+  if (ret != RCL_RET_OK) {
+    throw_from_rcl_error(ret, "Failed to trigger guard condition in cancel");
   }
 }
 
@@ -306,8 +319,9 @@ Executor::execute_any_executable(AnyExecutable & any_exec)
   any_exec.callback_group->can_be_taken_from().store(true);
   // Wake the wait, because it may need to be recalculated or work that
   // was previously blocked is now available.
-  if (rcl_trigger_guard_condition(&interrupt_guard_condition_) != RCL_RET_OK) {
-    throw std::runtime_error(rcl_get_error_string().str);
+  rcl_ret_t ret = rcl_trigger_guard_condition(&interrupt_guard_condition_);
+  if (ret != RCL_RET_OK) {
+    throw_from_rcl_error(ret, "Failed to trigger guard condition from execute_any_executable");
   }
 }
 
@@ -472,19 +486,19 @@ Executor::wait_for_work(std::chrono::nanoseconds timeout)
       }
     }
     // clear wait set
-    if (rcl_wait_set_clear(&wait_set_) != RCL_RET_OK) {
-      throw std::runtime_error("Couldn't clear wait set");
+    rcl_ret_t ret = rcl_wait_set_clear(&wait_set_);
+    if (ret != RCL_RET_OK) {
+      throw_from_rcl_error(ret, "Couldn't clear wait set");
     }
 
     // The size of waitables are accounted for in size of the other entities
-    rcl_ret_t ret = rcl_wait_set_resize(
+    ret = rcl_wait_set_resize(
       &wait_set_, memory_strategy_->number_of_ready_subscriptions(),
       memory_strategy_->number_of_guard_conditions(), memory_strategy_->number_of_ready_timers(),
       memory_strategy_->number_of_ready_clients(), memory_strategy_->number_of_ready_services(),
       memory_strategy_->number_of_ready_events());
     if (RCL_RET_OK != ret) {
-      throw std::runtime_error(
-              std::string("Couldn't resize the wait set : ") + rcl_get_error_string().str);
+      throw_from_rcl_error(ret, "Couldn't resize the wait set");
     }
 
     if (!memory_strategy_->add_handles_to_wait_set(&wait_set_)) {

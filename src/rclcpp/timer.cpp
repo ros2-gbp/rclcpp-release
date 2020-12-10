@@ -61,15 +61,11 @@ TimerBase::TimerBase(
   rcl_clock_t * clock_handle = clock_->get_clock_handle();
   {
     std::lock_guard<std::mutex> clock_guard(clock_->get_clock_mutex());
-    if (
-      rcl_timer_init(
-        timer_handle_.get(), clock_handle, rcl_context.get(), period.count(), nullptr,
-        rcl_get_default_allocator()) != RCL_RET_OK)
-    {
-      RCUTILS_LOG_ERROR_NAMED(
-        "rclcpp",
-        "Couldn't initialize rcl timer handle: %s\n", rcl_get_error_string().str);
-      rcl_reset_error();
+    rcl_ret_t ret = rcl_timer_init(
+      timer_handle_.get(), clock_handle, rcl_context.get(), period.count(), nullptr,
+      rcl_get_default_allocator());
+    if (ret != RCL_RET_OK) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "Couldn't initialize rcl timer handle");
     }
   }
 }
@@ -80,8 +76,9 @@ TimerBase::~TimerBase()
 void
 TimerBase::cancel()
 {
-  if (rcl_timer_cancel(timer_handle_.get()) != RCL_RET_OK) {
-    throw std::runtime_error(std::string("Couldn't cancel timer: ") + rcl_get_error_string().str);
+  rcl_ret_t ret = rcl_timer_cancel(timer_handle_.get());
+  if (ret != RCL_RET_OK) {
+    rclcpp::exceptions::throw_from_rcl_error(ret, "Couldn't cancel timer");
   }
 }
 
@@ -99,8 +96,9 @@ TimerBase::is_canceled()
 void
 TimerBase::reset()
 {
-  if (rcl_timer_reset(timer_handle_.get()) != RCL_RET_OK) {
-    throw std::runtime_error(std::string("Couldn't reset timer: ") + rcl_get_error_string().str);
+  rcl_ret_t ret = rcl_timer_reset(timer_handle_.get());
+  if (ret != RCL_RET_OK) {
+    rclcpp::exceptions::throw_from_rcl_error(ret, "Couldn't reset timer");
   }
 }
 
@@ -108,8 +106,9 @@ bool
 TimerBase::is_ready()
 {
   bool ready = false;
-  if (rcl_timer_is_ready(timer_handle_.get(), &ready) != RCL_RET_OK) {
-    throw std::runtime_error(std::string("Failed to check timer: ") + rcl_get_error_string().str);
+  rcl_ret_t ret = rcl_timer_is_ready(timer_handle_.get(), &ready);
+  if (ret != RCL_RET_OK) {
+    rclcpp::exceptions::throw_from_rcl_error(ret, "Failed to check timer");
   }
   return ready;
 }
@@ -118,14 +117,10 @@ std::chrono::nanoseconds
 TimerBase::time_until_trigger()
 {
   int64_t time_until_next_call = 0;
-  if (
-    rcl_timer_get_time_until_next_call(
-      timer_handle_.get(),
-      &time_until_next_call) != RCL_RET_OK)
-  {
-    throw std::runtime_error(
-            std::string(
-              "Timer could not get time until next call: ") + rcl_get_error_string().str);
+  rcl_ret_t ret = rcl_timer_get_time_until_next_call(
+    timer_handle_.get(), &time_until_next_call);
+  if (ret != RCL_RET_OK) {
+    rclcpp::exceptions::throw_from_rcl_error(ret, "Timer could not get time until next call");
   }
   return std::chrono::nanoseconds(time_until_next_call);
 }
