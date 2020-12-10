@@ -51,21 +51,61 @@ if(BUILD_TESTING)
   set(ament_cmake_cppcheck_ADDITIONAL_INCLUDE_DIRS ${rclcpp_INCLUDE_DIRS})
   ament_lint_auto_find_test_dependencies()
 
+  find_package(performance_test_fixture REQUIRED)
+
+  add_performance_test(
+    benchmark_lifecycle_client
+    test/benchmark/benchmark_lifecycle_client.cpp)
+  if(TARGET benchmark_lifecycle_client)
+    target_link_libraries(benchmark_lifecycle_client ${PROJECT_NAME})
+    ament_target_dependencies(benchmark_lifecycle_client rclcpp)
+  endif()
+  add_performance_test(
+    benchmark_lifecycle_node
+    test/benchmark/benchmark_lifecycle_node.cpp)
+  if(TARGET benchmark_lifecycle_node)
+    target_link_libraries(benchmark_lifecycle_node ${PROJECT_NAME})
+    ament_target_dependencies(benchmark_lifecycle_node rclcpp)
+  endif()
+  add_performance_test(
+    benchmark_state
+    test/benchmark/benchmark_state.cpp)
+  if(TARGET benchmark_state)
+    target_link_libraries(benchmark_state ${PROJECT_NAME})
+  endif()
+  add_performance_test(
+    benchmark_transition
+    test/benchmark/benchmark_transition.cpp)
+  if(TARGET benchmark_transition)
+    target_link_libraries(benchmark_transition ${PROJECT_NAME})
+  endif()
+
   ament_add_gtest(test_lifecycle_node test/test_lifecycle_node.cpp)
   if(TARGET test_lifecycle_node)
     ament_target_dependencies(test_lifecycle_node
       "rcl_lifecycle"
       "rclcpp"
+      "rcutils"
     )
-    target_link_libraries(test_lifecycle_node ${PROJECT_NAME})
+    target_link_libraries(test_lifecycle_node ${PROJECT_NAME} mimick)
+  endif()
+  ament_add_gtest(test_lifecycle_publisher test/test_lifecycle_publisher.cpp)
+  if(TARGET test_lifecycle_publisher)
+    ament_target_dependencies(test_lifecycle_publisher
+      "rcl_lifecycle"
+      "rclcpp"
+      "test_msgs"
+    )
+    target_link_libraries(test_lifecycle_publisher ${PROJECT_NAME})
   endif()
   ament_add_gtest(test_lifecycle_service_client test/test_lifecycle_service_client.cpp)
   if(TARGET test_lifecycle_service_client)
     ament_target_dependencies(test_lifecycle_service_client
       "rcl_lifecycle"
       "rclcpp"
+      "rcutils"
     )
-    target_link_libraries(test_lifecycle_service_client ${PROJECT_NAME})
+    target_link_libraries(test_lifecycle_service_client ${PROJECT_NAME} mimick)
   endif()
   ament_add_gtest(test_state_machine_info test/test_state_machine_info.cpp)
   if(TARGET test_state_machine_info)
@@ -104,8 +144,12 @@ if(BUILD_TESTING)
     ament_target_dependencies(test_transition_wrapper
       "rcl_lifecycle"
       "rclcpp"
+      "rcutils"
     )
-    target_link_libraries(test_transition_wrapper ${PROJECT_NAME})
+    target_link_libraries(test_transition_wrapper ${PROJECT_NAME} mimick)
+    target_compile_definitions(test_transition_wrapper
+      PUBLIC RCUTILS_ENABLE_FAULT_INJECTION
+    )
   endif()
 endif()
 

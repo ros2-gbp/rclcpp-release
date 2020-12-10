@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <thread>
@@ -23,7 +24,14 @@
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include "../mocking_utils/patch.hpp"
+#include "../utils/rclcpp_gtest_macros.hpp"
+
 #include "test_msgs/msg/empty.hpp"
+
+// Note: This is a long running test with rmw_connext_cpp, if you change this file, please check
+// that this test can complete fully, or adjust the timeout as necessary.
+// See https://github.com/ros2/rmw_connext/issues/325 for resolution
 
 using namespace std::chrono_literals;
 
@@ -150,7 +158,19 @@ TEST_F(TestSubscription, construction_and_destruction) {
       (void)msg;
     };
   {
-    auto sub = node->create_subscription<Empty>("topic", 10, callback);
+    constexpr size_t depth = 10u;
+    auto sub = node->create_subscription<Empty>("topic", depth, callback);
+
+    EXPECT_NE(nullptr, sub->get_subscription_handle());
+    // Converting to base class was necessary for the compiler to choose the const version of
+    // get_subscription_handle()
+    const rclcpp::SubscriptionBase * const_sub = sub.get();
+    EXPECT_NE(nullptr, const_sub->get_subscription_handle());
+    EXPECT_FALSE(sub->use_take_shared_method());
+
+    EXPECT_NE(nullptr, sub->get_message_type_support_handle().typesupport_identifier);
+    EXPECT_NE(nullptr, sub->get_message_type_support_handle().data);
+    EXPECT_EQ(depth, sub->get_actual_qos().get_rmw_qos_profile().depth);
   }
 
   {
@@ -227,6 +247,21 @@ TEST_F(TestSubscription, various_creation_signatures) {
   {
     auto sub = rclcpp::create_subscription<Empty>(
       node, "topic", 42, cb, rclcpp::SubscriptionOptions());
+    (void)sub;
+  }
+  {
+    rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>> options;
+    options.allocator = std::make_shared<std::allocator<void>>();
+    EXPECT_NE(nullptr, options.get_allocator());
+    auto sub = rclcpp::create_subscription<Empty>(
+      node, "topic", 42, cb, options);
+    (void)sub;
+  }
+  {
+    rclcpp::SubscriptionOptionsBase options_base;
+    rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>> options(options_base);
+    auto sub = rclcpp::create_subscription<Empty>(
+      node, "topic", 42, cb, options);
     (void)sub;
   }
 }
@@ -329,6 +364,86 @@ TEST_F(TestSubscription, take_serialized) {
   }
 }
 
+TEST_F(TestSubscription, rcl_subscription_init_error) {
+  initialize();
+  auto callback = [](std::shared_ptr<const test_msgs::msg::Empty>) {};
+  auto mock = mocking_utils::patch_and_return(
+    "lib:rclcpp", rcl_subscription_init, RCL_RET_TOPIC_NAME_INVALID);
+
+  // reset() is not needed for triggering exception, just to avoid an unused return value warning
+  EXPECT_THROW(
+    node->create_subscription<test_msgs::msg::Empty>("topic", 10, callback).reset(),
+    rclcpp::exceptions::RCLError);
+}
+
+TEST_F(TestSubscription, rcl_subscription_fini_error) {
+  initialize();
+  auto callback = [](std::shared_ptr<const test_msgs::msg::Empty>) {};
+  auto mock = mocking_utils::inject_on_return(
+    "lib:rclcpp", rcl_subscription_fini, RCL_RET_ERROR);
+
+  // Cleanup just fails, no exception expected
+  EXPECT_NO_THROW(
+    node->create_subscription<test_msgs::msg::Empty>("topic", 10, callback).reset());
+}
+
+TEST_F(TestSubscription, rcl_subscription_get_actual_qos_error) {
+  initialize();
+  auto callback = [](std::shared_ptr<const test_msgs::msg::Empty>) {};
+  auto mock = mocking_utils::patch_and_return(
+    "lib:rclcpp", rcl_subscription_get_actual_qos, nullptr);
+
+  auto sub = node->create_subscription<test_msgs::msg::Empty>("topic", 10, callback);
+  RCLCPP_EXPECT_THROW_EQ(
+    sub->get_actual_qos(), std::runtime_error("failed to get qos settings: error not set"));
+}
+
+TEST_F(TestSubscription, rcl_take_type_erased_error) {
+  initialize();
+  auto callback = [](std::shared_ptr<const test_msgs::msg::Empty>) {};
+  auto mock = mocking_utils::patch_and_return(
+    "lib:rclcpp", rcl_take, RCL_RET_ERROR);
+
+  auto sub = node->create_subscription<test_msgs::msg::Empty>("topic", 10, callback);
+  test_msgs::msg::Empty msg;
+  rclcpp::MessageInfo message_info;
+
+  EXPECT_THROW(sub->take_type_erased(&msg, message_info), rclcpp::exceptions::RCLError);
+}
+
+TEST_F(TestSubscription, rcl_take_serialized_message_error) {
+  initialize();
+  auto callback = [](std::shared_ptr<const test_msgs::msg::Empty>) {};
+  auto mock = mocking_utils::patch_and_return(
+    "lib:rclcpp", rcl_take_serialized_message, RCL_RET_ERROR);
+
+  auto sub = node->create_subscription<test_msgs::msg::Empty>("topic", 10, callback);
+  rclcpp::SerializedMessage msg;
+  rclcpp::MessageInfo message_info;
+
+  EXPECT_THROW(sub->take_serialized(msg, message_info), rclcpp::exceptions::RCLError);
+}
+
+TEST_F(TestSubscription, rcl_subscription_get_publisher_count_error) {
+  initialize();
+  auto callback = [](std::shared_ptr<const test_msgs::msg::Empty>) {};
+  auto mock = mocking_utils::patch_and_return(
+    "lib:rclcpp", rcl_subscription_get_publisher_count, RCL_RET_ERROR);
+
+  auto sub = node->create_subscription<test_msgs::msg::Empty>("topic", 10, callback);
+  EXPECT_THROW(sub->get_publisher_count(), rclcpp::exceptions::RCLError);
+}
+
+TEST_F(TestSubscription, handle_loaned_message) {
+  initialize();
+  auto callback = [](std::shared_ptr<const test_msgs::msg::Empty>) {};
+  auto sub = node->create_subscription<test_msgs::msg::Empty>("topic", 10, callback);
+
+  test_msgs::msg::Empty msg;
+  rclcpp::MessageInfo message_info;
+  EXPECT_NO_THROW(sub->handle_loaned_message(&msg, message_info));
+}
+
 /*
    Testing subscription with intraprocess enabled and invalid QoS
  */
@@ -349,6 +464,29 @@ TEST_P(TestSubscriptionInvalidIntraprocessQos, test_subscription_throws) {
           callback);},
       std::invalid_argument);
   }
+}
+
+/*
+   Testing subscription with invalid use_intra_process_comm
+ */
+TEST_P(TestSubscriptionInvalidIntraprocessQos, test_subscription_throws_intraprocess) {
+  rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>> options;
+  options.use_intra_process_comm = static_cast<rclcpp::IntraProcessSetting>(5);
+
+  initialize();
+  rclcpp::QoS qos = GetParam().qos;
+  auto callback = std::bind(
+    &TestSubscriptionInvalidIntraprocessQos::OnMessage,
+    this,
+    std::placeholders::_1);
+
+  RCLCPP_EXPECT_THROW_EQ(
+    {auto subscription = node->create_subscription<test_msgs::msg::Empty>(
+        "topic",
+        qos,
+        callback,
+        options);},
+    std::runtime_error("Unrecognized IntraProcessSetting value"));
 }
 
 static std::vector<TestParameters> invalid_qos_profiles()
