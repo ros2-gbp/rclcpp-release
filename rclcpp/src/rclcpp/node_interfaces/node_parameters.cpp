@@ -69,7 +69,7 @@ NodeParameters::NodeParameters(
   if (start_parameter_event_publisher) {
     events_publisher_ = rclcpp::create_publisher<MessageT, AllocatorT, PublisherT>(
       node_topics,
-      "parameter_events",
+      "/parameter_events",
       parameter_event_qos,
       publisher_options);
   }
@@ -107,11 +107,14 @@ NodeParameters::NodeParameters(
           rcl_yaml_node_struct_fini(params);
         });
       rclcpp::ParameterMap initial_map = rclcpp::parameter_map_from(params);
-      for (auto iter = initial_map.begin(); initial_map.end() != iter; iter++) {
-        // TODO(cottsay) implement further wildcard matching
-        if (iter->first == "/**" || iter->first == combined_name_) {
+
+      // Enforce wildcard matching precedence
+      // TODO(cottsay) implement further wildcard matching
+      const std::vector<std::string> node_matching_names{"/**", combined_name_};
+      for (const auto & node_name : node_matching_names) {
+        if (initial_map.count(node_name) > 0) {
           // Combine parameter yaml files, overwriting values in older ones
-          for (auto & param : iter->second) {
+          for (const rclcpp::Parameter & param : initial_map.at(node_name)) {
             parameter_overrides_[param.get_name()] =
               rclcpp::ParameterValue(param.get_value_message());
           }
@@ -156,7 +159,7 @@ __lockless_has_parameter(
 // see https://en.cppreference.com/w/cpp/types/numeric_limits/epsilon
 RCLCPP_LOCAL
 bool
-__are_doubles_equal(double x, double y, size_t ulp = 100)
+__are_doubles_equal(double x, double y, double ulp = 100.0)
 {
   return std::abs(x - y) <= std::numeric_limits<double>::epsilon() * std::abs(x + y) * ulp;
 }

@@ -19,6 +19,7 @@
 #include <rmw/rmw.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
@@ -33,15 +34,16 @@
 #include "rcl/publisher.h"
 #include "rcl/subscription.h"
 
-#include "rcl_interfaces/msg/intra_process_message.hpp"
-
 #include "rclcpp/contexts/default_context.hpp"
 #include "rclcpp/create_client.hpp"
 #include "rclcpp/create_publisher.hpp"
 #include "rclcpp/create_service.hpp"
+#include "rclcpp/create_timer.hpp"
 #include "rclcpp/create_subscription.hpp"
+#include "rclcpp/detail/resolve_enable_topic_statistics.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/qos.hpp"
+#include "rclcpp/timer.hpp"
 #include "rclcpp/type_support_decl.hpp"
 #include "rclcpp/visibility_control.hpp"
 
@@ -107,14 +109,14 @@ typename rclcpp::WallTimer<CallbackT>::SharedPtr
 Node::create_wall_timer(
   std::chrono::duration<DurationRepT, DurationT> period,
   CallbackT callback,
-  rclcpp::callback_group::CallbackGroup::SharedPtr group)
+  rclcpp::CallbackGroup::SharedPtr group)
 {
-  auto timer = rclcpp::WallTimer<CallbackT>::make_shared(
-    std::chrono::duration_cast<std::chrono::nanoseconds>(period),
+  return rclcpp::create_wall_timer(
+    period,
     std::move(callback),
-    this->node_base_->get_context());
-  node_timers_->add_timer(timer, group);
-  return timer;
+    group,
+    this->node_base_.get(),
+    this->node_timers_.get());
 }
 
 template<typename ServiceT>
@@ -122,7 +124,7 @@ typename Client<ServiceT>::SharedPtr
 Node::create_client(
   const std::string & service_name,
   const rmw_qos_profile_t & qos_profile,
-  rclcpp::callback_group::CallbackGroup::SharedPtr group)
+  rclcpp::CallbackGroup::SharedPtr group)
 {
   return rclcpp::create_client<ServiceT>(
     node_base_,
@@ -139,7 +141,7 @@ Node::create_service(
   const std::string & service_name,
   CallbackT && callback,
   const rmw_qos_profile_t & qos_profile,
-  rclcpp::callback_group::CallbackGroup::SharedPtr group)
+  rclcpp::CallbackGroup::SharedPtr group)
 {
   return rclcpp::create_service<ServiceT, CallbackT>(
     node_base_,
@@ -158,12 +160,16 @@ Node::declare_parameter(
   const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
   bool ignore_override)
 {
-  return this->declare_parameter(
-    name,
-    rclcpp::ParameterValue(default_value),
-    parameter_descriptor,
-    ignore_override
-  ).get<ParameterT>();
+  try {
+    return this->declare_parameter(
+      name,
+      rclcpp::ParameterValue(default_value),
+      parameter_descriptor,
+      ignore_override
+    ).get<ParameterT>();
+  } catch (const ParameterTypeException & ex) {
+    throw exceptions::InvalidParameterTypeException(name, ex.what());
+  }
 }
 
 template<typename ParameterT>

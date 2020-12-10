@@ -81,7 +81,7 @@
  *   - rclcpp/executors/multi_threaded_executor.hpp
  * - CallbackGroups (mechanism for enforcing concurrency rules for callbacks):
  *   - rclcpp::Node::create_callback_group()
- *   - rclcpp::callback_group::CallbackGroup
+ *   - rclcpp::CallbackGroup
  *   - rclcpp/callback_group.hpp
  *
  * Additionally, there are some methods for introspecting the ROS graph:
@@ -128,6 +128,7 @@
  *   - rclcpp/context.hpp
  *   - rclcpp/contexts/default_context.hpp
  * - Various utilities:
+ *   - rclcpp/duration.hpp
  *   - rclcpp/function_traits.hpp
  *   - rclcpp/macros.hpp
  *   - rclcpp/scope_exit.hpp
@@ -143,6 +144,7 @@
 #include <memory>
 
 #include "rclcpp/executors.hpp"
+#include "rclcpp/guard_condition.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/parameter.hpp"
@@ -152,6 +154,7 @@
 #include "rclcpp/time.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/visibility_control.hpp"
+#include "rclcpp/wait_set.hpp"
 #include "rclcpp/waitable.hpp"
 
 #endif  // RCLCPP__RCLCPP_HPP_

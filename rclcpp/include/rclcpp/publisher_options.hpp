@@ -30,10 +30,7 @@
 namespace rclcpp
 {
 
-namespace callback_group
-{
 class CallbackGroup;
-}  // namespace callback_group
 
 /// Non-templated part of PublisherOptionsWithAllocator<Allocator>.
 struct PublisherOptionsBase
@@ -44,8 +41,11 @@ struct PublisherOptionsBase
   /// Callbacks for various events related to publishers.
   PublisherEventCallbacks event_callbacks;
 
+  /// Whether or not to use default callbacks when user doesn't supply any in event_callbacks
+  bool use_default_callbacks = true;
+
   /// Callback group in which the waitable items from the publisher should be placed.
-  std::shared_ptr<rclcpp::callback_group::CallbackGroup> callback_group;
+  std::shared_ptr<rclcpp::CallbackGroup> callback_group;
 
   /// Optional RMW implementation specific payload to be used during creation of the publisher.
   std::shared_ptr<rclcpp::detail::RMWImplementationSpecificPublisherPayload>
@@ -71,7 +71,7 @@ struct PublisherOptionsWithAllocator : public PublisherOptionsBase
   rcl_publisher_options_t
   to_rcl_publisher_options(const rclcpp::QoS & qos) const
   {
-    rcl_publisher_options_t result;
+    rcl_publisher_options_t result = rcl_publisher_get_default_options();
     using AllocatorTraits = std::allocator_traits<Allocator>;
     using MessageAllocatorT = typename AllocatorTraits::template rebind_alloc<MessageT>;
     auto message_alloc = std::make_shared<MessageAllocatorT>(*this->get_allocator().get());

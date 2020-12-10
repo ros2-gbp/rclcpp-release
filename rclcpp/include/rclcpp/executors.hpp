@@ -20,6 +20,7 @@
 
 #include "rclcpp/executors/multi_threaded_executor.hpp"
 #include "rclcpp/executors/single_threaded_executor.hpp"
+#include "rclcpp/executors/static_single_threaded_executor.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/visibility_control.hpp"
@@ -66,11 +67,11 @@ using rclcpp::executors::SingleThreadedExecutor;
  * \return The return code, one of `SUCCESS`, `INTERRUPTED`, or `TIMEOUT`.
  */
 template<typename ResponseT, typename TimeRepT = int64_t, typename TimeT = std::milli>
-rclcpp::executor::FutureReturnCode
+rclcpp::FutureReturnCode
 spin_node_until_future_complete(
-  rclcpp::executor::Executor & executor,
+  rclcpp::Executor & executor,
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
-  std::shared_future<ResponseT> & future,
+  const std::shared_future<ResponseT> & future,
   std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
 {
   // TODO(wjwwood): does not work recursively; can't call spin_node_until_future_complete
@@ -83,11 +84,11 @@ spin_node_until_future_complete(
 
 template<typename NodeT = rclcpp::Node, typename ResponseT, typename TimeRepT = int64_t,
   typename TimeT = std::milli>
-rclcpp::executor::FutureReturnCode
+rclcpp::FutureReturnCode
 spin_node_until_future_complete(
-  rclcpp::executor::Executor & executor,
+  rclcpp::Executor & executor,
   std::shared_ptr<NodeT> node_ptr,
-  std::shared_future<ResponseT> & future,
+  const std::shared_future<ResponseT> & future,
   std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
 {
   return rclcpp::executors::spin_node_until_future_complete(
@@ -100,10 +101,10 @@ spin_node_until_future_complete(
 }  // namespace executors
 
 template<typename FutureT, typename TimeRepT = int64_t, typename TimeT = std::milli>
-rclcpp::executor::FutureReturnCode
+rclcpp::FutureReturnCode
 spin_until_future_complete(
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
-  std::shared_future<FutureT> & future,
+  const std::shared_future<FutureT> & future,
   std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
 {
   rclcpp::executors::SingleThreadedExecutor executor;
@@ -112,10 +113,10 @@ spin_until_future_complete(
 
 template<typename NodeT = rclcpp::Node, typename FutureT, typename TimeRepT = int64_t,
   typename TimeT = std::milli>
-rclcpp::executor::FutureReturnCode
+rclcpp::FutureReturnCode
 spin_until_future_complete(
   std::shared_ptr<NodeT> node_ptr,
-  std::shared_future<FutureT> & future,
+  const std::shared_future<FutureT> & future,
   std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
 {
   return rclcpp::spin_until_future_complete(node_ptr->get_node_base_interface(), future, timeout);

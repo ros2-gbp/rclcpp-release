@@ -30,6 +30,7 @@
 
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
+#include "rclcpp/node_interfaces/node_logging_interface.hpp"
 #include "rclcpp/node_interfaces/node_parameters_interface.hpp"
 #include "rclcpp/node_interfaces/node_services_interface.hpp"
 #include "rclcpp/node_interfaces/node_topics_interface.hpp"
@@ -169,6 +170,7 @@ public:
   void
   remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const handler) override;
 
+  [[deprecated("use add_on_set_parameters_callback(OnParametersSetCallbackType callback) instead")]]
   RCLCPP_PUBLIC
   OnParametersSetCallbackType
   set_on_parameters_set_callback(OnParametersSetCallbackType callback) override;

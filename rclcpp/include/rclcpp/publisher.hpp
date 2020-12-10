@@ -59,6 +59,17 @@ public:
 
   RCLCPP_SMART_PTR_DEFINITIONS(Publisher<MessageT, AllocatorT>)
 
+  /// Default constructor.
+  /**
+   * The constructor for a Publisher is almost never called directly.
+   * Instead, subscriptions should be instantiated through the function
+   * rclcpp::create_publisher().
+   *
+   * \param[in] node_base NodeBaseInterface pointer that is used in part of the setup.
+   * \param[in] topic Name of the topic to publish to.
+   * \param[in] qos QoS profile for Subcription.
+   * \param[in] options options for the subscription.
+   */
   Publisher(
     rclcpp::node_interfaces::NodeBaseInterface * node_base,
     const std::string & topic,
@@ -84,7 +95,22 @@ public:
         options_.event_callbacks.liveliness_callback,
         RCL_PUBLISHER_LIVELINESS_LOST);
     }
-
+    if (options_.event_callbacks.incompatible_qos_callback) {
+      this->add_event_handler(
+        options_.event_callbacks.incompatible_qos_callback,
+        RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS);
+    } else if (options_.use_default_callbacks) {
+      // Register default callback when not specified
+      try {
+        this->add_event_handler(
+          [this](QOSOfferedIncompatibleQoSInfo & info) {
+            this->default_incompatible_qos_callback(info);
+          },
+          RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS);
+      } catch (UnsupportedEventTypeException & /*exc*/) {
+        // pass
+      }
+    }
     // Setup continues in the post construction method, post_init_setup().
   }
 
@@ -202,6 +228,12 @@ public:
     return this->do_serialized_publish(&serialized_msg);
   }
 
+  void
+  publish(const SerializedMessage & serialized_msg)
+  {
+    return this->do_serialized_publish(&serialized_msg.get_rcl_serialized_message());
+  }
+
   /// Publish an instance of a LoanedMessage.
   /**
    * When publishing a loaned message, the memory for this ROS message will be deallocated
@@ -247,12 +279,12 @@ protected:
   void
   do_inter_process_publish(const MessageT & msg)
   {
-    auto status = rcl_publish(&publisher_handle_, &msg, nullptr);
+    auto status = rcl_publish(publisher_handle_.get(), &msg, nullptr);
 
     if (RCL_RET_PUBLISHER_INVALID == status) {
       rcl_reset_error();  // next call will reset error message if not context
-      if (rcl_publisher_is_valid_except_context(&publisher_handle_)) {
-        rcl_context_t * context = rcl_publisher_get_context(&publisher_handle_);
+      if (rcl_publisher_is_valid_except_context(publisher_handle_.get())) {
+        rcl_context_t * context = rcl_publisher_get_context(publisher_handle_.get());
         if (nullptr != context && !rcl_context_is_valid(context)) {
           // publisher is invalid due to context being shutdown
           return;
@@ -271,7 +303,7 @@ protected:
       // TODO(Karsten1987): support serialized message passed by intraprocess
       throw std::runtime_error("storing serialized messages in intra process is not supported yet");
     }
-    auto status = rcl_publish_serialized_message(&publisher_handle_, serialized_msg, nullptr);
+    auto status = rcl_publish_serialized_message(publisher_handle_.get(), serialized_msg, nullptr);
     if (RCL_RET_OK != status) {
       rclcpp::exceptions::throw_from_rcl_error(status, "failed to publish serialized message");
     }
@@ -280,12 +312,12 @@ protected:
   void
   do_loaned_message_publish(MessageT * msg)
   {
-    auto status = rcl_publish_loaned_message(&publisher_handle_, msg, nullptr);
+    auto status = rcl_publish_loaned_message(publisher_handle_.get(), msg, nullptr);
 
     if (RCL_RET_PUBLISHER_INVALID == status) {
       rcl_reset_error();  // next call will reset error message if not context
-      if (rcl_publisher_is_valid_except_context(&publisher_handle_)) {
-        rcl_context_t * context = rcl_publisher_get_context(&publisher_handle_);
+      if (rcl_publisher_is_valid_except_context(publisher_handle_.get())) {
+        rcl_context_t * context = rcl_publisher_get_context(publisher_handle_.get());
         if (nullptr != context && !rcl_context_is_valid(context)) {
           // publisher is invalid due to context being shutdown
           return;
