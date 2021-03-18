@@ -31,10 +31,6 @@
 
 #include "./mocking_utils/patch.hpp"
 
-// Note: This is a long running test with rmw_connext_cpp, if you change this file, please check
-// that this test can complete fully, or adjust the timeout as necessary.
-// See https://github.com/ros2/rmw_connext/issues/325 for resolution
-
 using lifecycle_msgs::msg::State;
 using lifecycle_msgs::msg::Transition;
 
@@ -425,7 +421,9 @@ TEST_F(TestDefaultStateMachine, check_parameters) {
     rclcpp::exceptions::ParameterNotDeclaredException);
 
   // Default descriptor overload
-  test_node->declare_parameter(bool_name, rclcpp::ParameterValue(true));
+  rcl_interfaces::msg::ParameterDescriptor bool_descriptor;
+  bool_descriptor.dynamic_typing = true;
+  test_node->declare_parameter(bool_name, rclcpp::ParameterValue(true), bool_descriptor);
 
   // Explicit descriptor overload
   rcl_interfaces::msg::ParameterDescriptor int_descriptor;
