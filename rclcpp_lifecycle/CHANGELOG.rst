@@ -3,6 +3,11 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+8.0.0 (2021-03-23)
+------------------
+* make rcl_lifecyle_com_interface optional in lifecycle nodes (`#1507 <https://github.com/ros2/rclcpp/issues/1507>`_)
+* Contributors: Karsten Knese
+
 7.0.1 (2021-03-22)
 ------------------
 
