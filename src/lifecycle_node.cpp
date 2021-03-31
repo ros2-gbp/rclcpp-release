@@ -102,7 +102,8 @@ LifecycleNode::LifecycleNode(
       node_logging_,
       node_clock_,
       node_parameters_,
-      options.clock_qos()
+      options.clock_qos(),
+      options.use_clock_thread()
     )),
   node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
   node_options_(options),
@@ -164,9 +165,10 @@ LifecycleNode::get_logger() const
 
 rclcpp::CallbackGroup::SharedPtr
 LifecycleNode::create_callback_group(
-  rclcpp::CallbackGroupType group_type)
+  rclcpp::CallbackGroupType group_type,
+  bool automatically_add_to_executor_with_node)
 {
-  return node_base_->create_callback_group(group_type);
+  return node_base_->create_callback_group(group_type, automatically_add_to_executor_with_node);
 }
 
 const rclcpp::ParameterValue &
