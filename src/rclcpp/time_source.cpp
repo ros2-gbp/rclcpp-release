@@ -216,7 +216,7 @@ void TimeSource::set_clock(
   }
 }
 
-void TimeSource::clock_cb(const rosgraph_msgs::msg::Clock::SharedPtr msg)
+void TimeSource::clock_cb(std::shared_ptr<const rosgraph_msgs::msg::Clock> msg)
 {
   if (!this->ros_time_active_ && SET_TRUE == this->parameter_state_) {
     enable_ros_time();
@@ -256,13 +256,17 @@ void TimeSource::create_clock_sub()
       false
     );
     options.callback_group = clock_callback_group_;
+    rclcpp::ExecutorOptions exec_options;
+    exec_options.context = node_base_->get_context();
+    clock_executor_ =
+      std::make_shared<rclcpp::executors::SingleThreadedExecutor>(exec_options);
     if (!clock_executor_thread_.joinable()) {
       clock_executor_thread_ = std::thread(
         [this]() {
           cancel_clock_executor_promise_ = std::promise<void>{};
           auto future = cancel_clock_executor_promise_.get_future();
-          clock_executor_.add_callback_group(clock_callback_group_, node_base_);
-          clock_executor_.spin_until_future_complete(future);
+          clock_executor_->add_callback_group(clock_callback_group_, node_base_);
+          clock_executor_->spin_until_future_complete(future);
         }
       );
     }
@@ -283,14 +287,15 @@ void TimeSource::destroy_clock_sub()
   std::lock_guard<std::mutex> guard(clock_sub_lock_);
   if (clock_executor_thread_.joinable()) {
     cancel_clock_executor_promise_.set_value();
-    clock_executor_.cancel();
+    clock_executor_->cancel();
     clock_executor_thread_.join();
-    clock_executor_.remove_callback_group(clock_callback_group_);
+    clock_executor_->remove_callback_group(clock_callback_group_);
   }
   clock_subscription_.reset();
 }
 
-void TimeSource::on_parameter_event(const rcl_interfaces::msg::ParameterEvent::SharedPtr event)
+void TimeSource::on_parameter_event(
+  std::shared_ptr<const rcl_interfaces::msg::ParameterEvent> event)
 {
   // Filter out events on 'use_sim_time' parameter instances in other nodes.
   if (event->node != node_base_->get_fully_qualified_name()) {
