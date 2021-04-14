@@ -36,11 +36,11 @@ namespace rclcpp
 namespace graph_listener
 {
 
-GraphListener::GraphListener(const std::shared_ptr<Context> & parent_context)
-: weak_parent_context_(parent_context),
-  rcl_parent_context_(parent_context->get_rcl_context()),
+GraphListener::GraphListener(std::shared_ptr<rclcpp::Context> parent_context)
+: parent_context_(parent_context),
   is_started_(false),
-  is_shutdown_(false)
+  is_shutdown_(false),
+  shutdown_guard_condition_(nullptr)
 {
   // TODO(wjwwood): make a guard condition class in rclcpp so this can be tracked
   //   automatically with the rcl guard condition
@@ -48,33 +48,18 @@ GraphListener::GraphListener(const std::shared_ptr<Context> & parent_context)
   // guard condition is using it.
   rcl_ret_t ret = rcl_guard_condition_init(
     &interrupt_guard_condition_,
-    rcl_parent_context_.get(),
+    parent_context->get_rcl_context().get(),
     rcl_guard_condition_get_default_options());
   if (RCL_RET_OK != ret) {
     throw_from_rcl_error(ret, "failed to create interrupt guard condition");
   }
+
+  shutdown_guard_condition_ = parent_context->get_interrupt_guard_condition(&wait_set_);
 }
 
 GraphListener::~GraphListener()
 {
   this->shutdown(std::nothrow);
-}
-
-void GraphListener::init_wait_set()
-{
-  rcl_ret_t ret = rcl_wait_set_init(
-    &wait_set_,
-    0,  // number_of_subscriptions
-    2,  // number_of_guard_conditions
-    0,  // number_of_timers
-    0,  // number_of_clients
-    0,  // number_of_services
-    0,  // number_of_events
-    rcl_parent_context_.get(),
-    rcl_get_default_allocator());
-  if (RCL_RET_OK != ret) {
-    throw_from_rcl_error(ret, "failed to initialize wait set");
-  }
 }
 
 void
@@ -84,13 +69,30 @@ GraphListener::start_if_not_started()
   if (is_shutdown_.load()) {
     throw GraphListenerShutdownError();
   }
-  auto parent_context = weak_parent_context_.lock();
-  if (!is_started_ && parent_context) {
+  if (!is_started_) {
+    // Initialize the wait set before starting.
+    auto parent_context = parent_context_.lock();
+    if (!parent_context) {
+      throw std::runtime_error("parent context was destroyed");
+    }
+    rcl_ret_t ret = rcl_wait_set_init(
+      &wait_set_,
+      0,  // number_of_subscriptions
+      2,  // number_of_guard_conditions
+      0,  // number_of_timers
+      0,  // number_of_clients
+      0,  // number_of_services
+      0,  // number_of_events
+      parent_context->get_rcl_context().get(),
+      rcl_get_default_allocator());
+    if (RCL_RET_OK != ret) {
+      throw_from_rcl_error(ret, "failed to initialize wait set");
+    }
     // Register an on_shutdown hook to shtudown the graph listener.
     // This is important to ensure that the wait set is finalized before
     // destruction of static objects occurs.
     std::weak_ptr<GraphListener> weak_this = shared_from_this();
-    parent_context->on_shutdown(
+    rclcpp::on_shutdown(
       [weak_this]() {
         auto shared_this = weak_this.lock();
         if (shared_this) {
@@ -98,8 +100,6 @@ GraphListener::start_if_not_started()
           shared_this->shutdown(std::nothrow);
         }
       });
-    // Initialize the wait set before starting.
-    init_wait_set();
     // Start the listener thread.
     listener_thread_ = std::thread(&GraphListener::run, this);
     is_started_ = true;
@@ -144,6 +144,14 @@ GraphListener::run_loop()
     }
     // This lock is released when the loop continues or exits.
     std::lock_guard<std::mutex> nodes_lock(node_graph_interfaces_mutex_, std::adopt_lock);
+    // Ensure that the context doesn't go out of scope.
+    auto parent_context = parent_context_.lock();
+    if (!parent_context) {
+      // The parent context may be destroyed before this loop is stopped.
+      // In that case, the loop is broken and the function just returns silently.
+      return;
+    }
+
     // Resize the wait set if necessary.
     const size_t node_graph_interfaces_size = node_graph_interfaces_.size();
     // Add 2 for the interrupt and shutdown guard conditions
@@ -163,7 +171,13 @@ GraphListener::run_loop()
     if (RCL_RET_OK != ret) {
       throw_from_rcl_error(ret, "failed to add interrupt guard condition to wait set");
     }
-
+    // Put the shutdown guard condition in the wait set.
+    size_t shutdown_guard_condition_index = 0u;
+    ret = rcl_wait_set_add_guard_condition(
+      &wait_set_, shutdown_guard_condition_, &shutdown_guard_condition_index);
+    if (RCL_RET_OK != ret) {
+      throw_from_rcl_error(ret, "failed to add shutdown guard condition to wait set");
+    }
     // Put graph guard conditions for each node into the wait set.
     std::vector<size_t> graph_gc_indexes(node_graph_interfaces_size, 0u);
     for (size_t i = 0u; i < node_graph_interfaces_size; ++i) {
@@ -192,6 +206,9 @@ GraphListener::run_loop()
       throw_from_rcl_error(ret, "failed to wait on wait set");
     }
 
+    // Check to see if the shutdown guard condition has been triggered.
+    bool shutdown_guard_condition_triggered =
+      (shutdown_guard_condition_ == wait_set_.guard_conditions[shutdown_guard_condition_index]);
     // Notify nodes who's guard conditions are set (triggered).
     for (size_t i = 0u; i < node_graph_interfaces_size; ++i) {
       const auto node_ptr = node_graph_interfaces_[i];
@@ -202,7 +219,7 @@ GraphListener::run_loop()
       if (graph_gc == wait_set_.guard_conditions[graph_gc_indexes[i]]) {
         node_ptr->notify_graph_change();
       }
-      if (is_shutdown_) {
+      if (shutdown_guard_condition_triggered) {
         // If shutdown, then notify the node of this as well.
         node_ptr->notify_shutdown();
       }
@@ -334,16 +351,7 @@ GraphListener::remove_node(rclcpp::node_interfaces::NodeGraphInterface * node_gr
 }
 
 void
-GraphListener::cleanup_wait_set()
-{
-  rcl_ret_t ret = rcl_wait_set_fini(&wait_set_);
-  if (RCL_RET_OK != ret) {
-    throw_from_rcl_error(ret, "failed to finalize wait set");
-  }
-}
-
-void
-GraphListener::__shutdown()
+GraphListener::__shutdown(bool should_throw)
 {
   std::lock_guard<std::mutex> shutdown_lock(shutdown_mutex_);
   if (!is_shutdown_.exchange(true)) {
@@ -355,8 +363,22 @@ GraphListener::__shutdown()
     if (RCL_RET_OK != ret) {
       throw_from_rcl_error(ret, "failed to finalize interrupt guard condition");
     }
+    if (shutdown_guard_condition_) {
+      auto parent_context_ptr = parent_context_.lock();
+      if (parent_context_ptr) {
+        if (should_throw) {
+          parent_context_ptr->release_interrupt_guard_condition(&wait_set_);
+        } else {
+          parent_context_ptr->release_interrupt_guard_condition(&wait_set_, std::nothrow);
+        }
+      }
+      shutdown_guard_condition_ = nullptr;
+    }
     if (is_started_) {
-      cleanup_wait_set();
+      ret = rcl_wait_set_fini(&wait_set_);
+      if (RCL_RET_OK != ret) {
+        throw_from_rcl_error(ret, "failed to finalize wait set");
+      }
     }
   }
 }
@@ -364,14 +386,14 @@ GraphListener::__shutdown()
 void
 GraphListener::shutdown()
 {
-  this->__shutdown();
+  this->__shutdown(true);
 }
 
 void
 GraphListener::shutdown(const std::nothrow_t &) noexcept
 {
   try {
-    this->__shutdown();
+    this->__shutdown(false);
   } catch (const std::exception & exc) {
     RCLCPP_ERROR(
       rclcpp::get_logger("rclcpp"),

@@ -16,8 +16,6 @@
 #define RCLCPP__QOS_EVENT_HPP_
 
 #include <functional>
-#include <memory>
-#include <stdexcept>
 #include <string>
 
 #include "rcl/error_handling.h"
@@ -36,7 +34,6 @@ using QOSDeadlineRequestedInfo = rmw_requested_deadline_missed_status_t;
 using QOSDeadlineOfferedInfo = rmw_offered_deadline_missed_status_t;
 using QOSLivelinessChangedInfo = rmw_liveliness_changed_status_t;
 using QOSLivelinessLostInfo = rmw_liveliness_lost_status_t;
-using QOSMessageLostInfo = rmw_message_lost_status_t;
 using QOSOfferedIncompatibleQoSInfo = rmw_offered_qos_incompatible_event_status_t;
 using QOSRequestedIncompatibleQoSInfo = rmw_requested_qos_incompatible_event_status_t;
 
@@ -44,7 +41,6 @@ using QOSDeadlineRequestedCallbackType = std::function<void (QOSDeadlineRequeste
 using QOSDeadlineOfferedCallbackType = std::function<void (QOSDeadlineOfferedInfo &)>;
 using QOSLivelinessChangedCallbackType = std::function<void (QOSLivelinessChangedInfo &)>;
 using QOSLivelinessLostCallbackType = std::function<void (QOSLivelinessLostInfo &)>;
-using QOSMessageLostCallbackType = std::function<void (QOSMessageLostInfo &)>;
 using QOSOfferedIncompatibleQoSCallbackType = std::function<void (QOSOfferedIncompatibleQoSInfo &)>;
 using QOSRequestedIncompatibleQoSCallbackType =
   std::function<void (QOSRequestedIncompatibleQoSInfo &)>;
@@ -63,7 +59,6 @@ struct SubscriptionEventCallbacks
   QOSDeadlineRequestedCallbackType deadline_callback;
   QOSLivelinessChangedCallbackType liveliness_callback;
   QOSRequestedIncompatibleQoSCallbackType incompatible_qos_callback;
-  QOSMessageLostCallbackType message_lost_callback;
 };
 
 class UnsupportedEventTypeException : public exceptions::RCLErrorBase, public std::runtime_error
@@ -133,31 +128,21 @@ public:
     }
   }
 
-  /// Take data so that the callback cannot be scheduled again
-  std::shared_ptr<void>
-  take_data() override
+  /// Execute any entities of the Waitable that are ready.
+  void
+  execute() override
   {
     EventCallbackInfoT callback_info;
+
     rcl_ret_t ret = rcl_take_event(&event_handle_, &callback_info);
     if (ret != RCL_RET_OK) {
       RCUTILS_LOG_ERROR_NAMED(
         "rclcpp",
         "Couldn't take event info: %s", rcl_get_error_string().str);
-      return nullptr;
+      return;
     }
-    return std::static_pointer_cast<void>(std::make_shared<EventCallbackInfoT>(callback_info));
-  }
 
-  /// Execute any entities of the Waitable that are ready.
-  void
-  execute(std::shared_ptr<void> & data) override
-  {
-    if (!data) {
-      throw std::runtime_error("'data' is empty");
-    }
-    auto callback_ptr = std::static_pointer_cast<EventCallbackInfoT>(data);
-    event_callback_(*callback_ptr);
-    callback_ptr.reset();
+    event_callback_(callback_info);
   }
 
 private:

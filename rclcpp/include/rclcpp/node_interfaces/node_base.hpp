@@ -83,9 +83,7 @@ public:
 
   RCLCPP_PUBLIC
   rclcpp::CallbackGroup::SharedPtr
-  create_callback_group(
-    rclcpp::CallbackGroupType group_type,
-    bool automatically_add_to_executor_with_node = true) override;
+  create_callback_group(rclcpp::CallbackGroupType group_type) override;
 
   RCLCPP_PUBLIC
   rclcpp::CallbackGroup::SharedPtr
@@ -117,10 +115,6 @@ public:
 
   bool
   get_enable_topic_statistics_default() const override;
-
-  std::string
-  resolve_topic_or_service_name(
-    const std::string & name, bool is_service, bool only_expand = false) const override;
 
 private:
   RCLCPP_DISABLE_COPY(NodeBase)

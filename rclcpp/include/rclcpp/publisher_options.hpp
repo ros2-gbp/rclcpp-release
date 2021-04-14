@@ -26,7 +26,6 @@
 #include "rclcpp/intra_process_setting.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/qos_event.hpp"
-#include "rclcpp/qos_overriding_options.hpp"
 
 namespace rclcpp
 {
@@ -45,19 +44,12 @@ struct PublisherOptionsBase
   /// Whether or not to use default callbacks when user doesn't supply any in event_callbacks
   bool use_default_callbacks = true;
 
-  /// Require middleware to generate unique network flow endpoints
-  /// Disabled by default
-  rmw_unique_network_flow_endpoints_requirement_t require_unique_network_flow_endpoints =
-    RMW_UNIQUE_NETWORK_FLOW_ENDPOINTS_NOT_REQUIRED;
-
   /// Callback group in which the waitable items from the publisher should be placed.
   std::shared_ptr<rclcpp::CallbackGroup> callback_group;
 
   /// Optional RMW implementation specific payload to be used during creation of the publisher.
   std::shared_ptr<rclcpp::detail::RMWImplementationSpecificPublisherPayload>
   rmw_implementation_payload = nullptr;
-
-  QosOverridingOptions qos_overriding_options;
 };
 
 /// Structure containing optional configuration for Publishers.
@@ -85,8 +77,6 @@ struct PublisherOptionsWithAllocator : public PublisherOptionsBase
     auto message_alloc = std::make_shared<MessageAllocatorT>(*this->get_allocator().get());
     result.allocator = rclcpp::allocator::get_rcl_allocator<MessageT>(*message_alloc);
     result.qos = qos.get_rmw_qos_profile();
-    result.rmw_publisher_options.require_unique_network_flow_endpoints =
-      this->require_unique_network_flow_endpoints;
 
     // Apply payload to rcl_publisher_options if necessary.
     if (rmw_implementation_payload && rmw_implementation_payload->has_been_customized()) {

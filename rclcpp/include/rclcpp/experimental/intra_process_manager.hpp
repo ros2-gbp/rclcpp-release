@@ -207,7 +207,7 @@ public:
       sub_ids.take_shared_subscriptions.size() <= 1)
     {
       // There is at maximum 1 buffer that does not require ownership.
-      // So this case is equivalent to all the buffers requiring ownership
+      // So we this case is equivalent to all the buffers requiring ownership
 
       // Merge the two vector of ids into a unique one
       std::vector<uint64_t> concatenated_vector(sub_ids.take_shared_subscriptions);
@@ -307,7 +307,7 @@ private:
   {
     SubscriptionInfo() = default;
 
-    rclcpp::experimental::SubscriptionIntraProcessBase::WeakPtr subscription;
+    rclcpp::experimental::SubscriptionIntraProcessBase::SharedPtr subscription;
     rmw_qos_profile_t qos;
     const char * topic_name;
     bool use_take_shared_method;
@@ -361,16 +361,13 @@ private:
       if (subscription_it == subscriptions_.end()) {
         throw std::runtime_error("subscription has unexpectedly gone out of scope");
       }
-      auto subscription_base = subscription_it->second.subscription.lock();
-      if (subscription_base) {
-        auto subscription = std::static_pointer_cast<
-          rclcpp::experimental::SubscriptionIntraProcess<MessageT>
-          >(subscription_base);
+      auto subscription_base = subscription_it->second.subscription;
 
-        subscription->provide_intra_process_message(message);
-      } else {
-        subscriptions_.erase(id);
-      }
+      auto subscription = std::static_pointer_cast<
+        rclcpp::experimental::SubscriptionIntraProcess<MessageT>
+        >(subscription_base);
+
+      subscription->provide_intra_process_message(message);
     }
   }
 
@@ -392,27 +389,24 @@ private:
       if (subscription_it == subscriptions_.end()) {
         throw std::runtime_error("subscription has unexpectedly gone out of scope");
       }
-      auto subscription_base = subscription_it->second.subscription.lock();
-      if (subscription_base) {
-        auto subscription = std::static_pointer_cast<
-          rclcpp::experimental::SubscriptionIntraProcess<MessageT>
-          >(subscription_base);
+      auto subscription_base = subscription_it->second.subscription;
 
-        if (std::next(it) == subscription_ids.end()) {
-          // If this is the last subscription, give up ownership
-          subscription->provide_intra_process_message(std::move(message));
-        } else {
-          // Copy the message since we have additional subscriptions to serve
-          MessageUniquePtr copy_message;
-          Deleter deleter = message.get_deleter();
-          auto ptr = MessageAllocTraits::allocate(*allocator.get(), 1);
-          MessageAllocTraits::construct(*allocator.get(), ptr, *message);
-          copy_message = MessageUniquePtr(ptr, deleter);
+      auto subscription = std::static_pointer_cast<
+        rclcpp::experimental::SubscriptionIntraProcess<MessageT>
+        >(subscription_base);
 
-          subscription->provide_intra_process_message(std::move(copy_message));
-        }
+      if (std::next(it) == subscription_ids.end()) {
+        // If this is the last subscription, give up ownership
+        subscription->provide_intra_process_message(std::move(message));
       } else {
-        subscriptions_.erase(subscription_it);
+        // Copy the message since we have additional subscriptions to serve
+        MessageUniquePtr copy_message;
+        Deleter deleter = message.get_deleter();
+        auto ptr = MessageAllocTraits::allocate(*allocator.get(), 1);
+        MessageAllocTraits::construct(*allocator.get(), ptr, *message);
+        copy_message = MessageUniquePtr(ptr, deleter);
+
+        subscription->provide_intra_process_message(std::move(copy_message));
       }
     }
   }

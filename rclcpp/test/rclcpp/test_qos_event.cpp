@@ -42,7 +42,7 @@ protected:
 
     node = std::make_shared<rclcpp::Node>("test_qos_event", "/ns");
 
-    message_callback = [node = node.get()](test_msgs::msg::Empty::ConstSharedPtr /*msg*/) {
+    message_callback = [node = node.get()](const test_msgs::msg::Empty::SharedPtr /*msg*/) {
         RCLCPP_INFO(node->get_logger(), "Message received");
       };
   }
@@ -55,7 +55,7 @@ protected:
   static constexpr char topic_name[] = "test_topic";
   rclcpp::Node::SharedPtr node;
   bool is_fastrtps;
-  std::function<void(test_msgs::msg::Empty::ConstSharedPtr)> message_callback;
+  std::function<void(const test_msgs::msg::Empty::SharedPtr)> message_callback;
 };
 
 constexpr char TestQosEvent::topic_name[];
@@ -218,11 +218,11 @@ TEST_F(TestQosEvent, test_default_incompatible_qos_callbacks)
     EXPECT_EQ("", sub_log_msg);
   } else {
     EXPECT_EQ(
-      "New subscription discovered on topic '/ns/test_topic', requesting incompatible QoS. "
+      "New subscription discovered on this topic, requesting incompatible QoS. "
       "No messages will be sent to it. Last incompatible policy: DURABILITY_QOS_POLICY",
       pub_log_msg);
     EXPECT_EQ(
-      "New publisher discovered on topic '/ns/test_topic', offering incompatible QoS. "
+      "New publisher discovered on this topic, offering incompatible QoS. "
       "No messages will be sent to it. Last incompatible policy: DURABILITY_QOS_POLICY",
       sub_log_msg);
   }
@@ -285,16 +285,14 @@ TEST_F(TestQosEvent, execute) {
   rclcpp::QOSEventHandler<decltype(callback), decltype(rcl_handle)> handler(
     callback, rcl_publisher_event_init, rcl_handle, event_type);
 
-  std::shared_ptr<void> data = handler.take_data();
-  EXPECT_NO_THROW(handler.execute(data));
+  EXPECT_NO_THROW(handler.execute());
   EXPECT_TRUE(handler_callback_executed);
 
   {
     handler_callback_executed = false;
     // Logs error and returns early
     auto mock = mocking_utils::patch_and_return("lib:rclcpp", rcl_take_event, RCL_RET_ERROR);
-    std::shared_ptr<void> data = handler.take_data();
-    EXPECT_THROW(handler.execute(data), std::runtime_error);
+    EXPECT_NO_THROW(handler.execute());
     EXPECT_FALSE(handler_callback_executed);
   }
 }

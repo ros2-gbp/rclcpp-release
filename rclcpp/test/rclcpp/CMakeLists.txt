@@ -2,7 +2,7 @@ find_package(ament_cmake_gtest REQUIRED)
 
 find_package(rmw_implementation_cmake REQUIRED)
 
-add_definitions(-DTEST_RESOURCES_DIRECTORY="${TEST_RESOURCES_DIRECTORY}")
+add_definitions(-DTEST_RESOURCES_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}/../resources")
 
 rosidl_generate_interfaces(${PROJECT_NAME}_test_msgs
   ../msg/Header.msg
@@ -94,15 +94,6 @@ ament_add_gtest(test_create_subscription test_create_subscription.cpp)
 if(TARGET test_create_subscription)
   target_link_libraries(test_create_subscription ${PROJECT_NAME})
   ament_target_dependencies(test_create_subscription
-    "test_msgs"
-  )
-endif()
-ament_add_gtest(test_add_callback_groups_to_executor
-  test_add_callback_groups_to_executor.cpp
-  TIMEOUT 120)
-if(TARGET test_add_callback_groups_to_executor)
-  target_link_libraries(test_add_callback_groups_to_executor ${PROJECT_NAME})
-  ament_target_dependencies(test_add_callback_groups_to_executor
     "test_msgs"
   )
 endif()
@@ -323,16 +314,6 @@ if(TARGET test_parameter)
   )
   target_link_libraries(test_parameter ${PROJECT_NAME})
 endif()
-ament_add_gtest(test_parameter_event_handler test_parameter_event_handler.cpp)
-if(TARGET test_parameter_event_handler)
-  ament_target_dependencies(test_parameter_event_handler
-    "rcl_interfaces"
-    "rmw"
-    "rosidl_generator_cpp"
-    "rosidl_typesupport_cpp"
-  )
-  target_link_libraries(test_parameter_event_handler ${PROJECT_NAME})
-endif()
 ament_add_gtest(test_parameter_map test_parameter_map.cpp)
 if(TARGET test_parameter_map)
   target_link_libraries(test_parameter_map ${PROJECT_NAME})
@@ -368,21 +349,6 @@ if(TARGET test_qos)
     ${PROJECT_NAME}
   )
 endif()
-function(test_generic_pubsub_for_rmw_implementation)
-  set(rmw_implementation_env_var RMW_IMPLEMENTATION=${rmw_implementation})
-  ament_add_gmock(test_generic_pubsub${target_suffix} test_generic_pubsub.cpp
-    ENV ${rmw_implementation_env_var}
-  )
-  if(TARGET test_generic_pubsub${target_suffix})
-    target_link_libraries(test_generic_pubsub${target_suffix} ${PROJECT_NAME})
-    ament_target_dependencies(test_generic_pubsub${target_suffix}
-      "rcpputils"
-      "rosidl_typesupport_cpp"
-      "test_msgs"
-    )
-  endif()
-endfunction()
-call_for_each_rmw_implementation(test_generic_pubsub_for_rmw_implementation)
 ament_add_gtest(test_qos_event test_qos_event.cpp)
 if(TARGET test_qos_event)
   ament_target_dependencies(test_qos_event
@@ -392,18 +358,6 @@ if(TARGET test_qos_event)
   target_link_libraries(test_qos_event
     ${PROJECT_NAME}
     mimick
-  )
-endif()
-ament_add_gmock(test_qos_overriding_options test_qos_overriding_options.cpp)
-if(TARGET test_qos_overriding_options)
-  target_link_libraries(test_qos_overriding_options
-    ${PROJECT_NAME}
-  )
-endif()
-ament_add_gmock(test_qos_parameters test_qos_parameters.cpp)
-if(TARGET test_qos_parameters)
-  target_link_libraries(test_qos_parameters
-    ${PROJECT_NAME}
   )
 endif()
 ament_add_gtest(test_rate test_rate.cpp)
@@ -488,10 +442,6 @@ if(TARGET test_type_support)
   )
   target_link_libraries(test_type_support ${PROJECT_NAME})
 endif()
-ament_add_gmock(test_typesupport_helpers test_typesupport_helpers.cpp)
-if(TARGET test_typesupport_helpers)
-  target_link_libraries(test_typesupport_helpers ${PROJECT_NAME})
-endif()
 ament_add_gtest(test_find_weak_nodes test_find_weak_nodes.cpp)
 if(TARGET test_find_weak_nodes)
   ament_target_dependencies(test_find_weak_nodes
@@ -556,6 +506,14 @@ if(TARGET test_utilities)
   ament_target_dependencies(test_utilities
     "rcl")
   target_link_libraries(test_utilities ${PROJECT_NAME} mimick)
+endif()
+
+ament_add_gtest(test_init test_init.cpp
+  APPEND_LIBRARY_DIRS "${append_library_dirs}")
+if(TARGET test_init)
+  ament_target_dependencies(test_init
+    "rcl")
+  target_link_libraries(test_init ${PROJECT_NAME})
 endif()
 
 ament_add_gtest(test_interface_traits test_interface_traits.cpp
@@ -664,12 +622,6 @@ ament_add_gtest(test_thread_safe_synchronization wait_set_policies/test_thread_s
 if(TARGET test_thread_safe_synchronization)
   ament_target_dependencies(test_thread_safe_synchronization "rcl" "test_msgs")
   target_link_libraries(test_thread_safe_synchronization ${PROJECT_NAME})
-endif()
-
-ament_add_gtest(test_rosout_qos test_rosout_qos.cpp)
-if(TARGET test_rosout_qos)
-  ament_target_dependencies(test_rosout_qos "rcl")
-  target_link_libraries(test_rosout_qos ${PROJECT_NAME})
 endif()
 
 ament_add_gtest(test_executor test_executor.cpp

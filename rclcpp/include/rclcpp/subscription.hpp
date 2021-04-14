@@ -92,7 +92,7 @@ public:
    * \param[in] topic_name Name of the topic to subscribe to.
    * \param[in] qos QoS profile for Subcription.
    * \param[in] callback User defined callback to call when a message is received.
-   * \param[in] options Options for the subscription.
+   * \param[in] options options for the subscription.
    * \param[in] message_memory_strategy The memory strategy to be used for managing message memory.
    * \param[in] subscription_topic_statistics Optional pointer to a topic statistics subcription.
    * \throws std::invalid_argument if the QoS is uncompatible with intra-process (if one
@@ -144,11 +144,6 @@ public:
         // pass
       }
     }
-    if (options.event_callbacks.message_lost_callback) {
-      this->add_event_handler(
-        options.event_callbacks.message_lost_callback,
-        RCL_SUBSCRIPTION_MESSAGE_LOST);
-    }
 
     // Setup intra process publishing if requested.
     if (rclcpp::detail::resolve_use_intra_process(options, *node_base)) {
@@ -171,7 +166,11 @@ public:
 
       // First create a SubscriptionIntraProcess which will be given to the intra-process manager.
       auto context = node_base->get_context();
-      subscription_intra_process_ = std::make_shared<SubscriptionIntraProcessT>(
+      using SubscriptionIntraProcessT = rclcpp::experimental::SubscriptionIntraProcess<
+        CallbackMessageT,
+        AllocatorT,
+        typename MessageUniquePtr::deleter_type>;
+      auto subscription_intra_process = std::make_shared<SubscriptionIntraProcessT>(
         callback,
         options.get_allocator(),
         context,
@@ -180,13 +179,13 @@ public:
         resolve_intra_process_buffer_type(options.intra_process_buffer_type, callback));
       TRACEPOINT(
         rclcpp_subscription_init,
-        static_cast<const void *>(get_subscription_handle().get()),
-        static_cast<const void *>(subscription_intra_process_.get()));
+        (const void *)get_subscription_handle().get(),
+        (const void *)subscription_intra_process.get());
 
       // Add it to the intra process manager.
       using rclcpp::experimental::IntraProcessManager;
       auto ipm = context->get_sub_context<IntraProcessManager>();
-      uint64_t intra_process_subscription_id = ipm->add_subscription(subscription_intra_process_);
+      uint64_t intra_process_subscription_id = ipm->add_subscription(subscription_intra_process);
       this->setup_intra_process(intra_process_subscription_id, ipm);
     }
 
@@ -196,12 +195,12 @@ public:
 
     TRACEPOINT(
       rclcpp_subscription_init,
-      static_cast<const void *>(get_subscription_handle().get()),
-      static_cast<const void *>(this));
+      (const void *)get_subscription_handle().get(),
+      (const void *)this);
     TRACEPOINT(
       rclcpp_subscription_callback_added,
-      static_cast<const void *>(this),
-      static_cast<const void *>(&any_callback_));
+      (const void *)this,
+      (const void *)&any_callback_);
     // The callback object gets copied, so if registration is done too early/before this point
     // (e.g. in `AnySubscriptionCallback::set()`), its address won't match any address used later
     // in subsequent tracepoints.
@@ -273,18 +272,11 @@ public:
       return;
     }
     auto typed_message = std::static_pointer_cast<CallbackMessageT>(message);
-
-    std::chrono::time_point<std::chrono::system_clock> now;
-    if (subscription_topic_statistics_) {
-      // get current time before executing callback to
-      // exclude callback duration from topic statistics result.
-      now = std::chrono::system_clock::now();
-    }
-
     any_callback_.dispatch(typed_message, message_info);
 
     if (subscription_topic_statistics_) {
-      const auto nanos = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
+      const auto nanos = std::chrono::time_point_cast<std::chrono::nanoseconds>(
+        std::chrono::system_clock::now());
       const auto time = rclcpp::Time(nanos.time_since_epoch().count());
       subscription_topic_statistics_->handle_message(*typed_message, time);
     }
@@ -343,11 +335,6 @@ private:
     message_memory_strategy_;
   /// Component which computes and publishes topic statistics for this subscriber
   SubscriptionTopicStatisticsSharedPtr subscription_topic_statistics_{nullptr};
-  using SubscriptionIntraProcessT = rclcpp::experimental::SubscriptionIntraProcess<
-    CallbackMessageT,
-    AllocatorT,
-    typename MessageUniquePtr::deleter_type>;
-  std::shared_ptr<SubscriptionIntraProcessT> subscription_intra_process_;
 };
 
 }  // namespace rclcpp

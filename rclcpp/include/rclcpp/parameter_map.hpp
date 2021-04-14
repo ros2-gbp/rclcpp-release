@@ -15,7 +15,6 @@
 #ifndef RCLCPP__PARAMETER_MAP_HPP_
 #define RCLCPP__PARAMETER_MAP_HPP_
 
-#include <rcl_yaml_param_parser/parser.h>
 #include <rcl_yaml_param_parser/types.h>
 
 #include <string>
@@ -48,14 +47,6 @@ parameter_map_from(const rcl_params_t * const c_params);
 RCLCPP_PUBLIC
 ParameterValue
 parameter_value_from(const rcl_variant_t * const c_value);
-
-/// Get the ParameterMap from a yaml file.
-/// \param[in] yaml_filename full name of the yaml file.
-/// \returns an instance of a parameter map
-/// \throws from rcl error of rcl_parse_yaml_file()
-RCLCPP_PUBLIC
-ParameterMap
-parameter_map_from_yaml_file(const std::string & yaml_filename);
 
 }  // namespace rclcpp
 

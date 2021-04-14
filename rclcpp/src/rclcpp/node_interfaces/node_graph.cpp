@@ -414,7 +414,7 @@ NodeGraph::wait_for_graph_change(
 }
 
 size_t
-NodeGraph::count_graph_users() const
+NodeGraph::count_graph_users()
 {
   return graph_users_count_.load();
 }

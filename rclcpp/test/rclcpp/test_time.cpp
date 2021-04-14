@@ -15,7 +15,6 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
-#include <chrono>
 #include <limits>
 #include <string>
 
@@ -30,8 +29,6 @@
 
 namespace
 {
-
-using namespace std::chrono_literals;
 
 bool logical_eq(const bool a, const bool b)
 {
@@ -224,7 +221,7 @@ TEST_F(TestTime, operators) {
   EXPECT_EQ(sub, young - old);
 
   rclcpp::Time young_changed(young);
-  young_changed -= rclcpp::Duration::from_nanoseconds(old.nanoseconds());
+  young_changed -= rclcpp::Duration(old.nanoseconds());
   EXPECT_EQ(sub.nanoseconds(), young_changed.nanoseconds());
 
   rclcpp::Time system_time(0, 0, RCL_SYSTEM_TIME);
@@ -323,8 +320,8 @@ TEST_F(TestTime, overflow_detectors) {
 TEST_F(TestTime, overflows) {
   rclcpp::Time max_time(std::numeric_limits<rcl_time_point_value_t>::max());
   rclcpp::Time min_time(std::numeric_limits<rcl_time_point_value_t>::min());
-  rclcpp::Duration one(1ns);
-  rclcpp::Duration two(2ns);
+  rclcpp::Duration one(1);
+  rclcpp::Duration two(2);
 
   // Cross min/max
   EXPECT_THROW(max_time + one, std::overflow_error);
@@ -397,7 +394,7 @@ TEST_F(TestTime, test_assignment_operator_from_builtin_msg_time) {
 }
 
 TEST_F(TestTime, test_sum_operator) {
-  const rclcpp::Duration one(1ns);
+  const rclcpp::Duration one(1);
   const rclcpp::Time test_time(0u);
   EXPECT_EQ(0u, test_time.nanoseconds());
 
@@ -409,41 +406,41 @@ TEST_F(TestTime, test_overflow_underflow_throws) {
   rclcpp::Time test_time(0u);
 
   RCLCPP_EXPECT_THROW_EQ(
-    test_time = rclcpp::Time(INT64_MAX) + rclcpp::Duration(1ns),
+    test_time = rclcpp::Time(INT64_MAX) + rclcpp::Duration(1),
     std::overflow_error("addition leads to int64_t overflow"));
   RCLCPP_EXPECT_THROW_EQ(
-    test_time = rclcpp::Time(INT64_MIN) + rclcpp::Duration(-1ns),
+    test_time = rclcpp::Time(INT64_MIN) + rclcpp::Duration(-1),
     std::underflow_error("addition leads to int64_t underflow"));
 
   RCLCPP_EXPECT_THROW_EQ(
-    test_time = rclcpp::Time(INT64_MAX) - rclcpp::Duration(-1ns),
+    test_time = rclcpp::Time(INT64_MAX) - rclcpp::Duration(-1),
     std::overflow_error("time subtraction leads to int64_t overflow"));
   RCLCPP_EXPECT_THROW_EQ(
-    test_time = rclcpp::Time(INT64_MIN) - rclcpp::Duration(1ns),
+    test_time = rclcpp::Time(INT64_MIN) - rclcpp::Duration(1),
     std::underflow_error("time subtraction leads to int64_t underflow"));
 
   test_time = rclcpp::Time(INT64_MAX);
   RCLCPP_EXPECT_THROW_EQ(
-    test_time += rclcpp::Duration(1ns),
+    test_time += rclcpp::Duration(1),
     std::overflow_error("addition leads to int64_t overflow"));
   test_time = rclcpp::Time(INT64_MIN);
   RCLCPP_EXPECT_THROW_EQ(
-    test_time += rclcpp::Duration(-1ns),
+    test_time += rclcpp::Duration(-1),
     std::underflow_error("addition leads to int64_t underflow"));
 
   test_time = rclcpp::Time(INT64_MAX);
   RCLCPP_EXPECT_THROW_EQ(
-    test_time -= rclcpp::Duration(-1ns),
+    test_time -= rclcpp::Duration(-1),
     std::overflow_error("time subtraction leads to int64_t overflow"));
   test_time = rclcpp::Time(INT64_MIN);
   RCLCPP_EXPECT_THROW_EQ(
-    test_time -= rclcpp::Duration(1ns),
+    test_time -= rclcpp::Duration(1),
     std::underflow_error("time subtraction leads to int64_t underflow"));
 
   RCLCPP_EXPECT_THROW_EQ(
-    test_time = rclcpp::Duration::from_nanoseconds(INT64_MAX) + rclcpp::Time(1),
+    test_time = rclcpp::Duration(INT64_MAX) + rclcpp::Time(1),
     std::overflow_error("addition leads to int64_t overflow"));
   RCLCPP_EXPECT_THROW_EQ(
-    test_time = rclcpp::Duration::from_nanoseconds(INT64_MIN) + rclcpp::Time(-1),
+    test_time = rclcpp::Duration(INT64_MIN) + rclcpp::Time(-1),
     std::underflow_error("addition leads to int64_t underflow"));
 }

@@ -14,11 +14,9 @@
 
 #include <gtest/gtest.h>
 
-#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "rcl/graph.h"
 #include "rcl/node_options.h"
@@ -68,43 +66,6 @@ protected:
 
   const rclcpp::node_interfaces::NodeGraph * node_graph() const {return node_graph_;}
 
-  size_t get_num_graph_things(std::function<size_t()> predicate)
-  {
-    constexpr std::chrono::milliseconds timeout(100);
-
-    size_t tries = 0;
-    size_t num_things = 0;
-    while (tries++ < 5) {
-      num_things = predicate();
-      if (num_things >= 1) {
-        break;
-      }
-
-      auto event = node()->get_graph_event();
-      EXPECT_NO_THROW(node()->wait_for_graph_change(event, timeout));
-    }
-
-    return num_things;
-  }
-
-  size_t get_num_topics()
-  {
-    return get_num_graph_things(
-      [this]() -> size_t {
-        auto topic_names_and_types = node_graph()->get_topic_names_and_types();
-        return topic_names_and_types.size();
-      });
-  }
-
-  size_t get_num_services()
-  {
-    return get_num_graph_things(
-      [this]() -> size_t {
-        auto service_names_and_types = node_graph()->get_service_names_and_types();
-        return service_names_and_types.size();
-      });
-  }
-
 private:
   std::shared_ptr<rclcpp::Node> node_;
   rclcpp::node_interfaces::NodeGraph * node_graph_;
@@ -112,9 +73,11 @@ private:
 
 TEST_F(TestNodeGraph, construct_from_node)
 {
-  EXPECT_LT(0u, get_num_topics());
+  auto topic_names_and_types = node_graph()->get_topic_names_and_types(false);
+  EXPECT_LT(0u, topic_names_and_types.size());
 
-  EXPECT_LT(0u, get_num_services());
+  auto service_names_and_types = node_graph()->get_service_names_and_types();
+  EXPECT_LT(0u, service_names_and_types.size());
 
   auto names = node_graph()->get_node_names();
   EXPECT_EQ(1u, names.size());
@@ -128,12 +91,13 @@ TEST_F(TestNodeGraph, construct_from_node)
 
   // get_graph_event is non-const
   EXPECT_NE(nullptr, node()->get_node_graph_interface()->get_graph_event());
-  EXPECT_LE(1u, node_graph()->count_graph_users());
+  EXPECT_EQ(1u, node()->get_node_graph_interface()->count_graph_users());
 }
 
 TEST_F(TestNodeGraph, get_topic_names_and_types)
 {
-  ASSERT_LT(0u, get_num_topics());
+  auto topic_names_and_types = node_graph()->get_topic_names_and_types();
+  EXPECT_LT(0u, topic_names_and_types.size());
 }
 
 TEST_F(TestNodeGraph, get_topic_names_and_types_rcl_error)
@@ -162,7 +126,8 @@ TEST_F(TestNodeGraph, get_topic_names_and_types_rcl_names_and_types_fini_error)
 
 TEST_F(TestNodeGraph, get_service_names_and_types)
 {
-  ASSERT_LT(0u, get_num_services());
+  auto service_names_and_types = node_graph()->get_service_names_and_types();
+  EXPECT_LT(0u, service_names_and_types.size());
 }
 
 TEST_F(TestNodeGraph, get_service_names_and_types_rcl_error)
@@ -335,7 +300,7 @@ TEST_F(TestNodeGraph, get_info_by_topic)
 {
   const rclcpp::QoS publisher_qos(1);
   auto publisher = node()->create_publisher<test_msgs::msg::Empty>("topic", publisher_qos);
-  auto callback = [](test_msgs::msg::Empty::ConstSharedPtr) {};
+  auto callback = [](const test_msgs::msg::Empty::SharedPtr) {};
 
   const rclcpp::QoS subscriber_qos(10);
   auto subscription =
@@ -344,13 +309,8 @@ TEST_F(TestNodeGraph, get_info_by_topic)
 
   EXPECT_EQ(0u, node_graph()->get_publishers_info_by_topic("topic", true).size());
 
-  std::vector<rclcpp::TopicEndpointInfo> publishers;
-  size_t num_publishers = get_num_graph_things(
-    [this, &publishers]() {
-      publishers = node_graph()->get_publishers_info_by_topic("topic", false);
-      return publishers.size();
-    });
-  ASSERT_EQ(1u, num_publishers);
+  auto publishers = node_graph()->get_publishers_info_by_topic("topic", false);
+  ASSERT_EQ(1u, publishers.size());
 
   auto publisher_endpoint_info = publishers[0];
   const auto const_publisher_endpoint_info = publisher_endpoint_info;
@@ -364,10 +324,28 @@ TEST_F(TestNodeGraph, get_info_by_topic)
   EXPECT_EQ(rclcpp::EndpointType::Publisher, const_publisher_endpoint_info.endpoint_type());
 
   rclcpp::QoS actual_qos = publisher_endpoint_info.qos_profile();
-  EXPECT_EQ(actual_qos.reliability(), rclcpp::ReliabilityPolicy::Reliable);
+  switch (actual_qos.get_rmw_qos_profile().history) {
+    case RMW_QOS_POLICY_HISTORY_KEEP_LAST:
+      EXPECT_EQ(1u, actual_qos.get_rmw_qos_profile().depth);
+      break;
+    case RMW_QOS_POLICY_HISTORY_UNKNOWN:
+      EXPECT_EQ(0u, actual_qos.get_rmw_qos_profile().depth);
+      break;
+    default:
+      ADD_FAILURE() << "unexpected history";
+  }
 
   rclcpp::QoS const_actual_qos = const_publisher_endpoint_info.qos_profile();
-  EXPECT_EQ(const_actual_qos.reliability(), rclcpp::ReliabilityPolicy::Reliable);
+  switch (const_actual_qos.get_rmw_qos_profile().history) {
+    case RMW_QOS_POLICY_HISTORY_KEEP_LAST:
+      EXPECT_EQ(1u, const_actual_qos.get_rmw_qos_profile().depth);
+      break;
+    case RMW_QOS_POLICY_HISTORY_UNKNOWN:
+      EXPECT_EQ(0u, const_actual_qos.get_rmw_qos_profile().depth);
+      break;
+    default:
+      ADD_FAILURE() << "unexpected history";
+  }
 
   auto endpoint_gid = publisher_endpoint_info.endpoint_gid();
   auto const_endpoint_gid = const_publisher_endpoint_info.endpoint_gid();

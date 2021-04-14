@@ -38,7 +38,6 @@
 #include "rclcpp/node_interfaces/node_topics.hpp"
 #include "rclcpp/node_interfaces/node_waitables.hpp"
 #include "rclcpp/parameter_service.hpp"
-#include "rclcpp/qos.hpp"
 
 #include "lifecycle_node_interface_impl.hpp"  // implementation
 
@@ -47,20 +46,17 @@ namespace rclcpp_lifecycle
 
 LifecycleNode::LifecycleNode(
   const std::string & node_name,
-  const rclcpp::NodeOptions & options,
-  bool enable_communication_interface)
+  const rclcpp::NodeOptions & options)
 : LifecycleNode(
     node_name,
     "",
-    options,
-    enable_communication_interface)
+    options)
 {}
 
 LifecycleNode::LifecycleNode(
   const std::string & node_name,
   const std::string & namespace_,
-  const rclcpp::NodeOptions & options,
-  bool enable_communication_interface)
+  const rclcpp::NodeOptions & options)
 : node_base_(new rclcpp::node_interfaces::NodeBase(
       node_name,
       namespace_,
@@ -101,15 +97,13 @@ LifecycleNode::LifecycleNode(
       node_services_,
       node_logging_,
       node_clock_,
-      node_parameters_,
-      options.clock_qos(),
-      options.use_clock_thread()
+      node_parameters_
     )),
   node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
   node_options_(options),
   impl_(new LifecycleNodeInterfaceImpl(node_base_, node_services_))
 {
-  impl_->init(enable_communication_interface);
+  impl_->init();
 
   register_on_configure(
     std::bind(
@@ -132,18 +126,7 @@ LifecycleNode::LifecycleNode(
 }
 
 LifecycleNode::~LifecycleNode()
-{
-  // release sub-interfaces in an order that allows them to consult with node_base during tear-down
-  node_waitables_.reset();
-  node_time_source_.reset();
-  node_parameters_.reset();
-  node_clock_.reset();
-  node_services_.reset();
-  node_topics_.reset();
-  node_timers_.reset();
-  node_logging_.reset();
-  node_graph_.reset();
-}
+{}
 
 const char *
 LifecycleNode::get_name() const
@@ -165,53 +148,18 @@ LifecycleNode::get_logger() const
 
 rclcpp::CallbackGroup::SharedPtr
 LifecycleNode::create_callback_group(
-  rclcpp::CallbackGroupType group_type,
-  bool automatically_add_to_executor_with_node)
+  rclcpp::CallbackGroupType group_type)
 {
-  return node_base_->create_callback_group(group_type, automatically_add_to_executor_with_node);
+  return node_base_->create_callback_group(group_type);
 }
 
 const rclcpp::ParameterValue &
 LifecycleNode::declare_parameter(
   const std::string & name,
   const rclcpp::ParameterValue & default_value,
-  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
-  bool ignore_override)
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor)
 {
-  return this->node_parameters_->declare_parameter(
-    name, default_value, parameter_descriptor, ignore_override);
-}
-
-const rclcpp::ParameterValue &
-LifecycleNode::declare_parameter(const std::string & name)
-{
-#ifndef _WIN32
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-  return this->node_parameters_->declare_parameter(name);
-#ifndef _WIN32
-# pragma GCC diagnostic pop
-#else
-# pragma warning(pop)
-#endif
-}
-
-const rclcpp::ParameterValue &
-LifecycleNode::declare_parameter(
-  const std::string & name,
-  rclcpp::ParameterType type,
-  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
-  bool ignore_override)
-{
-  return this->node_parameters_->declare_parameter(
-    name,
-    type,
-    parameter_descriptor,
-    ignore_override);
+  return this->node_parameters_->declare_parameter(name, default_value, parameter_descriptor);
 }
 
 void
@@ -230,6 +178,12 @@ rcl_interfaces::msg::SetParametersResult
 LifecycleNode::set_parameter(const rclcpp::Parameter & parameter)
 {
   return this->set_parameters_atomically({parameter});
+}
+
+bool
+LifecycleNode::group_in_node(rclcpp::CallbackGroup::SharedPtr group)
+{
+  return node_base_->callback_group_in_node(group);
 }
 
 std::vector<rcl_interfaces::msg::SetParametersResult>
@@ -313,6 +267,28 @@ LifecycleNode::remove_on_set_parameters_callback(
 {
   node_parameters_->remove_on_set_parameters_callback(callback);
 }
+
+// suppress deprecated function warning
+#if !defined(_WIN32)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#else  // !defined(_WIN32)
+# pragma warning(push)
+# pragma warning(disable: 4996)
+#endif
+
+rclcpp::Node::OnParametersSetCallbackType
+LifecycleNode::set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback)
+{
+  return node_parameters_->set_on_parameters_set_callback(callback);
+}
+
+// remove warning suppression
+#if !defined(_WIN32)
+# pragma GCC diagnostic pop
+#else  // !defined(_WIN32)
+# pragma warning(pop)
+#endif
 
 std::vector<std::string>
 LifecycleNode::get_node_names() const
@@ -534,12 +510,6 @@ std::vector<Transition>
 LifecycleNode::get_available_transitions()
 {
   return impl_->get_available_transitions();
-}
-
-std::vector<Transition>
-LifecycleNode::get_transition_graph()
-{
-  return impl_->get_transition_graph();
 }
 
 const State &

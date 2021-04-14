@@ -180,7 +180,7 @@ public:
     std::weak_ptr<rcl_node_t> weak_node_handle(node_handle_);
     // rcl does the static memory allocation here
     service_handle_ = std::shared_ptr<rcl_service_t>(
-      new rcl_service_t, [weak_node_handle, service_name](rcl_service_t * service)
+      new rcl_service_t, [weak_node_handle](rcl_service_t * service)
       {
         auto handle = weak_node_handle.lock();
         if (handle) {
@@ -192,10 +192,10 @@ public:
             rcl_reset_error();
           }
         } else {
-          RCLCPP_ERROR_STREAM(
+          RCLCPP_ERROR(
             rclcpp::get_logger("rclcpp"),
-            "Error in destruction of rcl service handle " << service_name <<
-              ": the Node Handle was destructed too early. You will leak memory");
+            "Error in destruction of rcl service handle: "
+            "the Node Handle was destructed too early. You will leak memory");
         }
         delete service;
       });
@@ -223,8 +223,8 @@ public:
     }
     TRACEPOINT(
       rclcpp_service_callback_added,
-      static_cast<const void *>(get_service_handle().get()),
-      static_cast<const void *>(&any_callback_));
+      (const void *)get_service_handle().get(),
+      (const void *)&any_callback_);
 #ifndef TRACETOOLS_DISABLED
     any_callback_.register_callback_for_tracing();
 #endif
@@ -258,8 +258,8 @@ public:
     service_handle_ = service_handle;
     TRACEPOINT(
       rclcpp_service_callback_added,
-      static_cast<const void *>(get_service_handle().get()),
-      static_cast<const void *>(&any_callback_));
+      (const void *)get_service_handle().get(),
+      (const void *)&any_callback_);
 #ifndef TRACETOOLS_DISABLED
     any_callback_.register_callback_for_tracing();
 #endif
@@ -295,8 +295,8 @@ public:
     service_handle_->impl = service_handle->impl;
     TRACEPOINT(
       rclcpp_service_callback_added,
-      static_cast<const void *>(get_service_handle().get()),
-      static_cast<const void *>(&any_callback_));
+      (const void *)get_service_handle().get(),
+      (const void *)&any_callback_);
 #ifndef TRACETOOLS_DISABLED
     any_callback_.register_callback_for_tracing();
 #endif
@@ -347,6 +347,15 @@ public:
     auto response = std::make_shared<typename ServiceT::Response>();
     any_callback_.dispatch(request_header, typed_request, response);
     send_response(*request_header, *response);
+  }
+
+  [[deprecated("use the send_response() which takes references instead of shared pointers")]]
+  void
+  send_response(
+    std::shared_ptr<rmw_request_id_t> req_id,
+    std::shared_ptr<typename ServiceT::Response> response)
+  {
+    send_response(*req_id, *response);
   }
 
   void
