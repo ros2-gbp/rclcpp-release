@@ -141,7 +141,7 @@ tracks:
       :{release_inc} --os-name rhel
     devel_branch: foxy
     last_version: 2.3.1
-    name: upstream
+    name: rclcpp
     patches: null
     release_inc: '1'
     release_repo_url: https://github.com/ros2-gbp/rclcpp-release.git
@@ -167,7 +167,7 @@ tracks:
       :{release_inc} --os-name rhel
     devel_branch: master
     last_version: 9.0.2
-    name: upstream
+    name: rclcpp
     patches: null
     release_inc: '2'
     release_repo_url: https://github.com/ros2-gbp/rclcpp-release.git
@@ -241,7 +241,7 @@ tracks:
       :{release_inc} --os-name rhel
     devel_branch: master
     last_version: 9.0.2
-    name: upstream
+    name: rclcpp
     patches: null
     release_inc: '1'
     release_repo_url: https://github.com/ros2-gbp/rclcpp-release.git
