@@ -1,0 +1,12 @@
+Source: ros-galactic-rclcpp-action
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-galactic-action-msgs, ros-galactic-ament-cmake, ros-galactic-ament-cmake-gtest, ros-galactic-ament-cmake-ros, ros-galactic-ament-lint-auto, ros-galactic-ament-lint-common, ros-galactic-mimick-vendor, ros-galactic-performance-test-fixture, ros-galactic-rcl-action, ros-galactic-rclcpp, ros-galactic-rosidl-runtime-c, ros-galactic-test-msgs, ros-galactic-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-galactic-rclcpp-action
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-galactic-action-msgs, ros-galactic-ament-cmake, ros-galactic-rcl-action, ros-galactic-rclcpp, ros-galactic-rosidl-runtime-c, ros-galactic-ros-workspace
+Description: Adds action APIs for C++.
