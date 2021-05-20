@@ -1,0 +1,12 @@
+Source: ros-galactic-rclcpp
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-galactic-ament-cmake-gmock, ros-galactic-ament-cmake-gtest, ros-galactic-ament-cmake-ros, ros-galactic-ament-index-cpp, ros-galactic-ament-lint-auto, ros-galactic-ament-lint-common, ros-galactic-builtin-interfaces, ros-galactic-libstatistics-collector, ros-galactic-mimick-vendor, ros-galactic-performance-test-fixture, ros-galactic-rcl, ros-galactic-rcl-interfaces, ros-galactic-rcl-yaml-param-parser, ros-galactic-rcpputils, ros-galactic-rcutils, ros-galactic-rmw, ros-galactic-rmw-implementation-cmake, ros-galactic-rosgraph-msgs, ros-galactic-rosidl-default-generators, ros-galactic-rosidl-runtime-cpp, ros-galactic-rosidl-typesupport-c, ros-galactic-rosidl-typesupport-cpp, ros-galactic-statistics-msgs, ros-galactic-test-msgs, ros-galactic-tracetools, ros-galactic-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-galactic-rclcpp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-galactic-ament-index-cpp, ros-galactic-builtin-interfaces, ros-galactic-libstatistics-collector, ros-galactic-rcl, ros-galactic-rcl-interfaces, ros-galactic-rcl-yaml-param-parser, ros-galactic-rcpputils, ros-galactic-rcutils, ros-galactic-rmw, ros-galactic-rosgraph-msgs, ros-galactic-rosidl-runtime-cpp, ros-galactic-rosidl-typesupport-c, ros-galactic-rosidl-typesupport-cpp, ros-galactic-statistics-msgs, ros-galactic-tracetools, ros-galactic-ros-workspace
+Description: The ROS client library in C++.
