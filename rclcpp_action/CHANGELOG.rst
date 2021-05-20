@@ -3,16 +3,16 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-11.0.0 (2021-05-18)
--------------------
-* Bump the benchmark timeout for benchmark_action_client (`#1671 <https://github.com/ros2/rclcpp/issues/1671>`_)
+9.1.0 (2021-05-20)
+------------------
+* Bump the benchmark timeout for benchmark_action_client (`#1672 <https://github.com/ros2/rclcpp/issues/1672>`_)
 * Contributors: Scott K Logan
 
-10.0.0 (2021-05-11)
--------------------
-* Returns CancelResponse::REJECT while goal handle failed to transit to CANCELING state (`#1641 <https://github.com/ros2/rclcpp/issues/1641>`_)
-* Fix action server deadlock issue that caused by other mutexes locked in CancelCallback (`#1635 <https://github.com/ros2/rclcpp/issues/1635>`_)
-* Contributors: Kaven Yau
+9.0.3 (2021-05-10)
+------------------
+* Returns CancelResponse::REJECT while goal handle failed to transit to CANCELING state (`#1641 <https://github.com/ros2/rclcpp/issues/1641>`_) (`#1653 <https://github.com/ros2/rclcpp/issues/1653>`_)
+* Fix action server deadlock issue that caused by other mutexes locked in CancelCallback (`#1635 <https://github.com/ros2/rclcpp/issues/1635>`_) (`#1646 <https://github.com/ros2/rclcpp/issues/1646>`_)
+* Contributors: Jacob Perron, Kaven Yau, William Woodall
 
 9.0.2 (2021-04-14)
 ------------------

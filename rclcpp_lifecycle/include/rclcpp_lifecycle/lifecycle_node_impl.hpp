@@ -61,6 +61,7 @@ template<
   typename MessageT,
   typename CallbackT,
   typename AllocatorT,
+  typename CallbackMessageT,
   typename SubscriptionT,
   typename MessageMemoryStrategyT>
 std::shared_ptr<SubscriptionT>

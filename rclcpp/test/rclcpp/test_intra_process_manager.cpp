@@ -136,10 +136,7 @@ namespace buffers
 {
 namespace mock
 {
-template<
-  typename MessageT,
-  typename Alloc = std::allocator<void>,
-  typename MessageDeleter = std::default_delete<MessageT>>
+template<typename MessageT>
 class IntraProcessBuffer
 {
 public:
@@ -223,12 +220,12 @@ template<
   typename MessageT,
   typename Alloc = std::allocator<void>,
   typename Deleter = std::default_delete<MessageT>>
-class SubscriptionIntraProcessBuffer : public SubscriptionIntraProcessBase
+class SubscriptionIntraProcess : public SubscriptionIntraProcessBase
 {
 public:
-  RCLCPP_SMART_PTR_DEFINITIONS(SubscriptionIntraProcessBuffer)
+  RCLCPP_SMART_PTR_DEFINITIONS(SubscriptionIntraProcess)
 
-  SubscriptionIntraProcessBuffer()
+  SubscriptionIntraProcess()
   : take_shared_method(false)
   {
     buffer = std::make_unique<rclcpp::experimental::buffers::mock::IntraProcessBuffer<MessageT>>();
@@ -265,25 +262,6 @@ public:
   typename rclcpp::experimental::buffers::mock::IntraProcessBuffer<MessageT>::UniquePtr buffer;
 };
 
-template<
-  typename MessageT,
-  typename Alloc = std::allocator<void>,
-  typename Deleter = std::default_delete<MessageT>>
-class SubscriptionIntraProcess : public SubscriptionIntraProcessBuffer<
-    MessageT,
-    Alloc,
-    Deleter
->
-{
-public:
-  RCLCPP_SMART_PTR_DEFINITIONS(SubscriptionIntraProcess)
-
-  SubscriptionIntraProcess()
-  : SubscriptionIntraProcessBuffer<MessageT, Alloc, Deleter>()
-  {
-  }
-};
-
 }  // namespace mock
 }  // namespace experimental
 }  // namespace rclcpp
@@ -292,14 +270,12 @@ public:
 #define RCLCPP__PUBLISHER_HPP_
 #define RCLCPP__PUBLISHER_BASE_HPP_
 #define RCLCPP__EXPERIMENTAL__SUBSCRIPTION_INTRA_PROCESS_HPP_
-#define RCLCPP__EXPERIMENTAL__SUBSCRIPTION_INTRA_PROCESS_BUFFER_HPP_
 #define RCLCPP__EXPERIMENTAL__SUBSCRIPTION_INTRA_PROCESS_BASE_HPP_
 // Force ipm to use our mock publisher class.
 #define Publisher mock::Publisher
 #define PublisherBase mock::PublisherBase
 #define IntraProcessBuffer mock::IntraProcessBuffer
 #define SubscriptionIntraProcessBase mock::SubscriptionIntraProcessBase
-#define SubscriptionIntraProcessBuffer mock::SubscriptionIntraProcessBuffer
 #define SubscriptionIntraProcess mock::SubscriptionIntraProcess
 #include "../src/rclcpp/intra_process_manager.cpp"
 #undef Publisher
@@ -331,7 +307,7 @@ void Publisher<T, Alloc>::publish(MessageUniquePtr msg)
   ipm->template do_intra_process_publish<T, Alloc>(
     intra_process_publisher_id_,
     std::move(msg),
-    *message_allocator_);
+    message_allocator_);
 }
 
 }  // namespace mock
