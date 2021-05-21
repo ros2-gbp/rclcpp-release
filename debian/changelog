@@ -1,0 +1,134 @@
+ros-dashing-rclcpp-action (0.7.16-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Fri, 21 May 2021 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.15-1bionic) bionic; urgency=high
+
+  * Fix typo in action client logger name. (#1414 <https://github.com/ros2/rclcpp/issues/1414>)
+  * Contributors: Seulbae Kim
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Tue, 24 Nov 2020 08:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.14-1bionic) bionic; urgency=high
+
+  * Fixed doxygen warnings. (#1208 <https://github.com/ros2/rclcpp/issues/1208>)
+  * Contributors: Alejandro Hernández Cordero
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Fri, 10 Jul 2020 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.13-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Thu, 12 Mar 2020 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.12-1bionic) bionic; urgency=high
+
+  * Fixed memory leak in action clients (#934 <https://github.com/ros2/rclcpp/issues/934>)
+  * Do not throw exception in action client if take fails (#891 <https://github.com/ros2/rclcpp/issues/891>)
+  * Contributors: Ivan Santiago Paunovic, Jacob Perron
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Thu, 05 Dec 2019 08:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.11-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Fri, 11 Oct 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.10-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Mon, 23 Sep 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.9-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Fri, 20 Sep 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.8-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Fri, 06 Sep 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.7-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Wed, 31 Jul 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.6-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Wed, 12 Jun 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.5-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Thu, 30 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.4-1bionic) bionic; urgency=high
+
+  * Guard against calling null goal response callback (#738 <https://github.com/ros2/rclcpp/issues/738>)
+  * Contributors: Jacob Perron
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Wed, 29 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.3-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Mon, 20 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.2-1bionic) bionic; urgency=high
+
+  * Added return code to CancelGoal service response. (#710 <https://github.com/ros2/rclcpp/issues/710>)
+  * Contributors: Jacob Perron, William Woodall
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Wed, 08 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.1-1bionic) bionic; urgency=high
+
+  * Added optional callbacks to action client for goal, response, and result. (#701 <https://github.com/ros2/rclcpp/issues/701>)
+  * Added overload for node interfaces. (#700 <https://github.com/ros2/rclcpp/issues/700>)
+  * Renamed action state transitions. (#677 <https://github.com/ros2/rclcpp/issues/677>)
+  * Contributors: Jacob Perron, Karsten Knese
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Fri, 26 Apr 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.7.0-1bionic) bionic; urgency=high
+
+  * Fixed hard-coded duration type representation so int64_t isn't assumed. (#648 <https://github.com/ros2/rclcpp/issues/648>)
+  * Added documentation to rclcpp_action. (#650 <https://github.com/ros2/rclcpp/pull/650>)
+  * Updated to use separated action types. (#601 <https://github.com/ros2/rclcpp/issues/601>)
+  * Updated to wait for action server before sending goal. (#637 <https://github.com/ros2/rclcpp/issues/637>)
+  * Refactored server goal handle's try_canceling() function. (#603 <https://github.com/ros2/rclcpp/issues/603>)
+  * Contributors: Emerson Knapp, Jacob Perron, Michel Hidalgo, Shane Loretz
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Sun, 14 Apr 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-action (0.6.2-1bionic) bionic; urgency=high
+
+
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Thu, 13 Dec 2018 08:00:00 -0000
+
+ros-dashing-rclcpp-action (0.6.1-1bionic) bionic; urgency=high
+
+  * Added wait_for_action_server() for action clients (#598 <https://github.com/ros2/rclcpp/issues/598>)
+  * Updated to adapt to action implicit changes (#602 <https://github.com/ros2/rclcpp/issues/602>)
+  * Added rclcpp_action Server implementation (#593 <https://github.com/ros2/rclcpp/issues/593>)
+  * Added action client implementation (#594 <https://github.com/ros2/rclcpp/issues/594>)
+  * Added skeleton for Action Server and Client (#579 <https://github.com/ros2/rclcpp/issues/579>)
+  * Contributors: Michel Hidalgo, Shane Loretz, William Woodall
+
+ -- Dirk Thomas <dthomas@osrfoundation.org>  Fri, 07 Dec 2018 08:00:00 -0000
+
+
