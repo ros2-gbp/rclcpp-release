@@ -12,27 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/** \mainpage rclcpp_lifecycle: Package containing a prototype for lifecycle implementation.
- *
- * - Lifecycle states: Define the State class. There are 4 primary states: Unconfigured, Inactive,
- *   Active and Finalized. There are also 6 transition states which are intermediate states during
- *   a requested transition. Configuring, CleaningUp, ShuttingDown, Activating, Deactivating and
- *   ErrorProcessing.
- *   - rclcpp_lifecycle/state.hpp
- * - Lifecycle transitions Define the Transition class. There are 7 transitions exposed to a
- *   supervisory process, they are: create, configure, cleanup, activate, deactivate, shutdown and
- *   destroy.
- *   - rclcpp_lifecycle/transition.hpp
- * - Lifecycle publisher creates a publisher that allows enabling and disabling message publication.
- *   - rclcpp_lifecycle/publisher.hpp
- * - Lifecycle node: An optional interface class for life cycle node implementations.
- *   - rclcpp_lifecycle/lifecycle_node.hpp
- *
- * Some useful internal abstractions and utilities:
- * - Macros for controlling symbol visibility on the library
- *   - rclcpp_lifecycle/visibility_control.h
- */
-
 #ifndef RCLCPP_LIFECYCLE__LIFECYCLE_NODE_HPP_
 #define RCLCPP_LIFECYCLE__LIFECYCLE_NODE_HPP_
 
@@ -41,8 +20,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "rcutils/macros.h"
 
 #include "rcl/error_handling.h"
 #include "rcl/node.h"
@@ -57,8 +34,6 @@
 #include "rclcpp/clock.hpp"
 #include "rclcpp/context.hpp"
 #include "rclcpp/event.hpp"
-#include "rclcpp/generic_publisher.hpp"
-#include "rclcpp/generic_subscription.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/message_memory_strategy.hpp"
@@ -129,75 +104,53 @@ public:
   /**
    * \param[in] node_name Name of the node.
    * \param[in] options Additional options to control creation of the node.
-   * \param[in] enable_communication_interface Deciding whether the communication interface of the underlying rcl_lifecycle_node shall be enabled.
    */
   RCLCPP_LIFECYCLE_PUBLIC
   explicit LifecycleNode(
     const std::string & node_name,
-    const rclcpp::NodeOptions & options = rclcpp::NodeOptions(),
-    bool enable_communication_interface = true);
+    const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
   /// Create a node based on the node name and a rclcpp::Context.
   /**
    * \param[in] node_name Name of the node.
    * \param[in] namespace_ Namespace of the node.
    * \param[in] options Additional options to control creation of the node.
-   * \param[in] enable_communication_interface Deciding whether the communication interface of the underlying rcl_lifecycle_node shall be enabled.
    */
   RCLCPP_LIFECYCLE_PUBLIC
   LifecycleNode(
     const std::string & node_name,
     const std::string & namespace_,
-    const rclcpp::NodeOptions & options = rclcpp::NodeOptions(),
-    bool enable_communication_interface = true);
+    const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
 
   RCLCPP_LIFECYCLE_PUBLIC
   virtual ~LifecycleNode();
 
   /// Get the name of the node.
-  /**
-   * \return The name of the node.
-   */
+  // \return The name of the node.
   RCLCPP_LIFECYCLE_PUBLIC
   const char *
   get_name() const;
 
-  /// Get the namespace of the node
-  /**
-   * \return The namespace of the node.
-   */
+  /// Get the namespace of the node.
+  // \return The namespace of the node.
   RCLCPP_LIFECYCLE_PUBLIC
   const char *
   get_namespace() const;
 
   /// Get the logger of the node.
-  /**
-   * \return The logger of the node.
-   */
+  /** \return The logger of the node. */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::Logger
   get_logger() const;
 
   /// Create and return a callback group.
-  /**
-   * \param[in] group_type callback group type to create by this method.
-   * \param[in] automatically_add_to_executor_with_node A boolean that
-   *   determines whether a callback group is automatically added to an executor
-   *   with the node with which it is associated.
-   * \return a callback group
-   */
   RCLCPP_LIFECYCLE_PUBLIC
-  rclcpp::CallbackGroup::SharedPtr
-  create_callback_group(
-    rclcpp::CallbackGroupType group_type,
-    bool automatically_add_to_executor_with_node = true);
+  rclcpp::callback_group::CallbackGroup::SharedPtr
+  create_callback_group(rclcpp::callback_group::CallbackGroupType group_type);
 
   /// Return the list of callback groups in the node.
-  /**
-   * \return list of callback groups in the node.
-   */
   RCLCPP_LIFECYCLE_PUBLIC
-  const std::vector<rclcpp::CallbackGroup::WeakPtr> &
+  const std::vector<rclcpp::callback_group::CallbackGroup::WeakPtr> &
   get_callback_groups() const;
 
   /// Create and return a Publisher.
@@ -212,10 +165,41 @@ public:
   create_publisher(
     const std::string & topic_name,
     const rclcpp::QoS & qos,
-    const PublisherOptionsWithAllocator<AllocatorT> & options = (
-      create_default_publisher_options<AllocatorT>()
-    )
+    const PublisherOptionsWithAllocator<AllocatorT> & options =
+    create_default_publisher_options<AllocatorT>()
   );
+
+  /// Create and return a Publisher.
+  /**
+   * \param[in] topic_name The topic for this publisher to publish on.
+   * \param[in] qos_history_depth The depth of the publisher message queue.
+   * \param[in] allocator allocator to use during publishing activities.
+   * \return Shared pointer to the created publisher.
+   */
+  template<typename MessageT, typename Alloc = std::allocator<void>>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated("use create_publisher(const std::string &, const rclcpp::QoS &, ...) instead")]]
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<MessageT, Alloc>>
+  create_publisher(
+    const std::string & topic_name,
+    size_t qos_history_depth,
+    std::shared_ptr<Alloc> allocator);
+
+  /// Create and return a LifecyclePublisher.
+  /**
+   * \param[in] topic_name The topic for this publisher to publish on.
+   * \param[in] qos_profile The QoS settings for this publisher.
+   * \param[in] allocator allocator to use during publishing activities.
+   * \return Shared pointer to the created publisher.
+   */
+  template<typename MessageT, typename Alloc = std::allocator<void>>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated("use create_publisher(const std::string &, const rclcpp::QoS &, ...) instead")]]
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<MessageT, Alloc>>
+  create_publisher(
+    const std::string & topic_name,
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_default,
+    std::shared_ptr<Alloc> allocator = nullptr);
 
   /// Create and return a Subscription.
   /**
@@ -226,17 +210,15 @@ public:
    * \param[in] msg_mem_strat The message memory strategy to use for allocating messages.
    * \return Shared pointer to the created subscription.
    */
+  /* TODO(jacquelinekay):
+     Windows build breaks when static member function passed as default
+     argument to msg_mem_strat, nullptr is a workaround.
+   */
   template<
     typename MessageT,
     typename CallbackT,
     typename AllocatorT = std::allocator<void>,
-    typename CallbackMessageT =
-    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type,
-    typename SubscriptionT = rclcpp::Subscription<MessageT, AllocatorT>,
-    typename MessageMemoryStrategyT = rclcpp::message_memory_strategy::MessageMemoryStrategy<
-      CallbackMessageT,
-      AllocatorT
-    >>
+    typename SubscriptionT = rclcpp::Subscription<MessageT, AllocatorT>>
   std::shared_ptr<SubscriptionT>
   create_subscription(
     const std::string & topic_name,
@@ -244,10 +226,81 @@ public:
     CallbackT && callback,
     const SubscriptionOptionsWithAllocator<AllocatorT> & options =
     create_default_subscription_options<AllocatorT>(),
-    typename MessageMemoryStrategyT::SharedPtr msg_mem_strat = (
-      MessageMemoryStrategyT::create_default()
-    )
-  );
+    typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, AllocatorT
+    >::SharedPtr
+    msg_mem_strat = nullptr);
+
+  /// Create and return a Subscription.
+  /**
+   * \param[in] topic_name The topic to subscribe on.
+   * \param[in] callback The user-defined callback function.
+   * \param[in] qos_profile The quality of service profile to pass on to the rmw implementation.
+   * \param[in] group The callback group for this subscription. NULL for no callback group.
+   * \param[in] ignore_local_publications True to ignore local publications.
+   * \param[in] msg_mem_strat The message memory strategy to use for allocating messages.
+   * \return Shared pointer to the created subscription.
+   */
+  /* TODO(jacquelinekay):
+     Windows build breaks when static member function passed as default
+     argument to msg_mem_strat, nullptr is a workaround.
+   */
+  template<
+    typename MessageT,
+    typename CallbackT,
+    typename Alloc = std::allocator<void>,
+    typename SubscriptionT = rclcpp::Subscription<MessageT, Alloc>>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated(
+    "use create_subscription(const std::string &, const rclcpp::QoS &, CallbackT, ...) instead"
+  )]]
+  std::shared_ptr<SubscriptionT>
+  create_subscription(
+    const std::string & topic_name,
+    CallbackT && callback,
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_default,
+    rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr,
+    bool ignore_local_publications = false,
+    typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
+    msg_mem_strat = nullptr,
+    std::shared_ptr<Alloc> allocator = nullptr);
+
+  /// Create and return a Subscription.
+  /**
+   * \param[in] topic_name The topic to subscribe on.
+   * \param[in] qos_history_depth The depth of the subscription's incoming message queue.
+   * \param[in] callback The user-defined callback function.
+   * \param[in] group The callback group for this subscription. NULL for no callback group.
+   * \param[in] ignore_local_publications True to ignore local publications.
+   * \param[in] msg_mem_strat The message memory strategy to use for allocating messages.
+   * \param[in] allocator allocator to be used during handling of subscription callbacks.
+   * \return Shared pointer to the created subscription.
+   */
+  /* TODO(jacquelinekay):
+     Windows build breaks when static member function passed as default
+     argument to msg_mem_strat, nullptr is a workaround.
+   */
+  template<
+    typename MessageT,
+    typename CallbackT,
+    typename Alloc = std::allocator<void>,
+    typename SubscriptionT = rclcpp::Subscription<MessageT, Alloc>>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated(
+    "use create_subscription(const std::string &, const rclcpp::QoS &, CallbackT, ...) instead"
+  )]]
+  std::shared_ptr<SubscriptionT>
+  create_subscription(
+    const std::string & topic_name,
+    size_t qos_history_depth,
+    CallbackT && callback,
+    rclcpp::callback_group::CallbackGroup::SharedPtr group,
+    bool ignore_local_publications = false,
+    typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
+    msg_mem_strat = nullptr,
+    std::shared_ptr<Alloc> allocator = nullptr);
 
   /// Create a timer.
   /**
@@ -260,59 +313,24 @@ public:
   create_wall_timer(
     std::chrono::duration<DurationRepT, DurationT> period,
     CallbackT callback,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+    rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr);
 
-  /// Create and return a Client.
-  /**
-   * \sa rclcpp::Node::create_client
-   */
+  /* Create and return a Client. */
   template<typename ServiceT>
   typename rclcpp::Client<ServiceT>::SharedPtr
   create_client(
     const std::string & service_name,
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_services_default,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+    rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr);
 
-  /// Create and return a Service.
-  /**
-   * \sa rclcpp::Node::create_service
-   */
+  /* Create and return a Service. */
   template<typename ServiceT, typename CallbackT>
   typename rclcpp::Service<ServiceT>::SharedPtr
   create_service(
     const std::string & service_name,
     CallbackT && callback,
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_services_default,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
-
-  /// Create and return a GenericPublisher.
-  /**
-   * \sa rclcpp::Node::create_generic_publisher
-   */
-  template<typename AllocatorT = std::allocator<void>>
-  std::shared_ptr<rclcpp::GenericPublisher> create_generic_publisher(
-    const std::string & topic_name,
-    const std::string & topic_type,
-    const rclcpp::QoS & qos,
-    const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options = (
-      rclcpp::PublisherOptionsWithAllocator<AllocatorT>()
-    )
-  );
-
-  /// Create and return a GenericSubscription.
-  /**
-   * \sa rclcpp::Node::create_generic_subscription
-   */
-  template<typename AllocatorT = std::allocator<void>>
-  std::shared_ptr<rclcpp::GenericSubscription> create_generic_subscription(
-    const std::string & topic_name,
-    const std::string & topic_type,
-    const rclcpp::QoS & qos,
-    std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
-    const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options = (
-      rclcpp::SubscriptionOptionsWithAllocator<AllocatorT>()
-    )
-  );
+    rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr);
 
   /// Declare and initialize a parameter, return the effective value.
   /**
@@ -322,39 +340,9 @@ public:
   const rclcpp::ParameterValue &
   declare_parameter(
     const std::string & name,
-    const rclcpp::ParameterValue & default_value,
+    const rclcpp::ParameterValue & default_value = rclcpp::ParameterValue(),
     const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor(),
-    bool ignore_override = false);
-
-  /// Declare and initialize a parameter, return the effective value.
-  /**
-   * \sa rclcpp::Node::declare_parameter
-   */
-  RCLCPP_LIFECYCLE_PUBLIC
-  const rclcpp::ParameterValue &
-  declare_parameter(
-    const std::string & name,
-    rclcpp::ParameterType type,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor{},
-    bool ignore_override = false);
-
-  /// Declare a parameter
-  [[deprecated(
-    "declare_parameter() with only a name is deprecated and will be deleted in the future.\n" \
-    "If you want to declare a parameter that won't change type without a default value use:\n" \
-    "`node->declare_parameter<ParameterT>(name)`, where e.g. ParameterT=int64_t.\n\n" \
-    "If you want to declare a parameter that can dynamically change type use:\n" \
-    "```\n" \
-    "rcl_interfaces::msg::ParameterDescriptor descriptor;\n" \
-    "descriptor.dynamic_typing = true;\n" \
-    "node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);\n" \
-    "```"
-  )]]
-  RCLCPP_LIFECYCLE_PUBLIC
-  const rclcpp::ParameterValue &
-  declare_parameter(const std::string & name);
+    rcl_interfaces::msg::ParameterDescriptor());
 
   /// Declare and initialize a parameter with a type.
   /**
@@ -366,20 +354,7 @@ public:
     const std::string & name,
     const ParameterT & default_value,
     const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor(),
-    bool ignore_override = false);
-
-  /// Declare and initialize a parameter with a type.
-  /**
-   * See the non-templated declare_parameter() on this class for details.
-   */
-  template<typename ParameterT>
-  auto
-  declare_parameter(
-    const std::string & name,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor(),
-    bool ignore_override = false);
+    rcl_interfaces::msg::ParameterDescriptor());
 
   /// Declare and initialize several parameters with the same namespace and type.
   /**
@@ -444,6 +419,30 @@ public:
   rcl_interfaces::msg::SetParametersResult
   set_parameters_atomically(const std::vector<rclcpp::Parameter> & parameters);
 
+  /// Set one parameter, unless that parameter has already been set.
+  /**
+   * \sa rclcpp::Node::set_parameter_if_not_set
+   */
+  template<typename ParameterT>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated("use declare_parameter() instead")]]
+  void
+  set_parameter_if_not_set(
+    const std::string & name,
+    const ParameterT & value);
+
+  /// Set a map of parameters with the same prefix.
+  /**
+   * \sa rclcpp::Node::set_parameters_if_not_set
+   */
+  template<typename MapValueT>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated("use declare_parameters() instead")]]
+  void
+  set_parameters_if_not_set(
+    const std::string & name,
+    const std::map<std::string, MapValueT> & values);
+
   /// Return the parameter by the given name.
   /**
    * \sa rclcpp::Node::get_parameter
@@ -499,6 +498,19 @@ public:
     const std::string & prefix,
     std::map<std::string, MapValueT> & values) const;
 
+  /// Get the parameter value; if not set, set the "alternative value" and store it in the node.
+  /**
+   * \sa rclcpp::Node::get_parameter_or_set
+   */
+  template<typename ParameterT>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated("use declare_parameter() and it's return value instead")]]
+  void
+  get_parameter_or_set(
+    const std::string & name,
+    ParameterT & value,
+    const ParameterT & alternative_value);
+
   /// Return the parameter descriptor for the given parameter name.
   /**
    * \sa rclcpp::Node::describe_parameter
@@ -531,98 +543,47 @@ public:
   rcl_interfaces::msg::ListParametersResult
   list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const;
 
-  using OnSetParametersCallbackHandle =
-    rclcpp::node_interfaces::OnSetParametersCallbackHandle;
   using OnParametersSetCallbackType =
     rclcpp::node_interfaces::NodeParametersInterface::OnParametersSetCallbackType;
 
-  /// Add a callback for when parameters are being set.
+  /// Register a callback to be called anytime a parameter is about to be changed.
   /**
-   * \sa rclcpp::Node::add_on_set_parameters_callback
+   * \sa rclcpp::Node::set_on_parameters_set_callback
    */
   RCLCPP_LIFECYCLE_PUBLIC
-  RCUTILS_WARN_UNUSED
-  rclcpp_lifecycle::LifecycleNode::OnSetParametersCallbackHandle::SharedPtr
-  add_on_set_parameters_callback(
+  rclcpp_lifecycle::LifecycleNode::OnParametersSetCallbackType
+  set_on_parameters_set_callback(
     rclcpp_lifecycle::LifecycleNode::OnParametersSetCallbackType callback);
 
-  /// Remove a callback registered with `add_on_set_parameters_callback`.
+  /// Register the callback for parameter changes
   /**
-   * \sa rclcpp::Node::remove_on_set_parameters_callback
+   * \sa rclcpp::Node::register_param_change_callback
    */
-  RCLCPP_LIFECYCLE_PUBLIC
+  template<typename CallbackT>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated("use set_on_parameters_set_callback() instead")]]
   void
-  remove_on_set_parameters_callback(
-    const rclcpp_lifecycle::LifecycleNode::OnSetParametersCallbackHandle * const handler);
+  register_param_change_callback(CallbackT && callback);
 
-  /// Return a vector of existing node names (string).
-  /**
-   * \sa rclcpp::Node::get_node_names
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   std::vector<std::string>
   get_node_names() const;
 
-  /// Return a map of existing topic names to list of topic types.
-  /**
-   * \sa rclcpp::Node::get_topic_names_and_types
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   std::map<std::string, std::vector<std::string>>
   get_topic_names_and_types(bool no_demangle = false) const;
 
-  /// Return a map of existing service names to list of topic types.
-  /**
-   * \sa rclcpp::Node::get_service_names_and_types
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   std::map<std::string, std::vector<std::string>>
   get_service_names_and_types() const;
 
-  /// Return a map of existing service names to list of service types for a specific node.
-  /**
-   * This function only considers services - not clients.
-   *
-   * \param[in] node_name name of the node
-   * \param[in] namespace_ namespace of the node
-   */
-  RCLCPP_LIFECYCLE_PUBLIC
-  std::map<std::string, std::vector<std::string>>
-  get_service_names_and_types_by_node(
-    const std::string & node_name,
-    const std::string & namespace_) const;
-
-  /// Return the number of publishers that are advertised on a given topic.
-  /**
-   * \sa rclcpp::Node::count_publishers
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   size_t
   count_publishers(const std::string & topic_name) const;
 
-  /// Return the number of subscribers who have created a subscription for a given topic.
-  /**
-   * \sa rclcpp::Node::count_subscribers
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   size_t
   count_subscribers(const std::string & topic_name) const;
-
-  /// Return the topic endpoint information about publishers on a given topic.
-  /**
-   * \sa rclcpp::Node::get_publishers_info_by_topic
-   */
-  RCLCPP_LIFECYCLE_PUBLIC
-  std::vector<rclcpp::TopicEndpointInfo>
-  get_publishers_info_by_topic(const std::string & topic_name, bool no_mangle = false) const;
-
-  /// Return the topic endpoint information about subscriptions on a given topic.
-  /**
-   * \sa rclcpp::Node::get_subscriptions_info_by_topic
-   */
-  RCLCPP_LIFECYCLE_PUBLIC
-  std::vector<rclcpp::TopicEndpointInfo>
-  get_subscriptions_info_by_topic(const std::string & topic_name, bool no_mangle = false) const;
 
   /// Return a graph event, which will be set anytime a graph change occurs.
   /* The graph Event object is a loan which must be returned.
@@ -646,114 +607,65 @@ public:
     rclcpp::Event::SharedPtr event,
     std::chrono::nanoseconds timeout);
 
-  /// Get a clock as a non-const shared pointer which is managed by the node.
-  /**
-   * \sa rclcpp::node_interfaces::NodeClock::get_clock
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::Clock::SharedPtr
   get_clock();
 
-  /// Get a clock as a const shared pointer which is managed by the node.
-  /**
-   * \sa rclcpp::node_interfaces::NodeClock::get_clock
-   */
-  RCLCPP_LIFECYCLE_PUBLIC
-  rclcpp::Clock::ConstSharedPtr
-  get_clock() const;
-
-  /// Returns current time from the time source specified by clock_type.
-  /**
-   * \sa rclcpp::Clock::now
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::Time
-  now() const;
+  now();
 
   /// Return the Node's internal NodeBaseInterface implementation.
-  /**
-   * \sa rclcpp::Node::get_node_base_interface
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr
   get_node_base_interface();
 
   /// Return the Node's internal NodeClockInterface implementation.
-  /**
-   * \sa rclcpp::Node::get_node_clock_interface
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::node_interfaces::NodeClockInterface::SharedPtr
   get_node_clock_interface();
 
   /// Return the Node's internal NodeGraphInterface implementation.
-  /**
-   * \sa rclcpp::Node::get_node_graph_interface
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::node_interfaces::NodeGraphInterface::SharedPtr
   get_node_graph_interface();
 
   /// Return the Node's internal NodeLoggingInterface implementation.
-  /**
-   * \sa rclcpp::Node::get_node_logging_interface
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr
   get_node_logging_interface();
 
   /// Return the Node's internal NodeTimersInterface implementation.
-  /**
-   * \sa rclcpp::Node::get_node_timers_interface
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::node_interfaces::NodeTimersInterface::SharedPtr
   get_node_timers_interface();
 
   /// Return the Node's internal NodeTopicsInterface implementation.
-  /**
-   * \sa rclcpp::Node::get_node_topics_interface
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr
   get_node_topics_interface();
 
   /// Return the Node's internal NodeServicesInterface implementation.
-  /**
-   * \sa rclcpp::Node::get_node_services_interface
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::node_interfaces::NodeServicesInterface::SharedPtr
   get_node_services_interface();
 
   /// Return the Node's internal NodeParametersInterface implementation.
-  /**
-   * \sa rclcpp::Node::get_node_parameters_interface
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::node_interfaces::NodeParametersInterface::SharedPtr
   get_node_parameters_interface();
 
   /// Return the Node's internal NodeParametersInterface implementation.
-  /**
-   * \sa rclcpp::Node::get_node_time_source_interface
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::node_interfaces::NodeTimeSourceInterface::SharedPtr
   get_node_time_source_interface();
 
   /// Return the Node's internal NodeWaitablesInterface implementation.
-  /**
-   * \sa rclcpp::Node::get_node_waitables_interface
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   rclcpp::node_interfaces::NodeWaitablesInterface::SharedPtr
   get_node_waitables_interface();
 
   /// Return the NodeOptions used when creating this node.
-  /**
-   * \sa rclcpp::Node::get_node_options
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const rclcpp::NodeOptions &
   get_node_options() const;
@@ -761,216 +673,100 @@ public:
   //
   // LIFECYCLE COMPONENTS
   //
-  /// Return the current State.
-  /**
-   * \return the current state
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   get_current_state();
 
-  /// Return a list with the available states.
-  /**
-   * \return list with the available states.
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   std::vector<State>
   get_available_states();
 
-  /// Return a list with the current available transitions.
-  /**
-   * \return list with the current available transitions.
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   std::vector<Transition>
   get_available_transitions();
 
-  /// Return a list with all the transitions.
-  /**
-   * \return list with all the transitions in the transition graph.
-   */
-  RCLCPP_LIFECYCLE_PUBLIC
-  std::vector<Transition>
-  get_transition_graph();
-
-  /// Trigger the specified transition.
+  /// trigger the specified transition
   /*
-   * \return the new state after this transition
+   * return the new state after this transition
    */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   trigger_transition(const Transition & transition);
 
-  /// Trigger the specified transition and get the callback return code.
-  /*
-   * \param[out] cb_return_code transition callback return code
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   trigger_transition(
     const Transition & transition, LifecycleNodeInterface::CallbackReturn & cb_return_code);
 
-  /// Trigger the specified transition based on an id.
-  /*
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   trigger_transition(uint8_t transition_id);
 
-  /// Trigger the specified transition based on an id and get the callback return code.
-  /*
-   * \param[out] cb_return_code transition callback return code
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   trigger_transition(
     uint8_t transition_id, LifecycleNodeInterface::CallbackReturn & cb_return_code);
 
-  /// Trigger the configure transition
-  /*
-   * \param[out] cb_return_code transition callback return code.
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   configure();
 
-  /// Trigger the configure transition and get the callback return code.
-  /*
-   * \param[out] cb_return_code transition callback return code
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   configure(LifecycleNodeInterface::CallbackReturn & cb_return_code);
 
-  /// Trigger the cleanup transition.
-  /*
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   cleanup();
 
-  /// Trigger the cleanup transition and get the callback return code.
-  /*
-   * \param[out] cb_return_code transition callback return code
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   cleanup(LifecycleNodeInterface::CallbackReturn & cb_return_code);
 
-  /// Trigger the activate transition.
-  /*
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   activate();
 
-  /// Trigger the activate transition and get the callback return code.
-  /*
-   * \param[out] cb_return_code transition callback return code
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   activate(LifecycleNodeInterface::CallbackReturn & cb_return_code);
 
-  /// Trigger the deactivate transition
-  /*
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   deactivate();
 
-  /// Trigger the deactivate transition and get the callback return code.
-  /*
-   * \param[out] cb_return_code transition callback return code
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   deactivate(LifecycleNodeInterface::CallbackReturn & cb_return_code);
 
-  /// Trigger the shutdown transition
-  /*
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   shutdown();
 
-  /// Trigger the shutdown transition and get the callback return code.
-  /*
-   * \param[out] cb_return_code transition callback return code
-   * \return the new state after this transition
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
   shutdown(LifecycleNodeInterface::CallbackReturn & cb_return_code);
 
-  /// Register the configure callback
-  /**
-   * This callback will be called when the transition to this state is triggered
-   * \param[in] fcn callback function to call
-   * \return always true
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   bool
   register_on_configure(std::function<LifecycleNodeInterface::CallbackReturn(const State &)> fcn);
 
-  /// Register the cleanup callback
-  /**
-   * This callback will be called when the transition to this state is triggered
-   * \param[in] fcn callback function to call
-   * \return always true
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   bool
   register_on_cleanup(std::function<LifecycleNodeInterface::CallbackReturn(const State &)> fcn);
 
-  /// Register the shutdown callback
-  /**
-   * This callback will be called when the transition to this state is triggered
-   * \param[in] fcn callback function to call
-   * \return always true
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   bool
   register_on_shutdown(std::function<LifecycleNodeInterface::CallbackReturn(const State &)> fcn);
 
-  /// Register the activate callback
-  /**
-   * This callback will be called when the transition to this state is triggered
-   * \param[in] fcn callback function to call
-   * \return always true
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   bool
   register_on_activate(std::function<LifecycleNodeInterface::CallbackReturn(const State &)> fcn);
 
-  /// Register the deactivate callback
-  /**
-   * This callback will be called when the transition to this state is triggered
-   * \param[in] fcn callback function to call
-   * \return always true
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   bool
   register_on_deactivate(std::function<LifecycleNodeInterface::CallbackReturn(const State &)> fcn);
 
-  /// Register the error callback
-  /**
-   * This callback will be called when the transition to this state is triggered
-   * \param[in] fcn callback function to call
-   * \return always true
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   bool
   register_on_error(std::function<LifecycleNodeInterface::CallbackReturn(const State &)> fcn);
@@ -986,6 +782,10 @@ protected:
 
 private:
   RCLCPP_DISABLE_COPY(LifecycleNode)
+
+  RCLCPP_LIFECYCLE_PUBLIC
+  bool
+  group_in_node(rclcpp::callback_group::CallbackGroup::SharedPtr group);
 
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_;
   rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_;

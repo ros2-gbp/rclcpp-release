@@ -15,7 +15,6 @@
 #ifndef RCLCPP__TIMER_HPP_
 #define RCLCPP__TIMER_HPP_
 
-#include <atomic>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -31,8 +30,6 @@
 #include "rclcpp/rate.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/visibility_control.hpp"
-#include "tracetools/tracetools.h"
-#include "tracetools/utils.hpp"
 
 #include "rcl/error_handling.h"
 #include "rcl/timer.h"
@@ -48,27 +45,15 @@ class TimerBase
 public:
   RCLCPP_SMART_PTR_DEFINITIONS_NOT_COPYABLE(TimerBase)
 
-  /// TimerBase constructor
-  /**
-   * \param clock A clock to use for time and sleeping
-   * \param period The interval at which the timer fires
-   * \param context node context
-   */
   RCLCPP_PUBLIC
   explicit TimerBase(
     Clock::SharedPtr clock,
     std::chrono::nanoseconds period,
     rclcpp::Context::SharedPtr context);
 
-  /// TimerBase destructor
   RCLCPP_PUBLIC
-  virtual
   ~TimerBase();
 
-  /// Cancel the timer.
-  /**
-   * \throws std::runtime_error if the rcl_timer_cancel returns a failure
-   */
   RCLCPP_PUBLIC
   void
   cancel();
@@ -77,21 +62,16 @@ public:
   /**
    * \return true if the timer has been cancelled, false otherwise
    * \throws std::runtime_error if the rcl_get_error_state returns 0
-   * \throws rclcpp::exceptions::RCLError some child class exception based on ret
+   * \throws RCLErrorBase some child class exception based on ret
    */
   RCLCPP_PUBLIC
   bool
   is_canceled();
 
-  /// Reset the timer.
-  /**
-   * \throws std::runtime_error if the rcl_timer_reset returns a failure
-   */
   RCLCPP_PUBLIC
   void
   reset();
 
-  /// Call the callback function when the timer signal is emitted.
   RCLCPP_PUBLIC
   virtual void
   execute_callback() = 0;
@@ -101,10 +81,7 @@ public:
   get_timer_handle();
 
   /// Check how long the timer has until its next scheduled callback.
-  /**
-   * \return A std::chrono::duration representing the relative time until the next callback.
-   * \throws std::runtime_error if the rcl_timer_get_time_until_next_call returns a failure
-   */
+  /** \return A std::chrono::duration representing the relative time until the next callback. */
   RCLCPP_PUBLIC
   std::chrono::nanoseconds
   time_until_trigger();
@@ -118,30 +95,13 @@ public:
    * This function expects its caller to immediately trigger the callback after this function,
    * since it maintains the last time the callback was triggered.
    * \return True if the timer needs to trigger.
-   * \throws std::runtime_error if it failed to check timer
    */
   RCLCPP_PUBLIC
   bool is_ready();
 
-  /// Exchange the "in use by wait set" state for this timer.
-  /**
-   * This is used to ensure this timer is not used by multiple
-   * wait sets at the same time.
-   *
-   * \param[in] in_use_state the new state to exchange into the state, true
-   *   indicates it is now in use by a wait set, and false is that it is no
-   *   longer in use by a wait set.
-   * \returns the previous state.
-   */
-  RCLCPP_PUBLIC
-  bool
-  exchange_in_use_by_wait_set_state(bool in_use_state);
-
 protected:
   Clock::SharedPtr clock_;
   std::shared_ptr<rcl_timer_t> timer_handle_;
-
-  std::atomic<bool> in_use_by_wait_set_{false};
 };
 
 
@@ -174,14 +134,6 @@ public:
   )
   : TimerBase(clock, period, context), callback_(std::forward<FunctorT>(callback))
   {
-    TRACEPOINT(
-      rclcpp_timer_callback_added,
-      static_cast<const void *>(get_timer_handle().get()),
-      static_cast<const void *>(&callback_));
-    TRACEPOINT(
-      rclcpp_callback_register,
-      static_cast<const void *>(&callback_),
-      tracetools::get_symbol(callback_));
   }
 
   /// Default destructor.
@@ -191,10 +143,6 @@ public:
     cancel();
   }
 
-  /**
-   * \sa rclcpp::TimerBase::execute_callback
-   * \throws std::runtime_error if it failed to notify timer that callback occurred
-   */
   void
   execute_callback() override
   {
@@ -205,9 +153,7 @@ public:
     if (ret != RCL_RET_OK) {
       throw std::runtime_error("Failed to notify timer that callback occurred");
     }
-    TRACEPOINT(callback_start, static_cast<const void *>(&callback_), false);
     execute_callback_delegate<>();
-    TRACEPOINT(callback_end, static_cast<const void *>(&callback_));
   }
 
   // void specialization
@@ -235,8 +181,6 @@ public:
     callback_(*this);
   }
 
-  /// Is the clock steady (i.e. is the time between ticks constant?)
-  /** \return True if the clock used by this timer is steady. */
   bool
   is_steady() override
   {
@@ -261,12 +205,6 @@ class WallTimer : public GenericTimer<FunctorT>
 public:
   RCLCPP_SMART_PTR_DEFINITIONS(WallTimer)
 
-  /// Wall timer constructor
-  /**
-   * \param period The interval at which the timer fires
-   * \param callback The callback function to execute every interval
-   * \param context node context
-   */
   WallTimer(
     std::chrono::nanoseconds period,
     FunctorT && callback,

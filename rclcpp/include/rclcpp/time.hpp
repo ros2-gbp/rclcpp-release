@@ -31,17 +31,6 @@ class Clock;
 class Time
 {
 public:
-  /// Time constructor
-  /**
-   * Initializes the time values for seconds and nanoseconds individually.
-   * Large values for nanoseconds are wrapped automatically with the remainder added to seconds.
-   * Both inputs must be integers.
-   *
-   * \param seconds part of the time in seconds since time epoch
-   * \param nanoseconds part of the time in nanoseconds since time epoch
-   * \param clock_type clock type
-   * \throws std::runtime_error if seconds are negative
-   */
   RCLCPP_PUBLIC
   Time(int32_t seconds, uint32_t nanoseconds, rcl_clock_type_t clock_type = RCL_SYSTEM_TIME);
 
@@ -53,7 +42,6 @@ public:
   RCLCPP_PUBLIC
   explicit Time(int64_t nanoseconds = 0, rcl_clock_type_t clock_type = RCL_SYSTEM_TIME);
 
-  /// Copy constructor
   RCLCPP_PUBLIC
   Time(const Time & rhs);
 
@@ -75,17 +63,12 @@ public:
   RCLCPP_PUBLIC
   explicit Time(const rcl_time_point_t & time_point);
 
-  /// Time destructor
   RCLCPP_PUBLIC
   virtual ~Time();
 
-  /// Return a builtin_interfaces::msg::Time object based
   RCLCPP_PUBLIC
   operator builtin_interfaces::msg::Time() const;
 
-  /**
-   * \throws std::runtime_error if seconds are negative
-   */
   RCLCPP_PUBLIC
   Time &
   operator=(const Time & rhs);
@@ -100,9 +83,6 @@ public:
   Time &
   operator=(const builtin_interfaces::msg::Time & time_msg);
 
-  /**
-   * \throws std::runtime_error if the time sources are different
-   */
   RCLCPP_PUBLIC
   bool
   operator==(const rclcpp::Time & rhs) const;
@@ -111,101 +91,49 @@ public:
   bool
   operator!=(const rclcpp::Time & rhs) const;
 
-  /**
-   * \throws std::runtime_error if the time sources are different
-   */
   RCLCPP_PUBLIC
   bool
   operator<(const rclcpp::Time & rhs) const;
 
-  /**
-   * \throws std::runtime_error if the time sources are different
-   */
   RCLCPP_PUBLIC
   bool
   operator<=(const rclcpp::Time & rhs) const;
 
-  /**
-   * \throws std::runtime_error if the time sources are different
-   */
   RCLCPP_PUBLIC
   bool
   operator>=(const rclcpp::Time & rhs) const;
 
-  /**
-   * \throws std::runtime_error if the time sources are different
-   */
   RCLCPP_PUBLIC
   bool
   operator>(const rclcpp::Time & rhs) const;
 
-  /**
-   * \throws std::overflow_error if addition leads to overflow
-   */
   RCLCPP_PUBLIC
   Time
   operator+(const rclcpp::Duration & rhs) const;
 
-  /**
-   * \throws std::runtime_error if the time sources are different
-   * \throws std::overflow_error if addition leads to overflow
-   */
   RCLCPP_PUBLIC
   Duration
   operator-(const rclcpp::Time & rhs) const;
 
-  /**
-   * \throws std::overflow_error if addition leads to overflow
-   */
   RCLCPP_PUBLIC
   Time
   operator-(const rclcpp::Duration & rhs) const;
 
-  /**
-   * \throws std::overflow_error if addition leads to overflow
-   */
-  RCLCPP_PUBLIC
-  Time &
-  operator+=(const rclcpp::Duration & rhs);
-
-  /**
-   * \throws std::overflow_error if addition leads to overflow
-   */
-  RCLCPP_PUBLIC
-  Time &
-  operator-=(const rclcpp::Duration & rhs);
-
-  /// Get the nanoseconds since epoch
-  /**
-   * \return the nanoseconds since epoch as a rcl_time_point_value_t structure.
-   */
   RCLCPP_PUBLIC
   rcl_time_point_value_t
   nanoseconds() const;
 
-  /// Get the maximum representable value.
-  /**
-   * \return the maximum representable value
-   */
   RCLCPP_PUBLIC
   static Time
   max();
 
-  /// Get the seconds since epoch
-  /**
-   * \warning Depending on sizeof(double) there could be significant precision loss.
-   * When an exact time is required use nanoseconds() instead.
-   *
-   * \return the seconds since epoch as a floating point number.
-   */
+  /// \return the seconds since epoch as a floating point number.
+  /// \warning Depending on sizeof(double) there could be significant precision loss.
+  /// When an exact time is required use nanoseconds() instead.
   RCLCPP_PUBLIC
   double
   seconds() const;
 
-  /// Get the clock type
-  /**
-   * \return the clock type
-   */
   RCLCPP_PUBLIC
   rcl_clock_type_t
   get_clock_type() const;
@@ -215,10 +143,6 @@ private:
   friend Clock;  // Allow clock to manipulate internal data
 };
 
-/**
- * \throws std::overflow_error if addition leads to overflow
- */
-RCLCPP_PUBLIC
 Time
 operator+(const rclcpp::Duration & lhs, const rclcpp::Time & rhs);
 

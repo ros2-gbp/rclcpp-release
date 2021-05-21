@@ -19,8 +19,6 @@
 #include <string>
 #include <vector>
 
-#include "rclcpp/logging.hpp"
-
 #include "./parameter_service_names.hpp"
 
 using rclcpp::ParameterService;
@@ -41,13 +39,12 @@ ParameterService::ParameterService(
       const std::shared_ptr<rcl_interfaces::srv::GetParameters::Request> request,
       std::shared_ptr<rcl_interfaces::srv::GetParameters::Response> response)
     {
-      try {
-        auto parameters = node_params->get_parameters(request->names);
-        for (const auto & param : parameters) {
-          response->values.push_back(param.get_value_message());
-        }
-      } catch (const rclcpp::exceptions::ParameterNotDeclaredException & ex) {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Failed to get parameters: %s", ex.what());
+      for (const auto & name : request->names) {
+        // Default construct param to NOT_SET
+        rclcpp::Parameter param;
+        node_params->get_parameter(name, param);
+        // push back NOT_SET when get_parameter() call fails
+        response->values.push_back(param.get_value_message());
       }
     },
     qos_profile, nullptr);
@@ -62,13 +59,12 @@ ParameterService::ParameterService(
     {
       try {
         auto types = node_params->get_parameter_types(request->names);
-        std::transform(
-          types.cbegin(), types.cend(),
-          std::back_inserter(response->types), [](const uint8_t & type) {
-            return static_cast<rclcpp::ParameterType>(type);
-          });
+        std::transform(types.cbegin(), types.cend(),
+        std::back_inserter(response->types), [](const uint8_t & type) {
+          return static_cast<rclcpp::ParameterType>(type);
+        });
       } catch (const rclcpp::exceptions::ParameterNotDeclaredException & ex) {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Failed to get parameter types: %s", ex.what());
+        RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to get parameter types: %s", ex.what());
       }
     },
     qos_profile, nullptr);
@@ -89,7 +85,7 @@ ParameterService::ParameterService(
           result = node_params->set_parameters_atomically(
             {rclcpp::Parameter::from_parameter_msg(p)});
         } catch (const rclcpp::exceptions::ParameterNotDeclaredException & ex) {
-          RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Failed to set parameter: %s", ex.what());
+          RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to set parameter: %s", ex.what());
           result.successful = false;
           result.reason = ex.what();
         }
@@ -107,20 +103,19 @@ ParameterService::ParameterService(
       std::shared_ptr<rcl_interfaces::srv::SetParametersAtomically::Response> response)
     {
       std::vector<rclcpp::Parameter> pvariants;
-      std::transform(
-        request->parameters.cbegin(), request->parameters.cend(),
-        std::back_inserter(pvariants),
-        [](const rcl_interfaces::msg::Parameter & p) {
-          return rclcpp::Parameter::from_parameter_msg(p);
-        });
+      std::transform(request->parameters.cbegin(), request->parameters.cend(),
+      std::back_inserter(pvariants),
+      [](const rcl_interfaces::msg::Parameter & p) {
+        return rclcpp::Parameter::from_parameter_msg(p);
+      });
       try {
         auto result = node_params->set_parameters_atomically(pvariants);
         response->result = result;
       } catch (const rclcpp::exceptions::ParameterNotDeclaredException & ex) {
-        RCLCPP_DEBUG(
+        RCLCPP_WARN(
           rclcpp::get_logger("rclcpp"), "Failed to set parameters atomically: %s", ex.what());
         response->result.successful = false;
-        response->result.reason = "One or more parameters were not declared before setting";
+        response->result.reason = "One or more parameters wer not declared before setting";
       }
     },
     qos_profile, nullptr);
@@ -137,7 +132,7 @@ ParameterService::ParameterService(
         auto descriptors = node_params->describe_parameters(request->names);
         response->descriptors = descriptors;
       } catch (const rclcpp::exceptions::ParameterNotDeclaredException & ex) {
-        RCLCPP_DEBUG(rclcpp::get_logger("rclcpp"), "Failed to describe parameters: %s", ex.what());
+        RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to describe parameters: %s", ex.what());
       }
     },
     qos_profile, nullptr);

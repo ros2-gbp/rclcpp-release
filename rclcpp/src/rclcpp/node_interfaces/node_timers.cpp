@@ -16,8 +16,6 @@
 
 #include <string>
 
-#include "tracetools/tracetools.h"
-
 using rclcpp::node_interfaces::NodeTimers;
 
 NodeTimers::NodeTimers(rclcpp::node_interfaces::NodeBaseInterface * node_base)
@@ -30,7 +28,7 @@ NodeTimers::~NodeTimers()
 void
 NodeTimers::add_timer(
   rclcpp::TimerBase::SharedPtr timer,
-  rclcpp::CallbackGroup::SharedPtr callback_group)
+  rclcpp::callback_group::CallbackGroup::SharedPtr callback_group)
 {
   if (callback_group) {
     if (!node_base_->callback_group_in_node(callback_group)) {
@@ -46,8 +44,4 @@ NodeTimers::add_timer(
             std::string("Failed to notify wait set on timer creation: ") +
             rmw_get_error_string().str);
   }
-  TRACEPOINT(
-    rclcpp_timer_link_node,
-    static_cast<const void *>(timer->get_timer_handle().get()),
-    static_cast<const void *>(node_base_->get_rcl_node_handle()));
 }

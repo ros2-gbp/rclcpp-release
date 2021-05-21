@@ -27,33 +27,18 @@ typedef struct rcl_lifecycle_state_t rcl_lifecycle_state_t;
 namespace rclcpp_lifecycle
 {
 
-/// Abstract class for the Lifecycle's states.
-/**
- * There are 4 primary states: Unconfigured, Inactive, Active and Finalized.
- */
 class State
 {
 public:
   RCLCPP_LIFECYCLE_PUBLIC
   explicit State(rcutils_allocator_t allocator = rcutils_get_default_allocator());
 
-  /// State constructor.
-  /**
-   * \param[in] id of the state
-   * \param[in] label of the state
-   * \param[in] allocator a valid allocator used to initialized the state.
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   State(
     uint8_t id,
     const std::string & label,
     rcutils_allocator_t allocator = rcutils_get_default_allocator());
 
-  /// State constructor.
-  /**
-   * \param[in] rcl_lifecycle_state_handle structure with the state details
-   * \param[in] allocator a valid allocator used to initialized the state.
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   explicit State(
     const rcl_lifecycle_state_t * rcl_lifecycle_state_handle,
@@ -68,18 +53,10 @@ public:
   RCLCPP_LIFECYCLE_PUBLIC
   State & operator=(const State & rhs);
 
-  /// Return the id.
-  /**
-   * \return id of the state
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   uint8_t
   id() const;
 
-  /// Return the label.
-  /**
-   * \return label of state
-   */
   RCLCPP_LIFECYCLE_PUBLIC
   std::string
   label() const;
@@ -87,7 +64,7 @@ public:
 protected:
   RCLCPP_LIFECYCLE_PUBLIC
   void
-  reset() noexcept;
+  reset();
 
   rcutils_allocator_t allocator_;
 

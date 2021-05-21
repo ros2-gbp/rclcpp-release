@@ -17,11 +17,8 @@
 
 #include <map>
 #include <memory>
-#include <list>
 #include <string>
 #include <vector>
-
-#include "rcutils/macros.h"
 
 #include "rcl_interfaces/msg/list_parameters_result.hpp"
 #include "rcl_interfaces/msg/parameter_descriptor.hpp"
@@ -30,7 +27,6 @@
 
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
-#include "rclcpp/node_interfaces/node_logging_interface.hpp"
 #include "rclcpp/node_interfaces/node_parameters_interface.hpp"
 #include "rclcpp/node_interfaces/node_services_interface.hpp"
 #include "rclcpp/node_interfaces/node_topics_interface.hpp"
@@ -52,30 +48,6 @@ struct ParameterInfo
 
   /// A description of the parameter
   rcl_interfaces::msg::ParameterDescriptor descriptor;
-};
-
-// Internal RAII-style guard for mutation recursion
-class ParameterMutationRecursionGuard
-{
-public:
-  explicit ParameterMutationRecursionGuard(bool & allow_mod)
-  : allow_modification_(allow_mod)
-  {
-    if (!allow_modification_) {
-      throw rclcpp::exceptions::ParameterModifiedInCallbackException(
-              "cannot set or declare a parameter, or change the callback from within set callback");
-    }
-
-    allow_modification_ = false;
-  }
-
-  ~ParameterMutationRecursionGuard()
-  {
-    allow_modification_ = true;
-  }
-
-private:
-  bool & allow_modification_;
 };
 
 /// Implementation of the NodeParameters part of the Node API.
@@ -103,42 +75,12 @@ public:
   virtual
   ~NodeParameters();
 
-// This is overriding a deprecated method, so we need to ignore the deprecation warning here.
-// Users of the method will still get a warning!
-#ifndef _WIN32
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-  [[deprecated(RCLCPP_INTERNAL_NODE_PARAMETERS_INTERFACE_DEPRECATE_DECLARE)]]
-  RCLCPP_PUBLIC
-  const rclcpp::ParameterValue &
-  declare_parameter(const std::string & name) override;
-#ifndef _WIN32
-# pragma GCC diagnostic pop
-#else
-# pragma warning(pop)
-#endif
-
   RCLCPP_PUBLIC
   const rclcpp::ParameterValue &
   declare_parameter(
     const std::string & name,
     const rclcpp::ParameterValue & default_value,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor{},
-    bool ignore_override = false) override;
-
-  RCLCPP_PUBLIC
-  const rclcpp::ParameterValue &
-  declare_parameter(
-    const std::string & name,
-    rclcpp::ParameterType type,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor(),
-    bool ignore_override = false) override;
+    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor) override;
 
   RCLCPP_PUBLIC
   void
@@ -191,33 +133,24 @@ public:
   list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const override;
 
   RCLCPP_PUBLIC
-  RCUTILS_WARN_UNUSED
-  OnSetParametersCallbackHandle::SharedPtr
-  add_on_set_parameters_callback(OnParametersSetCallbackType callback) override;
+  OnParametersSetCallbackType
+  set_on_parameters_set_callback(OnParametersSetCallbackType callback) override;
 
+  [[deprecated("use set_on_parameters_set_callback() instead")]]
   RCLCPP_PUBLIC
   void
-  remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const handler) override;
+  register_param_change_callback(OnParametersSetCallbackType callback) override;
 
   RCLCPP_PUBLIC
   const std::map<std::string, rclcpp::ParameterValue> &
   get_parameter_overrides() const override;
 
-  using CallbacksContainerType = std::list<OnSetParametersCallbackHandle::WeakPtr>;
-
 private:
   RCLCPP_DISABLE_COPY(NodeParameters)
 
-  mutable std::recursive_mutex mutex_;
-
-  // There are times when we don't want to allow modifications to parameters
-  // (particularly when a set_parameter callback tries to call set_parameter,
-  // declare_parameter, etc).  In those cases, this will be set to false.
-  bool parameter_modification_enabled_{true};
+  mutable std::mutex mutex_;
 
   OnParametersSetCallbackType on_parameters_set_callback_ = nullptr;
-
-  CallbacksContainerType on_parameters_set_callback_container_;
 
   std::map<std::string, ParameterInfo> parameters_;
 

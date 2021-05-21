@@ -17,7 +17,6 @@
 
 #include <memory>
 #include <string>
-#include <utility>
 
 #include "rclcpp/node_interfaces/get_node_topics_interface.hpp"
 #include "rclcpp/node_interfaces/node_topics_interface.hpp"
@@ -25,70 +24,50 @@
 #include "rclcpp/publisher_factory.hpp"
 #include "rclcpp/publisher_options.hpp"
 #include "rclcpp/qos.hpp"
-#include "rclcpp/qos_overriding_options.hpp"
-#include "rclcpp/detail/qos_parameters.hpp"
-
 #include "rmw/qos_profiles.h"
 
 namespace rclcpp
 {
 
-namespace detail
-{
-/// Create and return a publisher of the given MessageT type.
 template<
   typename MessageT,
   typename AllocatorT = std::allocator<void>,
-  typename PublisherT = rclcpp::Publisher<MessageT, AllocatorT>,
-  typename NodeParametersT,
-  typename NodeTopicsT>
+  typename PublisherT = ::rclcpp::Publisher<MessageT, AllocatorT>>
+// cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+[[deprecated("use alternative rclcpp::create_publisher() signatures")]]
 std::shared_ptr<PublisherT>
 create_publisher(
-  NodeParametersT & node_parameters,
-  NodeTopicsT & node_topics,
+  rclcpp::node_interfaces::NodeTopicsInterface * node_topics,
   const std::string & topic_name,
-  const rclcpp::QoS & qos,
-  const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options = (
-    rclcpp::PublisherOptionsWithAllocator<AllocatorT>()
-  )
-)
+  const rmw_qos_profile_t & qos_profile,
+  const PublisherEventCallbacks & event_callbacks,
+  rclcpp::callback_group::CallbackGroup::SharedPtr group,
+  bool use_intra_process_comms,
+  std::shared_ptr<AllocatorT> allocator)
 {
-  auto node_topics_interface = rclcpp::node_interfaces::get_node_topics_interface(node_topics);
-  const rclcpp::QoS & actual_qos = options.qos_overriding_options.get_policy_kinds().size() ?
-    rclcpp::detail::declare_qos_parameters(
-    options.qos_overriding_options, node_parameters,
-    node_topics_interface->resolve_topic_name(topic_name),
-    qos, rclcpp::detail::PublisherQosParametersTraits{}) :
-    qos;
+  auto publisher_options = rcl_publisher_get_default_options();
+  publisher_options.qos = qos_profile;
 
-  // Create the publisher.
-  auto pub = node_topics_interface->create_publisher(
+  auto pub = node_topics->create_publisher(
     topic_name,
-    rclcpp::create_publisher_factory<MessageT, AllocatorT, PublisherT>(options),
-    actual_qos
-  );
+    rclcpp::create_publisher_factory<MessageT, AllocatorT, PublisherT>(event_callbacks, allocator),
+    publisher_options,
+    use_intra_process_comms);
 
-  // Add the publisher to the node topics interface.
-  node_topics_interface->add_publisher(pub, options.callback_group);
+  node_topics->add_publisher(pub, group);
 
   return std::dynamic_pointer_cast<PublisherT>(pub);
 }
-}  // namespace detail
-
 
 /// Create and return a publisher of the given MessageT type.
 /**
  * The NodeT type only needs to have a method called get_node_topics_interface()
  * which returns a shared_ptr to a NodeTopicsInterface.
- *
- * In case `options.qos_overriding_options` is enabling qos parameter overrides,
- * NodeT must also have a method called get_node_parameters_interface()
- * which returns a shared_ptr to a NodeParametersInterface.
  */
 template<
   typename MessageT,
   typename AllocatorT = std::allocator<void>,
-  typename PublisherT = rclcpp::Publisher<MessageT, AllocatorT>,
+  typename PublisherT = ::rclcpp::Publisher<MessageT, AllocatorT>,
   typename NodeT>
 std::shared_ptr<PublisherT>
 create_publisher(
@@ -97,31 +76,44 @@ create_publisher(
   const rclcpp::QoS & qos,
   const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options = (
     rclcpp::PublisherOptionsWithAllocator<AllocatorT>()
-  )
-)
+))
 {
-  return detail::create_publisher<MessageT, AllocatorT, PublisherT>(
-    node, node, topic_name, qos, options);
-}
+  using rclcpp::node_interfaces::get_node_topics_interface;
+  auto node_topics = get_node_topics_interface(node);
 
-/// Create and return a publisher of the given MessageT type.
-template<
-  typename MessageT,
-  typename AllocatorT = std::allocator<void>,
-  typename PublisherT = rclcpp::Publisher<MessageT, AllocatorT>>
-std::shared_ptr<PublisherT>
-create_publisher(
-  rclcpp::node_interfaces::NodeParametersInterface::SharedPtr & node_parameters,
-  rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr & node_topics,
-  const std::string & topic_name,
-  const rclcpp::QoS & qos,
-  const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options = (
-    rclcpp::PublisherOptionsWithAllocator<AllocatorT>()
-  )
-)
-{
-  return detail::create_publisher<MessageT, AllocatorT, PublisherT>(
-    node_parameters, node_topics, topic_name, qos, options);
+  std::shared_ptr<AllocatorT> allocator = options.allocator;
+  if (!allocator) {
+    allocator = std::make_shared<AllocatorT>();
+  }
+
+  bool use_intra_process;
+  switch (options.use_intra_process_comm) {
+    case IntraProcessSetting::Enable:
+      use_intra_process = true;
+      break;
+    case IntraProcessSetting::Disable:
+      use_intra_process = false;
+      break;
+    case IntraProcessSetting::NodeDefault:
+      use_intra_process = node_topics->get_node_base_interface()->get_use_intra_process_default();
+      break;
+    default:
+      throw std::runtime_error("Unrecognized IntraProcessSetting value");
+      break;
+  }
+
+  // TODO(wjwwood): convert all of the interfaces to use QoS and PublisherOptionsBase
+  auto pub = node_topics->create_publisher(
+    topic_name,
+    rclcpp::create_publisher_factory<MessageT, AllocatorT, PublisherT>(
+      options.event_callbacks,
+      allocator
+    ),
+    options.template to_rcl_publisher_options<MessageT>(qos),
+    use_intra_process
+  );
+  node_topics->add_publisher(pub, options.callback_group);
+  return std::dynamic_pointer_cast<PublisherT>(pub);
 }
 
 }  // namespace rclcpp

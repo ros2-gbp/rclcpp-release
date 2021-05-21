@@ -15,7 +15,6 @@
 #ifndef RCLCPP__CLIENT_HPP_
 #define RCLCPP__CLIENT_HPP_
 
-#include <atomic>
 #include <future>
 #include <map>
 #include <memory>
@@ -63,64 +62,22 @@ public:
   RCLCPP_PUBLIC
   virtual ~ClientBase();
 
-  /// Take the next response for this client as a type erased pointer.
-  /**
-   * The type erased pointer allows for this method to be used in a type
-   * agnostic way along with ClientBase::create_response(),
-   * ClientBase::create_request_header(), and ClientBase::handle_response().
-   * The typed version of this can be used if the Service type is known,
-   * \sa Client::take_response().
-   *
-   * \param[out] response_out The type erased pointer to a Service Response into
-   *   which the middleware will copy the response being taken.
-   * \param[out] request_header_out The request header to be filled by the
-   *   middleware when taking, and which can be used to associte the response
-   *   to a specific request.
-   * \returns true if the response was taken, otherwise false.
-   * \throws rclcpp::exceptions::RCLError based exceptions if the underlying
-   *   rcl function fail.
-   */
-  RCLCPP_PUBLIC
-  bool
-  take_type_erased_response(void * response_out, rmw_request_id_t & request_header_out);
-
-  /// Return the name of the service.
-  /** \return The name of the service. */
   RCLCPP_PUBLIC
   const char *
   get_service_name() const;
 
-  /// Return the rcl_client_t client handle in a std::shared_ptr.
-  /**
-   * This handle remains valid after the Client is destroyed.
-   * The actual rcl client is not finalized until it is out of scope everywhere.
-   */
   RCLCPP_PUBLIC
   std::shared_ptr<rcl_client_t>
   get_client_handle();
 
-  /// Return the rcl_client_t client handle in a std::shared_ptr.
-  /**
-   * This handle remains valid after the Client is destroyed.
-   * The actual rcl client is not finalized until it is out of scope everywhere.
-   */
   RCLCPP_PUBLIC
   std::shared_ptr<const rcl_client_t>
   get_client_handle() const;
 
-  /// Return if the service is ready.
-  /**
-   * \return `true` if the service is ready, `false` otherwise
-   */
   RCLCPP_PUBLIC
   bool
   service_is_ready() const;
 
-  /// Wait for a service to be ready.
-  /**
-   * \param timeout maximum time to wait
-   * \return `true` if the service is ready and the timeout is not over, `false` otherwise
-   */
   template<typename RepT = int64_t, typename RatioT = std::milli>
   bool
   wait_for_service(
@@ -135,20 +92,6 @@ public:
   virtual std::shared_ptr<rmw_request_id_t> create_request_header() = 0;
   virtual void handle_response(
     std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<void> response) = 0;
-
-  /// Exchange the "in use by wait set" state for this client.
-  /**
-   * This is used to ensure this client is not used by multiple
-   * wait sets at the same time.
-   *
-   * \param[in] in_use_state the new state to exchange into the state, true
-   *   indicates it is now in use by a wait set, and false is that it is no
-   *   longer in use by a wait set.
-   * \returns the previous state.
-   */
-  RCLCPP_PUBLIC
-  bool
-  exchange_in_use_by_wait_set_state(bool in_use_state);
 
 protected:
   RCLCPP_DISABLE_COPY(ClientBase)
@@ -170,8 +113,6 @@ protected:
   std::shared_ptr<rclcpp::Context> context_;
 
   std::shared_ptr<rcl_client_t> client_handle_;
-
-  std::atomic<bool> in_use_by_wait_set_{false};
 };
 
 template<typename ServiceT>
@@ -195,17 +136,6 @@ public:
 
   RCLCPP_SMART_PTR_DEFINITIONS(Client)
 
-  /// Default constructor.
-  /**
-   * The constructor for a Client is almost never called directly.
-   * Instead, clients should be instantiated through the function
-   * rclcpp::create_client().
-   *
-   * \param[in] node_base NodeBaseInterface pointer that is used in part of the setup.
-   * \param[in] node_graph The node graph interface of the corresponding node.
-   * \param[in] service_name Name of the topic to publish to.
-   * \param[in] client_options options for the subscription.
-   */
   Client(
     rclcpp::node_interfaces::NodeBaseInterface * node_base,
     rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph,
@@ -241,39 +171,12 @@ public:
   {
   }
 
-  /// Take the next response for this client.
-  /**
-   * \sa ClientBase::take_type_erased_response().
-   *
-   * \param[out] response_out The reference to a Service Response into
-   *   which the middleware will copy the response being taken.
-   * \param[out] request_header_out The request header to be filled by the
-   *   middleware when taking, and which can be used to associte the response
-   *   to a specific request.
-   * \returns true if the response was taken, otherwise false.
-   * \throws rclcpp::exceptions::RCLError based exceptions if the underlying
-   *   rcl function fail.
-   */
-  bool
-  take_response(typename ServiceT::Response & response_out, rmw_request_id_t & request_header_out)
-  {
-    return this->take_type_erased_response(&response_out, request_header_out);
-  }
-
-  /// Create a shared pointer with the response type
-  /**
-   * \return shared pointer with the response type
-   */
   std::shared_ptr<void>
   create_response() override
   {
     return std::shared_ptr<void>(new typename ServiceT::Response());
   }
 
-  /// Create a shared pointer with a rmw_request_id_t
-  /**
-   * \return shared pointer with a rmw_request_id_t
-   */
   std::shared_ptr<rmw_request_id_t>
   create_request_header() override
   {
@@ -282,11 +185,6 @@ public:
     return std::shared_ptr<rmw_request_id_t>(new rmw_request_id_t);
   }
 
-  /// Handle a server response
-  /**
-    * \param[in] request_header used to check if the secuence number is valid
-    * \param[in] response message with the server response
-   */
   void
   handle_response(
     std::shared_ptr<rmw_request_id_t> request_header,
@@ -361,8 +259,7 @@ public:
     SharedPromiseWithRequest promise = std::make_shared<PromiseWithRequest>();
     SharedFutureWithRequest future_with_request(promise->get_future());
 
-    auto wrapping_cb = [future_with_request, promise, request,
-        cb = std::forward<CallbackWithRequestType>(cb)](SharedFuture future) {
+    auto wrapping_cb = [future_with_request, promise, request, &cb](SharedFuture future) {
         auto response = future.get();
         promise->set_value(std::make_pair(request, response));
         cb(future_with_request);

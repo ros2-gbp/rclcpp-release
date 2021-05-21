@@ -19,6 +19,7 @@
 
 #include "rclcpp/logger.hpp"
 #include "rclcpp/macros.hpp"
+#include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp

@@ -22,17 +22,13 @@
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/scope_exit.hpp"
 
-using rclcpp::detail::MutexTwoPriorities;
 using rclcpp::executors::MultiThreadedExecutor;
 
 MultiThreadedExecutor::MultiThreadedExecutor(
-  const rclcpp::ExecutorOptions & options,
+  const rclcpp::executor::ExecutorArgs & args,
   size_t number_of_threads,
-  bool yield_before_execute,
-  std::chrono::nanoseconds next_exec_timeout)
-: rclcpp::Executor(options),
-  yield_before_execute_(yield_before_execute),
-  next_exec_timeout_(next_exec_timeout)
+  bool yield_before_execute)
+: executor::Executor(args), yield_before_execute_(yield_before_execute)
 {
   number_of_threads_ = number_of_threads ? number_of_threads : std::thread::hardware_concurrency();
   if (number_of_threads_ == 0) {
@@ -52,8 +48,7 @@ MultiThreadedExecutor::spin()
   std::vector<std::thread> threads;
   size_t thread_id = 0;
   {
-    auto low_priority_wait_mutex = wait_mutex_.get_low_priority_lockable();
-    std::lock_guard<MutexTwoPriorities::LowPriorityLockable> wait_lock(low_priority_wait_mutex);
+    std::lock_guard<std::mutex> wait_lock(wait_mutex_);
     for (; thread_id < number_of_threads_ - 1; ++thread_id) {
       auto func = std::bind(&MultiThreadedExecutor::run, this, thread_id);
       threads.emplace_back(func);
@@ -76,14 +71,13 @@ void
 MultiThreadedExecutor::run(size_t)
 {
   while (rclcpp::ok(this->context_) && spinning.load()) {
-    rclcpp::AnyExecutable any_exec;
+    executor::AnyExecutable any_exec;
     {
-      auto low_priority_wait_mutex = wait_mutex_.get_low_priority_lockable();
-      std::lock_guard<MutexTwoPriorities::LowPriorityLockable> wait_lock(low_priority_wait_mutex);
+      std::lock_guard<std::mutex> wait_lock(wait_mutex_);
       if (!rclcpp::ok(this->context_) || !spinning.load()) {
         return;
       }
-      if (!get_next_executable(any_exec, next_exec_timeout_)) {
+      if (!get_next_executable(any_exec)) {
         continue;
       }
       if (any_exec.timer) {
@@ -106,8 +100,7 @@ MultiThreadedExecutor::run(size_t)
     execute_any_executable(any_exec);
 
     if (any_exec.timer) {
-      auto high_priority_wait_mutex = wait_mutex_.get_high_priority_lockable();
-      std::lock_guard<MutexTwoPriorities::HighPriorityLockable> wait_lock(high_priority_wait_mutex);
+      std::lock_guard<std::mutex> wait_lock(wait_mutex_);
       auto it = scheduled_timers_.find(any_exec.timer);
       if (it != scheduled_timers_.end()) {
         scheduled_timers_.erase(it);

@@ -19,7 +19,6 @@
 #include <rmw/rmw.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
@@ -34,18 +33,15 @@
 #include "rcl/publisher.h"
 #include "rcl/subscription.h"
 
+#include "rcl_interfaces/msg/intra_process_message.hpp"
+
 #include "rclcpp/contexts/default_context.hpp"
-#include "rclcpp/create_client.hpp"
-#include "rclcpp/create_generic_publisher.hpp"
-#include "rclcpp/create_generic_subscription.hpp"
 #include "rclcpp/create_publisher.hpp"
 #include "rclcpp/create_service.hpp"
 #include "rclcpp/create_subscription.hpp"
-#include "rclcpp/create_timer.hpp"
-#include "rclcpp/detail/resolve_enable_topic_statistics.hpp"
+#include "rclcpp/intra_process_manager.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/qos.hpp"
-#include "rclcpp/timer.hpp"
 #include "rclcpp/type_support_decl.hpp"
 #include "rclcpp/visibility_control.hpp"
 
@@ -82,20 +78,48 @@ Node::create_publisher(
     options);
 }
 
+template<typename MessageT, typename AllocatorT, typename PublisherT>
+std::shared_ptr<PublisherT>
+Node::create_publisher(
+  const std::string & topic_name,
+  size_t qos_history_depth,
+  std::shared_ptr<AllocatorT> allocator)
+{
+  PublisherOptionsWithAllocator<AllocatorT> pub_options;
+  pub_options.allocator = allocator;
+  return this->create_publisher<MessageT, AllocatorT, PublisherT>(
+    topic_name, rclcpp::QoS(rclcpp::KeepLast(qos_history_depth)), pub_options);
+}
+
+template<typename MessageT, typename AllocatorT, typename PublisherT>
+std::shared_ptr<PublisherT>
+Node::create_publisher(
+  const std::string & topic_name,
+  const rmw_qos_profile_t & qos_profile,
+  std::shared_ptr<AllocatorT> allocator)
+{
+  rclcpp::QoS qos(rclcpp::QoSInitialization::from_rmw(qos_profile));
+  qos.get_rmw_qos_profile() = qos_profile;
+
+  PublisherOptionsWithAllocator<AllocatorT> pub_options;
+  pub_options.allocator = allocator;
+  return this->create_publisher<MessageT, AllocatorT, PublisherT>(topic_name, qos, pub_options);
+}
+
 template<
   typename MessageT,
   typename CallbackT,
   typename AllocatorT,
-  typename CallbackMessageT,
-  typename SubscriptionT,
-  typename MessageMemoryStrategyT>
+  typename SubscriptionT>
 std::shared_ptr<SubscriptionT>
 Node::create_subscription(
   const std::string & topic_name,
   const rclcpp::QoS & qos,
   CallbackT && callback,
   const SubscriptionOptionsWithAllocator<AllocatorT> & options,
-  typename MessageMemoryStrategyT::SharedPtr msg_mem_strat)
+  typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, AllocatorT>::SharedPtr
+  msg_mem_strat)
 {
   return rclcpp::create_subscription<MessageT>(
     *this,
@@ -106,19 +130,78 @@ Node::create_subscription(
     msg_mem_strat);
 }
 
+template<
+  typename MessageT,
+  typename CallbackT,
+  typename Alloc,
+  typename SubscriptionT>
+std::shared_ptr<SubscriptionT>
+Node::create_subscription(
+  const std::string & topic_name,
+  CallbackT && callback,
+  const rmw_qos_profile_t & qos_profile,
+  rclcpp::callback_group::CallbackGroup::SharedPtr group,
+  bool ignore_local_publications,
+  typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
+  msg_mem_strat,
+  std::shared_ptr<Alloc> allocator)
+{
+  rclcpp::QoS qos(rclcpp::QoSInitialization::from_rmw(qos_profile));
+  qos.get_rmw_qos_profile() = qos_profile;
+
+  SubscriptionOptionsWithAllocator<Alloc> sub_options;
+  sub_options.callback_group = group;
+  sub_options.ignore_local_publications = ignore_local_publications;
+  sub_options.allocator = allocator;
+
+  return this->create_subscription<MessageT, CallbackT, Alloc, SubscriptionT>(
+    topic_name, qos, std::forward<CallbackT>(callback), sub_options, msg_mem_strat);
+}
+
+template<
+  typename MessageT,
+  typename CallbackT,
+  typename Alloc,
+  typename SubscriptionT>
+std::shared_ptr<SubscriptionT>
+Node::create_subscription(
+  const std::string & topic_name,
+  CallbackT && callback,
+  size_t qos_history_depth,
+  rclcpp::callback_group::CallbackGroup::SharedPtr group,
+  bool ignore_local_publications,
+  typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
+  msg_mem_strat,
+  std::shared_ptr<Alloc> allocator)
+{
+  SubscriptionOptionsWithAllocator<Alloc> sub_options;
+  sub_options.callback_group = group;
+  sub_options.ignore_local_publications = ignore_local_publications;
+  sub_options.allocator = allocator;
+
+  return this->create_subscription<MessageT, CallbackT, Alloc, SubscriptionT>(
+    topic_name,
+    rclcpp::QoS(rclcpp::KeepLast(qos_history_depth)),
+    std::forward<CallbackT>(callback),
+    sub_options,
+    msg_mem_strat);
+}
+
 template<typename DurationRepT, typename DurationT, typename CallbackT>
 typename rclcpp::WallTimer<CallbackT>::SharedPtr
 Node::create_wall_timer(
   std::chrono::duration<DurationRepT, DurationT> period,
   CallbackT callback,
-  rclcpp::CallbackGroup::SharedPtr group)
+  rclcpp::callback_group::CallbackGroup::SharedPtr group)
 {
-  return rclcpp::create_wall_timer(
-    period,
+  auto timer = rclcpp::WallTimer<CallbackT>::make_shared(
+    std::chrono::duration_cast<std::chrono::nanoseconds>(period),
     std::move(callback),
-    group,
-    this->node_base_.get(),
-    this->node_timers_.get());
+    this->node_base_->get_context());
+  node_timers_->add_timer(timer, group);
+  return timer;
 }
 
 template<typename ServiceT>
@@ -126,15 +209,23 @@ typename Client<ServiceT>::SharedPtr
 Node::create_client(
   const std::string & service_name,
   const rmw_qos_profile_t & qos_profile,
-  rclcpp::CallbackGroup::SharedPtr group)
+  rclcpp::callback_group::CallbackGroup::SharedPtr group)
 {
-  return rclcpp::create_client<ServiceT>(
-    node_base_,
+  rcl_client_options_t options = rcl_client_get_default_options();
+  options.qos = qos_profile;
+
+  using rclcpp::Client;
+  using rclcpp::ClientBase;
+
+  auto cli = Client<ServiceT>::make_shared(
+    node_base_.get(),
     node_graph_,
-    node_services_,
     extend_name_with_sub_namespace(service_name, this->get_sub_namespace()),
-    qos_profile,
-    group);
+    options);
+
+  auto cli_base_ptr = std::dynamic_pointer_cast<ClientBase>(cli);
+  node_services_->add_client(cli_base_ptr, group);
+  return cli;
 }
 
 template<typename ServiceT, typename CallbackT>
@@ -143,7 +234,7 @@ Node::create_service(
   const std::string & service_name,
   CallbackT && callback,
   const rmw_qos_profile_t & qos_profile,
-  rclcpp::CallbackGroup::SharedPtr group)
+  rclcpp::callback_group::CallbackGroup::SharedPtr group)
 {
   return rclcpp::create_service<ServiceT, CallbackT>(
     node_base_,
@@ -154,78 +245,17 @@ Node::create_service(
     group);
 }
 
-template<typename AllocatorT>
-std::shared_ptr<rclcpp::GenericPublisher>
-Node::create_generic_publisher(
-  const std::string & topic_name,
-  const std::string & topic_type,
-  const rclcpp::QoS & qos,
-  const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options)
-{
-  return rclcpp::create_generic_publisher(
-    node_topics_,
-    extend_name_with_sub_namespace(topic_name, this->get_sub_namespace()),
-    topic_type,
-    qos,
-    options
-  );
-}
-
-template<typename AllocatorT>
-std::shared_ptr<rclcpp::GenericSubscription>
-Node::create_generic_subscription(
-  const std::string & topic_name,
-  const std::string & topic_type,
-  const rclcpp::QoS & qos,
-  std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
-  const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
-{
-  return rclcpp::create_generic_subscription(
-    node_topics_,
-    extend_name_with_sub_namespace(topic_name, this->get_sub_namespace()),
-    topic_type,
-    qos,
-    std::move(callback),
-    options
-  );
-}
-
-
 template<typename ParameterT>
 auto
 Node::declare_parameter(
   const std::string & name,
   const ParameterT & default_value,
-  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
-  bool ignore_override)
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor)
 {
-  try {
-    return this->declare_parameter(
-      name,
-      rclcpp::ParameterValue(default_value),
-      parameter_descriptor,
-      ignore_override
-    ).get<ParameterT>();
-  } catch (const ParameterTypeException & ex) {
-    throw exceptions::InvalidParameterTypeException(name, ex.what());
-  }
-}
-
-template<typename ParameterT>
-auto
-Node::declare_parameter(
-  const std::string & name,
-  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
-  bool ignore_override)
-{
-  // get advantage of parameter value template magic to get
-  // the correct rclcpp::ParameterType from ParameterT
-  rclcpp::ParameterValue value{ParameterT{}};
   return this->declare_parameter(
     name,
-    value.get_type(),
-    parameter_descriptor,
-    ignore_override
+    rclcpp::ParameterValue(default_value),
+    parameter_descriptor
   ).get<ParameterT>();
 }
 
@@ -233,19 +263,14 @@ template<typename ParameterT>
 std::vector<ParameterT>
 Node::declare_parameters(
   const std::string & namespace_,
-  const std::map<std::string, ParameterT> & parameters,
-  bool ignore_overrides)
+  const std::map<std::string, ParameterT> & parameters)
 {
   std::vector<ParameterT> result;
   std::string normalized_namespace = namespace_.empty() ? "" : (namespace_ + ".");
   std::transform(
     parameters.begin(), parameters.end(), std::back_inserter(result),
-    [this, &normalized_namespace, ignore_overrides](auto element) {
-      return this->declare_parameter(
-        normalized_namespace + element.first,
-        element.second,
-        rcl_interfaces::msg::ParameterDescriptor(),
-        ignore_overrides);
+    [this, &normalized_namespace](auto element) {
+      return this->declare_parameter(normalized_namespace + element.first, element.second);
     }
   );
   return result;
@@ -258,24 +283,60 @@ Node::declare_parameters(
   const std::map<
     std::string,
     std::pair<ParameterT, rcl_interfaces::msg::ParameterDescriptor>
-  > & parameters,
-  bool ignore_overrides)
+  > & parameters)
 {
   std::vector<ParameterT> result;
   std::string normalized_namespace = namespace_.empty() ? "" : (namespace_ + ".");
   std::transform(
     parameters.begin(), parameters.end(), std::back_inserter(result),
-    [this, &normalized_namespace, ignore_overrides](auto element) {
+    [this, &normalized_namespace](auto element) {
       return static_cast<ParameterT>(
         this->declare_parameter(
           normalized_namespace + element.first,
           element.second.first,
-          element.second.second,
-          ignore_overrides)
+          element.second.second)
       );
     }
   );
   return result;
+}
+
+template<typename ParameterT>
+void
+Node::set_parameter_if_not_set(
+  const std::string & name,
+  const ParameterT & value)
+{
+  if (
+    !this->has_parameter(name) ||
+    this->describe_parameter(name).type == PARAMETER_NOT_SET)
+  {
+    this->set_parameter(rclcpp::Parameter(name, value));
+  }
+}
+
+// this is a partially-specialized version of set_parameter_if_not_set above,
+// where our concrete type for ParameterT is std::map, but the to-be-determined
+// type is the value in the map.
+template<typename ParameterT>
+void
+Node::set_parameters_if_not_set(
+  const std::string & name,
+  const std::map<std::string, ParameterT> & values)
+{
+  std::vector<rclcpp::Parameter> params;
+
+  for (const auto & val : values) {
+    std::string parameter_name = name + "." + val.first;
+    if (
+      !this->has_parameter(parameter_name) ||
+      this->describe_parameter(parameter_name).type == PARAMETER_NOT_SET)
+    {
+      params.push_back(rclcpp::Parameter(parameter_name, val.second));
+    }
+  }
+
+  this->set_parameters(params);
 }
 
 template<typename ParameterT>
@@ -328,6 +389,31 @@ Node::get_parameters(
   }
 
   return result;
+}
+
+template<typename ParameterT>
+void
+Node::get_parameter_or_set(
+  const std::string & name,
+  ParameterT & value,
+  const ParameterT & alternative_value)
+{
+  std::string sub_name = extend_name_with_sub_namespace(name, this->get_sub_namespace());
+
+  bool got_parameter = get_parameter(sub_name, value);
+  if (!got_parameter) {
+    this->set_parameters({
+        rclcpp::Parameter(sub_name, alternative_value),
+      });
+    value = alternative_value;
+  }
+}
+
+template<typename CallbackT>
+void
+Node::register_param_change_callback(CallbackT && callback)
+{
+  this->node_parameters_->register_param_change_callback(std::forward<CallbackT>(callback));
 }
 
 }  // namespace rclcpp

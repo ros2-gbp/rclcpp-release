@@ -18,8 +18,6 @@
 #include <memory>
 
 #include "rclcpp/function_traits.hpp"
-#include "rclcpp/serialized_message.hpp"
-#include "rclcpp/subscription_options.hpp"
 #include "rcl/types.h"
 
 namespace rclcpp
@@ -43,11 +41,11 @@ struct is_serialized_subscription_argument : std::false_type
 {};
 
 template<>
-struct is_serialized_subscription_argument<SerializedMessage>: std::true_type
+struct is_serialized_subscription_argument<rcl_serialized_message_t>: std::true_type
 {};
 
 template<>
-struct is_serialized_subscription_argument<std::shared_ptr<SerializedMessage>>
+struct is_serialized_subscription_argument<std::shared_ptr<rcl_serialized_message_t>>
   : std::true_type
 {};
 
@@ -64,7 +62,7 @@ struct is_serialized_callback
 template<typename MessageT>
 struct extract_message_type
 {
-  using type = typename std::remove_cv_t<std::remove_reference_t<MessageT>>;
+  using type = typename std::remove_cv<MessageT>::type;
 };
 
 template<typename MessageT>
@@ -77,7 +75,6 @@ struct extract_message_type<std::unique_ptr<MessageT, Deleter>>: extract_message
 
 template<
   typename CallbackT,
-  typename AllocatorT = std::allocator<void>,
   // Do not attempt if CallbackT is an integer (mistaken for depth)
   typename = std::enable_if_t<!std::is_integral<
     std::remove_cv_t<std::remove_reference_t<CallbackT>>>::value>,
@@ -88,10 +85,6 @@ template<
   // Do not attempt if CallbackT is a rmw_qos_profile_t (mistaken for qos profile)
   typename = std::enable_if_t<!std::is_same<
     rmw_qos_profile_t,
-    std::remove_cv_t<std::remove_reference_t<CallbackT>>>::value>,
-  // Do not attempt if CallbackT is a rclcpp::SubscriptionOptionsWithAllocator
-  typename = std::enable_if_t<!std::is_same<
-    rclcpp::SubscriptionOptionsWithAllocator<AllocatorT>,
     std::remove_cv_t<std::remove_reference_t<CallbackT>>>::value>
 >
 struct has_message_type : extract_message_type<

@@ -21,7 +21,6 @@
 #include "rcl_lifecycle/rcl_lifecycle.h"
 
 #include "rclcpp/exceptions.hpp"
-#include "rclcpp/logging.hpp"
 
 #include "rcutils/allocator.h"
 
@@ -247,7 +246,7 @@ Transition::goal_state() const
 }
 
 void
-Transition::reset() noexcept
+Transition::reset()
 {
   // can't free anything which is not owned
   if (!owns_rcl_transition_handle_) {
@@ -262,9 +261,7 @@ Transition::reset() noexcept
   allocator_.deallocate(transition_handle_, allocator_.state);
   transition_handle_ = nullptr;
   if (ret != RCL_RET_OK) {
-    RCLCPP_ERROR(
-      rclcpp::get_logger("rclcpp_lifecycle"),
-      "rcl_lifecycle_transition_fini did not complete successfully, leaking memory");
+    rclcpp::exceptions::throw_from_rcl_error(ret);
   }
 }
 }  // namespace rclcpp_lifecycle

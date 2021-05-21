@@ -48,8 +48,7 @@
  *   - rclcpp::Node::get_parameter()
  *   - rclcpp::Node::describe_parameters()
  *   - rclcpp::Node::list_parameters()
- *   - rclcpp::Node::add_on_set_parameters_callback()
- *   - rclcpp::Node::remove_on_set_parameters_callback()
+ *   - rclcpp::Node::register_param_change_callback()
  *   - rclcpp::Parameter
  *   - rclcpp::ParameterValue
  *   - rclcpp::AsyncParametersClient
@@ -81,7 +80,7 @@
  *   - rclcpp/executors/multi_threaded_executor.hpp
  * - CallbackGroups (mechanism for enforcing concurrency rules for callbacks):
  *   - rclcpp::Node::create_callback_group()
- *   - rclcpp::CallbackGroup
+ *   - rclcpp::callback_group::CallbackGroup
  *   - rclcpp/callback_group.hpp
  *
  * Additionally, there are some methods for introspecting the ROS graph:
@@ -117,15 +116,6 @@
  * - Allocator related items:
  *   - rclcpp/allocator/allocator_common.hpp
  *   - rclcpp/allocator/allocator_deleter.hpp
- * - Generic publisher
- *   - rclcpp::Node::create_generic_publisher()
- *   - rclcpp::GenericPublisher
- *   - rclcpp::GenericPublisher::publish()
- *   - rclcpp/generic_publisher.hpp
- * - Generic subscription
- *   - rclcpp::Node::create_generic_subscription()
- *   - rclcpp::GenericSubscription
- *   - rclcpp/generic_subscription.hpp
  * - Memory management tools:
  *   - rclcpp/memory_strategies.hpp
  *   - rclcpp/memory_strategy.hpp
@@ -137,13 +127,11 @@
  *   - rclcpp/context.hpp
  *   - rclcpp/contexts/default_context.hpp
  * - Various utilities:
- *   - rclcpp/duration.hpp
  *   - rclcpp/function_traits.hpp
  *   - rclcpp/macros.hpp
  *   - rclcpp/scope_exit.hpp
  *   - rclcpp/time.hpp
  *   - rclcpp/utilities.hpp
- *   - rclcpp/typesupport_helpers.hpp
  *   - rclcpp/visibility_control.hpp
  */
 
@@ -154,18 +142,15 @@
 #include <memory>
 
 #include "rclcpp/executors.hpp"
-#include "rclcpp/guard_condition.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/node.hpp"
-#include "rclcpp/parameter_client.hpp"
-#include "rclcpp/parameter_event_handler.hpp"
 #include "rclcpp/parameter.hpp"
+#include "rclcpp/parameter_client.hpp"
 #include "rclcpp/parameter_service.hpp"
 #include "rclcpp/rate.hpp"
 #include "rclcpp/time.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/visibility_control.hpp"
 #include "rclcpp/waitable.hpp"
-#include "rclcpp/wait_set.hpp"
 
 #endif  // RCLCPP__RCLCPP_HPP_

@@ -55,6 +55,7 @@ private:
   rclcpp::Node node_;
 };
 
+
 }  // namespace test_rclcpp_components
 
 #include "rclcpp_components/register_node_macro.hpp"

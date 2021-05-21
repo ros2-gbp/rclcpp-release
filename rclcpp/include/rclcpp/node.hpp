@@ -17,7 +17,6 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <functional>
 #include <list>
 #include <map>
 #include <memory>
@@ -26,8 +25,6 @@
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include "rcutils/macros.h"
 
 #include "rcl/error_handling.h"
 #include "rcl/node.h"
@@ -42,8 +39,6 @@
 #include "rclcpp/clock.hpp"
 #include "rclcpp/context.hpp"
 #include "rclcpp/event.hpp"
-#include "rclcpp/generic_publisher.hpp"
-#include "rclcpp/generic_subscription.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/message_memory_strategy.hpp"
@@ -83,7 +78,6 @@ public:
   /**
    * \param[in] node_name Name of the node.
    * \param[in] options Additional options to control creation of the node.
-   * \throws InvalidNamespaceError if the namespace is invalid
    */
   RCLCPP_PUBLIC
   explicit Node(
@@ -95,7 +89,6 @@ public:
    * \param[in] node_name Name of the node.
    * \param[in] namespace_ Namespace of the node.
    * \param[in] options Additional options to control creation of the node.
-   * \throws InvalidNamespaceError if the namespace is invalid
    */
   RCLCPP_PUBLIC
   explicit Node(
@@ -129,7 +122,6 @@ public:
   /// Get the fully-qualified name of the node.
   /**
    * The fully-qualified name includes the local namespace and name of the node.
-   * \return fully-qualified name of the node.
    */
   RCLCPP_PUBLIC
   const char *
@@ -143,14 +135,12 @@ public:
 
   /// Create and return a callback group.
   RCLCPP_PUBLIC
-  rclcpp::CallbackGroup::SharedPtr
-  create_callback_group(
-    rclcpp::CallbackGroupType group_type,
-    bool automatically_add_to_executor_with_node = true);
+  rclcpp::callback_group::CallbackGroup::SharedPtr
+  create_callback_group(rclcpp::callback_group::CallbackGroupType group_type);
 
   /// Return the list of callback groups in the node.
   RCLCPP_PUBLIC
-  const std::vector<rclcpp::CallbackGroup::WeakPtr> &
+  const std::vector<rclcpp::callback_group::CallbackGroup::WeakPtr> &
   get_callback_groups() const;
 
   /// Create and return a Publisher.
@@ -161,17 +151,15 @@ public:
    *
    * For example, all of these cases will work:
    *
-   * ```cpp
-   * pub = node->create_publisher<MsgT>("chatter", 10);  // implicitly KeepLast
-   * pub = node->create_publisher<MsgT>("chatter", QoS(10));  // implicitly KeepLast
-   * pub = node->create_publisher<MsgT>("chatter", QoS(KeepLast(10)));
-   * pub = node->create_publisher<MsgT>("chatter", QoS(KeepAll()));
-   * pub = node->create_publisher<MsgT>("chatter", QoS(1).best_effort().durability_volatile());
-   * {
-   *   rclcpp::QoS custom_qos(KeepLast(10), rmw_qos_profile_sensor_data);
-   *   pub = node->create_publisher<MsgT>("chatter", custom_qos);
-   * }
-   * ```
+   *   pub = node->create_publisher<MsgT>("chatter", 10);  // implicitly KeepLast
+   *   pub = node->create_publisher<MsgT>("chatter", QoS(10));  // implicitly KeepLast
+   *   pub = node->create_publisher<MsgT>("chatter", QoS(KeepLast(10)));
+   *   pub = node->create_publisher<MsgT>("chatter", QoS(KeepAll()));
+   *   pub = node->create_publisher<MsgT>("chatter", QoS(1).best_effort().durability_volatile());
+   *   {
+   *     rclcpp::QoS custom_qos(KeepLast(10), rmw_qos_profile_sensor_data);
+   *     pub = node->create_publisher<MsgT>("chatter", custom_qos);
+   *   }
    *
    * The publisher options may optionally be passed as the third argument for
    * any of the above cases.
@@ -184,7 +172,7 @@ public:
   template<
     typename MessageT,
     typename AllocatorT = std::allocator<void>,
-    typename PublisherT = rclcpp::Publisher<MessageT, AllocatorT>>
+    typename PublisherT = ::rclcpp::Publisher<MessageT, AllocatorT>>
   std::shared_ptr<PublisherT>
   create_publisher(
     const std::string & topic_name,
@@ -193,27 +181,63 @@ public:
     PublisherOptionsWithAllocator<AllocatorT>()
   );
 
+  /// Create and return a Publisher.
+  /**
+   * \param[in] topic_name The topic for this publisher to publish on.
+   * \param[in] qos_history_depth The depth of the publisher message queue.
+   * \param[in] allocator Custom allocator.
+   * \return Shared pointer to the created publisher.
+   */
+  template<
+    typename MessageT,
+    typename AllocatorT = std::allocator<void>,
+    typename PublisherT = ::rclcpp::Publisher<MessageT, AllocatorT>>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated("use create_publisher(const std::string &, const rclcpp::QoS &, ...) instead")]]
+  std::shared_ptr<PublisherT>
+  create_publisher(
+    const std::string & topic_name,
+    size_t qos_history_depth,
+    std::shared_ptr<AllocatorT> allocator);
+
+  /// Create and return a Publisher.
+  /**
+   * \param[in] topic_name The topic for this publisher to publish on.
+   * \param[in] qos_profile The quality of service profile to pass on to the rmw implementation.
+   * \param[in] allocator Optional custom allocator.
+   * \return Shared pointer to the created publisher.
+   */
+  template<
+    typename MessageT,
+    typename AllocatorT = std::allocator<void>,
+    typename PublisherT = ::rclcpp::Publisher<MessageT, AllocatorT>>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated("use create_publisher(const std::string &, const rclcpp::QoS &, ...) instead")]]
+  std::shared_ptr<PublisherT>
+  create_publisher(
+    const std::string & topic_name,
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_default,
+    std::shared_ptr<AllocatorT> allocator = nullptr);
+
   /// Create and return a Subscription.
   /**
    * \param[in] topic_name The topic to subscribe on.
-   * \param[in] qos QoS profile for Subcription.
    * \param[in] callback The user-defined callback function to receive a message
+   * \param[in] qos_history_depth The depth of the subscription's incoming message queue.
    * \param[in] options Additional options for the creation of the Subscription.
    * \param[in] msg_mem_strat The message memory strategy to use for allocating messages.
    * \return Shared pointer to the created subscription.
+   */
+  /* TODO(jacquelinekay):
+     Windows build breaks when static member function passed as default
+     argument to msg_mem_strat, nullptr is a workaround.
    */
   template<
     typename MessageT,
     typename CallbackT,
     typename AllocatorT = std::allocator<void>,
-    typename CallbackMessageT =
-    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type,
-    typename SubscriptionT = rclcpp::Subscription<CallbackMessageT, AllocatorT>,
-    typename MessageMemoryStrategyT = rclcpp::message_memory_strategy::MessageMemoryStrategy<
-      CallbackMessageT,
-      AllocatorT
-    >
-  >
+    typename SubscriptionT = rclcpp::Subscription<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, AllocatorT>>
   std::shared_ptr<SubscriptionT>
   create_subscription(
     const std::string & topic_name,
@@ -221,10 +245,84 @@ public:
     CallbackT && callback,
     const SubscriptionOptionsWithAllocator<AllocatorT> & options =
     SubscriptionOptionsWithAllocator<AllocatorT>(),
-    typename MessageMemoryStrategyT::SharedPtr msg_mem_strat = (
-      MessageMemoryStrategyT::create_default()
-    )
-  );
+    typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, AllocatorT
+    >::SharedPtr
+    msg_mem_strat = nullptr);
+
+  /// Create and return a Subscription.
+  /**
+   * \param[in] topic_name The topic to subscribe on.
+   * \param[in] callback The user-defined callback function.
+   * \param[in] qos_profile The quality of service profile to pass on to the rmw implementation.
+   * \param[in] group The callback group for this subscription. NULL for no callback group.
+   * \param[in] ignore_local_publications True to ignore local publications.
+   * \param[in] msg_mem_strat The message memory strategy to use for allocating messages.
+   * \param[in] allocator Optional custom allocator.
+   * \return Shared pointer to the created subscription.
+   */
+  /* TODO(jacquelinekay):
+     Windows build breaks when static member function passed as default
+     argument to msg_mem_strat, nullptr is a workaround.
+   */
+  template<
+    typename MessageT,
+    typename CallbackT,
+    typename Alloc = std::allocator<void>,
+    typename SubscriptionT = rclcpp::Subscription<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated(
+    "use create_subscription(const std::string &, const rclcpp::QoS &, CallbackT, ...) instead"
+  )]]
+  std::shared_ptr<SubscriptionT>
+  create_subscription(
+    const std::string & topic_name,
+    CallbackT && callback,
+    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_default,
+    rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr,
+    bool ignore_local_publications = false,
+    typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
+    msg_mem_strat = nullptr,
+    std::shared_ptr<Alloc> allocator = nullptr);
+
+  /// Create and return a Subscription.
+  /**
+   * \param[in] topic_name The topic to subscribe on.
+   * \param[in] qos_history_depth The depth of the subscription's incoming message queue.
+   * \param[in] callback The user-defined callback function.
+   * \param[in] group The callback group for this subscription. NULL for no callback group.
+   * \param[in] ignore_local_publications True to ignore local publications.
+   * \param[in] msg_mem_strat The message memory strategy to use for allocating messages.
+   * \param[in] allocator Optional custom allocator.
+   * \return Shared pointer to the created subscription.
+   */
+  /* TODO(jacquelinekay):
+     Windows build breaks when static member function passed as default
+     argument to msg_mem_strat, nullptr is a workaround.
+   */
+  template<
+    typename MessageT,
+    typename CallbackT,
+    typename Alloc = std::allocator<void>,
+    typename SubscriptionT = rclcpp::Subscription<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated(
+    "use create_subscription(const std::string &, const rclcpp::QoS &, CallbackT, ...) instead"
+  )]]
+  std::shared_ptr<SubscriptionT>
+  create_subscription(
+    const std::string & topic_name,
+    CallbackT && callback,
+    size_t qos_history_depth,
+    rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr,
+    bool ignore_local_publications = false,
+    typename rclcpp::message_memory_strategy::MessageMemoryStrategy<
+      typename rclcpp::subscription_traits::has_message_type<CallbackT>::type, Alloc>::SharedPtr
+    msg_mem_strat = nullptr,
+    std::shared_ptr<Alloc> allocator = nullptr);
 
   /// Create a timer.
   /**
@@ -237,7 +335,7 @@ public:
   create_wall_timer(
     std::chrono::duration<DurationRepT, DurationT> period,
     CallbackT callback,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+    rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr);
 
   /// Create and return a Client.
   /**
@@ -251,7 +349,7 @@ public:
   create_client(
     const std::string & service_name,
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_services_default,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+    rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr);
 
   /// Create and return a Service.
   /**
@@ -267,56 +365,7 @@ public:
     const std::string & service_name,
     CallbackT && callback,
     const rmw_qos_profile_t & qos_profile = rmw_qos_profile_services_default,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
-
-  /// Create and return a GenericPublisher.
-  /**
-   * The returned pointer will never be empty, but this function can throw various exceptions, for
-   * instance when the message's package can not be found on the AMENT_PREFIX_PATH.
-   *
-   * \param[in] topic_name Topic name
-   * \param[in] topic_type Topic type
-   * \param[in] qos %QoS settings
-   * \param options %Publisher options.
-   * Not all publisher options are currently respected, the only relevant options for this
-   * publisher are `event_callbacks`, `use_default_callbacks`, and `%callback_group`.
-   * \return Shared pointer to the created generic publisher.
-   */
-  template<typename AllocatorT = std::allocator<void>>
-  std::shared_ptr<rclcpp::GenericPublisher> create_generic_publisher(
-    const std::string & topic_name,
-    const std::string & topic_type,
-    const rclcpp::QoS & qos,
-    const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options = (
-      rclcpp::PublisherOptionsWithAllocator<AllocatorT>()
-    )
-  );
-
-  /// Create and return a GenericSubscription.
-  /**
-   * The returned pointer will never be empty, but this function can throw various exceptions, for
-   * instance when the message's package can not be found on the AMENT_PREFIX_PATH.
-   *
-   * \param[in] topic_name Topic name
-   * \param[in] topic_type Topic type
-   * \param[in] qos %QoS settings
-   * \param[in] callback Callback for new messages of serialized form
-   * \param[in] options %Subscription options.
-   * Not all subscription options are currently respected, the only relevant options for this
- * subscription are `event_callbacks`, `use_default_callbacks`, `ignore_local_publications`, and
- * `%callback_group`.
-   * \return Shared pointer to the created generic subscription.
-   */
-  template<typename AllocatorT = std::allocator<void>>
-  std::shared_ptr<rclcpp::GenericSubscription> create_generic_subscription(
-    const std::string & topic_name,
-    const std::string & topic_type,
-    const rclcpp::QoS & qos,
-    std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
-    const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options = (
-      rclcpp::SubscriptionOptionsWithAllocator<AllocatorT>()
-    )
-  );
+    rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr);
 
   /// Declare and initialize a parameter, return the effective value.
   /**
@@ -333,10 +382,8 @@ public:
    * are ignored, and should be specified using the name argument to this
    * function and the default value's type instead.
    *
-   * If `ignore_override` is `true`, the parameter override will be ignored.
-   *
    * This method, if successful, will result in any callback registered with
-   * add_on_set_parameters_callback to be called.
+   * set_on_parameters_set_callback to be called.
    * If that callback prevents the initial value for the parameter from being
    * set then rclcpp::exceptions::InvalidParameterValueException is thrown.
    *
@@ -348,8 +395,6 @@ public:
    *   did not override it.
    * \param[in] parameter_descriptor An optional, custom description for
    *   the parameter.
-   * \param[in] ignore_override When `true`, the parameter override is ignored.
-   *    Default to `false`.
    * \return A const reference to the value of the parameter.
    * \throws rclcpp::exceptions::ParameterAlreadyDeclaredException if parameter
    *   has already been declared.
@@ -357,58 +402,14 @@ public:
    *   name is invalid.
    * \throws rclcpp::exceptions::InvalidParameterValueException if initial
    *   value fails to be set.
-   * \throws rclcpp::exceptions::InvalidParameterTypeException
-   *   if the type of the default value or override is wrong.
    */
   RCLCPP_PUBLIC
   const rclcpp::ParameterValue &
   declare_parameter(
     const std::string & name,
-    const rclcpp::ParameterValue & default_value,
+    const rclcpp::ParameterValue & default_value = rclcpp::ParameterValue(),
     const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor(),
-    bool ignore_override = false);
-
-  /// Declare and initialize a parameter, return the effective value.
-  /**
-   * Same as the previous one, but a default value is not provided and the user
-   * must provide a parameter override of the correct type.
-   *
-   * \param[in] name The name of the parameter.
-   * \param[in] type Desired type of the parameter, which will enforced at runtime.
-   * \param[in] parameter_descriptor An optional, custom description for
-   *   the parameter.
-   * \param[in] ignore_override When `true`, the parameter override is ignored.
-   *    Default to `false`.
-   * \return A const reference to the value of the parameter.
-   * \throws Same as the previous overload taking a default value.
-   * \throws rclcpp::exceptions::InvalidParameterTypeException
-   *   if an override is not provided or the provided override is of the wrong type.
-   */
-  RCLCPP_PUBLIC
-  const rclcpp::ParameterValue &
-  declare_parameter(
-    const std::string & name,
-    rclcpp::ParameterType type,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor{},
-    bool ignore_override = false);
-
-  /// Declare a parameter
-  [[deprecated(
-    "declare_parameter() with only a name is deprecated and will be deleted in the future.\n" \
-    "If you want to declare a parameter that won't change type without a default value use:\n" \
-    "`node->declare_parameter<ParameterT>(name)`, where e.g. ParameterT=int64_t.\n\n" \
-    "If you want to declare a parameter that can dynamically change type use:\n" \
-    "```\n" \
-    "rcl_interfaces::msg::ParameterDescriptor descriptor;\n" \
-    "descriptor.dynamic_typing = true;\n" \
-    "node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);\n" \
-    "```"
-  )]]
-  RCLCPP_PUBLIC
-  const rclcpp::ParameterValue &
-  declare_parameter(const std::string & name);
+    rcl_interfaces::msg::ParameterDescriptor());
 
   /// Declare and initialize a parameter with a type.
   /**
@@ -416,7 +417,7 @@ public:
    *
    * If the type of the default value, and therefore also the type of return
    * value, differs from the initial value provided in the node options, then
-   * a rclcpp::exceptions::InvalidParameterTypeException may be thrown.
+   * a rclcpp::ParameterTypeException may be thrown.
    * To avoid this, use the declare_parameter() method which returns an
    * rclcpp::ParameterValue instead.
    *
@@ -437,20 +438,7 @@ public:
     const std::string & name,
     const ParameterT & default_value,
     const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor(),
-    bool ignore_override = false);
-
-  /// Declare and initialize a parameter with a type.
-  /**
-   * See the non-templated declare_parameter() on this class for details.
-   */
-  template<typename ParameterT>
-  auto
-  declare_parameter(
-    const std::string & name,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor(),
-    bool ignore_override = false);
+    rcl_interfaces::msg::ParameterDescriptor());
 
   /// Declare and initialize several parameters with the same namespace and type.
   /**
@@ -465,22 +453,19 @@ public:
    * expanding "namespace.key".
    * This allows you to declare several parameters at once without a namespace.
    *
-   * The map contains default values for parameters.
-   * There is another overload which takes the std::pair with the default value
-   * and descriptor.
-   *
-   * If `ignore_overrides` is `true`, all the overrides of the parameters declared
-   * by the function call will be ignored.
+   * The map may either contain default values for parameters, or a std::pair
+   * where the first element is a default value and the second is a
+   * parameter descriptor.
+   * This function only takes the default value, but there is another overload
+   * which takes the std::pair with the default value and descriptor.
    *
    * This method, if successful, will result in any callback registered with
-   * add_on_set_parameters_callback to be called, once for each parameter.
+   * set_on_parameters_set_callback to be called, once for each parameter.
    * If that callback prevents the initial value for any parameter from being
    * set then rclcpp::exceptions::InvalidParameterValueException is thrown.
    *
    * \param[in] namespace_ The namespace in which to declare the parameters.
    * \param[in] parameters The parameters to set in the given namespace.
-   * \param[in] ignore_overrides When `true`, the parameters overrides are ignored.
-   *    Default to `false`.
    * \throws rclcpp::exceptions::ParameterAlreadyDeclaredException if parameter
    *   has already been declared.
    * \throws rclcpp::exceptions::InvalidParametersException if a parameter
@@ -492,8 +477,7 @@ public:
   std::vector<ParameterT>
   declare_parameters(
     const std::string & namespace_,
-    const std::map<std::string, ParameterT> & parameters,
-    bool ignore_overrides = false);
+    const std::map<std::string, ParameterT> & parameters);
 
   /// Declare and initialize several parameters with the same namespace and type.
   /**
@@ -509,13 +493,12 @@ public:
     const std::map<
       std::string,
       std::pair<ParameterT, rcl_interfaces::msg::ParameterDescriptor>
-    > & parameters,
-    bool ignore_overrides = false);
+    > & parameters);
 
   /// Undeclare a previously declared parameter.
   /**
    * This method will not cause a callback registered with
-   * add_on_set_parameters_callback to be called.
+   * set_on_parameters_set_callback to be called.
    *
    * \param[in] name The name of the parameter to be undeclared.
    * \throws rclcpp::exceptions::ParameterNotDeclaredException if the parameter
@@ -549,7 +532,7 @@ public:
    * Parameter overrides are ignored by set_parameter.
    *
    * This method will result in any callback registered with
-   * add_on_set_parameters_callback to be called.
+   * set_on_parameters_set_callback to be called.
    * If the callback prevents the parameter from being set, then it will be
    * reflected in the SetParametersResult that is returned, but no exception
    * will be thrown.
@@ -590,7 +573,7 @@ public:
    * corresponding SetParametersResult in the vector returned by this function.
    *
    * This method will result in any callback registered with
-   * add_on_set_parameters_callback to be called, once for each parameter.
+   * set_on_parameters_set_callback to be called, once for each parameter.
    * If the callback prevents the parameter from being set, then, as mentioned
    * before, it will be reflected in the corresponding SetParametersResult
    * that is returned, but no exception will be thrown.
@@ -621,7 +604,7 @@ public:
    * If the exception is thrown then none of the parameters will have been set.
    *
    * This method will result in any callback registered with
-   * add_on_set_parameters_callback to be called, just one time.
+   * set_on_parameters_set_callback to be called, just one time.
    * If the callback prevents the parameters from being set, then it will be
    * reflected in the SetParametersResult which is returned, but no exception
    * will be thrown.
@@ -640,6 +623,38 @@ public:
   RCLCPP_PUBLIC
   rcl_interfaces::msg::SetParametersResult
   set_parameters_atomically(const std::vector<rclcpp::Parameter> & parameters);
+
+  /// Set one parameter, unless that parameter has already been set.
+  /**
+   * Set the given parameter unless already set.
+   *
+   * Deprecated, instead use declare_parameter().
+   *
+   * \param[in] parameters The vector of parameters to be set.
+   * \return The result of each set action as a vector.
+   */
+  template<typename ParameterT>
+  // cppcheck-suppress syntaxError // bug in cppcheck 1.82 for [[deprecated]] on templated function
+  [[deprecated("use declare_parameter() instead")]]
+  void
+  set_parameter_if_not_set(const std::string & name, const ParameterT & value);
+
+  /// Set a map of parameters with the same prefix.
+  /**
+   * For each key in the map, a parameter with a name of "name.key" will be set
+   * to the value in the map.
+   *
+   * Deprecated, instead use declare_parameters().
+   *
+   * \param[in] name The prefix of the parameters to set.
+   * \param[in] values The parameters to set in the given prefix.
+   */
+  template<typename ParameterT>
+  [[deprecated("use declare_parameters() instead")]]
+  void
+  set_parameters_if_not_set(
+    const std::string & name,
+    const std::map<std::string, ParameterT> & values);
 
   /// Return the parameter by the given name.
   /**
@@ -784,6 +799,28 @@ public:
     const std::string & prefix,
     std::map<std::string, ParameterT> & values) const;
 
+  /// Get the parameter value; if not set, set the "alternative value" and store it in the node.
+  /**
+   * If the parameter is set, then the "value" argument is assigned the value
+   * in the parameter.
+   * If the parameter is not set, then the "value" argument is assigned the "alternative_value",
+   * and the parameter is set to the "alternative_value" on the node.
+   *
+   * Deprecated, instead use declare_parameter()'s return value, or use
+   * has_parameter() to ensure it exists before getting it.
+   *
+   * \param[in] name The name of the parameter to get.
+   * \param[out] value The output where the value of the parameter should be assigned.
+   * \param[in] alternative_value Value to be used if the parameter was not set.
+   */
+  template<typename ParameterT>
+  [[deprecated("use declare_parameter() and it's return value instead")]]
+  void
+  get_parameter_or_set(
+    const std::string & name,
+    ParameterT & value,
+    const ParameterT & alternative_value);
+
   /// Return the parameter descriptor for the given parameter name.
   /**
    * Like get_parameters(), this method may throw the
@@ -799,7 +836,6 @@ public:
    * \throws rclcpp::exceptions::ParameterNotDeclaredException if the
    *   parameter has not been declared and undeclared parameters are not
    *   allowed.
-   * \throws std::runtime_error if the number of described parameters is more than one
    */
   RCLCPP_PUBLIC
   rcl_interfaces::msg::ParameterDescriptor
@@ -822,7 +858,6 @@ public:
    * \throws rclcpp::exceptions::ParameterNotDeclaredException if any of the
    *   parameters have not been declared and undeclared parameters are not
    *   allowed.
-   * \throws std::runtime_error if the number of described parameters is more than one
    */
   RCLCPP_PUBLIC
   std::vector<rcl_interfaces::msg::ParameterDescriptor>
@@ -856,12 +891,10 @@ public:
   rcl_interfaces::msg::ListParametersResult
   list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const;
 
-  using OnSetParametersCallbackHandle =
-    rclcpp::node_interfaces::OnSetParametersCallbackHandle;
   using OnParametersSetCallbackType =
     rclcpp::node_interfaces::NodeParametersInterface::OnParametersSetCallbackType;
 
-  /// Add a callback for when parameters are being set.
+  /// Register a callback to be called anytime a parameter is about to be changed.
   /**
    * The callback signature is designed to allow handling of any of the above
    * `set_parameter*` or `declare_parameter*` methods, and so it takes a const
@@ -871,29 +904,24 @@ public:
    *
    * For an example callback:
    *
-   * ```cpp
-   * rcl_interfaces::msg::SetParametersResult
-   * my_callback(const std::vector<rclcpp::Parameter> & parameters)
-   * {
-   *   rcl_interfaces::msg::SetParametersResult result;
-   *   result.successful = true;
-   *   for (const auto & parameter : parameters) {
-   *     if (!some_condition) {
-   *       result.successful = false;
-   *       result.reason = "the reason it could not be allowed";
+   *   rcl_interfaces::msg::SetParametersResult
+   *   my_callback(const std::vector<rclcpp::Parameter> & parameters)
+   *   {
+   *     rcl_interfaces::msg::SetParametersResult result;
+   *     result.successful = true;
+   *     for (const auto & parameter : parameters) {
+   *       if (!some_condition) {
+   *         result.successful = false;
+   *         result.reason = "the reason it could not be allowed";
+   *       }
    *     }
+   *     return result;
    *   }
-   *   return result;
-   * }
-   * ```
    *
    * You can see that the SetParametersResult is a boolean flag for success
    * and an optional reason that can be used in error reporting when it fails.
    *
    * This allows the node developer to control which parameters may be changed.
-   *
-   * It is considered bad practice to reject changes for "unknown" parameters as this prevents
-   * other parts of the node (that may be aware of these parameters) from handling them.
    *
    * Note that the callback is called when declare_parameter() and its variants
    * are called, and so you cannot assume the parameter has been set before
@@ -902,60 +930,29 @@ public:
    *
    * Some constraints like read_only are enforced before the callback is called.
    *
-   * The callback may introspect other already set parameters (by calling any
-   * of the {get,list,describe}_parameter() methods), but may *not* modify
-   * other parameters (by calling any of the {set,declare}_parameter() methods)
-   * or modify the registered callback itself (by calling the
-   * add_on_set_parameters_callback() method).  If a callback tries to do any
-   * of the latter things,
-   * rclcpp::exceptions::ParameterModifiedInCallbackException will be thrown.
+   * There may only be one callback set at a time, so the previously set
+   * callback is returned when this method is used, or nullptr will be returned
+   * if no callback was previously set.
    *
-   * The callback functions must remain valid as long as the
-   * returned smart pointer is valid.
-   * The returned smart pointer can be promoted to a shared version.
-   *
-   * Resetting or letting the smart pointer go out of scope unregisters the callback.
-   * `remove_on_set_parameters_callback` can also be used.
-   *
-   * The registered callbacks are called when a parameter is set.
-   * When a callback returns a not successful result, the remaining callbacks aren't called.
-   * The order of the callback is the reverse from the registration order.
-   *
-   * \param callback The callback to register.
-   * \returns A shared pointer. The callback is valid as long as the smart pointer is alive.
-   * \throws std::bad_alloc if the allocation of the OnSetParametersCallbackHandle fails.
+   * \param[in] callback The callback to be called when the value for a
+   *   parameter is about to be set.
+   * \return The previous callback that was registered, if there was one,
+   *   otherwise nullptr.
    */
   RCLCPP_PUBLIC
-  RCUTILS_WARN_UNUSED
-  OnSetParametersCallbackHandle::SharedPtr
-  add_on_set_parameters_callback(OnParametersSetCallbackType callback);
+  rclcpp::Node::OnParametersSetCallbackType
+  set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback);
 
-  /// Remove a callback registered with `add_on_set_parameters_callback`.
+  /// Register the callback for parameter changes
   /**
-   * Delete a handler returned by `add_on_set_parameters_callback`.
-   *
-   * e.g.:
-   *
-   *    `remove_on_set_parameters_callback(scoped_callback.get())`
-   *
-   * As an alternative, the smart pointer can be reset:
-   *
-   *    `scoped_callback.reset()`
-   *
-   * Supposing that `scoped_callback` was the only owner.
-   *
-   * Calling `remove_on_set_parameters_callback` more than once with the same handler,
-   * or calling it after the shared pointer has been reset is an error.
-   * Resetting or letting the smart pointer go out of scope after calling
-   * `remove_on_set_parameters_callback` is not a problem.
-   *
-   * \param handler The callback handler to remove.
-   * \throws std::runtime_error if the handler was not created with `add_on_set_parameters_callback`,
-   *   or if it has been removed before.
+   * \param[in] callback User defined callback function.
+   *   It is expected to atomically set parameters.
+   * \note Repeated invocations of this function will overwrite previous callbacks.
    */
-  RCLCPP_PUBLIC
+  template<typename CallbackT>
+  [[deprecated("use set_on_parameters_set_callback() instead")]]
   void
-  remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const handler);
+  register_param_change_callback(CallbackT && callback);
 
   /// Get the fully-qualified names of all available nodes.
   /**
@@ -966,108 +963,21 @@ public:
   std::vector<std::string>
   get_node_names() const;
 
-  /// Return a map of existing topic names to list of topic types.
-  /**
-   * \return a map of existing topic names to list of topic types.
-   * \throws std::runtime_error anything that rcl_error can throw
-   */
   RCLCPP_PUBLIC
   std::map<std::string, std::vector<std::string>>
   get_topic_names_and_types() const;
 
-  /// Return a map of existing service names to list of service types.
-  /**
-   * \return a map of existing service names to list of service types.
-   * \throws std::runtime_error anything that rcl_error can throw
-   */
   RCLCPP_PUBLIC
   std::map<std::string, std::vector<std::string>>
   get_service_names_and_types() const;
 
-  /// Return the number of publishers that are advertised on a given topic.
-  /**
-   * \param[in] node_name the node_name on which to count the publishers.
-   * \param[in] namespace_ the namespace of the node associated with the name
-   * \return number of publishers that are advertised on a given topic.
-   * \throws std::runtime_error if publishers could not be counted
-   */
-  RCLCPP_PUBLIC
-  std::map<std::string, std::vector<std::string>>
-  get_service_names_and_types_by_node(
-    const std::string & node_name,
-    const std::string & namespace_) const;
-
-  /// Return the number of publishers created for a given topic.
-  /**
-   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
-   * \return number of publishers that have been created for the given topic.
-   * \throws std::runtime_error if publishers could not be counted
-   */
   RCLCPP_PUBLIC
   size_t
   count_publishers(const std::string & topic_name) const;
 
-  /// Return the number of subscribers created for a given topic.
-  /**
-   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
-   * \return number of subscribers that have been created for the given topic.
-   * \throws std::runtime_error if subscribers could not be counted
-   */
   RCLCPP_PUBLIC
   size_t
   count_subscribers(const std::string & topic_name) const;
-
-  /// Return the topic endpoint information about publishers on a given topic.
-  /**
-   * The returned parameter is a list of topic endpoint information, where each item will contain
-   * the node name, node namespace, topic type, endpoint type, topic endpoint's GID, and its QoS
-   * profile.
-   *
-   * When the `no_mangle` parameter is `true`, the provided `topic_name` should be a valid topic
-   * name for the middleware (useful when combining ROS with native middleware (e.g. DDS) apps).
-   * When the `no_mangle` parameter is `false`, the provided `topic_name` should follow
-   * ROS topic name conventions.
-   *
-   * `topic_name` may be a relative, private, or fully qualified topic name.
-   * A relative or private topic will be expanded using this node's namespace and name.
-   * The queried `topic_name` is not remapped.
-   *
-   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
-   * \param[in] no_mangle if `true`, `topic_name` needs to be a valid middleware topic name,
-   *   otherwise it should be a valid ROS topic name. Defaults to `false`.
-   * \return a list of TopicEndpointInfo representing all the publishers on this topic.
-   * \throws InvalidTopicNameError if the given topic_name is invalid.
-   * \throws std::runtime_error if internal error happens.
-   */
-  RCLCPP_PUBLIC
-  std::vector<rclcpp::TopicEndpointInfo>
-  get_publishers_info_by_topic(const std::string & topic_name, bool no_mangle = false) const;
-
-  /// Return the topic endpoint information about subscriptions on a given topic.
-  /**
-   * The returned parameter is a list of topic endpoint information, where each item will contain
-   * the node name, node namespace, topic type, endpoint type, topic endpoint's GID, and its QoS
-   * profile.
-   *
-   * When the `no_mangle` parameter is `true`, the provided `topic_name` should be a valid topic
-   * name for the middleware (useful when combining ROS with native middleware (e.g. DDS) apps).
-   * When the `no_mangle` parameter is `false`, the provided `topic_name` should follow
-   * ROS topic name conventions.
-   *
-   * `topic_name` may be a relative, private, or fully qualified topic name.
-   * A relative or private topic will be expanded using this node's namespace and name.
-   * The queried `topic_name` is not remapped.
-   *
-   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
-   * \param[in] no_mangle if `true`, `topic_name` needs to be a valid middleware topic name,
-   *   otherwise it should be a valid ROS topic name. Defaults to `false`.
-   * \return a list of TopicEndpointInfo representing all the subscriptions on this topic.
-   * \throws InvalidTopicNameError if the given topic_name is invalid.
-   * \throws std::runtime_error if internal error happens.
-   */
-  RCLCPP_PUBLIC
-  std::vector<rclcpp::TopicEndpointInfo>
-  get_subscriptions_info_by_topic(const std::string & topic_name, bool no_mangle = false) const;
 
   /// Return a graph event, which will be set anytime a graph change occurs.
   /* The graph Event object is a loan which must be returned.
@@ -1082,9 +992,6 @@ public:
   /**
    * The given Event must be acquire through the get_graph_event() method.
    *
-   * \param[in] event pointer to an Event to wait for
-   * \param[in] timeout nanoseconds to wait for the Event to change the state
-   *
    * \throws InvalidEventError if the given event is nullptr
    * \throws EventNotRegisteredError if the given event was not acquired with
    *   get_graph_event().
@@ -1095,29 +1002,13 @@ public:
     rclcpp::Event::SharedPtr event,
     std::chrono::nanoseconds timeout);
 
-  /// Get a clock as a non-const shared pointer which is managed by the node.
-  /**
-   * \sa rclcpp::node_interfaces::NodeClock::get_clock
-   */
   RCLCPP_PUBLIC
   rclcpp::Clock::SharedPtr
   get_clock();
 
-  /// Get a clock as a const shared pointer which is managed by the node.
-  /**
-   * \sa rclcpp::node_interfaces::NodeClock::get_clock
-   */
-  RCLCPP_PUBLIC
-  rclcpp::Clock::ConstSharedPtr
-  get_clock() const;
-
-  /// Returns current time from the time source specified by clock_type.
-  /**
-   * \sa rclcpp::Clock::now
-   */
   RCLCPP_PUBLIC
   Time
-  now() const;
+  now();
 
   /// Return the Node's internal NodeBaseInterface implementation.
   RCLCPP_PUBLIC
@@ -1164,7 +1055,7 @@ public:
   rclcpp::node_interfaces::NodeParametersInterface::SharedPtr
   get_node_parameters_interface();
 
-  /// Return the Node's internal NodeTimeSourceInterface implementation.
+  /// Return the Node's internal NodeParametersInterface implementation.
   RCLCPP_PUBLIC
   rclcpp::node_interfaces::NodeTimeSourceInterface::SharedPtr
   get_node_time_source_interface();
@@ -1177,17 +1068,15 @@ public:
    *
    * For example, consider:
    *
-   * ```cpp
-   * auto node = std::make_shared<rclcpp::Node>("my_node", "my_ns");
-   * node->get_sub_namespace();  // -> ""
-   * auto sub_node1 = node->create_sub_node("a");
-   * sub_node1->get_sub_namespace();  // -> "a"
-   * auto sub_node2 = sub_node1->create_sub_node("b");
-   * sub_node2->get_sub_namespace();  // -> "a/b"
-   * auto sub_node3 = node->create_sub_node("foo");
-   * sub_node3->get_sub_namespace();  // -> "foo"
-   * node->get_sub_namespace();  // -> ""
-   * ```
+   *   auto node = std::make_shared<rclcpp::Node>("my_node", "my_ns");
+   *   node->get_sub_namespace();  // -> ""
+   *   auto sub_node1 = node->create_sub_node("a");
+   *   sub_node1->get_sub_namespace();  // -> "a"
+   *   auto sub_node2 = sub_node1->create_sub_node("b");
+   *   sub_node2->get_sub_namespace();  // -> "a/b"
+   *   auto sub_node3 = node->create_sub_node("foo");
+   *   sub_node3->get_sub_namespace();  // -> "foo"
+   *   node->get_sub_namespace();  // -> ""
    *
    * get_namespace() will return the original node namespace, and will not
    * include the sub-namespace if one exists.
@@ -1209,17 +1098,15 @@ public:
    *
    * For example, consider:
    *
-   * ```cpp
-   * auto node = std::make_shared<rclcpp::Node>("my_node", "my_ns");
-   * node->get_effective_namespace();  // -> "/my_ns"
-   * auto sub_node1 = node->create_sub_node("a");
-   * sub_node1->get_effective_namespace();  // -> "/my_ns/a"
-   * auto sub_node2 = sub_node1->create_sub_node("b");
-   * sub_node2->get_effective_namespace();  // -> "/my_ns/a/b"
-   * auto sub_node3 = node->create_sub_node("foo");
-   * sub_node3->get_effective_namespace();  // -> "/my_ns/foo"
-   * node->get_effective_namespace();  // -> "/my_ns"
-   * ```
+   *   auto node = std::make_shared<rclcpp::Node>("my_node", "my_ns");
+   *   node->get_effective_namespace();  // -> "/my_ns"
+   *   auto sub_node1 = node->create_sub_node("a");
+   *   sub_node1->get_effective_namespace();  // -> "/my_ns/a"
+   *   auto sub_node2 = sub_node1->create_sub_node("b");
+   *   sub_node2->get_effective_namespace();  // -> "/my_ns/a/b"
+   *   auto sub_node3 = node->create_sub_node("foo");
+   *   sub_node3->get_effective_namespace();  // -> "/my_ns/foo"
+   *   node->get_effective_namespace();  // -> "/my_ns"
    *
    * \sa get_namespace()
    * \sa get_sub_namespace()
@@ -1276,6 +1163,19 @@ public:
   const rclcpp::NodeOptions &
   get_node_options() const;
 
+  /// Manually assert that this Node is alive (for RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_NODE).
+  /**
+   * If the rmw Liveliness policy is set to RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_NODE, the creator
+   * of this node may manually call `assert_liveliness` at some point in time to signal to the rest
+   * of the system that this Node is still alive.
+   *
+   * \return `true` if the liveliness was asserted successfully, otherwise `false`
+   */
+  RCLCPP_PUBLIC
+  RCUTILS_WARN_UNUSED
+  bool
+  assert_liveliness() const;
+
 protected:
   /// Construct a sub-node, which will extend the namespace of all entities created with it.
   /**
@@ -1291,6 +1191,10 @@ protected:
 
 private:
   RCLCPP_DISABLE_COPY(Node)
+
+  RCLCPP_PUBLIC
+  bool
+  group_in_node(callback_group::CallbackGroup::SharedPtr group);
 
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_;
   rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_;

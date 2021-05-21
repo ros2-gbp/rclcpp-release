@@ -42,10 +42,11 @@ public:
 
   /// Add a timer to the node.
   RCLCPP_PUBLIC
+  virtual
   void
   add_timer(
     rclcpp::TimerBase::SharedPtr timer,
-    rclcpp::CallbackGroup::SharedPtr callback_group) override;
+    rclcpp::callback_group::CallbackGroup::SharedPtr callback_group);
 
 private:
   RCLCPP_DISABLE_COPY(NodeTimers)

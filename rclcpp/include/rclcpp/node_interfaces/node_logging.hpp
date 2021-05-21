@@ -42,12 +42,14 @@ public:
   ~NodeLogging();
 
   RCLCPP_PUBLIC
+  virtual
   rclcpp::Logger
-  get_logger() const override;
+  get_logger() const;
 
   RCLCPP_PUBLIC
+  virtual
   const char *
-  get_logger_name() const override;
+  get_logger_name() const;
 
 private:
   RCLCPP_DISABLE_COPY(NodeLogging)

@@ -29,6 +29,8 @@
 
 namespace rclcpp
 {
+namespace executor
+{
 
 struct AnyExecutable
 {
@@ -40,16 +42,17 @@ struct AnyExecutable
 
   // Only one of the following pointers will be set.
   rclcpp::SubscriptionBase::SharedPtr subscription;
+  rclcpp::SubscriptionBase::SharedPtr subscription_intra_process;
   rclcpp::TimerBase::SharedPtr timer;
   rclcpp::ServiceBase::SharedPtr service;
   rclcpp::ClientBase::SharedPtr client;
   rclcpp::Waitable::SharedPtr waitable;
   // These are used to keep the scope on the containing items
-  rclcpp::CallbackGroup::SharedPtr callback_group;
+  rclcpp::callback_group::CallbackGroup::SharedPtr callback_group;
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base;
-  std::shared_ptr<void> data;
 };
 
+}  // namespace executor
 }  // namespace rclcpp
 
 #endif  // RCLCPP__ANY_EXECUTABLE_HPP_

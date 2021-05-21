@@ -24,10 +24,8 @@
 #include "rosidl_typesupport_cpp/message_type_support.hpp"
 
 #include "rclcpp/publisher.hpp"
-#include "rclcpp/publisher_base.hpp"
-#include "rclcpp/publisher_options.hpp"
+#include "rclcpp/intra_process_manager.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
-#include "rclcpp/qos.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
@@ -43,9 +41,6 @@ namespace rclcpp
  * called from a templated "create_publisher" method on the Node class, and
  * is passed to the non-templated "create_publisher" method on the NodeTopics
  * class where it is used to create and setup the Publisher.
- *
- * It also handles the two step construction of Publishers, first calling
- * the constructor and then the post_init_setup() method.
  */
 struct PublisherFactory
 {
@@ -54,33 +49,39 @@ struct PublisherFactory
     rclcpp::PublisherBase::SharedPtr(
       rclcpp::node_interfaces::NodeBaseInterface * node_base,
       const std::string & topic_name,
-      const rclcpp::QoS & qos
-    )>;
+      const rcl_publisher_options_t & publisher_options)>;
 
-  const PublisherFactoryFunction create_typed_publisher;
+  PublisherFactoryFunction create_typed_publisher;
 };
 
-/// Return a PublisherFactory with functions setup for creating a PublisherT<MessageT, AllocatorT>.
-template<typename MessageT, typename AllocatorT, typename PublisherT>
+/// Return a PublisherFactory with functions setup for creating a PublisherT<MessageT, Alloc>.
+template<typename MessageT, typename Alloc, typename PublisherT>
 PublisherFactory
-create_publisher_factory(const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options)
+create_publisher_factory(
+  const PublisherEventCallbacks & event_callbacks,
+  std::shared_ptr<Alloc> allocator)
 {
-  PublisherFactory factory {
-    // factory function that creates a MessageT specific PublisherT
-    [options](
-      rclcpp::node_interfaces::NodeBaseInterface * node_base,
-      const std::string & topic_name,
-      const rclcpp::QoS & qos
+  PublisherFactory factory;
+
+  // factory function that creates a MessageT specific PublisherT
+  factory.create_typed_publisher =
+    [event_callbacks, allocator](
+    rclcpp::node_interfaces::NodeBaseInterface * node_base,
+    const std::string & topic_name,
+    const rcl_publisher_options_t & publisher_options
     ) -> std::shared_ptr<PublisherT>
     {
-      auto publisher = std::make_shared<PublisherT>(node_base, topic_name, qos, options);
-      // This is used for setting up things like intra process comms which
-      // require this->shared_from_this() which cannot be called from
-      // the constructor.
-      publisher->post_init_setup(node_base, topic_name, qos, options);
-      return publisher;
-    }
-  };
+      auto options_copy = publisher_options;
+      auto message_alloc = std::make_shared<typename PublisherT::MessageAlloc>(*allocator.get());
+      options_copy.allocator = allocator::get_rcl_allocator<MessageT>(*message_alloc.get());
+
+      return std::make_shared<PublisherT>(
+        node_base,
+        topic_name,
+        options_copy,
+        event_callbacks,
+        message_alloc);
+    };
 
   // return the factory now that it is populated
   return factory;

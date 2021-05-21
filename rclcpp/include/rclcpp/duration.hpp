@@ -26,29 +26,12 @@ namespace rclcpp
 class RCLCPP_PUBLIC Duration
 {
 public:
-  /// Duration constructor.
-  /**
-   * Initializes the time values for seconds and nanoseconds individually.
-   * Large values for nsecs are wrapped automatically with the remainder added to secs.
-   * Both inputs must be integers.
-   * Seconds can be negative.
-   *
-   * \param seconds time in seconds
-   * \param nanoseconds time in nanoseconds
-   */
   Duration(int32_t seconds, uint32_t nanoseconds);
 
-  /// Construct duration from the specified nanoseconds.
-  [[deprecated(
-    "Use Duration::from_nanoseconds instead or std::chrono_literals. For example:"
-    "rclcpp::Duration::from_nanoseconds(int64_variable);"
-    "rclcpp::Duration(0ns);")]]
   explicit Duration(rcl_duration_value_t nanoseconds);
 
-  /// Construct duration from the specified std::chrono::nanoseconds.
   explicit Duration(std::chrono::nanoseconds nanoseconds);
 
-  // This constructor matches any std::chrono value other than nanoseconds
   // intentionally not using explicit to create a conversion constructor
   template<class Rep, class Period>
   // cppcheck-suppress noExplicitConstructor
@@ -59,10 +42,6 @@ public:
   // cppcheck-suppress noExplicitConstructor
   Duration(const builtin_interfaces::msg::Duration & duration_msg);  // NOLINT(runtime/explicit)
 
-  /// Time constructor
-  /**
-   * \param duration rcl_duration_t structure to copy.
-   */
   explicit Duration(const rcl_duration_t & duration);
 
   Duration(const Duration & rhs);
@@ -102,10 +81,6 @@ public:
   Duration
   operator-(const rclcpp::Duration & rhs) const;
 
-  /// Get the maximum representable value.
-  /**
-   * \return the maximum representable value
-   */
   static
   Duration
   max();
@@ -113,34 +88,15 @@ public:
   Duration
   operator*(double scale) const;
 
-  /// Get duration in nanosecods
-  /**
-   * \return the duration in nanoseconds as a rcl_duration_value_t.
-   */
   rcl_duration_value_t
   nanoseconds() const;
 
-  /// Get duration in seconds
-  /**
-   * \warning Depending on sizeof(double) there could be significant precision loss.
-   *   When an exact time is required use nanoseconds() instead.
-   * \return the duration in seconds as a floating point number.
-   */
+  /// \return the duration in seconds as a floating point number.
+  /// \warning Depending on sizeof(double) there could be significant precision loss.
+  /// When an exact time is required use nanoseconds() instead.
   double
   seconds() const;
 
-  /// Create a duration object from a floating point number representing seconds
-  static Duration
-  from_seconds(double seconds);
-
-  /// Create a duration object from an integer number representing nanoseconds
-  static Duration
-  from_nanoseconds(rcl_duration_value_t nanoseconds);
-
-  static Duration
-  from_rmw_time(rmw_time_t duration);
-
-  /// Convert Duration into a std::chrono::Duration.
   template<class DurationT>
   DurationT
   to_chrono() const
@@ -148,14 +104,11 @@ public:
     return std::chrono::duration_cast<DurationT>(std::chrono::nanoseconds(this->nanoseconds()));
   }
 
-  /// Convert Duration into rmw_time_t.
   rmw_time_t
   to_rmw_time() const;
 
 private:
   rcl_duration_t rcl_duration_;
-
-  Duration() = default;
 };
 
 }  // namespace rclcpp
