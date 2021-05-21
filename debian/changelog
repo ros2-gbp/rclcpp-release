@@ -1,0 +1,146 @@
+ros-dashing-rclcpp-components (0.7.16-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Fri, 21 May 2021 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.15-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Tue, 24 Nov 2020 08:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.14-1bionic) bionic; urgency=high
+
+  * Added rclcpp_components Doxyfile. (#1201 <https://github.com/ros2/rclcpp/issues/1201>)
+  * Contributors: Alejandro Hernández Cordero
+
+ -- Michael Carroll <michael@openrobotics.org>  Fri, 10 Jul 2020 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.13-1bionic) bionic; urgency=high
+
+  * Remove absolute path from installed CMake code.  (#949 <https://github.com/ros2/rclcpp/issues/949>)
+  * Contributors: Jacob Perron
+
+ -- Michael Carroll <michael@openrobotics.org>  Thu, 12 Mar 2020 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.12-1bionic) bionic; urgency=high
+
+  * Backport rclcpp_components_register_node (#935 <https://github.com/ros2/rclcpp/issues/935>)
+  * Contributors: Shane Loretz
+
+ -- Michael Carroll <michael@openrobotics.org>  Thu, 05 Dec 2019 08:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.11-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Fri, 11 Oct 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.10-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Mon, 23 Sep 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.9-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Fri, 20 Sep 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.8-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Fri, 06 Sep 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.7-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Wed, 31 Jul 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.6-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Wed, 12 Jun 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.5-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Thu, 30 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.4-1bionic) bionic; urgency=high
+
+  * Rename parameter options (#745 <https://github.com/ros2/rclcpp/issues/745>)
+  * don't use global arguments for components loaded into the manager (#736 <https://github.com/ros2/rclcpp/issues/736>)
+  * Contributors: Dirk Thomas, William Woodall
+
+ -- Michael Carroll <michael@openrobotics.org>  Wed, 29 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.3-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Mon, 20 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.2-1bionic) bionic; urgency=high
+
+  * Updated to support changes to ``Node::get_node_names()``. (#698 <https://github.com/ros2/rclcpp/issues/698>)
+  * Contributors: jhdcs
+
+ -- Michael Carroll <michael@openrobotics.org>  Wed, 08 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.1-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Fri, 26 Apr 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.7.0-1bionic) bionic; urgency=high
+
+  * Introduce rclcpp_components to implement composition (#665 <https://github.com/ros2/rclcpp/issues/665>)
+  * Contributors: Michael Carroll
+
+ -- Michael Carroll <michael@openrobotics.org>  Sun, 14 Apr 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.6.2-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Wed, 12 Dec 2018 08:00:00 -0000
+
+ros-dashing-rclcpp-components (0.6.1-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Thu, 06 Dec 2018 08:00:00 -0000
+
+ros-dashing-rclcpp-components (0.6.0-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Mon, 19 Nov 2018 08:00:00 -0000
+
+ros-dashing-rclcpp-components (0.5.1-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Thu, 28 Jun 2018 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.5.0-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Mon, 25 Jun 2018 07:00:00 -0000
+
+ros-dashing-rclcpp-components (0.4.0-1bionic) bionic; urgency=high
+
+
+
+ -- Michael Carroll <michael@openrobotics.org>  Fri, 08 Dec 2017 08:00:00 -0000
+
+
