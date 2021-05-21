@@ -88,7 +88,7 @@ tracks:
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc} --os-name rhel
     devel_branch: dashing
-    last_version: 0.7.15
+    last_version: 0.7.16
     name: rclcpp
     patches: null
     release_inc: '1'
