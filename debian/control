@@ -1,0 +1,12 @@
+Source: ros-dashing-rclcpp-lifecycle
+Section: misc
+Priority: optional
+Maintainer: Karsten Knese <karsten@osrfoundation.org>
+Build-Depends: debhelper (>= 9.0.0), ros-dashing-ament-cmake-gtest, ros-dashing-ament-cmake-ros, ros-dashing-ament-lint-auto, ros-dashing-ament-lint-common, ros-dashing-lifecycle-msgs, ros-dashing-rcl-lifecycle, ros-dashing-rclcpp, ros-dashing-rmw-implementation, ros-dashing-rosidl-typesupport-cpp, ros-dashing-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-dashing-rclcpp-lifecycle
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-dashing-lifecycle-msgs, ros-dashing-rcl-lifecycle, ros-dashing-rclcpp, ros-dashing-rmw-implementation, ros-dashing-rosidl-typesupport-cpp, ros-dashing-ros-workspace
+Description: Package containing a prototype for lifecycle implementation

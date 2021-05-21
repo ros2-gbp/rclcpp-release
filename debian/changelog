@@ -1,0 +1,170 @@
+ros-dashing-rclcpp-lifecycle (0.7.16-1bionic) bionic; urgency=high
+
+
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Fri, 21 May 2021 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.15-1bionic) bionic; urgency=high
+
+  * Type conversions fixes. (#901 <https://github.com/ros2/rclcpp/issues/901>) (#1209 <https://github.com/ros2/rclcpp/issues/1209>)
+  * Contributors: Michel Hidalgo, Monika Idzik
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Tue, 24 Nov 2020 08:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.14-1bionic) bionic; urgency=high
+
+  * Fixed doxygen warnings. (#1208 <https://github.com/ros2/rclcpp/issues/1208>)
+  * Contributors: Alejandro Hernández Cordero
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Fri, 10 Jul 2020 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.13-1bionic) bionic; urgency=high
+
+
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Thu, 12 Mar 2020 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.12-1bionic) bionic; urgency=high
+
+
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Thu, 05 Dec 2019 08:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.11-1bionic) bionic; urgency=high
+
+
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Fri, 11 Oct 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.10-1bionic) bionic; urgency=high
+
+  * reset error message before setting a new one, embed the original one (#854 <https://github.com/ros2/rclcpp/issues/854>) (#866 <https://github.com/ros2/rclcpp/issues/866>)
+  * Contributors: Dirk Thomas, Zachary Michaels
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Mon, 23 Sep 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.9-1bionic) bionic; urgency=high
+
+
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Fri, 20 Sep 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.8-1bionic) bionic; urgency=high
+
+  * Fixed error messages which were not printing to console. (#777 <https://github.com/ros2/rclcpp/issues/777>) (#847 <https://github.com/ros2/rclcpp/issues/847>)
+  * Contributors: Jacob Perron
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Fri, 06 Sep 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.7-1bionic) bionic; urgency=high
+
+  * Added a default value to node options in LifecycleNode constructor to match node constructor. Updated API documentation. (#801 <https://github.com/ros2/rclcpp/issues/801>)
+  * Contributors: Esteve Fernandez, Dirk Thomas
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Wed, 31 Jul 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.6-1bionic) bionic; urgency=high
+
+
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Wed, 12 Jun 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.5-1bionic) bionic; urgency=high
+
+
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Thu, 30 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.4-1bionic) bionic; urgency=high
+
+  * Rename parameter options (#745 <https://github.com/ros2/rclcpp/issues/745>)
+  * Contributors: William Woodall
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Wed, 29 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.3-1bionic) bionic; urgency=high
+
+  * Added missing template functionality to lifecycle_node. (#707 <https://github.com/ros2/rclcpp/issues/707>)
+  * Contributors: Michael Jeronimo
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Mon, 20 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.2-1bionic) bionic; urgency=high
+
+  * Added new way to specify QoS settings for publishers and subscriptions. (#713 <https://github.com/ros2/rclcpp/issues/713>)
+  * Deprecated ``shared_ptr`` and raw pointer versions of ``Publisher<T>::publish()``. (#709 <https://github.com/ros2/rclcpp/issues/709>)
+  * Implemented API to set callbacks for liveliness and deadline QoS events for publishers and subscriptions. (#695 <https://github.com/ros2/rclcpp/issues/695>)
+  * Changed the ``IntraProcessManager`` to be capable of storing ``shared_ptr<const T>`` in addition to ``unique_ptr<T>``. (#690 <https://github.com/ros2/rclcpp/issues/690>)
+  * Contributors: M. M, William Woodall, ivanpauno
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Wed, 08 May 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.1-1bionic) bionic; urgency=high
+
+  * Added read only parameters. (#495 <https://github.com/ros2/rclcpp/issues/495>)
+  * Contributors: Shane Loretz, William Woodall
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Fri, 26 Apr 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.7.0-1bionic) bionic; urgency=high
+
+  * Fixed linter errors in rclcpp_lifecycle. (#672 <https://github.com/ros2/rclcpp/issues/672>)
+  * Added parameter-related templates to LifecycleNode. (#645 <https://github.com/ros2/rclcpp/issues/645>)
+  * Fixed use_sim_time issue on LifeCycleNode. (#651 <https://github.com/ros2/rclcpp/issues/651>)
+  * Updated to use ament_target_dependencies where possible. (#659 <https://github.com/ros2/rclcpp/issues/659>)
+  * Fixed hard-coded duration type representation so int64_t isn't assumed. (#648 <https://github.com/ros2/rclcpp/issues/648>)
+  * Added a method to the LifecycleNode class to get the logging interface. (#652 <https://github.com/ros2/rclcpp/issues/652>)
+  * Set Parameter Event Publisher settings #591 <https://github.com/ros2/rclcpp/issues/591> (#614 <https://github.com/ros2/rclcpp/issues/614>)
+  * Replaced node constructor arguments with NodeOptions. (#622 <https://github.com/ros2/rclcpp/issues/622>)
+  * Removed dependency on rclpy. (#626 <https://github.com/ros2/rclcpp/issues/626>)
+  * Contributors: Emerson Knapp, Karsten Knese, Michael Carroll, Michael Jeronimo, Vinnam Kim, William Woodall, ivanpauno, rarvolt
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Sun, 14 Apr 2019 07:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.6.2-1bionic) bionic; urgency=high
+
+
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Thu, 13 Dec 2018 08:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.6.1-1bionic) bionic; urgency=high
+
+  * Added node path and time stamp to parameter event message (#584 <https://github.com/ros2/rclcpp/issues/584>)
+  * Refactored init to allow for non-global init (#587 <https://github.com/ros2/rclcpp/issues/587>)
+  * Add class Waitable (#589 <https://github.com/ros2/rclcpp/issues/589>)
+  * Contributors: Dirk Thomas, Jacob Perron, William Woodall, bpwilcox
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Fri, 07 Dec 2018 08:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.6.0-1bionic) bionic; urgency=high
+
+  * Updated to use new error handling API from rcutils (#577 <https://github.com/ros2/rclcpp/issues/577>)
+  * Deleted TRANSITION_SHUTDOWN (#576 <https://github.com/ros2/rclcpp/issues/576>)
+  * Added a warning when publishing if publisher is not active (#574 <https://github.com/ros2/rclcpp/issues/574>)
+  * Added SMART_PTRS_DEF to LifecyclePublisher (#569 <https://github.com/ros2/rclcpp/issues/569>)
+  * Added service for transition graph (#555 <https://github.com/ros2/rclcpp/issues/555>)
+  * Added semicolons to all RCLCPP and RCUTILS macros. (#565 <https://github.com/ros2/rclcpp/issues/565>)
+  * Fixed and improved documentation  (#546 <https://github.com/ros2/rclcpp/issues/546>)
+  * Removed unneeded dependency on std_msgs (#513 <https://github.com/ros2/rclcpp/issues/513>)
+  * Removed use of uninitialized CMake var (#511 <https://github.com/ros2/rclcpp/issues/511>)
+  * Added get_node_names API from node. (#508 <https://github.com/ros2/rclcpp/issues/508>)
+  * Fixed rosidl dependencies (#507 <https://github.com/ros2/rclcpp/issues/507>)
+  * Contributors: Chris Lalancette, Dirk Thomas, Francisco Martín Rico, Karsten Knese, Mikael Arguedas, Sriram Raghunathan, William Woodall, cho3
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Mon, 19 Nov 2018 08:00:00 -0000
+
+ros-dashing-rclcpp-lifecycle (0.5.0-1bionic) bionic; urgency=high
+
+  * Added functions that allow you to publish serialized messages and received serialized messages in your subscription callback. (#388 <https://github.com/ros2/rclcpp/issues/388>)
+  * Added ability to initialize parameter values in a node with an argument to the Node constructor. (#486 <https://github.com/ros2/rclcpp/issues/486>)
+  * Nodes now autostart the ROS parameter services which let you get, set, and list parameters in a node. (#478 <https://github.com/ros2/rclcpp/issues/478>)
+  * Fixed a bug that occurred when mixing ``std::shared_ptr`` and ``std::bind``. (#470 <https://github.com/ros2/rclcpp/issues/470>)
+  * Added ability to pass command line arguments to the Node constructor. (#461 <https://github.com/ros2/rclcpp/issues/461>)
+  * Changed library export order for static linking. (#446 <https://github.com/ros2/rclcpp/issues/446>)
+  * Now depends on ``ament_cmake_ros``. (#444 <https://github.com/ros2/rclcpp/issues/444>)
+  * Updaed code to use logging macros rather than ``fprintf()``. (#439 <https://github.com/ros2/rclcpp/issues/439>)
+  * Contributors: Dirk Thomas, Guillaume Autran, Karsten Knese, Michael Carroll, Mikael Arguedas, Shane Loretz, dhood
+
+ -- Karsten Knese <karsten@osrfoundation.org>  Mon, 25 Jun 2018 07:00:00 -0000
+
+
