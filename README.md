@@ -1,3 +1,30 @@
+## rclcpp (rolling) - 11.1.0-1
+
+The packages in the `rclcpp` repository were released into the `rolling` distro by running `/Users/william/.pyenv/versions/3.8.0/bin/bloom-release -r rolling -t rolling rclcpp` on `Tue, 13 Jul 2021 19:40:32 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_components`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `11.0.0-1`
+- old version: `11.0.0-1`
+- new version: `11.1.0-1`
+
+Versions of tools used:
+
+- bloom version: `0.10.7`
+- catkin_pkg version: `0.4.23`
+- rosdep version: `0.19.0`
+- rosdistro version: `0.8.2`
+- vcstools version: `0.1.42`
+
+
 ## rclcpp (dashing) - 0.7.16-1
 
 The packages in the `rclcpp` repository were released into the `dashing` distro by running `/home/steven/osrf/bloom/.direnv/python-3.9.5/bin/bloom-release -r dashing rclcpp --override-release-repository-push-url git@github.com:ros2-gbp/rclcpp-release` on `Fri, 21 May 2021 15:22:06 -0000`
