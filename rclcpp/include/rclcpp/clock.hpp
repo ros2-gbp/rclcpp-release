@@ -16,12 +16,16 @@
 #define RCLCPP__CLOCK_HPP_
 
 #include <functional>
+#include <memory>
+#include <mutex>
 
 #include "rclcpp/macros.hpp"
 #include "rclcpp/time.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 #include "rcl/time.h"
+#include "rcutils/time.h"
+#include "rcutils/types/rcutils_ret.h"
 
 namespace rclcpp
 {
@@ -85,6 +89,7 @@ public:
   bool
   ros_time_is_active();
 
+  /// Return the rcl_clock_t clock handle
   RCLCPP_PUBLIC
   rcl_clock_t *
   get_clock_handle() noexcept;
@@ -92,6 +97,11 @@ public:
   RCLCPP_PUBLIC
   rcl_clock_type_t
   get_clock_type() const noexcept;
+
+  /// Get the clock's mutex
+  RCLCPP_PUBLIC
+  std::mutex &
+  get_clock_mutex() noexcept;
 
   // Add a callback to invoke if the jump threshold is exceeded.
   /**
@@ -126,14 +136,14 @@ private:
   RCLCPP_PUBLIC
   static void
   on_time_jump(
-    const struct rcl_time_jump_t * time_jump,
+    const rcl_time_jump_t * time_jump,
     bool before_jump,
     void * user_data);
 
-  /// Internal storage backed by rcl
-  rcl_clock_t rcl_clock_;
-  friend TimeSource;  /// Allow TimeSource to access the rcl_clock_ datatype.
-  rcl_allocator_t allocator_;
+  /// Private internal storage
+  class Impl;
+
+  std::shared_ptr<Impl> impl_;
 };
 
 }  // namespace rclcpp

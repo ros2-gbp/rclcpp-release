@@ -15,14 +15,16 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_TIME_SOURCE_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_TIME_SOURCE_HPP_
 
-#include "rclcpp/callback_group.hpp"
-#include "rclcpp/clock.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/node_interfaces/node_clock_interface.hpp"
+#include "rclcpp/node_interfaces/node_graph_interface.hpp"
+#include "rclcpp/node_interfaces/node_logging_interface.hpp"
 #include "rclcpp/node_interfaces/node_parameters_interface.hpp"
+#include "rclcpp/node_interfaces/node_services_interface.hpp"
 #include "rclcpp/node_interfaces/node_time_source_interface.hpp"
 #include "rclcpp/node_interfaces/node_topics_interface.hpp"
+#include "rclcpp/qos.hpp"
 #include "rclcpp/time_source.hpp"
 #include "rclcpp/visibility_control.hpp"
 
@@ -45,7 +47,9 @@ public:
     rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services,
     rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr node_logging,
     rclcpp::node_interfaces::NodeClockInterface::SharedPtr node_clock,
-    rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters
+    rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters,
+    const rclcpp::QoS & qos = rclcpp::RosoutQoS(),
+    bool use_clock_thread = true
   );
 
   RCLCPP_PUBLIC

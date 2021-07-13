@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <map>
 #include <memory>
@@ -20,6 +21,9 @@
 #include <utility>
 #include <vector>
 
+#include "rcl/arguments.h"
+
+#include "rclcpp/detail/qos_parameters.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/graph_listener.hpp"
 #include "rclcpp/node.hpp"
@@ -27,24 +31,17 @@
 #include "rclcpp/node_interfaces/node_clock.hpp"
 #include "rclcpp/node_interfaces/node_graph.hpp"
 #include "rclcpp/node_interfaces/node_logging.hpp"
-// When compiling this file, Windows produces a deprecation warning for the
-// deprecated function prototype of NodeParameters::register_param_change_callback().
-// Other compilers do not.
-#if defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
 #include "rclcpp/node_interfaces/node_parameters.hpp"
-#if defined(_WIN32)
-# pragma warning(pop)
-#endif
 #include "rclcpp/node_interfaces/node_services.hpp"
 #include "rclcpp/node_interfaces/node_time_source.hpp"
 #include "rclcpp/node_interfaces/node_timers.hpp"
 #include "rclcpp/node_interfaces/node_topics.hpp"
 #include "rclcpp/node_interfaces/node_waitables.hpp"
+#include "rclcpp/qos_overriding_options.hpp"
 
 #include "rmw/validate_namespace.h"
+
+#include "./detail/resolve_parameter_overrides.hpp"
 
 using rclcpp::Node;
 using rclcpp::NodeOptions;
@@ -104,6 +101,45 @@ Node::Node(
 {
 }
 
+static
+rclcpp::QoS
+get_parameter_events_qos(
+  rclcpp::node_interfaces::NodeBaseInterface & node_base,
+  const rclcpp::NodeOptions & options)
+{
+  auto final_qos = options.parameter_event_qos();
+  const rcl_arguments_t * global_args = nullptr;
+  auto * rcl_options = options.get_rcl_node_options();
+  if (rcl_options->use_global_arguments) {
+    auto context_ptr = node_base.get_context()->get_rcl_context();
+    global_args = &(context_ptr->global_arguments);
+  }
+
+  auto parameter_overrides = rclcpp::detail::resolve_parameter_overrides(
+    node_base.get_fully_qualified_name(),
+    options.parameter_overrides(),
+    &rcl_options->arguments,
+    global_args);
+
+  auto final_topic_name = node_base.resolve_topic_or_service_name("/parameter_events", false);
+  auto prefix = "qos_overrides." + final_topic_name + ".";
+  std::array<rclcpp::QosPolicyKind, 4> policies = {
+    rclcpp::QosPolicyKind::Depth,
+    rclcpp::QosPolicyKind::Durability,
+    rclcpp::QosPolicyKind::History,
+    rclcpp::QosPolicyKind::Reliability,
+  };
+  for (const auto & policy : policies) {
+    auto param_name = prefix + rclcpp::qos_policy_kind_to_cstr(policy);
+    auto it = parameter_overrides.find(param_name);
+    auto value = it != parameter_overrides.end() ?
+      it->second :
+      rclcpp::detail::get_default_qos_param_value(policy, options.parameter_event_qos());
+    rclcpp::detail::apply_qos_override(policy, value, final_qos);
+  }
+  return final_qos;
+}
+
 Node::Node(
   const std::string & node_name,
   const std::string & namespace_,
@@ -113,11 +149,12 @@ Node::Node(
       namespace_,
       options.context(),
       *(options.get_rcl_node_options()),
-      options.use_intra_process_comms())),
+      options.use_intra_process_comms(),
+      options.enable_topic_statistics())),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),
   node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_.get())),
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
-  node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get())),
+  node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get(), node_timers_.get())),
   node_services_(new rclcpp::node_interfaces::NodeServices(node_base_.get())),
   node_clock_(new rclcpp::node_interfaces::NodeClock(
       node_base_,
@@ -135,7 +172,9 @@ Node::Node(
       options.parameter_overrides(),
       options.start_parameter_services(),
       options.start_parameter_event_publisher(),
-      options.parameter_event_qos(),
+      // This is needed in order to apply parameter overrides to the qos profile provided in
+      // options.
+      get_parameter_events_qos(*node_base_, options),
       options.parameter_event_publisher_options(),
       options.allow_undeclared_parameters(),
       options.automatically_declare_parameters_from_overrides()
@@ -147,13 +186,29 @@ Node::Node(
       node_services_,
       node_logging_,
       node_clock_,
-      node_parameters_
+      node_parameters_,
+      options.clock_qos(),
+      options.use_clock_thread()
     )),
   node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
   node_options_(options),
   sub_namespace_(""),
   effective_namespace_(create_effective_namespace(this->get_namespace(), sub_namespace_))
 {
+  // we have got what we wanted directly from the overrides,
+  // but declare the parameters anyway so they are visible.
+  rclcpp::detail::declare_qos_parameters(
+    rclcpp::QosOverridingOptions
+  {
+    QosPolicyKind::Depth,
+    QosPolicyKind::Durability,
+    QosPolicyKind::History,
+    QosPolicyKind::Reliability,
+  },
+    node_parameters_,
+    node_topics_->resolve_topic_name("/parameter_events"),
+    options.parameter_event_qos(),
+    rclcpp::detail::PublisherQosParametersTraits{});
 }
 
 Node::Node(
@@ -193,7 +248,18 @@ Node::Node(
 }
 
 Node::~Node()
-{}
+{
+  // release sub-interfaces in an order that allows them to consult with node_base during tear-down
+  node_waitables_.reset();
+  node_time_source_.reset();
+  node_parameters_.reset();
+  node_clock_.reset();
+  node_services_.reset();
+  node_topics_.reset();
+  node_timers_.reset();
+  node_logging_.reset();
+  node_graph_.reset();
+}
 
 const char *
 Node::get_name() const
@@ -219,26 +285,58 @@ Node::get_logger() const
   return node_logging_->get_logger();
 }
 
-rclcpp::callback_group::CallbackGroup::SharedPtr
+rclcpp::CallbackGroup::SharedPtr
 Node::create_callback_group(
-  rclcpp::callback_group::CallbackGroupType group_type)
+  rclcpp::CallbackGroupType group_type,
+  bool automatically_add_to_executor_with_node)
 {
-  return node_base_->create_callback_group(group_type);
+  return node_base_->create_callback_group(group_type, automatically_add_to_executor_with_node);
 }
 
-bool
-Node::group_in_node(rclcpp::callback_group::CallbackGroup::SharedPtr group)
+const rclcpp::ParameterValue &
+Node::declare_parameter(const std::string & name)
 {
-  return node_base_->callback_group_in_node(group);
+#ifndef _WIN32
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#else
+# pragma warning(push)
+# pragma warning(disable: 4996)
+#endif
+  return this->node_parameters_->declare_parameter(name);
+#ifndef _WIN32
+# pragma GCC diagnostic pop
+#else
+# pragma warning(pop)
+#endif
 }
 
 const rclcpp::ParameterValue &
 Node::declare_parameter(
   const std::string & name,
   const rclcpp::ParameterValue & default_value,
-  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor)
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+  bool ignore_override)
 {
-  return this->node_parameters_->declare_parameter(name, default_value, parameter_descriptor);
+  return this->node_parameters_->declare_parameter(
+    name,
+    default_value,
+    parameter_descriptor,
+    ignore_override);
+}
+
+const rclcpp::ParameterValue &
+Node::declare_parameter(
+  const std::string & name,
+  rclcpp::ParameterType type,
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+  bool ignore_override)
+{
+  return this->node_parameters_->declare_parameter(
+    name,
+    type,
+    parameter_descriptor,
+    ignore_override);
 }
 
 void
@@ -321,10 +419,16 @@ Node::list_parameters(const std::vector<std::string> & prefixes, uint64_t depth)
   return node_parameters_->list_parameters(prefixes, depth);
 }
 
-rclcpp::Node::OnParametersSetCallbackType
-Node::set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback)
+rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
+Node::add_on_set_parameters_callback(OnParametersSetCallbackType callback)
 {
-  return node_parameters_->set_on_parameters_set_callback(callback);
+  return node_parameters_->add_on_set_parameters_callback(callback);
+}
+
+void
+Node::remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const callback)
+{
+  return node_parameters_->remove_on_set_parameters_callback(callback);
 }
 
 std::vector<std::string>
@@ -345,6 +449,15 @@ Node::get_service_names_and_types() const
   return node_graph_->get_service_names_and_types();
 }
 
+std::map<std::string, std::vector<std::string>>
+Node::get_service_names_and_types_by_node(
+  const std::string & node_name,
+  const std::string & namespace_) const
+{
+  return node_graph_->get_service_names_and_types_by_node(
+    node_name, namespace_);
+}
+
 size_t
 Node::count_publishers(const std::string & topic_name) const
 {
@@ -357,7 +470,19 @@ Node::count_subscribers(const std::string & topic_name) const
   return node_graph_->count_subscribers(topic_name);
 }
 
-const std::vector<rclcpp::callback_group::CallbackGroup::WeakPtr> &
+std::vector<rclcpp::TopicEndpointInfo>
+Node::get_publishers_info_by_topic(const std::string & topic_name, bool no_mangle) const
+{
+  return node_graph_->get_publishers_info_by_topic(topic_name, no_mangle);
+}
+
+std::vector<rclcpp::TopicEndpointInfo>
+Node::get_subscriptions_info_by_topic(const std::string & topic_name, bool no_mangle) const
+{
+  return node_graph_->get_subscriptions_info_by_topic(topic_name, no_mangle);
+}
+
+const std::vector<rclcpp::CallbackGroup::WeakPtr> &
 Node::get_callback_groups() const
 {
   return node_base_->get_callback_groups();
@@ -383,8 +508,14 @@ Node::get_clock()
   return node_clock_->get_clock();
 }
 
+rclcpp::Clock::ConstSharedPtr
+Node::get_clock() const
+{
+  return node_clock_->get_clock();
+}
+
 rclcpp::Time
-Node::now()
+Node::now() const
 {
   return node_clock_->get_clock()->now();
 }
@@ -473,10 +604,4 @@ const NodeOptions &
 Node::get_node_options() const
 {
   return this->node_options_;
-}
-
-bool
-Node::assert_liveliness() const
-{
-  return node_base_->assert_liveliness();
 }

@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "component_manager.hpp"
+#include "rclcpp_components/component_manager.hpp"
 
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ament_index_cpp/get_resource.hpp"
+#include "class_loader/class_loader.hpp"
 #include "rcpputils/filesystem_helper.hpp"
 #include "rcpputils/split.hpp"
 
@@ -29,16 +31,21 @@ namespace rclcpp_components
 {
 
 ComponentManager::ComponentManager(
-  std::weak_ptr<rclcpp::executor::Executor> executor)
-: Node("ComponentManager"),
+  std::weak_ptr<rclcpp::Executor> executor,
+  std::string node_name,
+  const rclcpp::NodeOptions & node_options)
+: Node(std::move(node_name), node_options),
   executor_(executor)
 {
-  loadNode_srv_ = create_service<LoadNode>("~/_container/load_node",
-      std::bind(&ComponentManager::OnLoadNode, this, _1, _2, _3));
-  unloadNode_srv_ = create_service<UnloadNode>("~/_container/unload_node",
-      std::bind(&ComponentManager::OnUnloadNode, this, _1, _2, _3));
-  listNodes_srv_ = create_service<ListNodes>("~/_container/list_nodes",
-      std::bind(&ComponentManager::OnListNodes, this, _1, _2, _3));
+  loadNode_srv_ = create_service<LoadNode>(
+    "~/_container/load_node",
+    std::bind(&ComponentManager::OnLoadNode, this, _1, _2, _3));
+  unloadNode_srv_ = create_service<UnloadNode>(
+    "~/_container/unload_node",
+    std::bind(&ComponentManager::OnUnloadNode, this, _1, _2, _3));
+  listNodes_srv_ = create_service<ListNodes>(
+    "~/_container/list_nodes",
+    std::bind(&ComponentManager::OnListNodes, this, _1, _2, _3));
 }
 
 ComponentManager::~ComponentManager()
@@ -54,12 +61,14 @@ ComponentManager::~ComponentManager()
 }
 
 std::vector<ComponentManager::ComponentResource>
-ComponentManager::get_component_resources(const std::string & package_name) const
+ComponentManager::get_component_resources(
+  const std::string & package_name, const std::string & resource_index) const
 {
   std::string content;
   std::string base_path;
-  if (!ament_index_cpp::get_resource(
-      "rclcpp_components", package_name, content, &base_path))
+  if (
+    !ament_index_cpp::get_resource(
+      resource_index, package_name, content, &base_path))
   {
     throw ComponentManagerException("Could not find requested resource in ament index");
   }
@@ -112,6 +121,51 @@ ComponentManager::create_component_factory(const ComponentResource & resource)
   return {};
 }
 
+rclcpp::NodeOptions
+ComponentManager::CreateNodeOptions(const std::shared_ptr<LoadNode::Request> request)
+{
+  std::vector<rclcpp::Parameter> parameters;
+  for (const auto & p : request->parameters) {
+    parameters.push_back(rclcpp::Parameter::from_parameter_msg(p));
+  }
+
+  std::vector<std::string> remap_rules;
+  remap_rules.reserve(request->remap_rules.size() * 2 + 1);
+  remap_rules.push_back("--ros-args");
+  for (const std::string & rule : request->remap_rules) {
+    remap_rules.push_back("-r");
+    remap_rules.push_back(rule);
+  }
+
+  if (!request->node_name.empty()) {
+    remap_rules.push_back("-r");
+    remap_rules.push_back("__node:=" + request->node_name);
+  }
+
+  if (!request->node_namespace.empty()) {
+    remap_rules.push_back("-r");
+    remap_rules.push_back("__ns:=" + request->node_namespace);
+  }
+
+  auto options = rclcpp::NodeOptions()
+    .use_global_arguments(false)
+    .parameter_overrides(parameters)
+    .arguments(remap_rules);
+
+  for (const auto & a : request->extra_arguments) {
+    const rclcpp::Parameter extra_argument = rclcpp::Parameter::from_parameter_msg(a);
+    if (extra_argument.get_name() == "use_intra_process_comms") {
+      if (extra_argument.get_type() != rclcpp::ParameterType::PARAMETER_BOOL) {
+        throw ComponentManagerException(
+                "Extra component argument 'use_intra_process_comms' must be a boolean");
+      }
+      options.use_intra_process_comms(extra_argument.get_value<bool>());
+    }
+  }
+
+  return options;
+}
+
 void
 ComponentManager::OnLoadNode(
   const std::shared_ptr<rmw_request_id_t> request_header,
@@ -133,27 +187,8 @@ ComponentManager::OnLoadNode(
         continue;
       }
 
-      std::vector<rclcpp::Parameter> parameters;
-      for (const auto & p : request->parameters) {
-        parameters.push_back(rclcpp::Parameter::from_parameter_msg(p));
-      }
-
-      std::vector<std::string> remap_rules {request->remap_rules};
-
-      if (!request->node_name.empty()) {
-        remap_rules.push_back("__node:=" + request->node_name);
-      }
-
-      if (!request->node_namespace.empty()) {
-        remap_rules.push_back("__ns:=" + request->node_namespace);
-      }
-
-      auto options = rclcpp::NodeOptions()
-        .use_global_arguments(false)
-        .parameter_overrides(parameters)
-        .arguments(remap_rules);
-
-      auto node_id = unique_id++;
+      auto options = CreateNodeOptions(request);
+      auto node_id = unique_id_++;
 
       if (0 == node_id) {
         // This puts a technical limit on the number of times you can add a component.
@@ -168,6 +203,11 @@ ComponentManager::OnLoadNode(
 
       try {
         node_wrappers_[node_id] = factory->create_node_instance(options);
+      } catch (const std::exception & ex) {
+        // In the case that the component constructor throws an exception,
+        // rethrow into the following catch block.
+        throw ComponentManagerException(
+                "Component constructor threw an exception: " + std::string(ex.what()));
       } catch (...) {
         // In the case that the component constructor throws an exception,
         // rethrow into the following catch block.
@@ -190,7 +230,7 @@ ComponentManager::OnLoadNode(
     response->error_message = "Failed to find class with the requested plugin name.";
     response->success = false;
   } catch (const ComponentManagerException & ex) {
-    RCLCPP_ERROR(get_logger(), ex.what());
+    RCLCPP_ERROR(get_logger(), "%s", ex.what());
     response->error_message = ex.what();
     response->success = false;
   }
@@ -211,7 +251,7 @@ ComponentManager::OnUnloadNode(
     std::stringstream ss;
     ss << "No node found with unique_id: " << request->unique_id;
     response->error_message = ss.str();
-    RCLCPP_WARN(get_logger(), ss.str());
+    RCLCPP_WARN(get_logger(), "%s", ss.str().c_str());
   } else {
     if (auto exec = executor_.lock()) {
       exec->remove_node(wrapper->second.get_node_base_interface());

@@ -15,6 +15,8 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_SERVICES_INTERFACE_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_SERVICES_INTERFACE_HPP_
 
+#include <string>
+
 #include "rclcpp/callback_group.hpp"
 #include "rclcpp/client.hpp"
 #include "rclcpp/macros.hpp"
@@ -41,14 +43,20 @@ public:
   void
   add_client(
     rclcpp::ClientBase::SharedPtr client_base_ptr,
-    rclcpp::callback_group::CallbackGroup::SharedPtr group) = 0;
+    rclcpp::CallbackGroup::SharedPtr group) = 0;
 
   RCLCPP_PUBLIC
   virtual
   void
   add_service(
     rclcpp::ServiceBase::SharedPtr service_base_ptr,
-    rclcpp::callback_group::CallbackGroup::SharedPtr group) = 0;
+    rclcpp::CallbackGroup::SharedPtr group) = 0;
+
+  /// Get the remapped and expanded service name given a input name.
+  RCLCPP_PUBLIC
+  virtual
+  std::string
+  resolve_service_name(const std::string & name, bool only_expand = false) const = 0;
 };
 
 }  // namespace node_interfaces

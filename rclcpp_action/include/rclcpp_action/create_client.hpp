@@ -37,6 +37,7 @@ namespace rclcpp_action
  * \param[in] name The action name.
  * \param[in] group The action client will be added to this callback group.
  *   If `nullptr`, then the action client is added to the default callback group.
+ * \param[in] options Options to pass to the underlying `rcl_action_client_t`.
  */
 template<typename ActionT>
 typename Client<ActionT>::SharedPtr
@@ -46,11 +47,12 @@ create_client(
   rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr node_logging_interface,
   rclcpp::node_interfaces::NodeWaitablesInterface::SharedPtr node_waitables_interface,
   const std::string & name,
-  rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr)
+  rclcpp::CallbackGroup::SharedPtr group = nullptr,
+  const rcl_action_client_options_t & options = rcl_action_client_get_default_options())
 {
   std::weak_ptr<rclcpp::node_interfaces::NodeWaitablesInterface> weak_node =
     node_waitables_interface;
-  std::weak_ptr<rclcpp::callback_group::CallbackGroup> weak_group = group;
+  std::weak_ptr<rclcpp::CallbackGroup> weak_group = group;
   bool group_is_null = (nullptr == group.get());
 
   auto deleter = [weak_node, weak_group, group_is_null](Client<ActionT> * ptr)
@@ -59,20 +61,19 @@ create_client(
         return;
       }
       auto shared_node = weak_node.lock();
-      if (!shared_node) {
-        return;
-      }
-      // API expects a shared pointer, give it one with a deleter that does nothing.
-      std::shared_ptr<Client<ActionT>> fake_shared_ptr(ptr, [](Client<ActionT> *) {});
+      if (shared_node) {
+        // API expects a shared pointer, give it one with a deleter that does nothing.
+        std::shared_ptr<Client<ActionT>> fake_shared_ptr(ptr, [](Client<ActionT> *) {});
 
-      if (group_is_null) {
-        // Was added to default group
-        shared_node->remove_waitable(fake_shared_ptr, nullptr);
-      } else {
-        // Was added to a specfic group
-        auto shared_group = weak_group.lock();
-        if (shared_group) {
-          shared_node->remove_waitable(fake_shared_ptr, shared_group);
+        if (group_is_null) {
+          // Was added to default group
+          shared_node->remove_waitable(fake_shared_ptr, nullptr);
+        } else {
+          // Was added to a specific group
+          auto shared_group = weak_group.lock();
+          if (shared_group) {
+            shared_node->remove_waitable(fake_shared_ptr, shared_group);
+          }
         }
       }
       delete ptr;
@@ -83,7 +84,8 @@ create_client(
       node_base_interface,
       node_graph_interface,
       node_logging_interface,
-      name),
+      name,
+      options),
     deleter);
 
   node_waitables_interface->add_waitable(action_client, group);
@@ -96,21 +98,24 @@ create_client(
  * \param[in] name The action name.
  * \param[in] group The action client will be added to this callback group.
  *   If `nullptr`, then the action client is added to the default callback group.
+ * \param[in] options Options to pass to the underlying `rcl_action_client_t`.
  */
-template<typename ActionT>
+template<typename ActionT, typename NodeT>
 typename Client<ActionT>::SharedPtr
 create_client(
-  rclcpp::Node::SharedPtr node,
+  NodeT node,
   const std::string & name,
-  rclcpp::callback_group::CallbackGroup::SharedPtr group = nullptr)
+  rclcpp::CallbackGroup::SharedPtr group = nullptr,
+  const rcl_action_client_options_t & options = rcl_action_client_get_default_options())
 {
-  return create_client<ActionT>(
+  return rclcpp_action::create_client<ActionT>(
     node->get_node_base_interface(),
     node->get_node_graph_interface(),
     node->get_node_logging_interface(),
     node->get_node_waitables_interface(),
     name,
-    group);
+    group,
+    options);
 }
 }  // namespace rclcpp_action
 

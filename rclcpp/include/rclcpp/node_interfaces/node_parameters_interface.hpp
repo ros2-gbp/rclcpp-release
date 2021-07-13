@@ -16,6 +16,7 @@
 #define RCLCPP__NODE_INTERFACES__NODE_PARAMETERS_INTERFACE_HPP_
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -32,6 +33,29 @@ namespace rclcpp
 namespace node_interfaces
 {
 
+struct OnSetParametersCallbackHandle
+{
+  RCLCPP_SMART_PTR_DEFINITIONS(OnSetParametersCallbackHandle)
+
+  using OnParametersSetCallbackType =
+    std::function<
+    rcl_interfaces::msg::SetParametersResult(
+      const std::vector<rclcpp::Parameter> &)>;
+
+  OnParametersSetCallbackType callback;
+};
+
+#define RCLCPP_INTERNAL_NODE_PARAMETERS_INTERFACE_DEPRECATE_DECLARE \
+  "declare_parameter() with only a name is deprecated and will be deleted in the future.\n" \
+  "If you want to declare a parameter that won't change type without a default value use:\n" \
+  "`node_params->declare_parameter(name, type)`, with e.g. type=rclcpp::PARAMETER_INTEGER.\n\n" \
+  "If you want to declare a parameter that can dynamically change type use:\n" \
+  "```\n" \
+  "rcl_interfaces::msg::ParameterDescriptor descriptor;\n" \
+  "descriptor.dynamic_typing = true;\n" \
+  "node_params->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);\n" \
+  "```"
+
 /// Pure virtual interface class for the NodeParameters part of the Node API.
 class NodeParametersInterface
 {
@@ -42,6 +66,15 @@ public:
   virtual
   ~NodeParametersInterface() = default;
 
+  /// Declare a parameter.
+  /**
+   * \sa rclcpp::Node::declare_parameter
+   */
+  [[deprecated(RCLCPP_INTERNAL_NODE_PARAMETERS_INTERFACE_DEPRECATE_DECLARE)]]
+  virtual
+  const rclcpp::ParameterValue &
+  declare_parameter(const std::string & name) = 0;
+
   /// Declare and initialize a parameter.
   /**
    * \sa rclcpp::Node::declare_parameter
@@ -51,9 +84,24 @@ public:
   const rclcpp::ParameterValue &
   declare_parameter(
     const std::string & name,
-    const rclcpp::ParameterValue & default_value = rclcpp::ParameterValue(),
+    const rclcpp::ParameterValue & default_value,
     const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor()) = 0;
+    rcl_interfaces::msg::ParameterDescriptor(),
+    bool ignore_override = false) = 0;
+
+  /// Declare a parameter.
+  /**
+   * \sa rclcpp::Node::declare_parameter
+   */
+  RCLCPP_PUBLIC
+  virtual
+  const rclcpp::ParameterValue &
+  declare_parameter(
+    const std::string & name,
+    rclcpp::ParameterType type,
+    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
+    rcl_interfaces::msg::ParameterDescriptor(),
+    bool ignore_override = false) = 0;
 
   /// Undeclare a parameter.
   /**
@@ -82,7 +130,7 @@ public:
   std::vector<rcl_interfaces::msg::SetParametersResult>
   set_parameters(const std::vector<rclcpp::Parameter> & parameters) = 0;
 
-  /// Set and initialize a parameter, all at once.
+  /// Set one or more parameters, all at once.
   /**
    * \sa rclcpp::Node::set_parameters_atomically
    */
@@ -157,28 +205,25 @@ public:
   rcl_interfaces::msg::ListParametersResult
   list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const = 0;
 
-  using OnParametersSetCallbackType =
-    std::function<
-    rcl_interfaces::msg::SetParametersResult(const std::vector<rclcpp::Parameter> &)
-    >;
+  using OnParametersSetCallbackType = OnSetParametersCallbackHandle::OnParametersSetCallbackType;
 
-  using ParametersCallbackFunction [[deprecated("use OnParametersSetCallbackType instead")]] =
-    OnParametersSetCallbackType;
-
-  /// Register a callback for when parameters are being set, return an existing one.
+  /// Add a callback for when parameters are being set.
   /**
-   * \sa rclcpp::Node::set_on_parameters_set_callback
+   * \sa rclcpp::Node::add_on_set_parameters_callback
    */
   RCLCPP_PUBLIC
   virtual
-  OnParametersSetCallbackType
-  set_on_parameters_set_callback(OnParametersSetCallbackType callback) = 0;
+  OnSetParametersCallbackHandle::SharedPtr
+  add_on_set_parameters_callback(OnParametersSetCallbackType callback) = 0;
 
-  [[deprecated("use set_on_parameters_set_callback() instead")]]
+  /// Remove a callback registered with `add_on_set_parameters_callback`.
+  /**
+   * \sa rclcpp::Node::remove_on_set_parameters_callback
+   */
   RCLCPP_PUBLIC
   virtual
   void
-  register_param_change_callback(OnParametersSetCallbackType callback) = 0;
+  remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const handler) = 0;
 
   /// Return the initial parameter values used by the NodeParameters to override default values.
   RCLCPP_PUBLIC

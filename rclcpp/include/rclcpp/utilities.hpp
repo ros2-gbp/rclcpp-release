@@ -45,7 +45,7 @@ namespace rclcpp
 /// Initialize communications via the rmw implementation and set up a global signal handler.
 /**
  * Initializes the global context which is accessible via the function
- * rclcpp::contexts::default_context::get_global_default_context().
+ * rclcpp::contexts::get_global_default_context().
  * Also, installs the global signal handlers with the function
  * rclcpp::install_signal_handlers().
  *
@@ -121,7 +121,7 @@ init_and_remove_ros_arguments(
  * \param[in] argv Argument vector.
  * \returns Members of the argument vector that are not ROS arguments.
  * \throws anything throw_from_rcl_error can throw
- * \throws rclcpp::exceptions::RCLErrorBase if the parsing fails
+ * \throws rclcpp::exceptions::RCLError if the parsing fails
  */
 RCLCPP_PUBLIC
 std::vector<std::string>
@@ -136,26 +136,12 @@ remove_ros_arguments(int argc, char const * const argv[]);
  * If nullptr is given for the context, then the global context is used, i.e.
  * the context initialized by rclcpp::init().
  *
- * \param[in] context Check for shutdown of this Context.
+ * \param[in] context Optional check for shutdown of this Context.
  * \return true if shutdown has been called, false otherwise
  */
 RCLCPP_PUBLIC
 bool
 ok(rclcpp::Context::SharedPtr context = nullptr);
-
-/// Return true if init() has already been called for the given context.
-/**
- * If nullptr is given for the context, then the global context is used, i.e.
- * the context initialized by rclcpp::init().
- *
- * Deprecated, as it is no longer different from rcl_ok().
- *
- * \param[in] context Check for initialization of this Context.
- * \return true if the context is initialized, and false otherwise
- */
-RCLCPP_PUBLIC
-bool
-is_initialized(rclcpp::Context::SharedPtr context = nullptr);
 
 /// Shutdown rclcpp context, invalidating it for derived entities.
 /**
@@ -167,7 +153,8 @@ is_initialized(rclcpp::Context::SharedPtr context = nullptr);
  * This will also cause the "on_shutdown" callbacks to be called.
  *
  * \sa rclcpp::Context::shutdown()
- * \param[in] context to be shutdown
+ * \param[in] context Optional to be shutdown
+ * \param[in] reason Optional string passed to the context shutdown method
  * \return true if shutdown was successful, false if context was already shutdown
  */
 RCLCPP_PUBLIC
@@ -205,7 +192,7 @@ on_shutdown(std::function<void()> callback, rclcpp::Context::SharedPtr context =
  * the context initialized by rclcpp::init().
  *
  * \param[in] nanoseconds A std::chrono::duration representing how long to sleep for.
- * \param[in] context which may interrupt this sleep
+ * \param[in] context Optional which may interrupt this sleep
  * \return true if the condition variable did not timeout.
  */
 RCLCPP_PUBLIC

@@ -37,26 +37,30 @@ public:
   RCLCPP_SMART_PTR_DEFINITIONS(ParameterEventsFilter)
   enum class EventType {NEW, DELETED, CHANGED};  ///< An enum for the type of event.
   /// Used for the listed results
-  using EventPair = std::pair<EventType, rcl_interfaces::msg::Parameter *>;
+  using EventPair = std::pair<EventType, const rcl_interfaces::msg::Parameter *>;
 
   /// Construct a filtered view of a parameter event.
   /**
    * \param[in] event The parameter event message to filter.
    * \param[in] names A list of parameter names of interest.
    * \param[in] types A list of the types of parameter events of iterest.
-  *    EventType NEW, DELETED, or CHANGED
-  *
-  * Example Usage:
-  * If you have recieved a parameter event and are only interested in parameters foo and
-  * bar being added or changed but don't care about deletion.
-  *    auto res = rclcpp::ParameterEventsFilter(
-  *      event_shared_ptr,
-  *      {"foo", "bar"},
-  *      {rclcpp::ParameterEventsFilter::EventType::NEW, rclcpp::ParameterEventsFilter::EventType::CHANGED});
-  */
+   *    EventType NEW, DELETED, or CHANGED
+   *
+   * Example Usage:
+   *
+   * If you have recieved a parameter event and are only interested in parameters foo and
+   * bar being added or changed but don't care about deletion.
+   *
+   * ```cpp
+   * auto res = rclcpp::ParameterEventsFilter(
+   *   event_shared_ptr,
+   *   {"foo", "bar"},
+   *   {rclcpp::ParameterEventsFilter::EventType::NEW, rclcpp::ParameterEventsFilter::EventType::CHANGED});
+   * ```
+   */
   RCLCPP_PUBLIC
   ParameterEventsFilter(
-    rcl_interfaces::msg::ParameterEvent::SharedPtr event,
+    std::shared_ptr<const rcl_interfaces::msg::ParameterEvent> event,
     const std::vector<std::string> & names,
     const std::vector<EventType> & types);
 
@@ -70,7 +74,7 @@ public:
 private:
   // access only allowed via const accessor.
   std::vector<EventPair> result_;  ///< Storage of the resultant vector
-  rcl_interfaces::msg::ParameterEvent::SharedPtr event_;  ///< Keep event in scope
+  std::shared_ptr<const rcl_interfaces::msg::ParameterEvent> event_;  ///< Keep event in scope
 };
 
 }  // namespace rclcpp

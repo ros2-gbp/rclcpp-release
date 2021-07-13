@@ -12,22 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// When compiling this file, Windows produces a deprecation warning for the
-// deprecated function prototype of NodeParameters::register_param_change_callback().
-// Other compilers do not.
-#if defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
 #include "rclcpp/node_interfaces/node_parameters.hpp"
-#if defined(_WIN32)
-# pragma warning(pop)
-#endif
 
 #include <rcl_yaml_param_parser/parser.h>
 
+#include <array>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
+#include <functional>
 #include <limits>
 #include <map>
 #include <memory>
@@ -42,6 +35,8 @@
 #include "rclcpp/scope_exit.hpp"
 #include "rcutils/logging_macros.h"
 #include "rmw/qos_profiles.h"
+
+#include "../detail/resolve_parameter_overrides.hpp"
 
 using rclcpp::node_interfaces::NodeParameters;
 
@@ -76,9 +71,10 @@ NodeParameters::NodeParameters(
   }
 
   if (start_parameter_event_publisher) {
+    // TODO(ivanpauno): Qos of the `/parameters_event` topic should be somehow overridable.
     events_publisher_ = rclcpp::create_publisher<MessageT, AllocatorT, PublisherT>(
       node_topics,
-      "parameter_events",
+      "/parameter_events",
       parameter_event_qos,
       publisher_options);
   }
@@ -93,85 +89,28 @@ NodeParameters::NodeParameters(
     throw std::runtime_error("Need valid node options in NodeParameters");
   }
 
-  // Get paths to yaml files containing initial parameter values
-  std::vector<std::string> yaml_paths;
-
-  auto get_yaml_paths = [&yaml_paths, &options](const rcl_arguments_t * args) {
-      int num_yaml_files = rcl_arguments_get_param_files_count(args);
-      if (num_yaml_files > 0) {
-        char ** param_files;
-        rcl_ret_t ret = rcl_arguments_get_param_files(args, options->allocator, &param_files);
-        if (RCL_RET_OK != ret) {
-          rclcpp::exceptions::throw_from_rcl_error(ret);
-        }
-        auto cleanup_param_files = make_scope_exit(
-          [&param_files, &num_yaml_files, &options]() {
-            for (int i = 0; i < num_yaml_files; ++i) {
-              options->allocator.deallocate(param_files[i], options->allocator.state);
-            }
-            options->allocator.deallocate(param_files, options->allocator.state);
-          });
-        for (int i = 0; i < num_yaml_files; ++i) {
-          yaml_paths.emplace_back(param_files[i]);
-        }
-      }
-    };
-
-  // global before local so that local overwrites global
+  const rcl_arguments_t * global_args = nullptr;
   if (options->use_global_arguments) {
     auto context_ptr = node_base->get_context()->get_rcl_context();
-    get_yaml_paths(&(context_ptr->global_arguments));
+    global_args = &(context_ptr->global_arguments);
   }
-  get_yaml_paths(&(options->arguments));
-
-  // Get fully qualified node name post-remapping to use to find node's params in yaml files
   combined_name_ = node_base->get_fully_qualified_name();
 
-  // TODO(sloretz) use rcl to parse yaml when circular dependency is solved
-  // See https://github.com/ros2/rcl/issues/252
-  for (const std::string & yaml_path : yaml_paths) {
-    rcl_params_t * yaml_params = rcl_yaml_node_struct_init(options->allocator);
-    if (nullptr == yaml_params) {
-      throw std::bad_alloc();
-    }
-    if (!rcl_parse_yaml_file(yaml_path.c_str(), yaml_params)) {
-      std::ostringstream ss;
-      ss << "Failed to parse parameters from file '" << yaml_path << "': " <<
-        rcl_get_error_string().str;
-      rcl_reset_error();
-      throw std::runtime_error(ss.str());
-    }
-
-    rclcpp::ParameterMap initial_map = rclcpp::parameter_map_from(yaml_params);
-    rcl_yaml_node_struct_fini(yaml_params);
-
-    for (auto iter = initial_map.begin(); initial_map.end() != iter; iter++) {
-      // TODO(cottsay) implement further wildcard matching
-      if (iter->first == "/**" || iter->first == combined_name_) {
-        // Combine parameter yaml files, overwriting values in older ones
-        for (auto & param : iter->second) {
-          parameter_overrides_[param.get_name()] =
-            rclcpp::ParameterValue(param.get_value_message());
-        }
-      }
-    }
-  }
-
-  // parameter overrides passed to constructor will overwrite overrides from yaml file sources
-  for (auto & param : parameter_overrides) {
-    parameter_overrides_[param.get_name()] =
-      rclcpp::ParameterValue(param.get_value_message());
-  }
+  parameter_overrides_ = rclcpp::detail::resolve_parameter_overrides(
+    combined_name_, parameter_overrides, &options->arguments, global_args);
 
   // If asked, initialize any parameters that ended up in the initial parameter values,
   // but did not get declared explcitily by this point.
   if (automatically_declare_parameters_from_overrides) {
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    descriptor.dynamic_typing = true;
     for (const auto & pair : this->get_parameter_overrides()) {
       if (!this->has_parameter(pair.first)) {
         this->declare_parameter(
           pair.first,
           pair.second,
-          rcl_interfaces::msg::ParameterDescriptor());
+          descriptor,
+          true);
       }
     }
   }
@@ -197,14 +136,13 @@ __are_doubles_equal(double x, double y, double ulp = 100.0)
   return std::abs(x - y) <= std::numeric_limits<double>::epsilon() * std::abs(x + y) * ulp;
 }
 
-RCLCPP_LOCAL
-inline
-void
-format_reason(std::string & reason, const std::string & name, const char * range_type)
+static
+std::string
+format_range_reason(const std::string & name, const char * range_type)
 {
   std::ostringstream ss;
   ss << "Parameter {" << name << "} doesn't comply with " << range_type << " range.";
-  reason = ss.str();
+  return ss.str();
 }
 
 RCLCPP_LOCAL
@@ -223,7 +161,7 @@ __check_parameter_value_in_range(
     }
     if ((v < integer_range.from_value) || (v > integer_range.to_value)) {
       result.successful = false;
-      format_reason(result.reason, descriptor.name, "integer");
+      result.reason = format_range_reason(descriptor.name, "integer");
       return result;
     }
     if (integer_range.step == 0) {
@@ -233,21 +171,19 @@ __check_parameter_value_in_range(
       return result;
     }
     result.successful = false;
-    format_reason(result.reason, descriptor.name, "integer");
+    result.reason = format_range_reason(descriptor.name, "integer");
     return result;
   }
 
   if (!descriptor.floating_point_range.empty() && value.get_type() == rclcpp::PARAMETER_DOUBLE) {
     double v = value.get<double>();
     auto fp_range = descriptor.floating_point_range.at(0);
-    if (__are_doubles_equal(v, fp_range.from_value) ||
-      __are_doubles_equal(v, fp_range.to_value))
-    {
+    if (__are_doubles_equal(v, fp_range.from_value) || __are_doubles_equal(v, fp_range.to_value)) {
       return result;
     }
     if ((v < fp_range.from_value) || (v > fp_range.to_value)) {
       result.successful = false;
-      format_reason(result.reason, descriptor.name, "floating point");
+      result.reason = format_range_reason(descriptor.name, "floating point");
       return result;
     }
     if (fp_range.step == 0.0) {
@@ -258,10 +194,23 @@ __check_parameter_value_in_range(
       return result;
     }
     result.successful = false;
-    format_reason(result.reason, descriptor.name, "floating point");
+    result.reason = format_range_reason(descriptor.name, "floating point");
     return result;
   }
   return result;
+}
+
+static
+std::string
+format_type_reason(
+  const std::string & name, const std::string & old_type, const std::string & new_type)
+{
+  std::ostringstream ss;
+  // WARN: A condition later depends on this message starting with "Wrong parameter type",
+  // check `declare_parameter` if you modify this!
+  ss << "Wrong parameter type, parameter {" << name << "} is of type {" << old_type <<
+    "}, setting it to {" << new_type << "} is not allowed.";
+  return ss.str();
 }
 
 // Return true if parameter values comply with the descriptors in parameter_infos.
@@ -269,18 +218,38 @@ RCLCPP_LOCAL
 rcl_interfaces::msg::SetParametersResult
 __check_parameters(
   std::map<std::string, rclcpp::node_interfaces::ParameterInfo> & parameter_infos,
-  const std::vector<rclcpp::Parameter> & parameters)
+  const std::vector<rclcpp::Parameter> & parameters,
+  bool allow_undeclared)
 {
   rcl_interfaces::msg::SetParametersResult result;
   result.successful = true;
   for (const rclcpp::Parameter & parameter : parameters) {
-    const rcl_interfaces::msg::ParameterDescriptor & descriptor =
-      parameter_infos[parameter.get_name()].descriptor;
+    std::string name = parameter.get_name();
+    rcl_interfaces::msg::ParameterDescriptor descriptor;
+    if (allow_undeclared) {
+      auto it = parameter_infos.find(name);
+      if (it != parameter_infos.cend()) {
+        descriptor = it->second.descriptor;
+      } else {
+        // implicitly declared parameters are dinamically typed!
+        descriptor.dynamic_typing = true;
+      }
+    } else {
+      descriptor = parameter_infos[name].descriptor;
+    }
+    const auto new_type = parameter.get_type();
+    const auto specified_type = static_cast<rclcpp::ParameterType>(descriptor.type);
+    result.successful = descriptor.dynamic_typing || specified_type == new_type;
+    if (!result.successful) {
+      result.reason = format_type_reason(
+        name, rclcpp::to_string(specified_type), rclcpp::to_string(new_type));
+      return result;
+    }
     result = __check_parameter_value_in_range(
       descriptor,
       parameter.get_parameter_value());
     if (!result.successful) {
-      break;
+      return result;
     }
   }
   return result;
@@ -288,25 +257,57 @@ __check_parameters(
 
 using OnParametersSetCallbackType =
   rclcpp::node_interfaces::NodeParametersInterface::OnParametersSetCallbackType;
+using CallbacksContainerType =
+  rclcpp::node_interfaces::NodeParameters::CallbacksContainerType;
+using OnSetParametersCallbackHandle =
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle;
+
+RCLCPP_LOCAL
+rcl_interfaces::msg::SetParametersResult
+__call_on_parameters_set_callbacks(
+  const std::vector<rclcpp::Parameter> & parameters,
+  CallbacksContainerType & callback_container,
+  const OnParametersSetCallbackType & callback)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  auto it = callback_container.begin();
+  while (it != callback_container.end()) {
+    auto shared_handle = it->lock();
+    if (nullptr != shared_handle) {
+      result = shared_handle->callback(parameters);
+      if (!result.successful) {
+        return result;
+      }
+      it++;
+    } else {
+      it = callback_container.erase(it);
+    }
+  }
+  if (callback) {
+    result = callback(parameters);
+  }
+  return result;
+}
 
 RCLCPP_LOCAL
 rcl_interfaces::msg::SetParametersResult
 __set_parameters_atomically_common(
   const std::vector<rclcpp::Parameter> & parameters,
   std::map<std::string, rclcpp::node_interfaces::ParameterInfo> & parameter_infos,
-  OnParametersSetCallbackType on_set_parameters_callback)
+  CallbacksContainerType & callback_container,
+  const OnParametersSetCallbackType & callback,
+  bool allow_undeclared = false)
 {
-  // Call the user callback to see if the new value(s) are allowed.
-  rcl_interfaces::msg::SetParametersResult result;
-  result.successful = true;
-  if (on_set_parameters_callback) {
-    result = on_set_parameters_callback(parameters);
-  }
+  // Check if the value being set complies with the descriptor.
+  rcl_interfaces::msg::SetParametersResult result = __check_parameters(
+    parameter_infos, parameters, allow_undeclared);
   if (!result.successful) {
     return result;
   }
-  // Check if the value being set complies with the descriptor.
-  result = __check_parameters(parameter_infos, parameters);
+  // Call the user callback to see if the new value(s) are allowed.
+  result =
+    __call_on_parameters_set_callbacks(parameters, callback_container, callback);
   if (!result.successful) {
     return result;
   }
@@ -332,9 +333,10 @@ __declare_parameter_common(
   const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
   std::map<std::string, rclcpp::node_interfaces::ParameterInfo> & parameters_out,
   const std::map<std::string, rclcpp::ParameterValue> & overrides,
-  OnParametersSetCallbackType on_set_parameters_callback,
+  CallbacksContainerType & callback_container,
+  const OnParametersSetCallbackType & callback,
   rcl_interfaces::msg::ParameterEvent * parameter_event_out,
-  bool use_overrides = true)
+  bool ignore_override = false)
 {
   using rclcpp::node_interfaces::ParameterInfo;
   std::map<std::string, ParameterInfo> parameter_infos {{name, ParameterInfo()}};
@@ -343,8 +345,23 @@ __declare_parameter_common(
   // Use the value from the overrides if available, otherwise use the default.
   const rclcpp::ParameterValue * initial_value = &default_value;
   auto overrides_it = overrides.find(name);
-  if (use_overrides && overrides_it != overrides.end()) {
+  if (!ignore_override && overrides_it != overrides.end()) {
     initial_value = &overrides_it->second;
+  }
+
+  // If there is no initial value, then skip initialization
+  if (initial_value->get_type() == rclcpp::PARAMETER_NOT_SET) {
+    // Add declared parameters to storage (without a value)
+    parameter_infos[name].descriptor.name = name;
+    if (parameter_descriptor.dynamic_typing) {
+      parameter_infos[name].descriptor.type = rclcpp::PARAMETER_NOT_SET;
+    } else {
+      parameter_infos[name].descriptor.type = parameter_descriptor.type;
+    }
+    parameters_out[name] = parameter_infos.at(name);
+    rcl_interfaces::msg::SetParametersResult result;
+    result.successful = true;
+    return result;
   }
 
   // Check with the user's callback to see if the initial value can be set.
@@ -353,7 +370,12 @@ __declare_parameter_common(
   auto result = __set_parameters_atomically_common(
     parameter_wrappers,
     parameter_infos,
-    on_set_parameters_callback);
+    callback_container,
+    callback);
+
+  if (!result.successful) {
+    return result;
+  }
 
   // Add declared parameters to storage.
   parameters_out[name] = parameter_infos.at(name);
@@ -366,23 +388,44 @@ __declare_parameter_common(
   return result;
 }
 
+static
 const rclcpp::ParameterValue &
-NodeParameters::declare_parameter(
+declare_parameter_helper(
   const std::string & name,
+  rclcpp::ParameterType type,
   const rclcpp::ParameterValue & default_value,
-  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor)
+  rcl_interfaces::msg::ParameterDescriptor parameter_descriptor,
+  bool ignore_override,
+  std::map<std::string, rclcpp::node_interfaces::ParameterInfo> & parameters,
+  const std::map<std::string, rclcpp::ParameterValue> & overrides,
+  CallbacksContainerType & callback_container,
+  const OnParametersSetCallbackType & callback,
+  rclcpp::Publisher<rcl_interfaces::msg::ParameterEvent> * events_publisher,
+  const std::string & combined_name,
+  rclcpp::node_interfaces::NodeClockInterface & node_clock)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
   // TODO(sloretz) parameter name validation
   if (name.empty()) {
     throw rclcpp::exceptions::InvalidParametersException("parameter name must not be empty");
   }
 
   // Error if this parameter has already been declared and is different
-  if (__lockless_has_parameter(parameters_, name)) {
+  if (__lockless_has_parameter(parameters, name)) {
     throw rclcpp::exceptions::ParameterAlreadyDeclaredException(
             "parameter '" + name + "' has already been declared");
+  }
+
+  if (!parameter_descriptor.dynamic_typing) {
+    if (rclcpp::PARAMETER_NOT_SET == type) {
+      type = default_value.get_type();
+    }
+    if (rclcpp::PARAMETER_NOT_SET == type) {
+      throw rclcpp::exceptions::InvalidParameterTypeException{
+              name,
+              "cannot declare a statically typed parameter with an uninitialized value"
+      };
+    }
+    parameter_descriptor.type = static_cast<uint8_t>(type);
   }
 
   rcl_interfaces::msg::ParameterEvent parameter_event;
@@ -390,29 +433,113 @@ NodeParameters::declare_parameter(
     name,
     default_value,
     parameter_descriptor,
-    parameters_,
-    parameter_overrides_,
-    on_parameters_set_callback_,
-    &parameter_event);
+    parameters,
+    overrides,
+    callback_container,
+    callback,
+    &parameter_event,
+    ignore_override);
 
   // If it failed to be set, then throw an exception.
   if (!result.successful) {
+    constexpr const char type_error_msg_start[] = "Wrong parameter type";
+    if (
+      0u == std::strncmp(
+        result.reason.c_str(), type_error_msg_start, sizeof(type_error_msg_start) - 1))
+    {
+      // TODO(ivanpauno): Refactor the logic so we don't need the above `strncmp` and we can
+      // detect between both exceptions more elegantly.
+      throw rclcpp::exceptions::InvalidParameterTypeException(name, result.reason);
+    }
     throw rclcpp::exceptions::InvalidParameterValueException(
             "parameter '" + name + "' could not be set: " + result.reason);
   }
 
   // Publish if events_publisher_ is not nullptr, which may be if disabled in the constructor.
-  if (nullptr != events_publisher_) {
-    events_publisher_->publish(parameter_event);
+  if (nullptr != events_publisher) {
+    parameter_event.node = combined_name;
+    parameter_event.stamp = node_clock.get_clock()->now();
+    events_publisher->publish(parameter_event);
   }
 
-  return parameters_.at(name).value;
+  return parameters.at(name).value;
+}
+
+const rclcpp::ParameterValue &
+NodeParameters::declare_parameter(const std::string & name)
+{
+  rcl_interfaces::msg::ParameterDescriptor descriptor;
+  descriptor.dynamic_typing = true;
+  return this->declare_parameter(name, rclcpp::ParameterValue{}, descriptor, false);
+}
+
+const rclcpp::ParameterValue &
+NodeParameters::declare_parameter(
+  const std::string & name,
+  const rclcpp::ParameterValue & default_value,
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+  bool ignore_override)
+{
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
+  ParameterMutationRecursionGuard guard(parameter_modification_enabled_);
+
+  return declare_parameter_helper(
+    name,
+    rclcpp::PARAMETER_NOT_SET,
+    default_value,
+    parameter_descriptor,
+    ignore_override,
+    parameters_,
+    parameter_overrides_,
+    on_parameters_set_callback_container_,
+    on_parameters_set_callback_,
+    events_publisher_.get(),
+    combined_name_,
+    *node_clock_);
+}
+
+const rclcpp::ParameterValue &
+NodeParameters::declare_parameter(
+  const std::string & name,
+  rclcpp::ParameterType type,
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+  bool ignore_override)
+{
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
+  ParameterMutationRecursionGuard guard(parameter_modification_enabled_);
+
+  if (rclcpp::PARAMETER_NOT_SET == type) {
+    throw std::invalid_argument{
+            "declare_parameter(): the provided parameter type cannot be rclcpp::PARAMETER_NOT_SET"};
+  }
+
+  if (parameter_descriptor.dynamic_typing == true) {
+    throw std::invalid_argument{
+            "declare_parameter(): cannot declare parameter of specific type and pass descriptor"
+            "with `dynamic_typing=true`"};
+  }
+
+  return declare_parameter_helper(
+    name,
+    type,
+    rclcpp::ParameterValue{},
+    parameter_descriptor,
+    ignore_override,
+    parameters_,
+    parameter_overrides_,
+    on_parameters_set_callback_container_,
+    on_parameters_set_callback_,
+    events_publisher_.get(),
+    combined_name_,
+    *node_clock_);
 }
 
 void
 NodeParameters::undeclare_parameter(const std::string & name)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
+
+  ParameterMutationRecursionGuard guard(parameter_modification_enabled_);
 
   auto parameter_info = parameters_.find(name);
   if (parameter_info == parameters_.end()) {
@@ -424,6 +551,10 @@ NodeParameters::undeclare_parameter(const std::string & name)
     throw rclcpp::exceptions::ParameterImmutableException(
             "cannot undeclare parameter '" + name + "' because it is read-only");
   }
+  if (!parameter_info->second.descriptor.dynamic_typing) {
+    throw rclcpp::exceptions::InvalidParameterTypeException{
+            name, "cannot undeclare an statically typed parameter"};
+  }
 
   parameters_.erase(parameter_info);
 }
@@ -431,7 +562,7 @@ NodeParameters::undeclare_parameter(const std::string & name)
 bool
 NodeParameters::has_parameter(const std::string & name) const
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
 
   return __lockless_has_parameter(parameters_, name);
 }
@@ -465,7 +596,9 @@ __find_parameter_by_name(
 rcl_interfaces::msg::SetParametersResult
 NodeParameters::set_parameters_atomically(const std::vector<rclcpp::Parameter> & parameters)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
+
+  ParameterMutationRecursionGuard guard(parameter_modification_enabled_);
 
   rcl_interfaces::msg::SetParametersResult result;
 
@@ -514,18 +647,25 @@ NodeParameters::set_parameters_atomically(const std::vector<rclcpp::Parameter> &
   std::map<std::string, rclcpp::node_interfaces::ParameterInfo> staged_parameter_changes;
   rcl_interfaces::msg::ParameterEvent parameter_event_msg;
   parameter_event_msg.node = combined_name_;
+  CallbacksContainerType empty_callback_container;
+
+  // Implicit declare uses dynamic type descriptor.
+  rcl_interfaces::msg::ParameterDescriptor descriptor;
+  descriptor.dynamic_typing = true;
   for (auto parameter_to_be_declared : parameters_to_be_declared) {
     // This should not throw, because we validated the name and checked that
     // the parameter was not already declared.
     result = __declare_parameter_common(
       parameter_to_be_declared->get_name(),
       parameter_to_be_declared->get_parameter_value(),
-      rcl_interfaces::msg::ParameterDescriptor(),  // Implicit declare uses default descriptor.
+      descriptor,
       staged_parameter_changes,
       parameter_overrides_,
-      nullptr,  // callback is explicitly null, so that it is called only once, when setting below.
+      // Only call callbacks once below
+      empty_callback_container,  // callback_container is explicitly empty
+      nullptr,  // callback is explicitly null.
       &parameter_event_msg,
-      false);
+      true);
     if (!result.successful) {
       // Declare failed, return knowing that nothing was changed because the
       // staged changes were not applied.
@@ -567,19 +707,28 @@ NodeParameters::set_parameters_atomically(const std::vector<rclcpp::Parameter> &
     if (rclcpp::PARAMETER_NOT_SET == parameter.get_type()) {
       auto it = parameters_.find(parameter.get_name());
       if (it != parameters_.end() && rclcpp::PARAMETER_NOT_SET != it->second.value.get_type()) {
+        if (!it->second.descriptor.dynamic_typing) {
+          result.reason = "cannot undeclare an statically typed parameter";
+          result.successful = false;
+          return result;
+        }
         parameters_to_be_undeclared.push_back(&parameter);
       }
     }
   }
 
-  // Set the all of the parameters including the ones declared implicitly above.
+  // Set all of the parameters including the ones declared implicitly above.
   result = __set_parameters_atomically_common(
     // either the original parameters given by the user, or ones updated with initial values
     *parameters_to_be_set,
     // they are actually set on the official parameter storage
     parameters_,
     // this will get called once, with all the parameters to be set
-    on_parameters_set_callback_);
+    on_parameters_set_callback_container_,
+    // These callbacks are called once. When a callback returns an unsuccessful result,
+    // the remaining aren't called.
+    on_parameters_set_callback_,
+    allow_undeclared_);  // allow undeclared
 
   // If not successful, then stop here.
   if (!result.successful) {
@@ -641,7 +790,7 @@ NodeParameters::set_parameters_atomically(const std::vector<rclcpp::Parameter> &
 std::vector<rclcpp::Parameter>
 NodeParameters::get_parameters(const std::vector<std::string> & names) const
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   std::vector<rclcpp::Parameter> results;
   results.reserve(names.size());
 
@@ -664,14 +813,21 @@ NodeParameters::get_parameters(const std::vector<std::string> & names) const
 rclcpp::Parameter
 NodeParameters::get_parameter(const std::string & name) const
 {
-  rclcpp::Parameter parameter;
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
 
-  if (get_parameter(name, parameter)) {
-    return parameter;
+  auto param_iter = parameters_.find(name);
+  if (
+    parameters_.end() != param_iter &&
+    (param_iter->second.value.get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET ||
+    param_iter->second.descriptor.dynamic_typing))
+  {
+    return rclcpp::Parameter{name, param_iter->second.value};
   } else if (this->allow_undeclared_) {
-    return parameter;
-  } else {
+    return rclcpp::Parameter{};
+  } else if (parameters_.end() == param_iter) {
     throw rclcpp::exceptions::ParameterNotDeclaredException(name);
+  } else {
+    throw rclcpp::exceptions::ParameterUninitializedException(name);
   }
 }
 
@@ -680,7 +836,7 @@ NodeParameters::get_parameter(
   const std::string & name,
   rclcpp::Parameter & parameter) const
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
 
   auto param_iter = parameters_.find(name);
   if (
@@ -699,7 +855,7 @@ NodeParameters::get_parameters_by_prefix(
   const std::string & prefix,
   std::map<std::string, rclcpp::Parameter> & parameters) const
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
 
   std::string prefix_with_dot = prefix.empty() ? prefix : prefix + ".";
   bool ret = false;
@@ -718,7 +874,7 @@ NodeParameters::get_parameters_by_prefix(
 std::vector<rcl_interfaces::msg::ParameterDescriptor>
 NodeParameters::describe_parameters(const std::vector<std::string> & names) const
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   std::vector<rcl_interfaces::msg::ParameterDescriptor> results;
   results.reserve(names.size());
 
@@ -746,7 +902,7 @@ NodeParameters::describe_parameters(const std::vector<std::string> & names) cons
 std::vector<uint8_t>
 NodeParameters::get_parameter_types(const std::vector<std::string> & names) const
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   std::vector<uint8_t> results;
   results.reserve(names.size());
 
@@ -772,7 +928,7 @@ NodeParameters::get_parameter_types(const std::vector<std::string> & names) cons
 rcl_interfaces::msg::ListParametersResult
 NodeParameters::list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const
 {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   rcl_interfaces::msg::ListParametersResult result;
 
   // TODO(mikaelarguedas) define parameter separator different from "/" to avoid ambiguity
@@ -782,25 +938,27 @@ NodeParameters::list_parameters(const std::vector<std::string> & prefixes, uint6
     bool get_all = (prefixes.size() == 0) &&
       ((depth == rcl_interfaces::srv::ListParameters::Request::DEPTH_RECURSIVE) ||
       (static_cast<uint64_t>(std::count(kv.first.begin(), kv.first.end(), *separator)) < depth));
-    bool prefix_matches = std::any_of(prefixes.cbegin(), prefixes.cend(),
-        [&kv, &depth, &separator](const std::string & prefix) {
-          if (kv.first == prefix) {
-            return true;
-          } else if (kv.first.find(prefix + separator) == 0) {
-            size_t length = prefix.length();
-            std::string substr = kv.first.substr(length);
-            // Cast as unsigned integer to avoid warning
-            return (depth == rcl_interfaces::srv::ListParameters::Request::DEPTH_RECURSIVE) ||
-            (static_cast<uint64_t>(std::count(substr.begin(), substr.end(), *separator)) < depth);
-          }
-          return false;
-        });
+    bool prefix_matches = std::any_of(
+      prefixes.cbegin(), prefixes.cend(),
+      [&kv, &depth, &separator](const std::string & prefix) {
+        if (kv.first == prefix) {
+          return true;
+        } else if (kv.first.find(prefix + separator) == 0) {
+          size_t length = prefix.length();
+          std::string substr = kv.first.substr(length);
+          // Cast as unsigned integer to avoid warning
+          return (depth == rcl_interfaces::srv::ListParameters::Request::DEPTH_RECURSIVE) ||
+          (static_cast<uint64_t>(std::count(substr.begin(), substr.end(), *separator)) < depth);
+        }
+        return false;
+      });
     if (get_all || prefix_matches) {
       result.names.push_back(kv.first);
       size_t last_separator = kv.first.find_last_of(separator);
       if (std::string::npos != last_separator) {
         std::string prefix = kv.first.substr(0, last_separator);
-        if (std::find(result.prefixes.cbegin(), result.prefixes.cend(), prefix) ==
+        if (
+          std::find(result.prefixes.cbegin(), result.prefixes.cend(), prefix) ==
           result.prefixes.cend())
         {
           result.prefixes.push_back(prefix);
@@ -811,36 +969,38 @@ NodeParameters::list_parameters(const std::vector<std::string> & prefixes, uint6
   return result;
 }
 
-NodeParameters::OnParametersSetCallbackType
-NodeParameters::set_on_parameters_set_callback(OnParametersSetCallbackType callback)
+void
+NodeParameters::remove_on_set_parameters_callback(
+  const OnSetParametersCallbackHandle * const handle)
 {
-  auto existing_callback = on_parameters_set_callback_;
-  on_parameters_set_callback_ = callback;
-  return existing_callback;
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
+  ParameterMutationRecursionGuard guard(parameter_modification_enabled_);
+
+  auto it = std::find_if(
+    on_parameters_set_callback_container_.begin(),
+    on_parameters_set_callback_container_.end(),
+    [handle](const auto & weak_handle) {
+      return handle == weak_handle.lock().get();
+    });
+  if (it != on_parameters_set_callback_container_.end()) {
+    on_parameters_set_callback_container_.erase(it);
+  } else {
+    throw std::runtime_error("Callback doesn't exist");
+  }
 }
 
-#if !defined(_WIN32)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else  // !defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-void
-NodeParameters::register_param_change_callback(ParametersCallbackFunction callback)
+OnSetParametersCallbackHandle::SharedPtr
+NodeParameters::add_on_set_parameters_callback(OnParametersSetCallbackType callback)
 {
-  if (on_parameters_set_callback_) {
-    RCLCPP_WARN(
-      node_logging_->get_logger(),
-      "on_parameters_set_callback already registered, overwriting previous callback");
-  }
-  on_parameters_set_callback_ = callback;
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
+  ParameterMutationRecursionGuard guard(parameter_modification_enabled_);
+
+  auto handle = std::make_shared<OnSetParametersCallbackHandle>();
+  handle->callback = callback;
+  // the last callback registered is executed first.
+  on_parameters_set_callback_container_.emplace_front(handle);
+  return handle;
 }
-#if !defined(_WIN32)
-# pragma GCC diagnostic pop
-#else  // !defined(_WIN32)
-# pragma warning(pop)
-#endif
 
 const std::map<std::string, rclcpp::ParameterValue> &
 NodeParameters::get_parameter_overrides() const

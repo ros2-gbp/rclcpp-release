@@ -38,13 +38,17 @@ public:
   /**
    * Default values for the node options:
    *
-   *   - context = rclcpp::contexts::default_context::get_global_default_context()
+   *   - context = rclcpp::contexts::get_global_default_context()
    *   - arguments = {}
    *   - parameter_overrides = {}
    *   - use_global_arguments = true
    *   - use_intra_process_comms = false
+   *   - enable_topic_statistics = false
    *   - start_parameter_services = true
    *   - start_parameter_event_publisher = true
+   *   - clock_qos = rclcpp::ClockQoS()
+   *   - use_clock_thread = true
+   *   - rosout_qos = rclcpp::RosoutQoS()
    *   - parameter_event_qos = rclcpp::ParameterEventQoS
    *     - with history setting and depth from rmw_qos_profile_parameter_events
    *   - parameter_event_publisher_options = rclcpp::PublisherOptionsBase
@@ -76,6 +80,9 @@ public:
    * This data structure is created lazily, on the first call to this function.
    * Repeated calls will not regenerate it unless one of the input settings
    * changed, like arguments, use_global_arguments, or the rcl allocator.
+   *
+   * \return a const rcl_node_options_t structure used by the node
+   * \throws exceptions::UnknownROSArgsError if there are unknown ROS arguments
    */
   RCLCPP_PUBLIC
   const rcl_node_options_t *
@@ -99,7 +106,7 @@ public:
   /// Set the arguments, return this for parameter idiom.
   /**
    * These arguments are used to extract remappings used by the node and other
-   * settings.
+   * ROS specific settings, as well as user defined non-ROS arguments.
    *
    * This will cause the internal rcl_node_options_t struct to be invalidated.
    */
@@ -152,6 +159,22 @@ public:
   NodeOptions &
   use_global_arguments(bool use_global_arguments);
 
+  /// Return the enable_rosout flag.
+  RCLCPP_PUBLIC
+  bool
+  enable_rosout() const;
+
+  /// Set the enable_rosout flag, return this for parameter idiom.
+  /**
+   * If false this will cause the node not to use rosout logging.
+   *
+   * Defaults to true for now, as there are still some cases where it is
+   * desirable.
+   */
+  RCLCPP_PUBLIC
+  NodeOptions &
+  enable_rosout(bool enable_rosout);
+
   /// Return the use_intra_process_comms flag.
   RCLCPP_PUBLIC
   bool
@@ -170,6 +193,23 @@ public:
   RCLCPP_PUBLIC
   NodeOptions &
   use_intra_process_comms(bool use_intra_process_comms);
+
+  /// Return the enable_topic_statistics flag.
+  RCLCPP_PUBLIC
+  bool
+  enable_topic_statistics() const;
+
+  /// Set the enable_topic_statistics flag, return this for parameter idiom.
+  /**
+   * If true, topic statistics collection and publication will be enabled
+   * for all subscriptions.
+   * This can be used to override the global topic statistics setting.
+   *
+   * Defaults to false.
+   */
+  RCLCPP_PUBLIC
+  NodeOptions &
+  enable_topic_statistics(bool enable_topic_statistics);
 
   /// Return the start_parameter_services flag.
   RCLCPP_PUBLIC
@@ -206,6 +246,33 @@ public:
   NodeOptions &
   start_parameter_event_publisher(bool start_parameter_event_publisher);
 
+  /// Return a reference to the clock QoS.
+  RCLCPP_PUBLIC
+  const rclcpp::QoS &
+  clock_qos() const;
+
+  /// Set the clock QoS.
+  /**
+   * The QoS settings to be used for the publisher on /clock topic, if enabled.
+   */
+  RCLCPP_PUBLIC
+  NodeOptions &
+  clock_qos(const rclcpp::QoS & clock_qos);
+
+
+  /// Return the use_clock_thread flag.
+  RCLCPP_PUBLIC
+  bool
+  use_clock_thread() const;
+
+  /// Set the use_clock_thread flag, return this for parameter idiom.
+  /**
+   * If true, a dedicated thread will be used to subscribe to "/clock" topic.
+   */
+  RCLCPP_PUBLIC
+  NodeOptions &
+  use_clock_thread(bool use_clock_thread);
+
   /// Return a reference to the parameter_event_qos QoS.
   RCLCPP_PUBLIC
   const rclcpp::QoS &
@@ -218,6 +285,19 @@ public:
   RCLCPP_PUBLIC
   NodeOptions &
   parameter_event_qos(const rclcpp::QoS & parameter_event_qos);
+
+  /// Return a reference to the rosout QoS.
+  RCLCPP_PUBLIC
+  const rclcpp::QoS &
+  rosout_qos() const;
+
+  /// Set the rosout QoS.
+  /**
+   * The QoS settings to be used for the publisher on /rosout topic, if enabled.
+   */
+  RCLCPP_PUBLIC
+  NodeOptions &
+  rosout_qos(const rclcpp::QoS & rosout_qos);
 
   /// Return a reference to the parameter_event_publisher_options.
   RCLCPP_PUBLIC
@@ -290,11 +370,6 @@ public:
   NodeOptions &
   allocator(rcl_allocator_t allocator);
 
-protected:
-  /// Retrieve the ROS_DOMAIN_ID environment variable and populate options.
-  size_t
-  get_domain_id_from_env() const;
-
 private:
   // This is mutable to allow for a const accessor which lazily creates the node options instance.
   /// Underlying rcl_node_options structure.
@@ -304,7 +379,7 @@ private:
   // documentation in this class.
 
   rclcpp::Context::SharedPtr context_ {
-    rclcpp::contexts::default_context::get_global_default_context()};
+    rclcpp::contexts::get_global_default_context()};
 
   std::vector<std::string> arguments_ {};
 
@@ -312,15 +387,25 @@ private:
 
   bool use_global_arguments_ {true};
 
+  bool enable_rosout_ {true};
+
   bool use_intra_process_comms_ {false};
+
+  bool enable_topic_statistics_ {false};
 
   bool start_parameter_services_ {true};
 
   bool start_parameter_event_publisher_ {true};
 
+  rclcpp::QoS clock_qos_ = rclcpp::ClockQoS();
+
+  bool use_clock_thread_ {true};
+
   rclcpp::QoS parameter_event_qos_ = rclcpp::ParameterEventsQoS(
     rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_parameter_events)
   );
+
+  rclcpp::QoS rosout_qos_ = rclcpp::RosoutQoS();
 
   rclcpp::PublisherOptionsBase parameter_event_publisher_options_ = rclcpp::PublisherOptionsBase();
 

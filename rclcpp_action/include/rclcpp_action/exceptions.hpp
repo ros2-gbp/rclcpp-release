@@ -16,6 +16,7 @@
 #define RCLCPP_ACTION__EXCEPTIONS_HPP_
 
 #include <stdexcept>
+#include <string>
 
 namespace rclcpp_action
 {
@@ -25,7 +26,7 @@ class UnknownGoalHandleError : public std::invalid_argument
 {
 public:
   UnknownGoalHandleError()
-  : std::invalid_argument("Goal handle is not know to this client.")
+  : std::invalid_argument("Goal handle is not known to this client.")
   {
   }
 };
@@ -33,8 +34,9 @@ public:
 class UnawareGoalHandleError : public std::runtime_error
 {
 public:
-  UnawareGoalHandleError()
-  : std::runtime_error("Goal handle is not tracking the goal result.")
+  UnawareGoalHandleError(
+    const std::string & message = "Goal handle is not tracking the goal result.")
+  : std::runtime_error(message)
   {
   }
 };

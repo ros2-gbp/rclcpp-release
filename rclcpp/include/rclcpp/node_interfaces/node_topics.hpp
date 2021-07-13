@@ -22,6 +22,7 @@
 
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
+#include "rclcpp/node_interfaces/node_timers_interface.hpp"
 #include "rclcpp/node_interfaces/node_topics_interface.hpp"
 #include "rclcpp/publisher.hpp"
 #include "rclcpp/publisher_factory.hpp"
@@ -39,7 +40,9 @@ public:
   RCLCPP_SMART_PTR_ALIASES_ONLY(NodeTopicsInterface)
 
   RCLCPP_PUBLIC
-  explicit NodeTopics(rclcpp::node_interfaces::NodeBaseInterface * node_base);
+  NodeTopics(
+    rclcpp::node_interfaces::NodeBaseInterface * node_base,
+    rclcpp::node_interfaces::NodeTimersInterface * node_timers);
 
   RCLCPP_PUBLIC
   ~NodeTopics() override;
@@ -49,37 +52,44 @@ public:
   create_publisher(
     const std::string & topic_name,
     const rclcpp::PublisherFactory & publisher_factory,
-    const rcl_publisher_options_t & publisher_options,
-    bool use_intra_process) override;
+    const rclcpp::QoS & qos) override;
 
   RCLCPP_PUBLIC
   void
   add_publisher(
     rclcpp::PublisherBase::SharedPtr publisher,
-    rclcpp::callback_group::CallbackGroup::SharedPtr callback_group) override;
+    rclcpp::CallbackGroup::SharedPtr callback_group) override;
 
   RCLCPP_PUBLIC
   rclcpp::SubscriptionBase::SharedPtr
   create_subscription(
     const std::string & topic_name,
     const rclcpp::SubscriptionFactory & subscription_factory,
-    const rcl_subscription_options_t & subscription_options,
-    bool use_intra_process) override;
+    const rclcpp::QoS & qos) override;
 
   RCLCPP_PUBLIC
   void
   add_subscription(
     rclcpp::SubscriptionBase::SharedPtr subscription,
-    rclcpp::callback_group::CallbackGroup::SharedPtr callback_group) override;
+    rclcpp::CallbackGroup::SharedPtr callback_group) override;
 
   RCLCPP_PUBLIC
   rclcpp::node_interfaces::NodeBaseInterface *
   get_node_base_interface() const override;
 
+  RCLCPP_PUBLIC
+  rclcpp::node_interfaces::NodeTimersInterface *
+  get_node_timers_interface() const override;
+
+  RCLCPP_PUBLIC
+  std::string
+  resolve_topic_name(const std::string & name, bool only_expand = false) const override;
+
 private:
   RCLCPP_DISABLE_COPY(NodeTopics)
 
   rclcpp::node_interfaces::NodeBaseInterface * node_base_;
+  rclcpp::node_interfaces::NodeTimersInterface * node_timers_;
 };
 
 }  // namespace node_interfaces
