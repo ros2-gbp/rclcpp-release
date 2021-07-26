@@ -148,10 +148,16 @@ public:
     rclcpp::CallbackGroupType group_type,
     bool automatically_add_to_executor_with_node = true);
 
-  /// Return the list of callback groups in the node.
+  /// Iterate over the callback groups in the node, calling the given function on each valid one.
+  /**
+   * This method is called in a thread-safe way, and also makes sure to only call the given
+   * function on those items that are still valid.
+   *
+   * \param[in] func The callback function to call on each valid callback group.
+   */
   RCLCPP_PUBLIC
-  const std::vector<rclcpp::CallbackGroup::WeakPtr> &
-  get_callback_groups() const;
+  void
+  for_each_callback_group(const node_interfaces::NodeBaseInterface::CallbackGroupFunction & func);
 
   /// Create and return a Publisher.
   /**
