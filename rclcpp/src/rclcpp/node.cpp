@@ -482,10 +482,11 @@ Node::get_subscriptions_info_by_topic(const std::string & topic_name, bool no_ma
   return node_graph_->get_subscriptions_info_by_topic(topic_name, no_mangle);
 }
 
-const std::vector<rclcpp::CallbackGroup::WeakPtr> &
-Node::get_callback_groups() const
+void
+Node::for_each_callback_group(
+  const node_interfaces::NodeBaseInterface::CallbackGroupFunction & func)
 {
-  return node_base_->get_callback_groups();
+  node_base_->for_each_callback_group(func);
 }
 
 rclcpp::Event::SharedPtr
