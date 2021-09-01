@@ -14,9 +14,6 @@
 
 #include <gtest/gtest.h>
 
-#include <chrono>
-#include <functional>
-#include <limits>
 #include <map>
 #include <memory>
 #include <string>
@@ -25,10 +22,10 @@
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/node.hpp"
+#include "rclcpp/scope_exit.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 #include "rcpputils/filesystem_helper.hpp"
-#include "rcpputils/scope_exit.hpp"
 
 #include "rmw/validate_namespace.h"
 
@@ -44,11 +41,6 @@ protected:
   static void SetUpTestCase()
   {
     rclcpp::init(0, nullptr);
-  }
-
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
   }
 
   void SetUp() override
@@ -102,7 +94,6 @@ TEST_F(TestNode, get_name_and_namespace) {
     auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/ns", node->get_namespace());
-    EXPECT_STREQ("/ns", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/ns/my_node", node->get_fully_qualified_name());
   }
   {
@@ -117,35 +108,30 @@ TEST_F(TestNode, get_name_and_namespace) {
     auto node = std::make_shared<rclcpp::Node>("my_node", "ns");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/ns", node->get_namespace());
-    EXPECT_STREQ("/ns", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/ns/my_node", node->get_fully_qualified_name());
   }
   {
     auto node = std::make_shared<rclcpp::Node>("my_node");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/", node->get_namespace());
-    EXPECT_STREQ("/", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/my_node", node->get_fully_qualified_name());
   }
   {
     auto node = std::make_shared<rclcpp::Node>("my_node", "");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/", node->get_namespace());
-    EXPECT_STREQ("/", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/my_node", node->get_fully_qualified_name());
   }
   {
     auto node = std::make_shared<rclcpp::Node>("my_node", "/my/ns");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/my/ns", node->get_namespace());
-    EXPECT_STREQ("/my/ns", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/my/ns/my_node", node->get_fully_qualified_name());
   }
   {
     auto node = std::make_shared<rclcpp::Node>("my_node", "my/ns");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/my/ns", node->get_namespace());
-    EXPECT_STREQ("/my/ns", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/my/ns/my_node", node->get_fully_qualified_name());
   }
   {
@@ -284,13 +270,6 @@ TEST_F(TestNode, subnode_construction_and_destruction) {
       auto subnode = node->create_sub_node("~sub_ns");
     }, rclcpp::exceptions::InvalidNamespaceError);
   }
-  {
-    ASSERT_THROW(
-    {
-      auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
-      auto subnode = node->create_sub_node("");
-    }, rclcpp::exceptions::NameValidationError);
-  }
 }
 
 TEST_F(TestNode, get_logger) {
@@ -346,17 +325,9 @@ TEST_F(TestNode, declare_parameter_with_no_initial_values) {
   // test cases without initial values
   auto node = std::make_shared<rclcpp::Node>("test_declare_parameter_node"_unq);
   {
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
     // no default, no initial
-    const std::string parameter_name = "parameter"_unq;
-    rclcpp::ParameterValue value = node->declare_parameter(
-      parameter_name, rclcpp::ParameterValue{}, descriptor);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter"_unq);
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_NOT_SET);
-    // Does not throw if unset before access
-    EXPECT_EQ(
-      rclcpp::PARAMETER_NOT_SET,
-      node->get_parameter(parameter_name).get_parameter_value().get_type());
   }
   {
     // int default, no initial
@@ -387,21 +358,15 @@ TEST_F(TestNode, declare_parameter_with_no_initial_values) {
   {
     // parameter already declared throws
     auto name = "parameter"_unq;
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
-    node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);
+    node->declare_parameter(name);
     EXPECT_THROW(
-    {
-      rcl_interfaces::msg::ParameterDescriptor descriptor;
-      descriptor.dynamic_typing = true;
-      node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);
-    },
+      {node->declare_parameter(name);},
       rclcpp::exceptions::ParameterAlreadyDeclaredException);
   }
   {
     // parameter name invalid throws
     EXPECT_THROW(
-      {node->declare_parameter("", 5);},
+      {node->declare_parameter("");},
       rclcpp::exceptions::InvalidParametersException);
   }
   {
@@ -423,51 +388,10 @@ TEST_F(TestNode, declare_parameter_with_no_initial_values) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});   // always reset
     EXPECT_THROW(
       {node->declare_parameter<std::string>(name, "not an int");},
       rclcpp::exceptions::InvalidParameterValueException);
-  }
-}
-
-TEST_F(TestNode, declare_parameter_with_allow_undeclared_parameters) {
-  // test cases without initial values
-  auto node = std::make_shared<rclcpp::Node>(
-    "test_declare_parameter_node"_unq, "/",
-    rclcpp::NodeOptions{}.allow_undeclared_parameters(true));
-  {
-    // declared parameters static typing is still enforced
-    auto param_name = "parameter"_unq;
-    auto value = node->declare_parameter(param_name, 5);
-    EXPECT_EQ(value, 5);
-    EXPECT_FALSE(node->set_parameter({param_name, "asd"}).successful);
-    auto param = node->get_parameter(param_name);
-    EXPECT_EQ(param.get_type(), rclcpp::PARAMETER_INTEGER);
-    EXPECT_EQ(param.get_value<int64_t>(), 5);
-  }
-  {
-    // not for automatically declared parameters
-    auto param_name = "parameter"_unq;
-    EXPECT_TRUE(node->set_parameter({param_name, 5}).successful);
-    auto param = node->get_parameter(param_name);
-    EXPECT_EQ(param.get_type(), rclcpp::PARAMETER_INTEGER);
-    EXPECT_EQ(param.get_value<int64_t>(), 5);
-    EXPECT_TRUE(node->set_parameter({param_name, "asd"}).successful);
-    param = node->get_parameter(param_name);
-    EXPECT_EQ(param.get_type(), rclcpp::PARAMETER_STRING);
-    EXPECT_EQ(param.get_value<std::string>(), "asd");
-  }
-  {
-    // declare after set is invalid
-    auto param_name = "parameter"_unq;
-    EXPECT_TRUE(node->set_parameter({param_name, 5}).successful);
-    auto param = node->get_parameter(param_name);
-    EXPECT_EQ(param.get_type(), rclcpp::PARAMETER_INTEGER);
-    EXPECT_EQ(param.get_value<int64_t>(), 5);
-    EXPECT_THROW(
-      node->declare_parameter(param_name, 5),
-      rclcpp::exceptions::ParameterAlreadyDeclaredException);
   }
 }
 
@@ -568,15 +492,13 @@ TEST_F(TestNode, declare_parameter_with_overrides) {
   auto node = std::make_shared<rclcpp::Node>("test_declare_parameter_node"_unq, no);
   {
     // no default, with override
-    rclcpp::ParameterValue value = node->declare_parameter(
-      "parameter_no_default", rclcpp::ParameterType::PARAMETER_INTEGER);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter_no_default");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
     EXPECT_EQ(value.get<int>(), 42);
   }
   {
     // no default, with override, and set after
-    rclcpp::ParameterValue value = node->declare_parameter(
-      "parameter_no_default_set", rclcpp::ParameterType::PARAMETER_INTEGER);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter_no_default_set");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
     EXPECT_EQ(value.get<int>(), 42);
     // check that the value is changed after a set
@@ -585,8 +507,8 @@ TEST_F(TestNode, declare_parameter_with_overrides) {
   }
   {
     // no default, with override
-    const rclcpp::ParameterValue & value = node->declare_parameter(
-      "parameter_no_default_set_cvref", rclcpp::ParameterType::PARAMETER_INTEGER);
+    const rclcpp::ParameterValue & value =
+      node->declare_parameter("parameter_no_default_set_cvref");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
     EXPECT_EQ(value.get<int>(), 42);
     // check that the value is changed after a set
@@ -633,21 +555,15 @@ TEST_F(TestNode, declare_parameter_with_overrides) {
   {
     // parameter already declared throws
     auto name = "parameter_already_declared";
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
-    node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);
+    node->declare_parameter(name);
     EXPECT_THROW(
-    {
-      rcl_interfaces::msg::ParameterDescriptor descriptor;
-      descriptor.dynamic_typing = true;
-      node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);
-    },
+      {node->declare_parameter(name);},
       rclcpp::exceptions::ParameterAlreadyDeclaredException);
   }
   {
     // parameter name invalid throws
     EXPECT_THROW(
-      {node->declare_parameter("", 5);},
+      {node->declare_parameter("");},
       rclcpp::exceptions::InvalidParametersException);
   }
   {
@@ -671,8 +587,7 @@ TEST_F(TestNode, declare_parameter_with_overrides) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
     EXPECT_THROW(
       {node->declare_parameter<int>(name, 43);},
       rclcpp::exceptions::InvalidParameterValueException);
@@ -682,22 +597,6 @@ TEST_F(TestNode, declare_parameter_with_overrides) {
     EXPECT_THROW(
       {node->declare_parameter("parameter_type_mismatch", 42);},
       rclcpp::exceptions::InvalidParameterTypeException);
-  }
-  {
-    // default type and expected type do not match
-    EXPECT_THROW(
-      {node->declare_parameter(
-          "parameter_type_mismatch", rclcpp::ParameterType::PARAMETER_INTEGER);},
-      rclcpp::exceptions::InvalidParameterTypeException);
-  }
-  {
-    // cannot pass an expected type and a descriptor with dynamic_typing=True
-    rcl_interfaces::msg::ParameterDescriptor descriptor{};
-    descriptor.dynamic_typing = true;
-    EXPECT_THROW(
-      {node->declare_parameter(
-          "invalid_argument", rclcpp::ParameterType::PARAMETER_INTEGER, descriptor);},
-      std::invalid_argument);
   }
 }
 
@@ -769,7 +668,7 @@ TEST_F(TestNode, declare_parameters_with_no_initial_values) {
   {
     // parameter already declared throws, even with not_set type
     auto name = "parameter"_unq;
-    node->declare_parameter(name, 42);
+    node->declare_parameter(name);
     EXPECT_THROW(
       {node->declare_parameters<int64_t>("", {{name, 42}});},
       rclcpp::exceptions::ParameterAlreadyDeclaredException);
@@ -799,8 +698,7 @@ TEST_F(TestNode, declare_parameters_with_no_initial_values) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
     EXPECT_THROW(
       {node->declare_parameters<std::string>("", {{name, "not an int"}});},
       rclcpp::exceptions::InvalidParameterValueException);
@@ -829,53 +727,45 @@ TEST_F(TestNode, declare_parameter_with_cli_overrides) {
   // To match parameters YAML file content, use a well-known node name for this test only.
   auto node = std::make_shared<rclcpp::Node>("test_declare_parameter_node", no);
   {
-    rclcpp::ParameterValue value = node->declare_parameter(
-      "parameter_bool", rclcpp::ParameterType::PARAMETER_BOOL);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter_bool");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_BOOL);
     EXPECT_EQ(value.get<bool>(), true);
   }
   {
-    rclcpp::ParameterValue value = node->declare_parameter(
-      "parameter_int", rclcpp::ParameterType::PARAMETER_INTEGER);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter_int");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
     EXPECT_EQ(value.get<int64_t>(), 21);  // set to 42 in CLI, overriden by file
   }
   {
-    rclcpp::ParameterValue value = node->declare_parameter(
-      "parameter_double", rclcpp::ParameterType::PARAMETER_DOUBLE);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter_double");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_DOUBLE);
     EXPECT_EQ(value.get<double>(), 0.42);
   }
   {
-    rclcpp::ParameterValue value = node->declare_parameter(
-      "parameter_string", rclcpp::ParameterType::PARAMETER_STRING);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter_string");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_STRING);
     EXPECT_EQ(value.get<std::string>(), "foo");
   }
   {
-    rclcpp::ParameterValue value = node->declare_parameter(
-      "parameter_bool_array", rclcpp::ParameterType::PARAMETER_BOOL_ARRAY);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter_bool_array");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_BOOL_ARRAY);
     std::vector<bool> expected_value{false, true};
     EXPECT_EQ(value.get<std::vector<bool>>(), expected_value);
   }
   {
-    rclcpp::ParameterValue value = node->declare_parameter(
-      "parameter_int_array", rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter_int_array");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER_ARRAY);
     std::vector<int64_t> expected_value{-21, 42};
     EXPECT_EQ(value.get<std::vector<int64_t>>(), expected_value);
   }
   {
-    rclcpp::ParameterValue value = node->declare_parameter(
-      "parameter_double_array", rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter_double_array");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_DOUBLE_ARRAY);
     std::vector<double> expected_value{-1.0, 0.42};
     EXPECT_EQ(value.get<std::vector<double>>(), expected_value);
   }
   {
-    rclcpp::ParameterValue value = node->declare_parameter(
-      "parameter_string_array", rclcpp::ParameterType::PARAMETER_STRING_ARRAY);
+    rclcpp::ParameterValue value = node->declare_parameter("parameter_string_array");
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_STRING_ARRAY);
     std::vector<std::string> expected_value{"foo", "bar"};
     // set to [baz, baz, baz] in file, overriden by CLI
@@ -888,9 +778,7 @@ TEST_F(TestNode, undeclare_parameter) {
   {
     // normal use
     auto name = "parameter"_unq;
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
-    node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);
+    node->declare_parameter(name);
     EXPECT_TRUE(node->has_parameter(name));
     node->undeclare_parameter(name);
     EXPECT_FALSE(node->has_parameter(name));
@@ -902,16 +790,6 @@ TEST_F(TestNode, undeclare_parameter) {
     EXPECT_THROW(
       {node->undeclare_parameter(name);},
       rclcpp::exceptions::ParameterNotDeclaredException);
-  }
-  {
-    // statically typed parameter throws
-    auto name = "parameter"_unq;
-    node->declare_parameter(name, 42);
-    EXPECT_TRUE(node->has_parameter(name));
-    EXPECT_THROW(
-      {node->undeclare_parameter(name);},
-      rclcpp::exceptions::InvalidParameterTypeException);
-    EXPECT_TRUE(node->has_parameter(name));
   }
   {
     // read only parameter throws
@@ -932,9 +810,7 @@ TEST_F(TestNode, has_parameter) {
   // normal use
   auto name = "parameter"_unq;
   EXPECT_FALSE(node->has_parameter(name));
-  rcl_interfaces::msg::ParameterDescriptor descriptor;
-  descriptor.dynamic_typing = true;
-  node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);
+  node->declare_parameter(name);
   EXPECT_TRUE(node->has_parameter(name));
   node->undeclare_parameter(name);
   EXPECT_FALSE(node->has_parameter(name));
@@ -945,9 +821,7 @@ TEST_F(TestNode, list_parameters) {
   // normal use
   auto name = "parameter"_unq;
   const size_t before_size = node->list_parameters({}, 1u).names.size();
-  rcl_interfaces::msg::ParameterDescriptor descriptor;
-  descriptor.dynamic_typing = true;
-  node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);
+  node->declare_parameter(name);
   EXPECT_EQ(1u + before_size, node->list_parameters({}, 1u).names.size());
   node->undeclare_parameter(name);
   EXPECT_EQ(before_size, node->list_parameters({}, 1u).names.size());
@@ -968,21 +842,10 @@ TEST_F(TestNode, set_parameter_undeclared_parameters_not_allowed) {
     EXPECT_EQ(node->get_parameter(name).get_value<int>(), 43);
   }
   {
-    // normal use, change type not allowed
-    auto name = "parameter"_unq;
-    EXPECT_FALSE(node->has_parameter(name));
-    node->declare_parameter(name, 42);
-    EXPECT_TRUE(node->has_parameter(name));
-    EXPECT_EQ(node->get_parameter(name).get_value<int>(), 42);
-    EXPECT_FALSE(node->set_parameter(rclcpp::Parameter(name, "not an integer")).successful);
-  }
-  {
     // normal use, change type
     auto name = "parameter"_unq;
     EXPECT_FALSE(node->has_parameter(name));
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
-    node->declare_parameter(name, 42, descriptor);
+    node->declare_parameter(name, 42);
     EXPECT_TRUE(node->has_parameter(name));
     EXPECT_EQ(node->get_parameter(name).get_value<int>(), 42);
     EXPECT_TRUE(node->set_parameter(rclcpp::Parameter(name, "not an integer")).successful);
@@ -1001,6 +864,8 @@ TEST_F(TestNode, set_parameter_undeclared_parameters_not_allowed) {
     EXPECT_TRUE(node->has_parameter(name3));
 
     EXPECT_EQ(node->get_parameter(name1).get_value<int>(), 42);
+    EXPECT_TRUE(node->set_parameter(rclcpp::Parameter(name1, "not an integer")).successful);
+    EXPECT_EQ(node->get_parameter(name1).get_value<std::string>(), std::string("not an integer"));
 
     EXPECT_EQ(node->get_parameter(name2).get_value<bool>(), true);
     EXPECT_TRUE(node->set_parameter(rclcpp::Parameter(name2, false)).successful);
@@ -1028,17 +893,14 @@ TEST_F(TestNode, set_parameter_undeclared_parameters_not_allowed) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
 
     EXPECT_FALSE(node->set_parameter(rclcpp::Parameter(name, 43)).successful);
   }
   {
     // setting type of rclcpp::PARAMETER_NOT_SET, when already not set, does not undeclare
     auto name = "parameter"_unq;
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
-    auto value = node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);
+    auto value = node->declare_parameter(name);
     EXPECT_TRUE(node->has_parameter(name));
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_NOT_SET);
 
@@ -1048,22 +910,9 @@ TEST_F(TestNode, set_parameter_undeclared_parameters_not_allowed) {
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_NOT_SET);
   }
   {
-    // setting type of rclcpp::PARAMETER_NOT_SET, when already to another type, will fail
+    // setting type of rclcpp::PARAMETER_NOT_SET, when already to another type, will undeclare
     auto name = "parameter"_unq;
     node->declare_parameter(name, 42);
-    EXPECT_TRUE(node->has_parameter(name));
-    auto value = node->get_parameter(name);
-    EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
-
-    EXPECT_FALSE(node->set_parameter(rclcpp::Parameter(name)).successful);
-  }
-  {
-    // setting type of rclcpp::PARAMETER_NOT_SET,
-    // when dynamic typing is allowing and already set to another type, will undeclare
-    auto name = "parameter"_unq;
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
-    node->declare_parameter(name, 42, descriptor);
     EXPECT_TRUE(node->has_parameter(name));
     auto value = node->get_parameter(name);
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
@@ -1407,9 +1256,15 @@ TEST_F(TestNode, set_parameter_undeclared_parameters_not_allowed) {
     auto name = "parameter"_unq;
     rcl_interfaces::msg::ParameterDescriptor descriptor;
     descriptor.type = rclcpp::PARAMETER_INTEGER;
-    node->declare_parameter(name, "asd", descriptor);
+    node->declare_parameter(name, 42, descriptor);
     EXPECT_TRUE(node->has_parameter(name));
     auto value = node->get_parameter(name);
+    EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
+    EXPECT_EQ(value.get_value<int64_t>(), 42);
+
+    EXPECT_TRUE(node->set_parameter(rclcpp::Parameter(name, "asd")).successful);
+    EXPECT_TRUE(node->has_parameter(name));
+    value = node->get_parameter(name);
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_STRING);
     EXPECT_EQ(value.get_value<std::string>(), "asd");
   }
@@ -1537,8 +1392,7 @@ TEST_F(TestNode, set_parameters_undeclared_parameters_not_allowed) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
 
     auto rets = node->set_parameters(
     {
@@ -1558,9 +1412,7 @@ TEST_F(TestNode, set_parameters_undeclared_parameters_not_allowed) {
   {
     // setting type of rclcpp::PARAMETER_NOT_SET, when already not set, does not undeclare
     auto name = "parameter"_unq;
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
-    auto value = node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);
+    auto value = node->declare_parameter(name);
     EXPECT_TRUE(node->has_parameter(name));
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_NOT_SET);
 
@@ -1570,22 +1422,9 @@ TEST_F(TestNode, set_parameters_undeclared_parameters_not_allowed) {
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_NOT_SET);
   }
   {
-    // setting type of rclcpp::PARAMETER_NOT_SET, when already to another type, will fail
+    // setting type of rclcpp::PARAMETER_NOT_SET, when already to another type, will undeclare
     auto name = "parameter"_unq;
     node->declare_parameter(name, 42);
-    EXPECT_TRUE(node->has_parameter(name));
-    auto value = node->get_parameter(name);
-    EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
-
-    EXPECT_FALSE(node->set_parameters({rclcpp::Parameter(name)})[0].successful);
-  }
-  {
-    // setting type of rclcpp::PARAMETER_NOT_SET,
-    // when already to another type and dynamic typic allowed, will undeclare
-    auto name = "parameter"_unq;
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
-    node->declare_parameter(name, 42, descriptor);
     EXPECT_TRUE(node->has_parameter(name));
     auto value = node->get_parameter(name);
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
@@ -1730,8 +1569,7 @@ TEST_F(TestNode, set_parameters_atomically_undeclared_parameters_not_allowed) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
 
     auto ret = node->set_parameters_atomically(
     {
@@ -1748,9 +1586,7 @@ TEST_F(TestNode, set_parameters_atomically_undeclared_parameters_not_allowed) {
   {
     // setting type of rclcpp::PARAMETER_NOT_SET, when already not set, does not undeclare
     auto name = "parameter"_unq;
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
-    auto value = node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);
+    auto value = node->declare_parameter(name);
     EXPECT_TRUE(node->has_parameter(name));
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_NOT_SET);
 
@@ -1760,22 +1596,9 @@ TEST_F(TestNode, set_parameters_atomically_undeclared_parameters_not_allowed) {
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_NOT_SET);
   }
   {
-    // setting type of rclcpp::PARAMETER_NOT_SET, when already to another type, will fail
+    // setting type of rclcpp::PARAMETER_NOT_SET, when already to another type, will undeclare
     auto name = "parameter"_unq;
     node->declare_parameter(name, 42);
-    EXPECT_TRUE(node->has_parameter(name));
-    auto value = node->get_parameter(name);
-    EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
-
-    EXPECT_FALSE(node->set_parameters_atomically({rclcpp::Parameter(name)}).successful);
-  }
-  {
-    // setting type of rclcpp::PARAMETER_NOT_SET,
-    // when dynamic typing is allowed and already declared to another type, will undeclare
-    auto name = "parameter"_unq;
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.dynamic_typing = true;
-    node->declare_parameter(name, 42, descriptor);
     EXPECT_TRUE(node->has_parameter(name));
     auto value = node->get_parameter(name);
     EXPECT_EQ(value.get_type(), rclcpp::PARAMETER_INTEGER);
@@ -1857,8 +1680,7 @@ TEST_F(TestNode, set_parameters_atomically_undeclared_parameters_allowed) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
 
     auto ret = node->set_parameters_atomically(
     {
@@ -2136,28 +1958,30 @@ TEST_F(TestNode, get_parameters_undeclared_parameters_not_allowed) {
   {
     // templated version with empty prefix will get all parameters
     auto node_local = std::make_shared<rclcpp::Node>("test_get_parameters_node"_unq);
-    auto name1 = "parameter"_unq;
-    auto name2 = "parameter"_unq;
+    auto name1 = "prefix1.parameter"_unq;
+    auto name2 = "prefix2.parameter"_unq;
 
-    node_local->declare_parameter("prefix." + name1, 42);
-    node_local->declare_parameter("prefix." + name2, 100);
+    node_local->declare_parameter(name1, 42);
+    node_local->declare_parameter(name2, 100);
+    // undeclare so that it doesn't interfere with the test
+    node_local->undeclare_parameter("use_sim_time");
 
     {
       std::map<std::string, int64_t> actual;
-      EXPECT_TRUE(node_local->get_parameters("prefix", actual));
+      EXPECT_TRUE(node_local->get_parameters("", actual));
       EXPECT_NE(actual.find(name1), actual.end());
       EXPECT_NE(actual.find(name2), actual.end());
     }
 
     // will throw if set of parameters is non-homogeneous
-    auto name3 = "prefix1.parameter"_unq;
-    node_local->declare_parameter<std::string>("prefix." + name3, "not an int");
+    auto name3 = "prefix2.parameter"_unq;
+    node_local->declare_parameter<std::string>(name3, "not an int");
 
     {
       std::map<std::string, int64_t> actual;
       EXPECT_THROW(
       {
-        node_local->get_parameters("prefix", actual);
+        node_local->get_parameters("", actual);
       },
         rclcpp::exceptions::InvalidParameterTypeException);
     }
@@ -2536,58 +2360,205 @@ TEST_F(TestNode, get_parameter_types_undeclared_parameters_allowed) {
   }
 }
 
-// test declare parameter with int, int64_t, float and double vector
-TEST_F(TestNode, declare_parameter_with_vector) {
-  auto node = std::make_shared<rclcpp::Node>(
-    "test_declare_parameter_with_vector"_unq,
-    rclcpp::NodeOptions().allow_undeclared_parameters(true));
-  {
-    // declare parameter and then get types to check
-    auto name1 = "parameter"_unq;
-    auto name2 = "parameter"_unq;
-    auto name3 = "parameter"_unq;
-    auto name4 = "parameter"_unq;
+// suppress deprecated function test warnings
+#if !defined(_WIN32)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#else  // !defined(_WIN32)
+# pragma warning(push)
+# pragma warning(disable: 4996)
+#endif
 
-    node->declare_parameter(name1, std::vector<int>{});
-    node->declare_parameter(name2, std::vector<int64_t>{});
-    node->declare_parameter(name3, std::vector<float>{});
-    node->declare_parameter(name4, std::vector<double>{});
+// test that it is possible to call get_parameter within the set_callback
+TEST_F(TestNode, set_on_parameters_set_callback_get_parameter) {
+  auto node = std::make_shared<rclcpp::Node>("test_set_callback_get_parameter_node"_unq);
 
-    EXPECT_TRUE(node->has_parameter(name1));
-    EXPECT_TRUE(node->has_parameter(name2));
-    EXPECT_TRUE(node->has_parameter(name3));
-    EXPECT_TRUE(node->has_parameter(name4));
+  int64_t intval = node->declare_parameter("intparam", 42);
+  EXPECT_EQ(intval, 42);
+  double floatval = node->declare_parameter("floatparam", 5.4);
+  EXPECT_EQ(floatval, 5.4);
 
-    auto results = node->get_parameter_types({name1, name2, name3, name4});
-    EXPECT_EQ(results.size(), 4u);
-    EXPECT_EQ(results[0], rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER_ARRAY);
-    EXPECT_EQ(results[1], rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER_ARRAY);
-    EXPECT_EQ(results[2], rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE_ARRAY);
-    EXPECT_EQ(results[3], rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE_ARRAY);
-  }
-  {
-    // declare parameter and then get values to check
-    auto name1 = "parameter"_unq;
-    auto name2 = "parameter"_unq;
-    auto name3 = "parameter"_unq;
-    auto name4 = "parameter"_unq;
+  double floatout;
+  RCLCPP_SCOPE_EXIT({node->set_on_parameters_set_callback(nullptr);});    // always reset
+  auto on_set_parameters =
+    [&node, &floatout](const std::vector<rclcpp::Parameter> & parameters) {
+      rcl_interfaces::msg::SetParametersResult result;
+      result.successful = true;
+      if (parameters.size() != 1) {
+        result.successful = false;
+      }
 
-    int64_t bigger_than_int = INT64_MAX - 42;
-    double bigger_than_float = std::numeric_limits<double>::max() - 42;
-    node->declare_parameter(name1, std::vector<int>{1, 2});
-    node->declare_parameter(name2, std::vector<int64_t>{3, bigger_than_int});
-    node->declare_parameter(name3, std::vector<float>{1.5f, 2.8f});
-    node->declare_parameter(name4, std::vector<double>{3.0, bigger_than_float});
+      if (parameters[0].get_value<int>() != 40) {
+        result.successful = false;
+      }
 
-    std::vector<rclcpp::Parameter> expected = {
-      {name1, std::vector<int>{1, 2}},
-      {name2, std::vector<int64_t>{3, bigger_than_int}},
-      {name3, std::vector<float>{1.5f, 2.8f}},
-      {name4, std::vector<double>{3.0, bigger_than_float}},
+      rclcpp::Parameter floatparam = node->get_parameter("floatparam");
+      if (floatparam.get_value<double>() != 5.4) {
+        result.successful = false;
+      }
+      floatout = floatparam.get_value<double>();
+
+      return result;
     };
-    EXPECT_EQ(node->get_parameters({name1, name2, name3, name4}), expected);
-  }
+
+  EXPECT_EQ(node->set_on_parameters_set_callback(on_set_parameters), nullptr);
+  ASSERT_NO_THROW(node->set_parameter({"intparam", 40}));
+  ASSERT_EQ(floatout, 5.4);
 }
+
+// test that calling set_parameter inside of a set_callback throws an exception
+TEST_F(TestNode, set_on_parameters_set_callback_set_parameter) {
+  auto node = std::make_shared<rclcpp::Node>("test_set_callback_set_parameter_node"_unq);
+
+  int64_t intval = node->declare_parameter("intparam", 42);
+  EXPECT_EQ(intval, 42);
+  double floatval = node->declare_parameter("floatparam", 5.4);
+  EXPECT_EQ(floatval, 5.4);
+
+  RCLCPP_SCOPE_EXIT({node->set_on_parameters_set_callback(nullptr);});    // always reset
+  auto on_set_parameters =
+    [&node](const std::vector<rclcpp::Parameter> & parameters) {
+      rcl_interfaces::msg::SetParametersResult result;
+      result.successful = true;
+      if (parameters.size() != 1) {
+        result.successful = false;
+      }
+
+      if (parameters[0].get_value<int>() != 40) {
+        result.successful = false;
+      }
+
+      // This should throw an exception
+      node->set_parameter({"floatparam", 5.6});
+
+      return result;
+    };
+
+  EXPECT_EQ(node->set_on_parameters_set_callback(on_set_parameters), nullptr);
+  EXPECT_THROW(
+  {
+    node->set_parameter(rclcpp::Parameter("intparam", 40));
+  }, rclcpp::exceptions::ParameterModifiedInCallbackException);
+}
+
+// test that calling declare_parameter inside of a set_callback throws an exception
+TEST_F(TestNode, set_on_parameters_set_callback_declare_parameter) {
+  auto node = std::make_shared<rclcpp::Node>("test_set_callback_declare_parameter_node"_unq);
+
+  int64_t intval = node->declare_parameter("intparam", 42);
+  EXPECT_EQ(intval, 42);
+  double floatval = node->declare_parameter("floatparam", 5.4);
+  EXPECT_EQ(floatval, 5.4);
+
+  RCLCPP_SCOPE_EXIT({node->set_on_parameters_set_callback(nullptr);});    // always reset
+  auto on_set_parameters =
+    [&node](const std::vector<rclcpp::Parameter> & parameters) {
+      rcl_interfaces::msg::SetParametersResult result;
+      result.successful = true;
+      if (parameters.size() != 1) {
+        result.successful = false;
+      }
+
+      if (parameters[0].get_value<int>() != 40) {
+        result.successful = false;
+      }
+
+      // This should throw an exception
+      node->declare_parameter("floatparam2", 5.6);
+
+      return result;
+    };
+
+  EXPECT_EQ(node->set_on_parameters_set_callback(on_set_parameters), nullptr);
+  EXPECT_THROW(
+  {
+    node->set_parameter(rclcpp::Parameter("intparam", 40));
+  }, rclcpp::exceptions::ParameterModifiedInCallbackException);
+}
+
+// test that calling undeclare_parameter inside a set_callback throws an exception
+TEST_F(TestNode, set_on_parameters_set_callback_undeclare_parameter) {
+  auto node = std::make_shared<rclcpp::Node>("test_set_callback_undeclare_parameter_node"_unq);
+
+  int64_t intval = node->declare_parameter("intparam", 42);
+  EXPECT_EQ(intval, 42);
+  double floatval = node->declare_parameter("floatparam", 5.4);
+  EXPECT_EQ(floatval, 5.4);
+
+  RCLCPP_SCOPE_EXIT({node->set_on_parameters_set_callback(nullptr);});    // always reset
+  auto on_set_parameters =
+    [&node](const std::vector<rclcpp::Parameter> & parameters) {
+      rcl_interfaces::msg::SetParametersResult result;
+      result.successful = true;
+      if (parameters.size() != 1) {
+        result.successful = false;
+      }
+
+      if (parameters[0].get_value<int>() != 40) {
+        result.successful = false;
+      }
+
+      // This should throw an exception
+      node->undeclare_parameter("floatparam");
+
+      return result;
+    };
+
+  EXPECT_EQ(node->set_on_parameters_set_callback(on_set_parameters), nullptr);
+  EXPECT_THROW(
+  {
+    node->set_parameter(rclcpp::Parameter("intparam", 40));
+  }, rclcpp::exceptions::ParameterModifiedInCallbackException);
+}
+
+// test that calling set_on_parameters_set_callback from a set_callback throws an exception
+TEST_F(TestNode, set_on_parameters_set_callback_set_on_parameters_set_callback) {
+  auto node = std::make_shared<rclcpp::Node>("test_set_callback_set_callback_node"_unq);
+
+  int64_t intval = node->declare_parameter("intparam", 42);
+  EXPECT_EQ(intval, 42);
+  double floatval = node->declare_parameter("floatparam", 5.4);
+  EXPECT_EQ(floatval, 5.4);
+
+  RCLCPP_SCOPE_EXIT({node->set_on_parameters_set_callback(nullptr);});    // always reset
+  auto on_set_parameters =
+    [&node](const std::vector<rclcpp::Parameter> & parameters) {
+      rcl_interfaces::msg::SetParametersResult result;
+      result.successful = true;
+      if (parameters.size() != 1) {
+        result.successful = false;
+      }
+
+      if (parameters[0].get_value<int>() != 40) {
+        result.successful = false;
+      }
+
+      auto bad_parameters =
+        [](const std::vector<rclcpp::Parameter> & parameters) {
+          (void)parameters;
+          rcl_interfaces::msg::SetParametersResult result;
+          return result;
+        };
+
+      // This should throw an exception
+      node->set_on_parameters_set_callback(bad_parameters);
+
+      return result;
+    };
+
+  EXPECT_EQ(node->set_on_parameters_set_callback(on_set_parameters), nullptr);
+  EXPECT_THROW(
+  {
+    node->set_parameter(rclcpp::Parameter("intparam", 40));
+  }, rclcpp::exceptions::ParameterModifiedInCallbackException);
+}
+
+// remove warning suppression
+#if !defined(_WIN32)
+# pragma GCC diagnostic pop
+#else  // !defined(_WIN32)
+# pragma warning(pop)
+#endif
 
 void expect_qos_profile_eq(
   const rmw_qos_profile_t & qos1, const rmw_qos_profile_t & qos2, bool is_publisher)
@@ -2605,34 +2576,6 @@ void expect_qos_profile_eq(
   EXPECT_EQ(qos1.liveliness_lease_duration.sec, qos2.liveliness_lease_duration.sec);
   EXPECT_EQ(qos1.liveliness_lease_duration.nsec, qos2.liveliness_lease_duration.nsec);
 }
-
-namespace
-{
-
-constexpr std::chrono::nanoseconds DEFAULT_EVENT_TIMEOUT = std::chrono::seconds(3);
-
-constexpr std::chrono::nanoseconds DEFAULT_EVENT_SLEEP_PERIOD = std::chrono::milliseconds(100);
-
-bool wait_for_event(
-  std::shared_ptr<rclcpp::Node> node,
-  std::function<bool()> predicate,
-  std::chrono::nanoseconds timeout = DEFAULT_EVENT_TIMEOUT,
-  std::chrono::nanoseconds sleep_period = DEFAULT_EVENT_SLEEP_PERIOD)
-{
-  auto start = std::chrono::steady_clock::now();
-  std::chrono::nanoseconds time_slept(0);
-
-  bool predicate_result;
-  while (!(predicate_result = predicate()) && time_slept < timeout) {
-    rclcpp::Event::SharedPtr graph_event = node->get_graph_event();
-    node->wait_for_graph_change(graph_event, sleep_period);
-    time_slept = std::chrono::duration_cast<std::chrono::nanoseconds>(
-      std::chrono::steady_clock::now() - start);
-  }
-  return predicate_result;
-}
-
-}  // namespace
 
 // test that calling get_publishers_info_by_topic and get_subscriptions_info_by_topic
 TEST_F(TestNode, get_publishers_subscriptions_info_by_topic) {
@@ -2665,13 +2608,9 @@ TEST_F(TestNode, get_publishers_subscriptions_info_by_topic) {
   };
   rclcpp::QoS qos = rclcpp::QoS(qos_initialization, rmw_qos_profile_default);
   auto publisher = node->create_publisher<test_msgs::msg::BasicTypes>(topic_name, qos);
-  // Wait for the underlying RMW implementation to catch up with graph changes
-  auto topic_is_published =
-    [&]() {return node->get_publishers_info_by_topic(fq_topic_name).size() > 0u;};
-  ASSERT_TRUE(wait_for_event(node, topic_is_published));
   // List should have one item
   auto publisher_list = node->get_publishers_info_by_topic(fq_topic_name);
-  ASSERT_EQ(publisher_list.size(), (size_t)1);
+  EXPECT_EQ(publisher_list.size(), (size_t)1);
   // Subscription list should be empty
   EXPECT_TRUE(node->get_subscriptions_info_by_topic(fq_topic_name).empty());
   // Verify publisher list has the right data.
@@ -2704,15 +2643,12 @@ TEST_F(TestNode, get_publishers_subscriptions_info_by_topic) {
     false
   };
   rclcpp::QoS qos2 = rclcpp::QoS(qos_initialization2, rmw_qos_profile_default2);
-  auto callback = [](test_msgs::msg::BasicTypes::ConstSharedPtr msg) {
+  auto callback = [](const test_msgs::msg::BasicTypes::SharedPtr msg) {
       (void)msg;
     };
   auto subscriber =
     node->create_subscription<test_msgs::msg::BasicTypes>(topic_name, qos2, callback);
-  // Wait for the underlying RMW implementation to catch up with graph changes
-  auto topic_is_subscribed =
-    [&]() {return node->get_subscriptions_info_by_topic(fq_topic_name).size() > 0u;};
-  ASSERT_TRUE(wait_for_event(node, topic_is_subscribed));
+
   // Both lists should have one item
   publisher_list = node->get_publishers_info_by_topic(fq_topic_name);
   auto subscription_list = node->get_subscriptions_info_by_topic(fq_topic_name);
@@ -2753,33 +2689,13 @@ TEST_F(TestNode, get_publishers_subscriptions_info_by_topic) {
 
 TEST_F(TestNode, callback_groups) {
   auto node = std::make_shared<rclcpp::Node>("node", "ns");
-  size_t num_callback_groups_in_basic_node = 0;
-  node->for_each_callback_group(
-    [&num_callback_groups_in_basic_node](rclcpp::CallbackGroup::SharedPtr group)
-    {
-      (void)group;
-      num_callback_groups_in_basic_node++;
-    });
+  size_t num_callback_groups_in_basic_node = node->get_callback_groups().size();
 
   auto group1 = node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  size_t num_callback_groups = 0;
-  node->for_each_callback_group(
-    [&num_callback_groups](rclcpp::CallbackGroup::SharedPtr group)
-    {
-      (void)group;
-      num_callback_groups++;
-    });
-  EXPECT_EQ(1u + num_callback_groups_in_basic_node, num_callback_groups);
+  EXPECT_EQ(1u + num_callback_groups_in_basic_node, node->get_callback_groups().size());
 
   auto group2 = node->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  size_t num_callback_groups2 = 0;
-  node->for_each_callback_group(
-    [&num_callback_groups2](rclcpp::CallbackGroup::SharedPtr group)
-    {
-      (void)group;
-      num_callback_groups2++;
-    });
-  EXPECT_EQ(2u + num_callback_groups_in_basic_node, num_callback_groups2);
+  EXPECT_EQ(2u + num_callback_groups_in_basic_node, node->get_callback_groups().size());
 }
 
 // This is tested more thoroughly in node_interfaces/test_node_graph
@@ -2854,89 +2770,5 @@ TEST_F(TestNode, create_sub_node_rmw_validate_namespace_error) {
     EXPECT_THROW(
       node->create_sub_node("ns").reset(),
       rclcpp::exceptions::RCLError);
-  }
-}
-
-TEST_F(TestNode, static_and_dynamic_typing) {
-  rclcpp::NodeOptions no;
-  no.parameter_overrides(
-  {
-    {"integer_parameter_override_ok", 43},
-    {"string_parameter_override_should_throw", 43},
-    {"integer_must_provide_override", 43},
-    {"cool_way_of_declaring_a_string_without_a_default", "hello!"}
-  });
-  auto node = std::make_shared<rclcpp::Node>("node", "ns", no);
-  {
-    auto param = node->declare_parameter("an_int", 42);
-    EXPECT_EQ(42, param);
-    auto result = node->set_parameter({"an_int", "string value"});
-    EXPECT_FALSE(result.successful);
-    result = node->set_parameter({"an_int", 43});
-    EXPECT_TRUE(result.successful);
-    EXPECT_TRUE(node->get_parameter("an_int", param));
-    EXPECT_EQ(43, param);
-  }
-  {
-    auto param = node->declare_parameter("integer_parameter_override_ok", 42);
-    EXPECT_EQ(43, param);
-  }
-  {
-    EXPECT_THROW(
-      node->declare_parameter("string_parameter_override_should_throw", "a string"),
-      rclcpp::exceptions::InvalidParameterTypeException);
-  }
-  {
-    auto param = node->declare_parameter(
-      "integer_must_provide_override", rclcpp::PARAMETER_INTEGER);
-    EXPECT_EQ(43, param.get<int64_t>());
-  }
-  {
-    auto param = node->declare_parameter<std::string>(
-      "cool_way_of_declaring_a_string_without_a_default");
-    EXPECT_EQ("hello!", param);
-  }
-  {
-    auto param = node->declare_parameter("integer_override_not_given", rclcpp::PARAMETER_INTEGER);
-    EXPECT_EQ(rclcpp::PARAMETER_NOT_SET, param.get_type());
-    // Throws if not set before access
-    EXPECT_THROW(
-      node->get_parameter("integer_override_not_given"),
-      rclcpp::exceptions::ParameterUninitializedException);
-  }
-  {
-    auto param = node->declare_parameter("integer_set_after_declare", rclcpp::PARAMETER_INTEGER);
-    EXPECT_EQ(rclcpp::PARAMETER_NOT_SET, param.get_type());
-    auto result = node->set_parameter(rclcpp::Parameter{"integer_set_after_declare", 44});
-    ASSERT_TRUE(result.successful) << result.reason;
-    auto get_param = node->get_parameter("integer_set_after_declare");
-    EXPECT_EQ(44, get_param.as_int());
-  }
-  {
-    EXPECT_THROW(
-      node->declare_parameter("parameter_not_set_is_not_a_valid_type", rclcpp::PARAMETER_NOT_SET),
-      std::invalid_argument);
-  }
-  {
-    EXPECT_THROW(
-      node->declare_parameter(
-        "uninitialized_not_valid_except_dynamic_typing", rclcpp::ParameterValue{}),
-      rclcpp::exceptions::InvalidParameterTypeException);
-  }
-  {
-#ifndef _WIN32
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-    auto param = node->declare_parameter("deprecated_way_dynamic_typing");
-    EXPECT_EQ(param, rclcpp::ParameterValue{});
-#ifndef _WIN32
-# pragma GCC diagnostic pop
-#else
-# pragma warning(pop)
-#endif
   }
 }

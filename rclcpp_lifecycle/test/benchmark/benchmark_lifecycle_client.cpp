@@ -212,9 +212,8 @@ public:
     performance_test_fixture::PerformanceTest::TearDown(state);
     executor->cancel();
     spinner_.join();
-    executor.reset();
-    lifecycle_client.reset();
     lifecycle_node.reset();
+    lifecycle_client.reset();
     rclcpp::shutdown();
   }
 

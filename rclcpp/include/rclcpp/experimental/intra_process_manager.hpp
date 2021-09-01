@@ -33,7 +33,6 @@
 #include "rclcpp/allocator/allocator_deleter.hpp"
 #include "rclcpp/experimental/subscription_intra_process.hpp"
 #include "rclcpp/experimental/subscription_intra_process_base.hpp"
-#include "rclcpp/experimental/subscription_intra_process_buffer.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/macros.hpp"
@@ -182,7 +181,7 @@ public:
   do_intra_process_publish(
     uint64_t intra_process_publisher_id,
     std::unique_ptr<MessageT, Deleter> message,
-    typename allocator::AllocRebind<MessageT, Alloc>::allocator_type & allocator)
+    std::shared_ptr<typename allocator::AllocRebind<MessageT, Alloc>::allocator_type> allocator)
   {
     using MessageAllocTraits = allocator::AllocRebind<MessageT, Alloc>;
     using MessageAllocatorT = typename MessageAllocTraits::allocator_type;
@@ -203,13 +202,12 @@ public:
       // None of the buffers require ownership, so we promote the pointer
       std::shared_ptr<MessageT> msg = std::move(message);
 
-      this->template add_shared_msg_to_buffers<MessageT, Alloc, Deleter>(
-        msg, sub_ids.take_shared_subscriptions);
+      this->template add_shared_msg_to_buffers<MessageT>(msg, sub_ids.take_shared_subscriptions);
     } else if (!sub_ids.take_ownership_subscriptions.empty() && // NOLINT
       sub_ids.take_shared_subscriptions.size() <= 1)
     {
       // There is at maximum 1 buffer that does not require ownership.
-      // So this case is equivalent to all the buffers requiring ownership
+      // So we this case is equivalent to all the buffers requiring ownership
 
       // Merge the two vector of ids into a unique one
       std::vector<uint64_t> concatenated_vector(sub_ids.take_shared_subscriptions);
@@ -227,9 +225,9 @@ public:
     {
       // Construct a new shared pointer from the message
       // for the buffers that do not require ownership
-      auto shared_msg = std::allocate_shared<MessageT, MessageAllocatorT>(allocator, *message);
+      auto shared_msg = std::allocate_shared<MessageT, MessageAllocatorT>(*allocator, *message);
 
-      this->template add_shared_msg_to_buffers<MessageT, Alloc, Deleter>(
+      this->template add_shared_msg_to_buffers<MessageT>(
         shared_msg, sub_ids.take_shared_subscriptions);
       this->template add_owned_msg_to_buffers<MessageT, Alloc, Deleter>(
         std::move(message), sub_ids.take_ownership_subscriptions, allocator);
@@ -244,7 +242,7 @@ public:
   do_intra_process_publish_and_return_shared(
     uint64_t intra_process_publisher_id,
     std::unique_ptr<MessageT, Deleter> message,
-    typename allocator::AllocRebind<MessageT, Alloc>::allocator_type & allocator)
+    std::shared_ptr<typename allocator::AllocRebind<MessageT, Alloc>::allocator_type> allocator)
   {
     using MessageAllocTraits = allocator::AllocRebind<MessageT, Alloc>;
     using MessageAllocatorT = typename MessageAllocTraits::allocator_type;
@@ -265,17 +263,17 @@ public:
       // If there are no owning, just convert to shared.
       std::shared_ptr<MessageT> shared_msg = std::move(message);
       if (!sub_ids.take_shared_subscriptions.empty()) {
-        this->template add_shared_msg_to_buffers<MessageT, Alloc, Deleter>(
+        this->template add_shared_msg_to_buffers<MessageT>(
           shared_msg, sub_ids.take_shared_subscriptions);
       }
       return shared_msg;
     } else {
       // Construct a new shared pointer from the message for the buffers that
       // do not require ownership and to return.
-      auto shared_msg = std::allocate_shared<MessageT, MessageAllocatorT>(allocator, *message);
+      auto shared_msg = std::allocate_shared<MessageT, MessageAllocatorT>(*allocator, *message);
 
       if (!sub_ids.take_shared_subscriptions.empty()) {
-        this->template add_shared_msg_to_buffers<MessageT, Alloc, Deleter>(
+        this->template add_shared_msg_to_buffers<MessageT>(
           shared_msg,
           sub_ids.take_shared_subscriptions);
       }
@@ -305,6 +303,25 @@ public:
   get_subscription_intra_process(uint64_t intra_process_subscription_id);
 
 private:
+  struct SubscriptionInfo
+  {
+    SubscriptionInfo() = default;
+
+    rclcpp::experimental::SubscriptionIntraProcessBase::SharedPtr subscription;
+    rmw_qos_profile_t qos;
+    const char * topic_name;
+    bool use_take_shared_method;
+  };
+
+  struct PublisherInfo
+  {
+    PublisherInfo() = default;
+
+    rclcpp::PublisherBase::WeakPtr publisher;
+    rmw_qos_profile_t qos;
+    const char * topic_name;
+  };
+
   struct SplittedSubscriptions
   {
     std::vector<uint64_t> take_shared_subscriptions;
@@ -312,10 +329,10 @@ private:
   };
 
   using SubscriptionMap =
-    std::unordered_map<uint64_t, rclcpp::experimental::SubscriptionIntraProcessBase::WeakPtr>;
+    std::unordered_map<uint64_t, SubscriptionInfo>;
 
   using PublisherMap =
-    std::unordered_map<uint64_t, rclcpp::PublisherBase::WeakPtr>;
+    std::unordered_map<uint64_t, PublisherInfo>;
 
   using PublisherToSubscriptionIdsMap =
     std::unordered_map<uint64_t, SplittedSubscriptions>;
@@ -331,14 +348,9 @@ private:
 
   RCLCPP_PUBLIC
   bool
-  can_communicate(
-    rclcpp::PublisherBase::SharedPtr pub,
-    rclcpp::experimental::SubscriptionIntraProcessBase::SharedPtr sub) const;
+  can_communicate(PublisherInfo pub_info, SubscriptionInfo sub_info) const;
 
-  template<
-    typename MessageT,
-    typename Alloc,
-    typename Deleter>
+  template<typename MessageT>
   void
   add_shared_msg_to_buffers(
     std::shared_ptr<const MessageT> message,
@@ -349,23 +361,13 @@ private:
       if (subscription_it == subscriptions_.end()) {
         throw std::runtime_error("subscription has unexpectedly gone out of scope");
       }
-      auto subscription_base = subscription_it->second.lock();
-      if (subscription_base) {
-        auto subscription = std::dynamic_pointer_cast<
-          rclcpp::experimental::SubscriptionIntraProcessBuffer<MessageT, Alloc, Deleter>
-          >(subscription_base);
-        if (nullptr == subscription) {
-          throw std::runtime_error(
-                  "failed to dynamic cast SubscriptionIntraProcessBase to "
-                  "SubscriptionIntraProcessBuffer<MessageT, Alloc, Deleter>, which "
-                  "can happen when the publisher and subscription use different "
-                  "allocator types, which is not supported");
-        }
+      auto subscription_base = subscription_it->second.subscription;
 
-        subscription->provide_intra_process_message(message);
-      } else {
-        subscriptions_.erase(id);
-      }
+      auto subscription = std::static_pointer_cast<
+        rclcpp::experimental::SubscriptionIntraProcess<MessageT>
+        >(subscription_base);
+
+      subscription->provide_intra_process_message(message);
     }
   }
 
@@ -377,7 +379,7 @@ private:
   add_owned_msg_to_buffers(
     std::unique_ptr<MessageT, Deleter> message,
     std::vector<uint64_t> subscription_ids,
-    typename allocator::AllocRebind<MessageT, Alloc>::allocator_type & allocator)
+    std::shared_ptr<typename allocator::AllocRebind<MessageT, Alloc>::allocator_type> allocator)
   {
     using MessageAllocTraits = allocator::AllocRebind<MessageT, Alloc>;
     using MessageUniquePtr = std::unique_ptr<MessageT, Deleter>;
@@ -387,34 +389,24 @@ private:
       if (subscription_it == subscriptions_.end()) {
         throw std::runtime_error("subscription has unexpectedly gone out of scope");
       }
-      auto subscription_base = subscription_it->second.lock();
-      if (subscription_base) {
-        auto subscription = std::dynamic_pointer_cast<
-          rclcpp::experimental::SubscriptionIntraProcessBuffer<MessageT, Alloc, Deleter>
-          >(subscription_base);
-        if (nullptr == subscription) {
-          throw std::runtime_error(
-                  "failed to dynamic cast SubscriptionIntraProcessBase to "
-                  "SubscriptionIntraProcessBuffer<MessageT, Alloc, Deleter>, which "
-                  "can happen when the publisher and subscription use different "
-                  "allocator types, which is not supported");
-        }
+      auto subscription_base = subscription_it->second.subscription;
 
-        if (std::next(it) == subscription_ids.end()) {
-          // If this is the last subscription, give up ownership
-          subscription->provide_intra_process_message(std::move(message));
-        } else {
-          // Copy the message since we have additional subscriptions to serve
-          MessageUniquePtr copy_message;
-          Deleter deleter = message.get_deleter();
-          auto ptr = MessageAllocTraits::allocate(allocator, 1);
-          MessageAllocTraits::construct(allocator, ptr, *message);
-          copy_message = MessageUniquePtr(ptr, deleter);
+      auto subscription = std::static_pointer_cast<
+        rclcpp::experimental::SubscriptionIntraProcess<MessageT>
+        >(subscription_base);
 
-          subscription->provide_intra_process_message(std::move(copy_message));
-        }
+      if (std::next(it) == subscription_ids.end()) {
+        // If this is the last subscription, give up ownership
+        subscription->provide_intra_process_message(std::move(message));
       } else {
-        subscriptions_.erase(subscription_it);
+        // Copy the message since we have additional subscriptions to serve
+        MessageUniquePtr copy_message;
+        Deleter deleter = message.get_deleter();
+        auto ptr = MessageAllocTraits::allocate(*allocator.get(), 1);
+        MessageAllocTraits::construct(*allocator.get(), ptr, *message);
+        copy_message = MessageUniquePtr(ptr, deleter);
+
+        subscription->provide_intra_process_message(std::move(copy_message));
       }
     }
   }

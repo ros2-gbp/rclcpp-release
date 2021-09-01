@@ -54,10 +54,7 @@ public:
 
   bool is_ready(rcl_wait_set_t *) override {return is_ready_;}
 
-  std::shared_ptr<void> take_data() override {return nullptr;}
-
-  void
-  execute(std::shared_ptr<void> & data) override {(void)data;}
+  void execute() override {}
 
   void set_is_ready(bool value) {is_ready_ = value;}
 
@@ -79,7 +76,7 @@ TEST_F(TestStoragePolicyCommon, rcl_wait_set_resize_error) {
   rclcpp::WaitSet wait_set;
 
   auto subscription = node->create_subscription<test_msgs::msg::Empty>(
-    "topic", 10, [](test_msgs::msg::Empty::ConstSharedPtr) {});
+    "topic", 10, [](test_msgs::msg::Empty::SharedPtr) {});
   rclcpp::SubscriptionWaitSetMask mask{true, true, true};
 
   auto mock = mocking_utils::patch_and_return(
@@ -103,7 +100,7 @@ TEST_F(TestStoragePolicyCommon, rcl_wait_set_clear_error) {
 TEST_F(TestStoragePolicyCommon, rcl_wait_set_add_subscription_error) {
   rclcpp::WaitSet wait_set;
   auto subscription = node->create_subscription<test_msgs::msg::Empty>(
-    "topic", 10, [](test_msgs::msg::Empty::ConstSharedPtr) {});
+    "topic", 10, [](test_msgs::msg::Empty::SharedPtr) {});
   rclcpp::SubscriptionWaitSetMask mask{true, true, true};
 
   auto mock = mocking_utils::patch_and_return(

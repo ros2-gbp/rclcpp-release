@@ -24,7 +24,6 @@
 #include "rclcpp/experimental/buffers/intra_process_buffer.hpp"
 #include "rclcpp/experimental/buffers/ring_buffer_implementation.hpp"
 #include "rclcpp/intra_process_buffer_type.hpp"
-#include "rclcpp/qos.hpp"
 
 namespace rclcpp
 {
@@ -38,13 +37,13 @@ template<
 typename rclcpp::experimental::buffers::IntraProcessBuffer<MessageT, Alloc, Deleter>::UniquePtr
 create_intra_process_buffer(
   IntraProcessBufferType buffer_type,
-  const rclcpp::QoS & qos,
+  rmw_qos_profile_t qos,
   std::shared_ptr<Alloc> allocator)
 {
   using MessageSharedPtr = std::shared_ptr<const MessageT>;
   using MessageUniquePtr = std::unique_ptr<MessageT, Deleter>;
 
-  size_t buffer_size = qos.depth();
+  size_t buffer_size = qos.depth;
 
   using rclcpp::experimental::buffers::IntraProcessBuffer;
   typename IntraProcessBuffer<MessageT, Alloc, Deleter>::UniquePtr buffer;

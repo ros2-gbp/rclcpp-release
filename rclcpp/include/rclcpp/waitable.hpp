@@ -16,7 +16,6 @@
 #define RCLCPP__WAITABLE_HPP_
 
 #include <atomic>
-#include <memory>
 
 #include "rclcpp/macros.hpp"
 #include "rclcpp/visibility_control.hpp"
@@ -126,17 +125,8 @@ public:
   bool
   is_ready(rcl_wait_set_t * wait_set) = 0;
 
-  /// Take the data so that it can be consumed with `execute`.
+  /// Execute any entities of the Waitable that are ready.
   /**
-   * NOTE: take_data is a partial fix to a larger design issue with the
-   * multithreaded executor. This method is likely to be removed when
-   * a more permanent fix is implemented. A longterm fix is currently
-   * being discussed here: https://github.com/ros2/rclcpp/pull/1276
-   *
-   * This method takes the data from the underlying data structure and
-   * writes it to the void shared pointer `data` that is passed into the
-   * method. The `data` can then be executed with the `execute` method.
-   *
    * Before calling this method, the Waitable should be added to a wait set,
    * waited on, and then updated.
    *
@@ -153,41 +143,13 @@ public:
    * // Update the Waitable
    * waitable.update(wait_set);
    * // Execute any entities of the Waitable that may be ready
-   * std::shared_ptr<void> data = waitable.take_data();
-   * ```
-   */
-  RCLCPP_PUBLIC
-  virtual
-  std::shared_ptr<void>
-  take_data() = 0;
-
-  /// Execute data that is passed in.
-  /**
-   * Before calling this method, the Waitable should be added to a wait set,
-   * waited on, and then updated - and the `take_data` method should be
-   * called.
-   *
-   * Example usage:
-   *
-   * ```cpp
-   * // ... create a wait set and a Waitable
-   * // Add the Waitable to the wait set
-   * bool add_ret = waitable.add_to_wait_set(wait_set);
-   * // ... error handling
-   * // Wait
-   * rcl_ret_t wait_ret = rcl_wait(wait_set);
-   * // ... error handling
-   * // Update the Waitable
-   * waitable.update(wait_set);
-   * // Execute any entities of the Waitable that may be ready
-   * std::shared_ptr<void> data = waitable.take_data();
-   * waitable.execute(data);
+   * waitable.execute();
    * ```
    */
   RCLCPP_PUBLIC
   virtual
   void
-  execute(std::shared_ptr<void> & data) = 0;
+  execute() = 0;
 
   /// Exchange the "in use by wait set" state for this timer.
   /**

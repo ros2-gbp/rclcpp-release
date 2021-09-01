@@ -25,7 +25,6 @@
 
 #include "rcl/error_handling.h"
 
-#include "rclcpp/qos.hpp"
 #include "rclcpp/type_support_decl.hpp"
 #include "rclcpp/waitable.hpp"
 
@@ -40,9 +39,7 @@ public:
   RCLCPP_SMART_PTR_ALIASES_ONLY(SubscriptionIntraProcessBase)
 
   RCLCPP_PUBLIC
-  SubscriptionIntraProcessBase(
-    const std::string & topic_name,
-    const rclcpp::QoS & qos_profile)
+  SubscriptionIntraProcessBase(const std::string & topic_name, rmw_qos_profile_t qos_profile)
   : topic_name_(topic_name), qos_profile_(qos_profile)
   {}
 
@@ -59,12 +56,8 @@ public:
   virtual bool
   is_ready(rcl_wait_set_t * wait_set) = 0;
 
-  virtual
-  std::shared_ptr<void>
-  take_data() = 0;
-
   virtual void
-  execute(std::shared_ptr<void> & data) = 0;
+  execute() = 0;
 
   virtual bool
   use_take_shared_method() const = 0;
@@ -74,7 +67,7 @@ public:
   get_topic_name() const;
 
   RCLCPP_PUBLIC
-  QoS
+  rmw_qos_profile_t
   get_actual_qos() const;
 
 protected:
@@ -86,7 +79,7 @@ private:
   trigger_guard_condition() = 0;
 
   std::string topic_name_;
-  QoS qos_profile_;
+  rmw_qos_profile_t qos_profile_;
 };
 
 }  // namespace experimental

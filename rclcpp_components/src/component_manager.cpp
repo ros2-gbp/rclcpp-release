@@ -39,13 +39,13 @@ ComponentManager::ComponentManager(
 {
   loadNode_srv_ = create_service<LoadNode>(
     "~/_container/load_node",
-    std::bind(&ComponentManager::on_load_node, this, _1, _2, _3));
+    std::bind(&ComponentManager::OnLoadNode, this, _1, _2, _3));
   unloadNode_srv_ = create_service<UnloadNode>(
     "~/_container/unload_node",
-    std::bind(&ComponentManager::on_unload_node, this, _1, _2, _3));
+    std::bind(&ComponentManager::OnUnloadNode, this, _1, _2, _3));
   listNodes_srv_ = create_service<ListNodes>(
     "~/_container/list_nodes",
-    std::bind(&ComponentManager::on_list_nodes, this, _1, _2, _3));
+    std::bind(&ComponentManager::OnListNodes, this, _1, _2, _3));
 }
 
 ComponentManager::~ComponentManager()
@@ -121,53 +121,8 @@ ComponentManager::create_component_factory(const ComponentResource & resource)
   return {};
 }
 
-rclcpp::NodeOptions
-ComponentManager::create_node_options(const std::shared_ptr<LoadNode::Request> request)
-{
-  std::vector<rclcpp::Parameter> parameters;
-  for (const auto & p : request->parameters) {
-    parameters.push_back(rclcpp::Parameter::from_parameter_msg(p));
-  }
-
-  std::vector<std::string> remap_rules;
-  remap_rules.reserve(request->remap_rules.size() * 2 + 1);
-  remap_rules.push_back("--ros-args");
-  for (const std::string & rule : request->remap_rules) {
-    remap_rules.push_back("-r");
-    remap_rules.push_back(rule);
-  }
-
-  if (!request->node_name.empty()) {
-    remap_rules.push_back("-r");
-    remap_rules.push_back("__node:=" + request->node_name);
-  }
-
-  if (!request->node_namespace.empty()) {
-    remap_rules.push_back("-r");
-    remap_rules.push_back("__ns:=" + request->node_namespace);
-  }
-
-  auto options = rclcpp::NodeOptions()
-    .use_global_arguments(false)
-    .parameter_overrides(parameters)
-    .arguments(remap_rules);
-
-  for (const auto & a : request->extra_arguments) {
-    const rclcpp::Parameter extra_argument = rclcpp::Parameter::from_parameter_msg(a);
-    if (extra_argument.get_name() == "use_intra_process_comms") {
-      if (extra_argument.get_type() != rclcpp::ParameterType::PARAMETER_BOOL) {
-        throw ComponentManagerException(
-                "Extra component argument 'use_intra_process_comms' must be a boolean");
-      }
-      options.use_intra_process_comms(extra_argument.get_value<bool>());
-    }
-  }
-
-  return options;
-}
-
 void
-ComponentManager::on_load_node(
+ComponentManager::OnLoadNode(
   const std::shared_ptr<rmw_request_id_t> request_header,
   const std::shared_ptr<LoadNode::Request> request,
   std::shared_ptr<LoadNode::Response> response)
@@ -187,7 +142,45 @@ ComponentManager::on_load_node(
         continue;
       }
 
-      auto options = create_node_options(request);
+      std::vector<rclcpp::Parameter> parameters;
+      for (const auto & p : request->parameters) {
+        parameters.push_back(rclcpp::Parameter::from_parameter_msg(p));
+      }
+
+      std::vector<std::string> remap_rules;
+      remap_rules.reserve(request->remap_rules.size() * 2 + 1);
+      remap_rules.push_back("--ros-args");
+      for (const std::string & rule : request->remap_rules) {
+        remap_rules.push_back("-r");
+        remap_rules.push_back(rule);
+      }
+
+      if (!request->node_name.empty()) {
+        remap_rules.push_back("-r");
+        remap_rules.push_back("__node:=" + request->node_name);
+      }
+
+      if (!request->node_namespace.empty()) {
+        remap_rules.push_back("-r");
+        remap_rules.push_back("__ns:=" + request->node_namespace);
+      }
+
+      auto options = rclcpp::NodeOptions()
+        .use_global_arguments(false)
+        .parameter_overrides(parameters)
+        .arguments(remap_rules);
+
+      for (const auto & a : request->extra_arguments) {
+        const rclcpp::Parameter extra_argument = rclcpp::Parameter::from_parameter_msg(a);
+        if (extra_argument.get_name() == "use_intra_process_comms") {
+          if (extra_argument.get_type() != rclcpp::ParameterType::PARAMETER_BOOL) {
+            throw ComponentManagerException(
+                    "Extra component argument 'use_intra_process_comms' must be a boolean");
+          }
+          options.use_intra_process_comms(extra_argument.get_value<bool>());
+        }
+      }
+
       auto node_id = unique_id_++;
 
       if (0 == node_id) {
@@ -230,14 +223,14 @@ ComponentManager::on_load_node(
     response->error_message = "Failed to find class with the requested plugin name.";
     response->success = false;
   } catch (const ComponentManagerException & ex) {
-    RCLCPP_ERROR(get_logger(), "%s", ex.what());
+    RCLCPP_ERROR(get_logger(), ex.what());
     response->error_message = ex.what();
     response->success = false;
   }
 }
 
 void
-ComponentManager::on_unload_node(
+ComponentManager::OnUnloadNode(
   const std::shared_ptr<rmw_request_id_t> request_header,
   const std::shared_ptr<UnloadNode::Request> request,
   std::shared_ptr<UnloadNode::Response> response)
@@ -251,7 +244,7 @@ ComponentManager::on_unload_node(
     std::stringstream ss;
     ss << "No node found with unique_id: " << request->unique_id;
     response->error_message = ss.str();
-    RCLCPP_WARN(get_logger(), "%s", ss.str().c_str());
+    RCLCPP_WARN(get_logger(), ss.str());
   } else {
     if (auto exec = executor_.lock()) {
       exec->remove_node(wrapper->second.get_node_base_interface());
@@ -262,7 +255,7 @@ ComponentManager::on_unload_node(
 }
 
 void
-ComponentManager::on_list_nodes(
+ComponentManager::OnListNodes(
   const std::shared_ptr<rmw_request_id_t> request_header,
   const std::shared_ptr<ListNodes::Request> request,
   std::shared_ptr<ListNodes::Response> response)

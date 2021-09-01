@@ -150,47 +150,48 @@ public:
     );
   }
 
-  bool collect_entities(const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
+  bool collect_entities(const WeakNodeList & weak_nodes) override
   {
-    bool has_invalid_weak_groups_or_nodes = false;
-    for (const auto & pair : weak_groups_to_nodes) {
-      auto group = pair.first.lock();
-      auto node = pair.second.lock();
-      if (group == nullptr || node == nullptr) {
-        has_invalid_weak_groups_or_nodes = true;
+    bool has_invalid_weak_nodes = false;
+    for (auto & weak_node : weak_nodes) {
+      auto node = weak_node.lock();
+      if (!node) {
+        has_invalid_weak_nodes = true;
         continue;
       }
-      if (!group || !group->can_be_taken_from().load()) {
-        continue;
+      for (auto & weak_group : node->get_callback_groups()) {
+        auto group = weak_group.lock();
+        if (!group || !group->can_be_taken_from().load()) {
+          continue;
+        }
+        group->find_subscription_ptrs_if(
+          [this](const rclcpp::SubscriptionBase::SharedPtr & subscription) {
+            subscription_handles_.push_back(subscription->get_subscription_handle());
+            return false;
+          });
+        group->find_service_ptrs_if(
+          [this](const rclcpp::ServiceBase::SharedPtr & service) {
+            service_handles_.push_back(service->get_service_handle());
+            return false;
+          });
+        group->find_client_ptrs_if(
+          [this](const rclcpp::ClientBase::SharedPtr & client) {
+            client_handles_.push_back(client->get_client_handle());
+            return false;
+          });
+        group->find_timer_ptrs_if(
+          [this](const rclcpp::TimerBase::SharedPtr & timer) {
+            timer_handles_.push_back(timer->get_timer_handle());
+            return false;
+          });
+        group->find_waitable_ptrs_if(
+          [this](const rclcpp::Waitable::SharedPtr & waitable) {
+            waitable_handles_.push_back(waitable);
+            return false;
+          });
       }
-      group->find_subscription_ptrs_if(
-        [this](const rclcpp::SubscriptionBase::SharedPtr & subscription) {
-          subscription_handles_.push_back(subscription->get_subscription_handle());
-          return false;
-        });
-      group->find_service_ptrs_if(
-        [this](const rclcpp::ServiceBase::SharedPtr & service) {
-          service_handles_.push_back(service->get_service_handle());
-          return false;
-        });
-      group->find_client_ptrs_if(
-        [this](const rclcpp::ClientBase::SharedPtr & client) {
-          client_handles_.push_back(client->get_client_handle());
-          return false;
-        });
-      group->find_timer_ptrs_if(
-        [this](const rclcpp::TimerBase::SharedPtr & timer) {
-          timer_handles_.push_back(timer->get_timer_handle());
-          return false;
-        });
-      group->find_waitable_ptrs_if(
-        [this](const rclcpp::Waitable::SharedPtr & waitable) {
-          waitable_handles_.push_back(waitable);
-          return false;
-        });
     }
-
-    return has_invalid_weak_groups_or_nodes;
+    return has_invalid_weak_nodes;
   }
 
   void add_waitable_handle(const rclcpp::Waitable::SharedPtr & waitable) override
@@ -263,14 +264,14 @@ public:
   void
   get_next_subscription(
     rclcpp::AnyExecutable & any_exec,
-    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
+    const WeakNodeList & weak_nodes) override
   {
     auto it = subscription_handles_.begin();
     while (it != subscription_handles_.end()) {
-      auto subscription = get_subscription_by_handle(*it, weak_groups_to_nodes);
+      auto subscription = get_subscription_by_handle(*it, weak_nodes);
       if (subscription) {
         // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_subscription(subscription, weak_groups_to_nodes);
+        auto group = get_group_by_subscription(subscription, weak_nodes);
         if (!group) {
           // Group was not found, meaning the subscription is not valid...
           // Remove it from the ready list and continue looking
@@ -286,7 +287,7 @@ public:
         // Otherwise it is safe to set and return the any_exec
         any_exec.subscription = subscription;
         any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
+        any_exec.node_base = get_node_by_group(group, weak_nodes);
         subscription_handles_.erase(it);
         return;
       }
@@ -298,14 +299,14 @@ public:
   void
   get_next_service(
     rclcpp::AnyExecutable & any_exec,
-    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
+    const WeakNodeList & weak_nodes) override
   {
     auto it = service_handles_.begin();
     while (it != service_handles_.end()) {
-      auto service = get_service_by_handle(*it, weak_groups_to_nodes);
+      auto service = get_service_by_handle(*it, weak_nodes);
       if (service) {
         // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_service(service, weak_groups_to_nodes);
+        auto group = get_group_by_service(service, weak_nodes);
         if (!group) {
           // Group was not found, meaning the service is not valid...
           // Remove it from the ready list and continue looking
@@ -321,7 +322,7 @@ public:
         // Otherwise it is safe to set and return the any_exec
         any_exec.service = service;
         any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
+        any_exec.node_base = get_node_by_group(group, weak_nodes);
         service_handles_.erase(it);
         return;
       }
@@ -331,16 +332,14 @@ public:
   }
 
   void
-  get_next_client(
-    rclcpp::AnyExecutable & any_exec,
-    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
+  get_next_client(rclcpp::AnyExecutable & any_exec, const WeakNodeList & weak_nodes) override
   {
     auto it = client_handles_.begin();
     while (it != client_handles_.end()) {
-      auto client = get_client_by_handle(*it, weak_groups_to_nodes);
+      auto client = get_client_by_handle(*it, weak_nodes);
       if (client) {
         // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_client(client, weak_groups_to_nodes);
+        auto group = get_group_by_client(client, weak_nodes);
         if (!group) {
           // Group was not found, meaning the service is not valid...
           // Remove it from the ready list and continue looking
@@ -356,7 +355,7 @@ public:
         // Otherwise it is safe to set and return the any_exec
         any_exec.client = client;
         any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
+        any_exec.node_base = get_node_by_group(group, weak_nodes);
         client_handles_.erase(it);
         return;
       }
@@ -368,14 +367,14 @@ public:
   void
   get_next_timer(
     rclcpp::AnyExecutable & any_exec,
-    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
+    const WeakNodeList & weak_nodes) override
   {
     auto it = timer_handles_.begin();
     while (it != timer_handles_.end()) {
-      auto timer = get_timer_by_handle(*it, weak_groups_to_nodes);
+      auto timer = get_timer_by_handle(*it, weak_nodes);
       if (timer) {
         // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_timer(timer, weak_groups_to_nodes);
+        auto group = get_group_by_timer(timer, weak_nodes);
         if (!group) {
           // Group was not found, meaning the timer is not valid...
           // Remove it from the ready list and continue looking
@@ -388,34 +387,27 @@ public:
           ++it;
           continue;
         }
-        if (!timer->call()) {
-          // timer was cancelled, skip it.
-          ++it;
-          continue;
-        }
         // Otherwise it is safe to set and return the any_exec
         any_exec.timer = timer;
         any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
+        any_exec.node_base = get_node_by_group(group, weak_nodes);
         timer_handles_.erase(it);
         return;
       }
-      // Else, the timer is no longer valid, remove it and continue
+      // Else, the service is no longer valid, remove it and continue
       it = timer_handles_.erase(it);
     }
   }
 
   void
-  get_next_waitable(
-    rclcpp::AnyExecutable & any_exec,
-    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
+  get_next_waitable(rclcpp::AnyExecutable & any_exec, const WeakNodeList & weak_nodes) override
   {
     auto it = waitable_handles_.begin();
     while (it != waitable_handles_.end()) {
       auto waitable = *it;
       if (waitable) {
         // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_waitable(waitable, weak_groups_to_nodes);
+        auto group = get_group_by_waitable(waitable, weak_nodes);
         if (!group) {
           // Group was not found, meaning the waitable is not valid...
           // Remove it from the ready list and continue looking
@@ -431,7 +423,7 @@ public:
         // Otherwise it is safe to set and return the any_exec
         any_exec.waitable = waitable;
         any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
+        any_exec.node_base = get_node_by_group(group, weak_nodes);
         waitable_handles_.erase(it);
         return;
       }

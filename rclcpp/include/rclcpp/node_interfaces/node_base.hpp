@@ -15,14 +15,11 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_BASE_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_BASE_HPP_
 
-#include <functional>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <vector>
 
 #include "rcl/node.h"
-#include "rclcpp/callback_group.hpp"
 #include "rclcpp/context.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
@@ -86,9 +83,7 @@ public:
 
   RCLCPP_PUBLIC
   rclcpp::CallbackGroup::SharedPtr
-  create_callback_group(
-    rclcpp::CallbackGroupType group_type,
-    bool automatically_add_to_executor_with_node = true) override;
+  create_callback_group(rclcpp::CallbackGroupType group_type) override;
 
   RCLCPP_PUBLIC
   rclcpp::CallbackGroup::SharedPtr
@@ -98,16 +93,9 @@ public:
   bool
   callback_group_in_node(rclcpp::CallbackGroup::SharedPtr group) override;
 
-  /// Iterate over the stored callback groups, calling the given function on each valid one.
-  /**
-   * This method is called in a thread-safe way, and also makes sure to only call the given
-   * function on those items that are still valid.
-   *
-   * \param[in] func The callback function to call on each valid callback group.
-   */
   RCLCPP_PUBLIC
-  void
-  for_each_callback_group(const CallbackGroupFunction & func) override;
+  const std::vector<rclcpp::CallbackGroup::WeakPtr> &
+  get_callback_groups() const override;
 
   RCLCPP_PUBLIC
   std::atomic_bool &
@@ -128,10 +116,6 @@ public:
   bool
   get_enable_topic_statistics_default() const override;
 
-  std::string
-  resolve_topic_or_service_name(
-    const std::string & name, bool is_service, bool only_expand = false) const override;
-
 private:
   RCLCPP_DISABLE_COPY(NodeBase)
 
@@ -142,7 +126,6 @@ private:
   std::shared_ptr<rcl_node_t> node_handle_;
 
   rclcpp::CallbackGroup::SharedPtr default_callback_group_;
-  std::mutex callback_groups_mutex_;
   std::vector<rclcpp::CallbackGroup::WeakPtr> callback_groups_;
 
   std::atomic_bool associated_with_executor_;

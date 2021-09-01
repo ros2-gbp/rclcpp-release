@@ -106,9 +106,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   rclcpp::CallbackGroup::SharedPtr
-  create_callback_group(
-    rclcpp::CallbackGroupType group_type,
-    bool automatically_add_to_executor_with_node = true) = 0;
+  create_callback_group(rclcpp::CallbackGroupType group_type) = 0;
 
   /// Return the default callback group.
   RCLCPP_PUBLIC
@@ -122,19 +120,11 @@ public:
   bool
   callback_group_in_node(rclcpp::CallbackGroup::SharedPtr group) = 0;
 
-  using CallbackGroupFunction = std::function<void (rclcpp::CallbackGroup::SharedPtr)>;
-
-  /// Iterate over the stored callback groups, calling the given function on each valid one.
-  /**
-   * This method is called in a thread-safe way, and also makes sure to only call the given
-   * function on those items that are still valid.
-   *
-   * \param[in] func The callback function to call on each valid callback group.
-   */
+  /// Return list of callback groups associated with this node.
   RCLCPP_PUBLIC
   virtual
-  void
-  for_each_callback_group(const CallbackGroupFunction & func) = 0;
+  const std::vector<rclcpp::CallbackGroup::WeakPtr> &
+  get_callback_groups() const = 0;
 
   /// Return the atomic bool which is used to ensure only one executor is used.
   RCLCPP_PUBLIC
@@ -171,13 +161,6 @@ public:
   virtual
   bool
   get_enable_topic_statistics_default() const = 0;
-
-  /// Expand and remap a given topic or service name.
-  RCLCPP_PUBLIC
-  virtual
-  std::string
-  resolve_topic_or_service_name(
-    const std::string & name, bool is_service, bool only_expand = false) const = 0;
 };
 
 }  // namespace node_interfaces

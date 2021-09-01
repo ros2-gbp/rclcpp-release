@@ -3,134 +3,44 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-13.0.0 (2021-08-23)
--------------------
-* Update client API to be able to remove pending requests. (`#1734 <https://github.com/ros2/rclcpp/issues/1734>`_)
-* Change log level for lifecycle_publisher. (`#1715 <https://github.com/ros2/rclcpp/issues/1715>`_)
-* Fix: RCLCPP_PUBLIC -> RCLCPP_LIFECYCLE_PUBLIC (`#1732 <https://github.com/ros2/rclcpp/issues/1732>`_)
-* Use rcpputils/scope_exit.hpp and remove rclcpp/scope_exit.hpp (`#1727 <https://github.com/ros2/rclcpp/issues/1727>`_)
-* Contributors: Alberto Soragna, Christophe Bedard, Ivan Santiago Paunovic, Shane Loretz
-
-12.0.0 (2021-07-26)
--------------------
-* Remove unsafe get_callback_groups API.
-  Callers should change to using for_each_callback_group(), or
-  store the callback groups they need internally.
-* Add in callback_groups_for_each.
-  The main reason to add this method in is to make accesses to the
-  callback_groups\_ vector thread-safe.  By having a
-  callback_groups_for_each that accepts a std::function, we can
-  just have the callers give us the callback they are interested
-  in, and we can take care of the locking.
-  The rest of this fairly large PR is cleaning up all of the places
-  that use get_callback_groups() to instead use
-  callback_groups_for_each().
-* Contributors: Chris Lalancette
-
-11.2.0 (2021-07-21)
--------------------
-
-11.1.0 (2021-07-13)
--------------------
-
-11.0.0 (2021-05-18)
--------------------
-* Fix destruction order in lifecycle benchmark (`#1675 <https://github.com/ros2/rclcpp/issues/1675>`_)
-* Contributors: Scott K Logan
-
-10.0.0 (2021-05-11)
--------------------
-* [rclcpp] Type Adaptation feature (`#1557 <https://github.com/ros2/rclcpp/issues/1557>`_)
-* Contributors: Audrow Nash, William Woodall
-
-9.0.2 (2021-04-14)
+2.4.0 (2021-09-01)
 ------------------
+* Fix SEGV caused by order of destruction of Node sub-interfaces (`#1469 <https://github.com/ros2/rclcpp/issues/1469>`_) (`#1736 <https://github.com/ros2/rclcpp/issues/1736>`_)
+* Contributors: Colin MacKenzie
 
-9.0.1 (2021-04-12)
+2.3.1 (2021-04-14)
 ------------------
+* Update quality declaration links (re: `ros2/docs.ros2.org#52 <https://github.com/ros2/docs.ros2.org/issues/52>`_) (`#1616 <https://github.com/ros2/rclcpp/issues/1616>`_)
+* Contributors: Simon Honigmann
 
-9.0.0 (2021-04-06)
+2.3.0 (2020-12-09)
 ------------------
-* Add generic publisher and generic subscription for serialized messages (`#1452 <https://github.com/ros2/rclcpp/issues/1452>`_)
-* updating quality declaration links (re: `ros2/docs.ros2.org#52 <https://github.com/ros2/docs.ros2.org/issues/52>`_) (`#1615 <https://github.com/ros2/rclcpp/issues/1615>`_)
-* Contributors: Nikolai Morin, shonigmann
-
-8.2.0 (2021-03-31)
-------------------
-* Fix flaky lifecycle node tests (`#1606 <https://github.com/ros2/rclcpp/issues/1606>`_)
-* Clock subscription callback group spins in its own thread (`#1556 <https://github.com/ros2/rclcpp/issues/1556>`_)
-* Delete debug messages (`#1602 <https://github.com/ros2/rclcpp/issues/1602>`_)
-* add automatically_add_executor_with_node option (`#1594 <https://github.com/ros2/rclcpp/issues/1594>`_)
-* Contributors: BriceRenaudeau, Ivan Santiago Paunovic, Jacob Perron, anaelle-sw
-
-8.1.0 (2021-03-25)
-------------------
-
-8.0.0 (2021-03-23)
-------------------
-* make rcl_lifecyle_com_interface optional in lifecycle nodes (`#1507 <https://github.com/ros2/rclcpp/issues/1507>`_)
-* Contributors: Karsten Knese
-
-7.0.1 (2021-03-22)
-------------------
-
-7.0.0 (2021-03-18)
-------------------
-* Add support for rmw_connextdds (`#1574 <https://github.com/ros2/rclcpp/issues/1574>`_)
-* Fix SEGV caused by order of destruction of Node sub-interfaces (`#1469 <https://github.com/ros2/rclcpp/issues/1469>`_)
-* Enforce static parameter types (`#1522 <https://github.com/ros2/rclcpp/issues/1522>`_)
-* Contributors: Andrea Sorbini, Colin MacKenzie, Ivan Santiago Paunovic
-
-6.3.1 (2021-02-08)
-------------------
-
-6.3.0 (2021-01-25)
-------------------
-
-6.2.0 (2021-01-08)
-------------------
-
-6.1.0 (2020-12-10)
-------------------
-* add LifecycleNode::get_transition_graph to match services. (`#1472 <https://github.com/ros2/rclcpp/issues/1472>`_)
-* Update QDs to QL 1 (`#1477 <https://github.com/ros2/rclcpp/issues/1477>`_)
-* Benchmark lifecycle features (`#1462 <https://github.com/ros2/rclcpp/issues/1462>`_)
-* Contributors: Stephen Brawner, brawner, tomoya
-
-6.0.0 (2020-11-18)
-------------------
-* Reserve vector capacities and use emplace_back for constructing vectors (`#1464 <https://github.com/ros2/rclcpp/issues/1464>`_)
-* [rclcpp_lifecycle] Change uint8_t iterator variables to size_t (`#1461 <https://github.com/ros2/rclcpp/issues/1461>`_)
-* Bump rclcpp packages to Quality Level 2 (`#1445 <https://github.com/ros2/rclcpp/issues/1445>`_)
-* Contributors: Louise Poubel, brawner
-
-5.1.0 (2020-11-02)
-------------------
-* Increase test timeouts of slow running tests with rmw_connext_cpp (`#1400 <https://github.com/ros2/rclcpp/issues/1400>`_)
-* Update maintainers (`#1384 <https://github.com/ros2/rclcpp/issues/1384>`_)
-* Add clock qos to node options (`#1375 <https://github.com/ros2/rclcpp/issues/1375>`_)
-* Contributors: Ivan Santiago Paunovic, brawner
-
-5.0.0 (2020-09-18)
-------------------
-* Increase test coverage of rclcpp_lifecycle to 96% (`#1298 <https://github.com/ros2/rclcpp/issues/1298>`_)
-* Log error instead of throwing exception in Transition and State reset(), mark no except (`#1297 <https://github.com/ros2/rclcpp/issues/1297>`_)
-* Remove unused private function (rclcpp::Node and rclcpp_lifecycle::Node) (`#1294 <https://github.com/ros2/rclcpp/issues/1294>`_)
-* Remove rmw-dependent unit-test checks (`#1293 <https://github.com/ros2/rclcpp/issues/1293>`_)
-* Added missing tests for rclcpp lifecycle (`#1240 <https://github.com/ros2/rclcpp/issues/1240>`_)
-* Warn about unused result of add_on_set_parameters_callback (`#1238 <https://github.com/ros2/rclcpp/issues/1238>`_)
-* Contributors: Alejandro Hernández Cordero, Jacob Perron, Stephen Brawner
-
-4.0.0 (2020-07-09)
-------------------
-* Remove deprecated set_on_parameters_set_callback function (`#1199 <https://github.com/ros2/rclcpp/issues/1199>`_)
-* Bump to QD to level 3 and fixed links (`#1158 <https://github.com/ros2/rclcpp/issues/1158>`_)
+* Reserve vector capacities and use emplace_back for constructing vectors (`#1464 <https://github.com/ros2/rclcpp/issues/1464>`_) (`#1489 <https://github.com/ros2/rclcpp/issues/1489>`_)
+* Change uint8_t iterator variables to size_t (`#1461 <https://github.com/ros2/rclcpp/issues/1461>`_) (`#1488 <https://github.com/ros2/rclcpp/issues/1488>`_)
+* Update QD to QL 1 (`#1480 <https://github.com/ros2/rclcpp/issues/1480>`_)
+* Benchmark lifecycle features (`#1462 <https://github.com/ros2/rclcpp/issues/1462>`_) (`#1471 <https://github.com/ros2/rclcpp/issues/1471>`_)
 * Fix race in test_lifecycle_service_client (`#1204 <https://github.com/ros2/rclcpp/issues/1204>`_)
-* Contributors: Alejandro Hernández Cordero, Claire Wang, Dirk Thomas
+* Increase test coverage of rclcpp_lifecycle to 96% (`#1298 <https://github.com/ros2/rclcpp/issues/1298>`_)
+* Add missing tests for rclcpp lifecycle (`#1240 <https://github.com/ros2/rclcpp/issues/1240>`_)
+* Contributors: Alejandro Hernández Cordero, Dirk Thomas, Jacob Perron, Louise Poubel, Stephen Brawner
 
-3.0.0 (2020-06-18)
+2.2.0 (2020-10-07)
 ------------------
-* Fix doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_)
+* Log error instead of throwing exception in Transition and State reset() mark no except (`#1297 <https://github.com/ros2/rclcpp/issues/1297>`_) (`#1378 <https://github.com/ros2/rclcpp/issues/1378>`_)
+* Remove rmw-dependent unit-test checks (`#1293 <https://github.com/ros2/rclcpp/issues/1293>`_) (`#1377 <https://github.com/ros2/rclcpp/issues/1377>`_)
+* Contributors: Stephen Brawner
+
+2.1.0 (2020-08-03)
+------------------
+* Warn about unused result of add_on_set_parameters_callback (`#1238 <https://github.com/ros2/rclcpp/issues/1238>`_) (`#1244 <https://github.com/ros2/rclcpp/issues/1244>`_)
+* Contributors: Jacob Perron
+
+2.0.2 (2020-07-07)
+------------------
+
+2.0.1 (2020-06-23)
+------------------
+* Fixed doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_) (`#1191 <https://github.com/ros2/rclcpp/issues/1191>`_)
 * Contributors: Alejandro Hernández Cordero
 
 2.0.0 (2020-06-01)
