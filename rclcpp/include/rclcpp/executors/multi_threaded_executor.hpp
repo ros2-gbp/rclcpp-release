@@ -82,17 +82,12 @@ protected:
 private:
   RCLCPP_DISABLE_COPY(MultiThreadedExecutor)
 
-  std::mutex wait_mutex_;  // Unused. Leave it for ABI compatibility.
+  detail::MutexTwoPriorities wait_mutex_;
   size_t number_of_threads_;
   bool yield_before_execute_;
   std::chrono::nanoseconds next_exec_timeout_;
 
   std::set<TimerBase::SharedPtr> scheduled_timers_;
-  static std::unordered_map<MultiThreadedExecutor *,
-    std::shared_ptr<detail::MutexTwoPriorities>> wait_mutex_set_;
-  static std::mutex shared_wait_mutex_;
-  // These variables are declared as static variables for ABI-compatibiliity.
-  // And they mimic member variables needed to backport from master.
 };
 
 }  // namespace executors

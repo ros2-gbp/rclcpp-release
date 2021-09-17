@@ -38,6 +38,8 @@ class NodeBaseInterface
 public:
   RCLCPP_SMART_PTR_ALIASES_ONLY(NodeBaseInterface)
 
+  using CallbackGroupFunction = std::function<void (rclcpp::CallbackGroup::SharedPtr)>;
+
   RCLCPP_PUBLIC
   virtual
   ~NodeBaseInterface() = default;
@@ -106,7 +108,9 @@ public:
   RCLCPP_PUBLIC
   virtual
   rclcpp::CallbackGroup::SharedPtr
-  create_callback_group(rclcpp::CallbackGroupType group_type) = 0;
+  create_callback_group(
+    rclcpp::CallbackGroupType group_type,
+    bool automatically_add_to_executor_with_node = true) = 0;
 
   /// Return the default callback group.
   RCLCPP_PUBLIC
@@ -161,6 +165,13 @@ public:
   virtual
   bool
   get_enable_topic_statistics_default() const = 0;
+
+  /// Expand and remap a given topic or service name.
+  RCLCPP_PUBLIC
+  virtual
+  std::string
+  resolve_topic_or_service_name(
+    const std::string & name, bool is_service, bool only_expand = false) const = 0;
 };
 
 }  // namespace node_interfaces

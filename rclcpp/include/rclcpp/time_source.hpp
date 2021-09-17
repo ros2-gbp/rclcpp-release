@@ -25,6 +25,7 @@
 #include "rcl_interfaces/msg/parameter_event.hpp"
 
 #include "rclcpp/node.hpp"
+#include "rclcpp/executors.hpp"
 #include "rclcpp/node_interfaces/node_parameters_interface.hpp"
 
 
@@ -32,6 +33,20 @@ namespace rclcpp
 {
 class Clock;
 
+/**
+ * Time source that will drive the attached clocks.
+ *
+ * If the attached node `use_sim_time` parameter is `true`, the attached clocks will
+ * be updated based on messages received.
+ *
+ * The subscription to the clock topic created by the time source can have it's qos reconfigured
+ * using parameter overrides, particularly the following ones are accepted:
+ *
+ * - qos_overrides./clock.depth
+ * - qos_overrides./clock.durability
+ * - qos_overrides./clock.history
+ * - qos_overrides./clock.reliability
+ */
 class TimeSource
 {
 public:
@@ -40,16 +55,24 @@ public:
    * The node will be attached to the time source.
    *
    * \param node std::shared pointer to a initialized node
+   * \param qos QoS that will be used when creating a `/clock` subscription.
    */
   RCLCPP_PUBLIC
-  explicit TimeSource(rclcpp::Node::SharedPtr node);
+  explicit TimeSource(
+    rclcpp::Node::SharedPtr node,
+    const rclcpp::QoS & qos = rclcpp::ClockQoS(),
+    bool use_clock_thread = true);
 
   /// Empty constructor
   /**
    * An Empty TimeSource class
+   *
+   * \param qos QoS that will be used when creating a `/clock` subscription.
    */
   RCLCPP_PUBLIC
-  TimeSource();
+  explicit TimeSource(
+    const rclcpp::QoS & qos = rclcpp::ClockQoS(),
+    bool use_clock_thread = true);
 
   /// Attack node to the time source.
   /**
@@ -101,6 +124,11 @@ public:
   RCLCPP_PUBLIC
   ~TimeSource();
 
+protected:
+  // Dedicated thread for clock subscription.
+  bool use_clock_thread_;
+  std::thread clock_executor_thread_;
+
 private:
   // Preserve the node reference
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_;
@@ -114,15 +142,21 @@ private:
   // Store (and update on node attach) logger for logging.
   Logger logger_;
 
+  // QoS of the clock subscription.
+  rclcpp::QoS qos_;
+
   // The subscription for the clock callback
   using MessageT = rosgraph_msgs::msg::Clock;
   using Alloc = std::allocator<void>;
   using SubscriptionT = rclcpp::Subscription<MessageT, Alloc>;
-  std::shared_ptr<SubscriptionT> clock_subscription_;
+  std::shared_ptr<SubscriptionT> clock_subscription_{nullptr};
   std::mutex clock_sub_lock_;
+  rclcpp::CallbackGroup::SharedPtr clock_callback_group_;
+  rclcpp::executors::SingleThreadedExecutor::SharedPtr clock_executor_;
+  std::promise<void> cancel_clock_executor_promise_;
 
   // The clock callback itself
-  void clock_cb(const rosgraph_msgs::msg::Clock::SharedPtr msg);
+  void clock_cb(std::shared_ptr<const rosgraph_msgs::msg::Clock> msg);
 
   // Create the subscription for the clock topic
   void create_clock_sub();
@@ -136,7 +170,7 @@ private:
   std::shared_ptr<ParamSubscriptionT> parameter_subscription_;
 
   // Callback for parameter updates
-  void on_parameter_event(const rcl_interfaces::msg::ParameterEvent::SharedPtr event);
+  void on_parameter_event(std::shared_ptr<const rcl_interfaces::msg::ParameterEvent> event);
 
   // An enum to hold the parameter state
   enum UseSimTimeParameterState {UNSET, SET_TRUE, SET_FALSE};
@@ -155,16 +189,16 @@ private:
 
   // Local storage of validity of ROS time
   // This is needed when new clocks are added.
-  bool ros_time_active_;
+  bool ros_time_active_{false};
   // Last set message to be passed to newly registered clocks
-  rosgraph_msgs::msg::Clock::SharedPtr last_msg_set_;
+  std::shared_ptr<const rosgraph_msgs::msg::Clock> last_msg_set_;
 
   // A lock to protect iterating the associated_clocks_ field.
   std::mutex clock_list_lock_;
   // A vector to store references to associated clocks.
   std::vector<rclcpp::Clock::SharedPtr> associated_clocks_;
   // A handler for the use_sim_time parameter callback.
-  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr sim_time_cb_handler_ = nullptr;
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr sim_time_cb_handler_{nullptr};
 };
 
 }  // namespace rclcpp

@@ -31,6 +31,8 @@ using rclcpp::exceptions::throw_from_rcl_error;
 
 using rclcpp::node_interfaces::NodeBase;
 
+using rclcpp::node_interfaces::map_of_mutexes;
+
 NodeBase::NodeBase(
   const std::string & node_name,
   const std::string & namespace_,
@@ -46,6 +48,9 @@ NodeBase::NodeBase(
   associated_with_executor_(false),
   notify_guard_condition_is_valid_(false)
 {
+  // Generate a mutex for this instance of NodeBase
+  NodeBase::map_object.create_mutex_of_nodebase(this);
+
   // Setup the guard condition that is notified when changes occur in the graph.
   rcl_guard_condition_options_t guard_condition_options = rcl_guard_condition_get_default_options();
   rcl_ret_t ret = rcl_guard_condition_init(
@@ -70,6 +75,7 @@ NodeBase::NodeBase(
   std::shared_ptr<std::recursive_mutex> logging_mutex = get_global_logging_mutex();
   {
     std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
+    // TODO(ivanpauno): /rosout Qos should be reconfigurable.
     // TODO(ivanpauno): Instead of mutually excluding rcl_node_init with the global logger mutex,
     // rcl_logging_rosout_init_publisher_for_node could be decoupled from there and be called
     // here directly.
@@ -165,6 +171,8 @@ NodeBase::~NodeBase()
         "failed to destroy guard condition: %s", rcl_get_error_string().str);
     }
   }
+
+  NodeBase::map_object.delete_mutex_of_nodebase(this);
 }
 
 const char *
@@ -216,11 +224,15 @@ NodeBase::get_shared_rcl_node_handle() const
 }
 
 rclcpp::CallbackGroup::SharedPtr
-NodeBase::create_callback_group(rclcpp::CallbackGroupType group_type)
+NodeBase::create_callback_group(
+  rclcpp::CallbackGroupType group_type,
+  bool automatically_add_to_executor_with_node)
 {
-  using rclcpp::CallbackGroup;
-  using rclcpp::CallbackGroupType;
-  auto group = CallbackGroup::SharedPtr(new CallbackGroup(group_type));
+  auto group = std::make_shared<rclcpp::CallbackGroup>(
+    group_type,
+    automatically_add_to_executor_with_node);
+  auto mutex_ptr = NodeBase::map_object.get_mutex_of_nodebase(this);
+  std::lock_guard<std::mutex> lock(*mutex_ptr);
   callback_groups_.push_back(group);
   return group;
 }
@@ -234,14 +246,16 @@ NodeBase::get_default_callback_group()
 bool
 NodeBase::callback_group_in_node(rclcpp::CallbackGroup::SharedPtr group)
 {
-  bool group_belongs_to_this_node = false;
+  auto mutex_ptr = NodeBase::map_object.get_mutex_of_nodebase(this);
+  std::lock_guard<std::mutex> lock(*mutex_ptr);
+
   for (auto & weak_group : this->callback_groups_) {
     auto cur_group = weak_group.lock();
     if (cur_group && (cur_group == group)) {
-      group_belongs_to_this_node = true;
+      return true;
     }
   }
-  return group_belongs_to_this_node;
+  return false;
 }
 
 const std::vector<rclcpp::CallbackGroup::WeakPtr> &
@@ -282,4 +296,63 @@ bool
 NodeBase::get_enable_topic_statistics_default() const
 {
   return enable_topic_statistics_default_;
+}
+
+std::string
+NodeBase::resolve_topic_or_service_name(
+  const std::string & name, bool is_service, bool only_expand) const
+{
+  char * output_cstr = NULL;
+  auto allocator = rcl_get_default_allocator();
+  rcl_ret_t ret = rcl_node_resolve_name(
+    node_handle_.get(),
+    name.c_str(),
+    allocator,
+    is_service,
+    only_expand,
+    &output_cstr);
+  if (RCL_RET_OK != ret) {
+    throw_from_rcl_error(ret, "failed to resolve name", rcl_get_error_state());
+  }
+  std::string output{output_cstr};
+  allocator.deallocate(output_cstr, allocator.state);
+  return output;
+}
+
+map_of_mutexes NodeBase::map_object = map_of_mutexes();
+
+void map_of_mutexes::create_mutex_of_nodebase(
+  const rclcpp::node_interfaces::NodeBaseInterface * nodebase)
+{
+  std::lock_guard<std::mutex> guard(this->internal_mutex_);
+  this->data_.emplace(nodebase, std::make_shared<std::mutex>() );
+}
+
+std::shared_ptr<std::mutex> map_of_mutexes::get_mutex_of_nodebase(
+  const rclcpp::node_interfaces::NodeBaseInterface * nodebase)
+{
+  std::lock_guard<std::mutex> guard(this->internal_mutex_);
+  return this->data_[nodebase];
+}
+
+void map_of_mutexes::delete_mutex_of_nodebase(
+  const rclcpp::node_interfaces::NodeBaseInterface * nodebase)
+{
+  std::lock_guard<std::mutex> guard(this->internal_mutex_);
+  this->data_.erase(nodebase);
+}
+
+// For each callback group free function implementation
+void rclcpp::node_interfaces::global_for_each_callback_group(
+  NodeBaseInterface * node_base_interface, const NodeBaseInterface::CallbackGroupFunction & func)
+{
+  auto mutex_ptr = NodeBase::map_object.get_mutex_of_nodebase(node_base_interface);
+  std::lock_guard<std::mutex> lock(*mutex_ptr);
+
+  for (const auto & weak_group : node_base_interface->get_callback_groups()) {
+    auto group = weak_group.lock();
+    if (group) {
+      func(group);
+    }
+  }
 }
