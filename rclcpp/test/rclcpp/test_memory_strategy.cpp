@@ -21,7 +21,6 @@
 
 #include "rclcpp/strategies/allocator_memory_strategy.hpp"
 #include "rclcpp/memory_strategy.hpp"
-#include "rclcpp/node_interfaces/node_base.hpp"
 #include "test_msgs/msg/empty.hpp"
 #include "test_msgs/srv/empty.hpp"
 
@@ -278,8 +277,7 @@ TEST_F(TestMemoryStrategy, get_node_by_group) {
   {
     auto node = std::make_shared<rclcpp::Node>("node", "ns");
     auto node_handle = node->get_node_base_interface();
-    rclcpp::node_interfaces::global_for_each_callback_group(
-      node_handle.get(),
+    node_handle->for_each_callback_group(
       [node_handle, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
       {
         weak_groups_to_nodes.insert(

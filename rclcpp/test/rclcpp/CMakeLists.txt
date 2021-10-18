@@ -7,10 +7,13 @@ add_definitions(-DTEST_RESOURCES_DIRECTORY="${TEST_RESOURCES_DIRECTORY}")
 rosidl_generate_interfaces(${PROJECT_NAME}_test_msgs
   ../msg/Header.msg
   ../msg/MessageWithHeader.msg
+  ../msg/String.msg
   DEPENDENCIES builtin_interfaces
   LIBRARY_NAME ${PROJECT_NAME}
   SKIP_INSTALL
 )
+# Need the target name to depend on generated interface libraries
+rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}_test_msgs" "rosidl_typesupport_cpp")
 
 ament_add_gtest(
   test_allocator_common
@@ -355,6 +358,48 @@ if(TARGET test_publisher)
   )
   target_link_libraries(test_publisher ${PROJECT_NAME} mimick)
 endif()
+
+set(append_library_dirs "${CMAKE_CURRENT_BINARY_DIR}")
+if(WIN32)
+  set(append_library_dirs "${append_library_dirs}/$<CONFIG>")
+endif()
+
+ament_add_gtest(test_publisher_with_type_adapter test_publisher_with_type_adapter.cpp
+  APPEND_LIBRARY_DIRS "${append_library_dirs}"
+)
+if(TARGET test_publisher_with_type_adapter)
+  ament_target_dependencies(test_publisher_with_type_adapter
+    "rcutils"
+    "rcl_interfaces"
+    "rmw"
+    "rosidl_runtime_cpp"
+    "rosidl_typesupport_cpp"
+    "test_msgs"
+  )
+  target_link_libraries(test_publisher_with_type_adapter
+    ${PROJECT_NAME}
+    mimick
+    ${cpp_typesupport_target})
+endif()
+
+ament_add_gtest(test_subscription_with_type_adapter test_subscription_with_type_adapter.cpp
+  APPEND_LIBRARY_DIRS "${append_library_dirs}"
+)
+if(TARGET test_subscription_with_type_adapter)
+  ament_target_dependencies(test_subscription_with_type_adapter
+    "rcutils"
+    "rcl_interfaces"
+    "rmw"
+    "rosidl_runtime_cpp"
+    "rosidl_typesupport_cpp"
+    "test_msgs"
+  )
+  target_link_libraries(test_subscription_with_type_adapter
+    ${PROJECT_NAME}
+    mimick
+    ${cpp_typesupport_target})
+endif()
+
 ament_add_gtest(test_publisher_subscription_count_api test_publisher_subscription_count_api.cpp)
 if(TARGET test_publisher_subscription_count_api)
   ament_target_dependencies(test_publisher_subscription_count_api
@@ -507,11 +552,6 @@ if(TARGET test_find_weak_nodes)
   target_link_libraries(test_find_weak_nodes ${PROJECT_NAME})
 endif()
 
-set(append_library_dirs "${CMAKE_CURRENT_BINARY_DIR}")
-if(WIN32)
-  set(append_library_dirs "${append_library_dirs}/$<CONFIG>")
-endif()
-
 ament_add_gtest(test_externally_defined_services test_externally_defined_services.cpp)
 ament_target_dependencies(test_externally_defined_services
   "rcl"
@@ -646,8 +686,9 @@ if(TARGET test_subscription_topic_statistics)
     "rosidl_typesupport_cpp"
     "statistics_msgs"
     "test_msgs")
-  rosidl_target_interfaces(test_subscription_topic_statistics ${PROJECT_NAME}_test_msgs "rosidl_typesupport_cpp")
-  target_link_libraries(test_subscription_topic_statistics ${PROJECT_NAME})
+  target_link_libraries(test_subscription_topic_statistics
+    ${PROJECT_NAME}
+    ${cpp_typesupport_target})
 endif()
 
 ament_add_gtest(test_subscription_options test_subscription_options.cpp)

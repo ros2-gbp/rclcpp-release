@@ -22,17 +22,18 @@
 
 #include "rcl/allocator.h"
 #include "rcl/error_handling.h"
+#include "rcpputils/scope_exit.hpp"
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/executor.hpp"
 #include "rclcpp/guard_condition.hpp"
 #include "rclcpp/memory_strategy.hpp"
 #include "rclcpp/node.hpp"
-#include "rclcpp/scope_exit.hpp"
 #include "rclcpp/utilities.hpp"
-#include "rclcpp/node_interfaces/node_base.hpp"
 
 #include "rcutils/logging_macros.h"
+
+#include "tracetools/tracetools.h"
 
 using namespace std::chrono_literals;
 
@@ -191,8 +192,7 @@ Executor::add_callback_groups_from_nodes_associated_to_executor()
   for (auto & weak_node : weak_nodes_) {
     auto node = weak_node.lock();
     if (node) {
-      rclcpp::node_interfaces::global_for_each_callback_group(
-        node.get(),
+      node->for_each_callback_group(
         [this, node](rclcpp::CallbackGroup::SharedPtr shared_group_ptr)
         {
           if (
@@ -268,11 +268,12 @@ Executor::add_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_pt
   // If the node already has an executor
   std::atomic_bool & has_executor = node_ptr->get_associated_with_executor_atomic();
   if (has_executor.exchange(true)) {
-    throw std::runtime_error("Node has already been added to an executor.");
+    throw std::runtime_error(
+            std::string("Node '") + node_ptr->get_fully_qualified_name() +
+            "' has already been added to an executor.");
   }
   std::lock_guard<std::mutex> guard{mutex_};
-  rclcpp::node_interfaces::global_for_each_callback_group(
-    node_ptr.get(),
+  node_ptr->for_each_callback_group(
     [this, node_ptr, notify](rclcpp::CallbackGroup::SharedPtr group_ptr)
     {
       if (!group_ptr->get_associated_with_executor_atomic().load() &&
@@ -451,7 +452,7 @@ Executor::spin_some_impl(std::chrono::nanoseconds max_duration, bool exhaustive)
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin_some() called while already spinning");
   }
-  RCLCPP_SCOPE_EXIT(this->spinning.store(false); );
+  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
   bool work_available = false;
   while (rclcpp::ok(context_) && spinning.load() && max_duration_not_elapsed()) {
     AnyExecutable any_exec;
@@ -485,7 +486,7 @@ Executor::spin_once(std::chrono::nanoseconds timeout)
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin_once() called while already spinning");
   }
-  RCLCPP_SCOPE_EXIT(this->spinning.store(false); );
+  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
   spin_once_impl(timeout);
 }
 
@@ -516,9 +517,15 @@ Executor::execute_any_executable(AnyExecutable & any_exec)
     return;
   }
   if (any_exec.timer) {
+    TRACEPOINT(
+      rclcpp_executor_execute,
+      static_cast<const void *>(any_exec.timer->get_timer_handle().get()));
     execute_timer(any_exec.timer);
   }
   if (any_exec.subscription) {
+    TRACEPOINT(
+      rclcpp_executor_execute,
+      static_cast<const void *>(any_exec.subscription->get_subscription_handle().get()));
     execute_subscription(any_exec.subscription);
   }
   if (any_exec.service) {
@@ -592,8 +599,7 @@ Executor::execute_subscription(rclcpp::SubscriptionBase::SharedPtr subscription)
       [&]() {return subscription->take_serialized(*serialized_msg.get(), message_info);},
       [&]()
       {
-        auto void_serialized_msg = std::static_pointer_cast<void>(serialized_msg);
-        subscription->handle_message(void_serialized_msg, message_info);
+        subscription->handle_serialized_message(serialized_msg, message_info);
       });
     subscription->return_serialized_message(serialized_msg);
   } else if (subscription->can_loan_messages()) {
@@ -680,6 +686,7 @@ Executor::execute_client(
 void
 Executor::wait_for_work(std::chrono::nanoseconds timeout)
 {
+  TRACEPOINT(rclcpp_executor_wait_for_work, timeout.count());
   {
     std::lock_guard<std::mutex> guard(mutex_);
 
@@ -829,6 +836,7 @@ Executor::get_next_ready_executable_from_map(
   const rclcpp::memory_strategy::MemoryStrategy::WeakCallbackGroupsToNodesMap &
   weak_groups_to_nodes)
 {
+  TRACEPOINT(rclcpp_executor_get_next_ready);
   bool success = false;
   std::lock_guard<std::mutex> guard{mutex_};
   // Check the timers to see if there are any that are ready

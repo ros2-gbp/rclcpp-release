@@ -192,21 +192,7 @@ public:
     rclcpp::CallbackGroupType group_type,
     bool automatically_add_to_executor_with_node = true);
 
-  /// Return the list of callback groups in the node.
-  /**
-   * \return list of callback groups in the node.
-   */
-  RCLCPP_LIFECYCLE_PUBLIC
-  const std::vector<rclcpp::CallbackGroup::WeakPtr> &
-  get_callback_groups() const;
-
-  /// Iterate over the callback groups in the node, calling the given function on each valid one.
-  /**
-   * This method is called in a thread-safe way, and also makes sure to only call the given
-   * function on those items that are still valid.
-   *
-   * \param[in] func The callback function to call on each valid callback group.
-   */
+  /// Iterate over the callback groups in the node, calling func on each valid one.
   RCLCPP_LIFECYCLE_PUBLIC
   void
   for_each_callback_group(
@@ -242,13 +228,8 @@ public:
     typename MessageT,
     typename CallbackT,
     typename AllocatorT = std::allocator<void>,
-    typename CallbackMessageT =
-    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type,
     typename SubscriptionT = rclcpp::Subscription<MessageT, AllocatorT>,
-    typename MessageMemoryStrategyT = rclcpp::message_memory_strategy::MessageMemoryStrategy<
-      CallbackMessageT,
-      AllocatorT
-    >>
+    typename MessageMemoryStrategyT = typename SubscriptionT::MessageMemoryStrategyType>
   std::shared_ptr<SubscriptionT>
   create_subscription(
     const std::string & topic_name,

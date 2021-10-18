@@ -16,9 +16,10 @@
 
 #include <chrono>
 #include <memory>
+#include <utility>
 #include <vector>
 
-#include "rclcpp/scope_exit.hpp"
+#include "rcpputils/scope_exit.hpp"
 
 using rclcpp::executors::StaticSingleThreadedExecutor;
 using rclcpp::experimental::ExecutableList;
@@ -43,11 +44,11 @@ StaticSingleThreadedExecutor::spin()
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin() called while already spinning");
   }
-  RCLCPP_SCOPE_EXIT(this->spinning.store(false); );
+  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
 
   // Set memory_strategy_ and exec_list_ based on weak_nodes_
   // Prepare wait_set_ based on memory_strategy_
-  entities_collector_->init(&wait_set_, memory_strategy_, &interrupt_guard_condition_);
+  entities_collector_->init(&wait_set_, memory_strategy_);
 
   while (rclcpp::ok(this->context_) && spinning.load()) {
     // Refresh wait set and wait for work
@@ -81,7 +82,7 @@ StaticSingleThreadedExecutor::spin_some_impl(std::chrono::nanoseconds max_durati
 {
   // Make sure the entities collector has been initialized
   if (!entities_collector_->is_init()) {
-    entities_collector_->init(&wait_set_, memory_strategy_, &interrupt_guard_condition_);
+    entities_collector_->init(&wait_set_, memory_strategy_);
   }
 
   auto start = std::chrono::steady_clock::now();
@@ -100,7 +101,7 @@ StaticSingleThreadedExecutor::spin_some_impl(std::chrono::nanoseconds max_durati
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin_some() called while already spinning");
   }
-  RCLCPP_SCOPE_EXIT(this->spinning.store(false); );
+  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
 
   while (rclcpp::ok(context_) && spinning.load() && max_duration_not_elapsed()) {
     // Get executables that are ready now
@@ -118,7 +119,7 @@ StaticSingleThreadedExecutor::spin_once_impl(std::chrono::nanoseconds timeout)
 {
   // Make sure the entities collector has been initialized
   if (!entities_collector_->is_init()) {
-    entities_collector_->init(&wait_set_, memory_strategy_, &interrupt_guard_condition_);
+    entities_collector_->init(&wait_set_, memory_strategy_);
   }
 
   if (rclcpp::ok(context_) && spinning.load()) {
@@ -237,7 +238,9 @@ StaticSingleThreadedExecutor::execute_ready_executables(bool spin_once)
   for (size_t i = 0; i < wait_set_.size_of_timers; ++i) {
     if (i < entities_collector_->get_number_of_timers()) {
       if (wait_set_.timers[i] && entities_collector_->get_timer(i)->is_ready()) {
-        execute_timer(entities_collector_->get_timer(i));
+        auto timer = entities_collector_->get_timer(i);
+        timer->call();
+        execute_timer(std::move(timer));
         if (spin_once) {
           return true;
         }

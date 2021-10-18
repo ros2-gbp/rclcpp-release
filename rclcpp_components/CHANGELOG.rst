@@ -2,14 +2,32 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-9.2.0 (2021-09-17)
-------------------
+13.1.0 (2021-10-18)
+-------------------
 
-9.1.0 (2021-05-20)
-------------------
+13.0.0 (2021-08-23)
+-------------------
+* Update client API to be able to remove pending requests. (`#1734 <https://github.com/ros2/rclcpp/issues/1734>`_)
+* Contributors: Ivan Santiago Paunovic
 
-9.0.3 (2021-05-10)
-------------------
+12.0.0 (2021-07-26)
+-------------------
+
+11.2.0 (2021-07-21)
+-------------------
+* Deprecate method names that use CamelCase in rclcpp_components. (`#1716 <https://github.com/ros2/rclcpp/issues/1716>`_)
+* Contributors: Rebecca Butler
+
+11.1.0 (2021-07-13)
+-------------------
+* Added a hook to generate node options in ComponentManager (`#1702 <https://github.com/ros2/rclcpp/issues/1702>`_)
+* Contributors: Rebecca Butler
+
+11.0.0 (2021-05-18)
+-------------------
+
+10.0.0 (2021-05-11)
+-------------------
 
 9.0.2 (2021-04-14)
 ------------------

@@ -2,26 +2,90 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-9.2.0 (2021-09-17)
-------------------
-* Added thread safe for_each_callback_group method (`#1741 <https://github.com/ros2/rclcpp/issues/1741>`_)
-* Added a function rclcpp::wait_for_message() convenience function (`#1705 <https://github.com/ros2/rclcpp/issues/1705>`_) (`#1740 <https://github.com/ros2/rclcpp/issues/1740>`_)
-* Fixed a documentation bug (`#1719 <https://github.com/ros2/rclcpp/issues/1719>`_) (`#1720 <https://github.com/ros2/rclcpp/issues/1720>`_)
-* Contributors: Aditya Pande, Karsten Knese, mergify[bot]
+13.1.0 (2021-10-18)
+-------------------
+* Fix dangerous std::bind capture in TimeSource implementation. (`#1768 <https://github.com/ros2/rclcpp/issues/1768>`_)
+* Fix dangerous std::bind capture in ParameterEventHandler implementation. (`#1770 <https://github.com/ros2/rclcpp/issues/1770>`_)
+* Handle sigterm, in the same way sigint is being handled. (`#1771 <https://github.com/ros2/rclcpp/issues/1771>`_)
+* rclcpp::Node copy constructor: make copy of node_waitables\_ member. (`#1799 <https://github.com/ros2/rclcpp/issues/1799>`_)
+* Extend NodeGraph to match what rcl provides. (`#1484 <https://github.com/ros2/rclcpp/issues/1484>`_)
+* Context::sleep_for(): replace recursion with do-while to avoid potential stack-overflow. (`#1765 <https://github.com/ros2/rclcpp/issues/1765>`_)
+* extend_sub_namespace(): Verify string::empty() before calling string::front(). (`#1764 <https://github.com/ros2/rclcpp/issues/1764>`_)
+* Deprecate the `void shared_ptr<MessageT>` subscription callback signatures. (`#1713 <https://github.com/ros2/rclcpp/issues/1713>`_)
+* Contributors: Abrar Rahman Protyasha, Chris Lalancette, Emerson Knapp, Geoffrey Biggs, Ivan Santiago Paunovic, Jorge Perez, Tomoya Fujita, William Woodall, Yong-Hao Zou, livanov93
 
-9.1.0 (2021-05-20)
-------------------
-* Allow declaring uninitialized statically typed parameters. (`#1673 <https://github.com/ros2/rclcpp/issues/1673>`_) (`#1681 <https://github.com/ros2/rclcpp/issues/1681>`_)
-* [service] Don't use a weak_ptr to avoid leaking. (`#1668 <https://github.com/ros2/rclcpp/issues/1668>`_) (`#1670 <https://github.com/ros2/rclcpp/issues/1670>`_)
-* Contributors: Jacob Perron, Ivan Santiago Paunovic
+13.0.0 (2021-08-23)
+-------------------
+* Remove can_be_nullptr assignment check for QNX case. (`#1752 <https://github.com/ros2/rclcpp/issues/1752>`_)
+* Update client API to be able to remove pending requests. (`#1734 <https://github.com/ros2/rclcpp/issues/1734>`_)
+* Fix: Allow to add a node while spinning in the StaticSingleThreadedExecutor. (`#1690 <https://github.com/ros2/rclcpp/issues/1690>`_)
+* Add tracing instrumentation for executor and message taking. (`#1738 <https://github.com/ros2/rclcpp/issues/1738>`_)
+* Fix: Reset timer trigger time before execute in StaticSingleThreadedExecutor. (`#1739 <https://github.com/ros2/rclcpp/issues/1739>`_)
+* Use FindPython3 and make python3 dependency explicit. (`#1745 <https://github.com/ros2/rclcpp/issues/1745>`_)
+* Use rosidl_get_typesupport_target(). (`#1729 <https://github.com/ros2/rclcpp/issues/1729>`_)
+* Fix returning invalid namespace if sub_namespace is empty. (`#1658 <https://github.com/ros2/rclcpp/issues/1658>`_)
+* Add free function to wait for a subscription message. (`#1705 <https://github.com/ros2/rclcpp/issues/1705>`_)
+* Use rcpputils/scope_exit.hpp and remove rclcpp/scope_exit.hpp. (`#1727 <https://github.com/ros2/rclcpp/issues/1727>`_)
+* Contributors: Ahmed Sobhy, Christophe Bedard, Ivan Santiago Paunovic, Karsten Knese, M. Hofstätter, Mauro Passerino, Shane Loretz, mauropasse
 
-9.0.3 (2021-05-10)
-------------------
-* Use OnShutdown callback handle instead of OnShutdown callback (`#1639 <https://github.com/ros2/rclcpp/issues/1639>`_) (`#1650 <https://github.com/ros2/rclcpp/issues/1650>`_)
-* use dynamic_pointer_cast to detect allocator mismatch in intra process manager (`#1643 <https://github.com/ros2/rclcpp/issues/1643>`_) (`#1644 <https://github.com/ros2/rclcpp/issues/1644>`_)
+12.0.0 (2021-07-26)
+-------------------
+* Remove unsafe get_callback_groups API.
+  Callers should change to using for_each_callback_group(), or
+  store the callback groups they need internally.
+* Add in callback_groups_for_each.
+  The main reason to add this method in is to make accesses to the
+  callback_groups\_ vector thread-safe.  By having a
+  callback_groups_for_each that accepts a std::function, we can
+  just have the callers give us the callback they are interested
+  in, and we can take care of the locking.
+  The rest of this fairly large PR is cleaning up all of the places
+  that use get_callback_groups() to instead use
+  callback_groups_for_each().
+* Use a different mechanism to avoid timers being scheduled multiple times by the MultiThreadedExecutor (`#1692 <https://github.com/ros2/rclcpp/issues/1692>`_)
+* Fix windows CI (`#1726 <https://github.com/ros2/rclcpp/issues/1726>`_)
+  Fix bug in AnyServiceCallback introduced in `#1709 <https://github.com/ros2/rclcpp/issues/1709>`_.
+* Contributors: Chris Lalancette, Ivan Santiago Paunovic
+
+11.2.0 (2021-07-21)
+-------------------
+* Support to defer to send a response in services. (`#1709 <https://github.com/ros2/rclcpp/issues/1709>`_)
+  Signed-off-by: Ivan Santiago Paunovic <ivanpauno@ekumenlabs.com>
+* Fix documentation bug. (`#1719 <https://github.com/ros2/rclcpp/issues/1719>`_)
+  Signed-off-by: William Woodall <william@osrfoundation.org>
+* Contributors: Ivan Santiago Paunovic, William Woodall
+
+11.1.0 (2021-07-13)
+-------------------
+* Removed left over ``is_initialized()`` implementation (`#1711 <https://github.com/ros2/rclcpp/issues/1711>`_)
+  Leftover from https://github.com/ros2/rclcpp/pull/1622
+* Fixed declare parameter methods for int and float vectors (`#1696 <https://github.com/ros2/rclcpp/issues/1696>`_)
+* Cleaned up implementation of the intra-process manager (`#1695 <https://github.com/ros2/rclcpp/issues/1695>`_)
+* Added the node name to an executor ``runtime_error`` (`#1686 <https://github.com/ros2/rclcpp/issues/1686>`_)
+* Fixed a typo "Attack" -> "Attach" (`#1687 <https://github.com/ros2/rclcpp/issues/1687>`_)
+* Removed use of std::allocator<>::rebind (`#1678 <https://github.com/ros2/rclcpp/issues/1678>`_)
+  rebind is deprecated in c++17 and removed in c++20
+* Contributors: Alberto Soragna, Chen Lihui, Chris Lalancette, Petter Nilsson, Steve Macenski, William Woodall
+
+11.0.0 (2021-05-18)
+-------------------
+* Allow declare uninitialized parameters (`#1673 <https://github.com/ros2/rclcpp/issues/1673>`_)
+* Fix syntax issue with gcc (`#1674 <https://github.com/ros2/rclcpp/issues/1674>`_)
+* [service] Don't use a weak_ptr to avoid leaking (`#1668 <https://github.com/ros2/rclcpp/issues/1668>`_)
+* Contributors: Ivan Santiago Paunovic, Jacob Perron, William Woodall
+
+10.0.0 (2021-05-11)
+-------------------
+* Fix doc typo (`#1663 <https://github.com/ros2/rclcpp/issues/1663>`_)
+* [rclcpp] Type Adaptation feature (`#1557 <https://github.com/ros2/rclcpp/issues/1557>`_)
+* Do not attempt to use void allocators for memory allocation. (`#1657 <https://github.com/ros2/rclcpp/issues/1657>`_)
+* Keep custom allocator in publisher and subscription options alive. (`#1647 <https://github.com/ros2/rclcpp/issues/1647>`_)
+* Fix get_publishers_subscriptions_info_by_topic test in test_node.cpp (`#1648 <https://github.com/ros2/rclcpp/issues/1648>`_)
+* Use OnShutdown callback handle instead of OnShutdown callback (`#1639 <https://github.com/ros2/rclcpp/issues/1639>`_)
+* use dynamic_pointer_cast to detect allocator mismatch in intra process manager (`#1643 <https://github.com/ros2/rclcpp/issues/1643>`_)
 * Increase cppcheck timeout to 500s (`#1634 <https://github.com/ros2/rclcpp/issues/1634>`_)
 * Clarify node parameters docs (`#1631 <https://github.com/ros2/rclcpp/issues/1631>`_)
-* Contributors: Barry Xu, Jacob Perron, Michel Hidalgo, Shane Loretz, William Woodall
+* Contributors: Audrow Nash, Barry Xu, Jacob Perron, Michel Hidalgo, Shane Loretz, William Woodall
 
 9.0.2 (2021-04-14)
 ------------------

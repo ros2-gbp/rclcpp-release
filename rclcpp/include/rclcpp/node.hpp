@@ -148,11 +148,6 @@ public:
     rclcpp::CallbackGroupType group_type,
     bool automatically_add_to_executor_with_node = true);
 
-  /// Return the list of callback groups in the node.
-  RCLCPP_PUBLIC
-  const std::vector<rclcpp::CallbackGroup::WeakPtr> &
-  get_callback_groups() const;
-
   /// Iterate over the callback groups in the node, calling the given function on each valid one.
   /**
    * This method is called in a thread-safe way, and also makes sure to only call the given
@@ -217,13 +212,8 @@ public:
     typename MessageT,
     typename CallbackT,
     typename AllocatorT = std::allocator<void>,
-    typename CallbackMessageT =
-    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type,
-    typename SubscriptionT = rclcpp::Subscription<CallbackMessageT, AllocatorT>,
-    typename MessageMemoryStrategyT = rclcpp::message_memory_strategy::MessageMemoryStrategy<
-      CallbackMessageT,
-      AllocatorT
-    >
+    typename SubscriptionT = rclcpp::Subscription<MessageT, AllocatorT>,
+    typename MessageMemoryStrategyT = typename SubscriptionT::MessageMemoryStrategyType
   >
   std::shared_ptr<SubscriptionT>
   create_subscription(

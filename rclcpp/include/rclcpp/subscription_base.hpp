@@ -107,7 +107,7 @@ public:
   /// Get the actual QoS settings, after the defaults have been determined.
   /**
    * The actual configuration applied when using RMW_QOS_POLICY_*_SYSTEM_DEFAULT
-   * can only be resolved after the creation of the publisher, and it
+   * can only be resolved after the creation of the subscription, and it
    * depends on the underlying rmw implementation.
    * If the underlying setting in use can't be represented in ROS terms,
    * it will be set to RMW_QOS_POLICY_*_UNKNOWN.
@@ -182,6 +182,13 @@ public:
   virtual
   void
   handle_message(std::shared_ptr<void> & message, const rclcpp::MessageInfo & message_info) = 0;
+
+  RCLCPP_PUBLIC
+  virtual
+  void
+  handle_serialized_message(
+    const std::shared_ptr<rclcpp::SerializedMessage> & serialized_message,
+    const rclcpp::MessageInfo & message_info) = 0;
 
   RCLCPP_PUBLIC
   virtual

@@ -21,9 +21,8 @@
 
 #include "gtest/gtest.h"
 
-#include "rclcpp/scope_exit.hpp"
 #include "rclcpp/strategies/allocator_memory_strategy.hpp"
-#include "rclcpp/node_interfaces/node_base.hpp"
+#include "rcpputils/scope_exit.hpp"
 #include "test_msgs/msg/empty.hpp"
 #include "test_msgs/srv/empty.hpp"
 
@@ -264,7 +263,7 @@ protected:
              "Calling rcl_wait_set_init() with expected sufficient capacities failed";
     }
 
-    RCLCPP_SCOPE_EXIT(
+    RCPPUTILS_SCOPE_EXIT(
     {
       EXPECT_EQ(RCL_RET_OK, rcl_wait_set_fini(&wait_set));
     });
@@ -292,7 +291,7 @@ protected:
              "Calling rcl_wait_set_init() with expected insufficient capacities failed";
     }
 
-    RCLCPP_SCOPE_EXIT(
+    RCPPUTILS_SCOPE_EXIT(
     {
       EXPECT_EQ(RCL_RET_OK, rcl_wait_set_fini(&wait_set_no_capacity));
     });
@@ -377,8 +376,7 @@ protected:
     auto basic_node_base = basic_node->get_node_base_interface();
     auto node_base = node_with_entity->get_node_base_interface();
     WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
-    rclcpp::node_interfaces::global_for_each_callback_group(
-      basic_node_base.get(),
+    basic_node_base->for_each_callback_group(
       [basic_node_base, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
       {
         weak_groups_to_nodes.insert(
@@ -387,8 +385,7 @@ protected:
             group_ptr,
             basic_node_base));
       });
-    rclcpp::node_interfaces::global_for_each_callback_group(
-      node_base.get(),
+    node_base->for_each_callback_group(
       [node_base, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
       {
         weak_groups_to_nodes.insert(
@@ -581,7 +578,7 @@ TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_guard_condition) {
   EXPECT_EQ(
     RCL_RET_OK,
     rcl_guard_condition_init(&guard_condition, rcl_context, guard_condition_options));
-  RCLCPP_SCOPE_EXIT(
+  RCPPUTILS_SCOPE_EXIT(
   {
     EXPECT_EQ(RCL_RET_OK, rcl_guard_condition_fini(&guard_condition));
   });

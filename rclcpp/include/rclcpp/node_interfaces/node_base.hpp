@@ -15,10 +15,10 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_BASE_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_BASE_HPP_
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "rcl/node.h"
@@ -33,33 +33,11 @@ namespace rclcpp
 namespace node_interfaces
 {
 
-RCLCPP_PUBLIC
-void global_for_each_callback_group(
-  NodeBaseInterface * node_base_interface,
-  const NodeBaseInterface::CallbackGroupFunction & func);
-
-// Class to hold the global map of mutexes
-class map_of_mutexes final
-{
-public:
-  // Methods need to be protected by internal mutex
-  void create_mutex_of_nodebase(const NodeBaseInterface * nodebase);
-  std::shared_ptr<std::mutex>
-  get_mutex_of_nodebase(const NodeBaseInterface * nodebase);
-  void delete_mutex_of_nodebase(const NodeBaseInterface * nodebase);
-
-private:
-  std::unordered_map<const NodeBaseInterface *, std::shared_ptr<std::mutex>> data_;
-  std::mutex internal_mutex_;
-};
-
 /// Implementation of the NodeBase part of the Node API.
 class NodeBase : public NodeBaseInterface
 {
 public:
   RCLCPP_SMART_PTR_ALIASES_ONLY(NodeBase)
-
-  static map_of_mutexes map_object;
 
   RCLCPP_PUBLIC
   NodeBase(
@@ -120,9 +98,16 @@ public:
   bool
   callback_group_in_node(rclcpp::CallbackGroup::SharedPtr group) override;
 
+  /// Iterate over the stored callback groups, calling the given function on each valid one.
+  /**
+   * This method is called in a thread-safe way, and also makes sure to only call the given
+   * function on those items that are still valid.
+   *
+   * \param[in] func The callback function to call on each valid callback group.
+   */
   RCLCPP_PUBLIC
-  const std::vector<rclcpp::CallbackGroup::WeakPtr> &
-  get_callback_groups() const override;
+  void
+  for_each_callback_group(const CallbackGroupFunction & func) override;
 
   RCLCPP_PUBLIC
   std::atomic_bool &
@@ -157,6 +142,7 @@ private:
   std::shared_ptr<rcl_node_t> node_handle_;
 
   rclcpp::CallbackGroup::SharedPtr default_callback_group_;
+  std::mutex callback_groups_mutex_;
   std::vector<rclcpp::CallbackGroup::WeakPtr> callback_groups_;
 
   std::atomic_bool associated_with_executor_;

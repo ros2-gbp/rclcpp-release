@@ -3,22 +3,37 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-9.2.0 (2021-09-17)
-------------------
-* Fixed a bug where it would occasionally miss a goal result, which was caused by race condition (`#1677 <https://github.com/ros2/rclcpp/issues/1677>`_) (`#1683 <https://github.com/ros2/rclcpp/issues/1683>`_)
-  * Co-authored-by: Kaven Yau <kavenyau@foxmail.com>
-* Contributors: Tomoya Fujita
+13.1.0 (2021-10-18)
+-------------------
+* Deprecate the `void shared_ptr<MessageT>` subscription callback signatures (`#1713 <https://github.com/ros2/rclcpp/issues/1713>`_)
+* Contributors: Abrar Rahman Protyasha, Tomoya Fujita
 
-9.1.0 (2021-05-20)
-------------------
-* Bump the benchmark timeout for benchmark_action_client (`#1672 <https://github.com/ros2/rclcpp/issues/1672>`_)
+13.0.0 (2021-08-23)
+-------------------
+* Use rcpputils/scope_exit.hpp and remove rclcpp/scope_exit.hpp. (`#1727 <https://github.com/ros2/rclcpp/issues/1727>`_)
+* Contributors: Christophe Bedard
+
+12.0.0 (2021-07-26)
+-------------------
+
+11.2.0 (2021-07-21)
+-------------------
+
+11.1.0 (2021-07-13)
+-------------------
+* Fixed occasionally missing goal result caused by race condition (`#1677 <https://github.com/ros2/rclcpp/issues/1677>`_)
+* Contributors: Kaven Yau
+
+11.0.0 (2021-05-18)
+-------------------
+* Bump the benchmark timeout for benchmark_action_client (`#1671 <https://github.com/ros2/rclcpp/issues/1671>`_)
 * Contributors: Scott K Logan
 
-9.0.3 (2021-05-10)
-------------------
-* Returns CancelResponse::REJECT while goal handle failed to transit to CANCELING state (`#1641 <https://github.com/ros2/rclcpp/issues/1641>`_) (`#1653 <https://github.com/ros2/rclcpp/issues/1653>`_)
-* Fix action server deadlock issue that caused by other mutexes locked in CancelCallback (`#1635 <https://github.com/ros2/rclcpp/issues/1635>`_) (`#1646 <https://github.com/ros2/rclcpp/issues/1646>`_)
-* Contributors: Jacob Perron, Kaven Yau, William Woodall
+10.0.0 (2021-05-11)
+-------------------
+* Returns CancelResponse::REJECT while goal handle failed to transit to CANCELING state (`#1641 <https://github.com/ros2/rclcpp/issues/1641>`_)
+* Fix action server deadlock issue that caused by other mutexes locked in CancelCallback (`#1635 <https://github.com/ros2/rclcpp/issues/1635>`_)
+* Contributors: Kaven Yau
 
 9.0.2 (2021-04-14)
 ------------------
