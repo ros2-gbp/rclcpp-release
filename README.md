@@ -1,3 +1,30 @@
+## rclcpp (rolling) - 14.0.0-1
+
+The packages in the `rclcpp` repository were released into the `rolling` distro by running `/usr/bin/bloom-release --track rolling --rosdistro rolling rclcpp` on `Fri, 17 Dec 2021 19:25:29 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_components`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `13.1.0-1`
+- old version: `13.1.0-1`
+- new version: `14.0.0-1`
+
+Versions of tools used:
+
+- bloom version: `0.10.7`
+- catkin_pkg version: `0.4.24`
+- rosdep version: `0.21.0`
+- rosdistro version: `0.8.3`
+- vcstools version: `0.1.42`
+
+
 ## rclcpp (rolling) - 13.1.0-1
 
 The packages in the `rclcpp` repository were released into the `rolling` distro by running `/usr/bin/bloom-release -r rolling --track rolling rclcpp` on `Mon, 18 Oct 2021 19:28:53 -0000`
