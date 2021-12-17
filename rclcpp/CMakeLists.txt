@@ -41,6 +41,7 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/clock.cpp
   src/rclcpp/context.cpp
   src/rclcpp/contexts/default_context.cpp
+  src/rclcpp/detail/add_guard_condition_to_rcl_wait_set.cpp
   src/rclcpp/detail/resolve_parameter_overrides.cpp
   src/rclcpp/detail/rmw_implementation_specific_payload.cpp
   src/rclcpp/detail/rmw_implementation_specific_publisher_payload.cpp
@@ -253,3 +254,5 @@ if(TEST cppcheck)
   # must set the property after ament_package()
   set_tests_properties(cppcheck PROPERTIES TIMEOUT 500)
 endif()
+
+ament_cmake_gen_version_h()

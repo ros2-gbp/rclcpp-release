@@ -44,7 +44,7 @@ public:
   : node_graph_(node_graph),
     node_handle(node_base->get_shared_rcl_node_handle()),
     logger(node_logging->get_logger().get_child("rclcpp_action")),
-    random_bytes_generator(std::random_device{} ())
+    random_bytes_generator(std::random_device{}())
   {
     std::weak_ptr<rcl_node_t> weak_node_handle(node_handle);
     client_handle = std::shared_ptr<rcl_action_client_t>(
@@ -252,12 +252,14 @@ ClientBase::get_number_of_ready_services()
   return pimpl_->num_services;
 }
 
-bool
+void
 ClientBase::add_to_wait_set(rcl_wait_set_t * wait_set)
 {
   rcl_ret_t ret = rcl_action_wait_set_add_action_client(
     wait_set, pimpl_->client_handle.get(), nullptr, nullptr);
-  return RCL_RET_OK == ret;
+  if (RCL_RET_OK != ret) {
+    rclcpp::exceptions::throw_from_rcl_error(ret, "ClientBase::add_to_wait_set() failed");
+  }
 }
 
 bool
