@@ -304,8 +304,8 @@ public:
 TEST_F(TestTimeSource, callbacks) {
   CallbackObject cbo;
   rcl_jump_threshold_t jump_threshold;
-  jump_threshold.min_forward.nanoseconds = 0;
-  jump_threshold.min_backward.nanoseconds = 0;
+  jump_threshold.min_forward.nanoseconds = 1;
+  jump_threshold.min_backward.nanoseconds = -1;
   jump_threshold.on_clock_change = true;
 
   rclcpp::TimeSource ts(node);
@@ -396,8 +396,8 @@ TEST_F(TestTimeSource, callbacks) {
 TEST_F(TestTimeSource, callback_handler_erasure) {
   CallbackObject cbo;
   rcl_jump_threshold_t jump_threshold;
-  jump_threshold.min_forward.nanoseconds = 0;
-  jump_threshold.min_backward.nanoseconds = 0;
+  jump_threshold.min_forward.nanoseconds = 1;
+  jump_threshold.min_backward.nanoseconds = -1;
   jump_threshold.on_clock_change = true;
 
   rclcpp::TimeSource ts(node);
@@ -741,4 +741,37 @@ TEST_F(TestTimeSource, check_sim_time_updated_in_callback_if_use_clock_thread) {
 
   // Node should have get out of timer callback
   ASSERT_FALSE(clock_thread_testing_node.GetIsCallbackFrozen());
+}
+
+TEST_F(TestTimeSource, clock_sleep_until_with_ros_time_basic) {
+  SimClockPublisherNode pub_node;
+  pub_node.SpinNode();
+
+  node->set_parameter({"use_sim_time", true});
+  auto clock = std::make_shared<rclcpp::Clock>(RCL_ROS_TIME);
+  rclcpp::TimeSource time_source;
+  time_source.attachNode(node);
+  time_source.attachClock(clock);
+
+  // Wait until time source has definitely received a first ROS time from the pub node
+  {
+    rcl_jump_threshold_t threshold;
+    threshold.on_clock_change = false;
+    threshold.min_backward.nanoseconds = -1;
+    threshold.min_forward.nanoseconds = 1;
+
+    std::condition_variable cv;
+    std::mutex mutex;
+    auto handler = clock->create_jump_callback(
+      nullptr,
+      [&cv](const rcl_time_jump_t &) {cv.notify_all();},
+      threshold);
+    std::unique_lock lock(mutex);
+    cv.wait(lock);
+  }
+
+  auto now = clock->now();
+  // Any amount of time will do, just need to make sure that we awake and return true
+  auto until = now + rclcpp::Duration(0, 500);
+  EXPECT_TRUE(clock->sleep_until(until));
 }
