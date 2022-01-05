@@ -1,0 +1,12 @@
+Source: ros-rolling-rclcpp
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), python3-dev, ros-rolling-ament-cmake-gen-version-h, ros-rolling-ament-cmake-gmock, ros-rolling-ament-cmake-gtest, ros-rolling-ament-cmake-ros, ros-rolling-ament-index-cpp, ros-rolling-ament-lint-auto, ros-rolling-ament-lint-common, ros-rolling-builtin-interfaces, ros-rolling-libstatistics-collector, ros-rolling-mimick-vendor, ros-rolling-performance-test-fixture, ros-rolling-rcl, ros-rolling-rcl-interfaces, ros-rolling-rcl-yaml-param-parser, ros-rolling-rcpputils, ros-rolling-rcutils, ros-rolling-rmw, ros-rolling-rmw-implementation-cmake, ros-rolling-rosgraph-msgs, ros-rolling-rosidl-default-generators, ros-rolling-rosidl-runtime-cpp, ros-rolling-rosidl-typesupport-c, ros-rolling-rosidl-typesupport-cpp, ros-rolling-statistics-msgs, ros-rolling-test-msgs, ros-rolling-tracetools, ros-rolling-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-rolling-rclcpp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-ament-index-cpp, ros-rolling-builtin-interfaces, ros-rolling-libstatistics-collector, ros-rolling-rcl, ros-rolling-rcl-interfaces, ros-rolling-rcl-yaml-param-parser, ros-rolling-rcpputils, ros-rolling-rcutils, ros-rolling-rmw, ros-rolling-rosgraph-msgs, ros-rolling-rosidl-runtime-cpp, ros-rolling-rosidl-typesupport-c, ros-rolling-rosidl-typesupport-cpp, ros-rolling-statistics-msgs, ros-rolling-tracetools, ros-rolling-ros-workspace
+Description: The ROS client library in C++.
