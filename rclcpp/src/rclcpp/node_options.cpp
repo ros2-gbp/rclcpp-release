@@ -77,10 +77,7 @@ NodeOptions::operator=(const NodeOptions & other)
     this->enable_topic_statistics_ = other.enable_topic_statistics_;
     this->start_parameter_services_ = other.start_parameter_services_;
     this->start_parameter_event_publisher_ = other.start_parameter_event_publisher_;
-    this->clock_qos_ = other.clock_qos_;
-    this->use_clock_thread_ = other.use_clock_thread_;
     this->parameter_event_qos_ = other.parameter_event_qos_;
-    this->rosout_qos_ = other.rosout_qos_;
     this->parameter_event_publisher_options_ = other.parameter_event_publisher_options_;
     this->allow_undeclared_parameters_ = other.allow_undeclared_parameters_;
     this->automatically_declare_parameters_from_overrides_ =
@@ -99,8 +96,8 @@ NodeOptions::get_rcl_node_options() const
     *node_options_ = rcl_node_get_default_options();
     node_options_->allocator = this->allocator_;
     node_options_->use_global_arguments = this->use_global_arguments_;
+    node_options_->domain_id = this->get_domain_id_from_env();
     node_options_->enable_rosout = this->enable_rosout_;
-    node_options_->rosout_qos = this->rosout_qos_.get_rmw_qos_profile();
 
     int c_argc = 0;
     std::unique_ptr<const char *[]> c_argv;
@@ -261,32 +258,6 @@ NodeOptions::start_parameter_event_publisher(bool start_parameter_event_publishe
 }
 
 const rclcpp::QoS &
-NodeOptions::clock_qos() const
-{
-  return this->clock_qos_;
-}
-
-NodeOptions &
-NodeOptions::clock_qos(const rclcpp::QoS & clock_qos)
-{
-  this->clock_qos_ = clock_qos;
-  return *this;
-}
-
-bool
-NodeOptions::use_clock_thread() const
-{
-  return this->use_clock_thread_;
-}
-
-NodeOptions &
-NodeOptions::use_clock_thread(bool use_clock_thread)
-{
-  this->use_clock_thread_ = use_clock_thread;
-  return *this;
-}
-
-const rclcpp::QoS &
 NodeOptions::parameter_event_qos() const
 {
   return this->parameter_event_qos_;
@@ -296,20 +267,6 @@ NodeOptions &
 NodeOptions::parameter_event_qos(const rclcpp::QoS & parameter_event_qos)
 {
   this->parameter_event_qos_ = parameter_event_qos;
-  return *this;
-}
-
-const rclcpp::QoS &
-NodeOptions::rosout_qos() const
-{
-  return this->rosout_qos_;
-}
-
-NodeOptions &
-NodeOptions::rosout_qos(const rclcpp::QoS & rosout_qos)
-{
-  this->node_options_.reset();
-  this->rosout_qos_ = rosout_qos;
   return *this;
 }
 
@@ -367,6 +324,38 @@ NodeOptions::allocator(rcl_allocator_t allocator)
   this->node_options_.reset();  // reset node options to make it be recreated on next access.
   this->allocator_ = allocator;
   return *this;
+}
+
+// TODO(wjwwood): reuse rcutils_get_env() to avoid code duplication.
+//   See also: https://github.com/ros2/rcl/issues/119
+size_t
+NodeOptions::get_domain_id_from_env() const
+{
+  // Determine the domain id based on the options and the ROS_DOMAIN_ID env variable.
+  size_t domain_id = std::numeric_limits<size_t>::max();
+  char * ros_domain_id = nullptr;
+  const char * env_var = "ROS_DOMAIN_ID";
+#ifndef _WIN32
+  ros_domain_id = getenv(env_var);
+#else
+  size_t ros_domain_id_size;
+  _dupenv_s(&ros_domain_id, &ros_domain_id_size, env_var);
+#endif
+  if (ros_domain_id) {
+    uint32_t number = static_cast<uint32_t>(strtoul(ros_domain_id, NULL, 0));
+    if (number == (std::numeric_limits<uint32_t>::max)()) {
+#ifdef _WIN32
+      // free the ros_domain_id before throwing, if getenv was used on Windows
+      free(ros_domain_id);
+#endif
+      throw std::runtime_error("failed to interpret ROS_DOMAIN_ID as integral number");
+    }
+    domain_id = static_cast<size_t>(number);
+#ifdef _WIN32
+    free(ros_domain_id);
+#endif
+  }
+  return domain_id;
 }
 
 }  // namespace rclcpp

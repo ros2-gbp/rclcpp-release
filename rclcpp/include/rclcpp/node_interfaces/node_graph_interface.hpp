@@ -20,7 +20,6 @@
 #include <chrono>
 #include <map>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -147,9 +146,6 @@ public:
   /**
    * A topic is considered to exist when at least one publisher or subscriber
    * exists for it, whether they be local or remote to this process.
-   * The returned names are the actual names of the topics, either announced by another nodes or by this one.
-   * Attempting to create publishers or subscribers using names returned by this function may not
-   * result in the desired topic name being used depending on the remap rules in use.
    *
    * \param[in] no_demangle if true, topic names and types are not demangled
    */
@@ -163,9 +159,6 @@ public:
    * A service is considered to exist when at least one service server or
    * service client exists for it, whether they be local or remote to this
    * process.
-   * The returned names are the actual names of the services, either announced by another nodes or by this one.
-   * Attempting to create clients or services using names returned by this function may not result in
-   * the desired service name being used depending on the remap rules in use.
    */
   RCLCPP_PUBLIC
   virtual
@@ -175,9 +168,6 @@ public:
   /// Return a map of existing service names to list of service types for a specific node.
   /**
    * This function only considers services - not clients.
-   * The returned names are the actual names after remap rules applied.
-   * Attempting to create service clients using names returned by this function may not
-   * result in the desired service name being used depending on the remap rules in use.
    *
    * \param[in] node_name name of the node
    * \param[in] namespace_ namespace of the node
@@ -189,104 +179,25 @@ public:
     const std::string & node_name,
     const std::string & namespace_) const = 0;
 
-  /// Return a map of existing service names and types with a specific node.
-  /**
-   * This function only considers clients - not service servers.
-   * The returned names are the actual names after remap rules applied.
-   * Attempting to create service servers using names returned by this function may not
-   * result in the desired service name being used depending on the remap rules in use.
-   *
-   * \param[in] node_name name of the node
-   * \param[in] namespace_ namespace of the node
-   */
-  RCLCPP_PUBLIC
-  virtual
-  std::map<std::string, std::vector<std::string>>
-  get_client_names_and_types_by_node(
-    const std::string & node_name,
-    const std::string & namespace_) const = 0;
-
-  /// Return a map of existing topic names to list of topic types for a specific node.
-  /**
-   * This function only considers publishers - not subscribers.
-   * The returned names are the actual names after remap rules applied.
-   * Attempting to create publishers or subscribers using names returned by this function may not
-   * result in the desired topic name being used depending on the remap rules in use.
-   *
-   * \param[in] node_name name of the node
-   * \param[in] namespace_ namespace of the node
-   * \param[in] no_demangle if true, topic names and types are not demangled
-   */
-  RCLCPP_PUBLIC
-  virtual
-  std::map<std::string, std::vector<std::string>>
-  get_publisher_names_and_types_by_node(
-    const std::string & node_name,
-    const std::string & namespace_,
-    bool no_demangle = false) const = 0;
-
-  /// Return a map of existing topic names to list of topic types for a specific node.
-  /**
-   * This function only considers subscribers - not publishers.
-   * The returned names are the actual names after remap rules applied.
-   * Attempting to create publishers or subscribers using names returned by this function may not
-   * result in the desired topic name being used depending on the remap rules in use.
-   *
-   * \param[in] node_name name of the node
-   * \param[in] namespace_ namespace of the node
-   * \param[in] no_demangle if true, topic names and types are not demangled
-   */
-  RCLCPP_PUBLIC
-  virtual
-  std::map<std::string, std::vector<std::string>>
-  get_subscriber_names_and_types_by_node(
-    const std::string & node_name,
-    const std::string & namespace_,
-    bool no_demangle = false) const = 0;
-
   /// Return a vector of existing node names (string).
-  /*
-   * The returned names are the actual names after remap rules applied.
-   */
   RCLCPP_PUBLIC
   virtual
   std::vector<std::string>
   get_node_names() const = 0;
 
-  /// Return a vector of existing node names, namespaces and enclaves (tuple of string).
-  /*
-   * The returned names are the actual names after remap rules applied.
-   * The enclaves contain the runtime security artifacts, those can be
-   * used to establish secured network.
-   * See https://design.ros2.org/articles/ros2_security_enclaves.html
-   */
-  RCLCPP_PUBLIC
-  virtual
-  std::vector<std::tuple<std::string, std::string, std::string>>
-  get_node_names_with_enclaves() const = 0;
-
   /// Return a vector of existing node names and namespaces (pair of string).
-  /*
-   * The returned names are the actual names after remap rules applied.
-   */
   RCLCPP_PUBLIC
   virtual
   std::vector<std::pair<std::string, std::string>>
   get_node_names_and_namespaces() const = 0;
 
   /// Return the number of publishers that are advertised on a given topic.
-  /*
-   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
-   */
   RCLCPP_PUBLIC
   virtual
   size_t
   count_publishers(const std::string & topic_name) const = 0;
 
   /// Return the number of subscribers who have created a subscription for a given topic.
-  /*
-   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
-   */
   RCLCPP_PUBLIC
   virtual
   size_t
@@ -352,13 +263,10 @@ public:
   RCLCPP_PUBLIC
   virtual
   size_t
-  count_graph_users() const = 0;
+  count_graph_users() = 0;
 
   /// Return the topic endpoint information about publishers on a given topic.
   /**
-   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
-   * \param[in] no_mangle if `true`, `topic_name` needs to be a valid middleware topic name,
-   *   otherwise it should be a valid ROS topic name.
    * \sa rclcpp::Node::get_publishers_info_by_topic
    */
   RCLCPP_PUBLIC
@@ -368,9 +276,6 @@ public:
 
   /// Return the topic endpoint information about subscriptions on a given topic.
   /**
-   * \param[in] topic_name the actual topic name used; it will not be automatically remapped.
-   * \param[in] no_mangle if `true`, `topic_name` needs to be a valid middleware topic name,
-   *   otherwise it should be a valid ROS topic name.
    * \sa rclcpp::Node::get_subscriptions_info_by_topic
    */
   RCLCPP_PUBLIC

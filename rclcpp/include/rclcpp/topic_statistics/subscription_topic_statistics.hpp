@@ -127,7 +127,7 @@ public:
   /**
    * This method acquires a lock to prevent race conditions to collectors list.
    */
-  virtual void publish_message_and_reset_measurements()
+  virtual void publish_message()
   {
     std::vector<MetricsMessage> msgs;
     rclcpp::Time window_end{get_current_nanoseconds_since_epoch()};
@@ -136,7 +136,6 @@ public:
       std::lock_guard<std::mutex> lock(mutex_);
       for (auto & collector : subscriber_statistics_collectors_) {
         const auto collected_stats = collector->GetStatisticsResults();
-        collector->ClearCurrentMeasurements();
 
         auto message = libstatistics_collector::collector::GenerateStatisticMessage(
           node_name_,

@@ -19,7 +19,6 @@ find_package(lifecycle_msgs REQUIRED)
 ### CPP High level library
 add_library(rclcpp_lifecycle
   src/lifecycle_node.cpp
-  src/managed_entity.cpp
   src/node_interfaces/lifecycle_node_interface.cpp
   src/state.cpp
   src/transition.cpp
@@ -81,7 +80,7 @@ if(BUILD_TESTING)
     target_link_libraries(benchmark_transition ${PROJECT_NAME})
   endif()
 
-  ament_add_gtest(test_lifecycle_node test/test_lifecycle_node.cpp TIMEOUT 120)
+  ament_add_gtest(test_lifecycle_node test/test_lifecycle_node.cpp)
   if(TARGET test_lifecycle_node)
     ament_target_dependencies(test_lifecycle_node
       "rcl_lifecycle"
@@ -99,12 +98,11 @@ if(BUILD_TESTING)
     )
     target_link_libraries(test_lifecycle_publisher ${PROJECT_NAME})
   endif()
-  ament_add_gtest(test_lifecycle_service_client test/test_lifecycle_service_client.cpp TIMEOUT 120)
+  ament_add_gtest(test_lifecycle_service_client test/test_lifecycle_service_client.cpp)
   if(TARGET test_lifecycle_service_client)
     ament_target_dependencies(test_lifecycle_service_client
       "rcl_lifecycle"
       "rclcpp"
-      "rcpputils"
       "rcutils"
     )
     target_link_libraries(test_lifecycle_service_client ${PROJECT_NAME} mimick)

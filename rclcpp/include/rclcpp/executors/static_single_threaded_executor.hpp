@@ -15,7 +15,6 @@
 #ifndef RCLCPP__EXECUTORS__STATIC_SINGLE_THREADED_EXECUTOR_HPP_
 #define RCLCPP__EXECUTORS__STATIC_SINGLE_THREADED_EXECUTOR_HPP_
 
-#include <chrono>
 #include <cassert>
 #include <cstdlib>
 #include <memory>
@@ -79,66 +78,15 @@ public:
   void
   spin() override;
 
-  /// Static executor implementation of spin some
-  /**
-   * This non-blocking function will execute entities that
-   * were ready when this API was called, until timeout or no
-   * more work available. Entities that got ready while
-   * executing work, won't be taken into account here.
-   *
-   * Example:
-   *   while(condition) {
-   *     spin_some();
-   *     sleep(); // User should have some sync work or
-   *              // sleep to avoid a 100% CPU usage
-   *   }
-   */
-  RCLCPP_PUBLIC
-  void
-  spin_some(std::chrono::nanoseconds max_duration = std::chrono::nanoseconds(0)) override;
-
-  /// Static executor implementation of spin all
-  /**
-   * This non-blocking function will execute entities until
-   * timeout or no more work available. If new entities get ready
-   * while executing work available, they will be executed
-   * as long as the timeout hasn't expired.
-   *
-   * Example:
-   *   while(condition) {
-   *     spin_all();
-   *     sleep(); // User should have some sync work or
-   *              // sleep to avoid a 100% CPU usage
-   *   }
-   */
-  RCLCPP_PUBLIC
-  void
-  spin_all(std::chrono::nanoseconds max_duration) override;
-
-  /// Add a callback group to an executor.
-  /**
-   * \sa rclcpp::Executor::add_callback_group
-   */
-  RCLCPP_PUBLIC
-  void
-  add_callback_group(
-    rclcpp::CallbackGroup::SharedPtr group_ptr,
-    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
-    bool notify = true) override;
-
-  /// Remove callback group from the executor
-  /**
-   * \sa rclcpp::Executor::remove_callback_group
-   */
-  RCLCPP_PUBLIC
-  void
-  remove_callback_group(
-    rclcpp::CallbackGroup::SharedPtr group_ptr,
-    bool notify = true) override;
-
   /// Add a node to the executor.
   /**
-   * \sa rclcpp::Executor::add_node
+   * An executor can have zero or more nodes which provide work during `spin` functions.
+   * \param[in] node_ptr Shared pointer to the node to be added.
+   * \param[in] notify True to trigger the interrupt guard condition during this function. If
+   * the executor is blocked at the rmw layer while waiting for work and it is notified that a new
+   * node was added, it will wake up.
+   * \throw std::runtime_error if node was already added or if rcl_trigger_guard_condition
+   * return an error
    */
   RCLCPP_PUBLIC
   void
@@ -148,7 +96,8 @@ public:
 
   /// Convenience function which takes Node and forwards NodeBaseInterface.
   /**
-   * \sa rclcpp::StaticSingleThreadedExecutor::add_node
+   * \throw std::runtime_error if node was already added or if rcl_trigger_guard_condition
+   * returns an error
    */
   RCLCPP_PUBLIC
   void
@@ -156,7 +105,11 @@ public:
 
   /// Remove a node from the executor.
   /**
-   * \sa rclcpp::Executor::remove_node
+   * \param[in] node_ptr Shared pointer to the node to remove.
+   * \param[in] notify True to trigger the interrupt guard condition and wake up the executor.
+   * This is useful if the last node was removed from the executor while the executor was blocked
+   * waiting for work in another thread, because otherwise the executor would never be notified.
+   * \throw std::runtime_error if rcl_trigger_guard_condition returns an error
    */
   RCLCPP_PUBLIC
   void
@@ -166,49 +119,87 @@ public:
 
   /// Convenience function which takes Node and forwards NodeBaseInterface.
   /**
-   * \sa rclcpp::Executor::remove_node
+   * \throw std::runtime_error if rcl_trigger_guard_condition returns an error
    */
   RCLCPP_PUBLIC
   void
   remove_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify = true) override;
 
-  RCLCPP_PUBLIC
-  std::vector<rclcpp::CallbackGroup::WeakPtr>
-  get_all_callback_groups() override;
-
-  /// Get callback groups that belong to executor.
+  /// Spin (blocking) until the future is complete, it times out waiting, or rclcpp is interrupted.
   /**
-   * \sa rclcpp::Executor::get_manually_added_callback_groups()
+   * \param[in] future The future to wait on. If this function returns SUCCESS, the future can be
+   *   accessed without blocking (though it may still throw an exception).
+   * \param[in] timeout Optional timeout parameter, which gets passed to
+   *    Executor::execute_ready_executables.
+   *   `-1` is block forever, `0` is non-blocking.
+   *   If the time spent inside the blocking loop exceeds this timeout, return a TIMEOUT return
+   *   code.
+   * \return The return code, one of `SUCCESS`, `INTERRUPTED`, or `TIMEOUT`.
+   *
+   *  Example usage:
+   *  rclcpp::executors::StaticSingleThreadedExecutor exec;
+   *  // ... other part of code like creating node
+   *  // define future
+   *  exec.add_node(node);
+   *  exec.spin_until_future_complete(future);
    */
-  RCLCPP_PUBLIC
-  std::vector<rclcpp::CallbackGroup::WeakPtr>
-  get_manually_added_callback_groups() override;
+  template<typename ResponseT, typename TimeRepT = int64_t, typename TimeT = std::milli>
+  rclcpp::FutureReturnCode
+  spin_until_future_complete(
+    std::shared_future<ResponseT> & future,
+    std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
+  {
+    std::future_status status = future.wait_for(std::chrono::seconds(0));
+    if (status == std::future_status::ready) {
+      return rclcpp::FutureReturnCode::SUCCESS;
+    }
 
-  /// Get callback groups that belong to executor.
-  /**
-   * \sa rclcpp::Executor::get_automatically_added_callback_groups_from_nodes()
-   */
-  RCLCPP_PUBLIC
-  std::vector<rclcpp::CallbackGroup::WeakPtr>
-  get_automatically_added_callback_groups_from_nodes() override;
+    auto end_time = std::chrono::steady_clock::now();
+    std::chrono::nanoseconds timeout_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      timeout);
+    if (timeout_ns > std::chrono::nanoseconds::zero()) {
+      end_time += timeout_ns;
+    }
+    std::chrono::nanoseconds timeout_left = timeout_ns;
+
+    entities_collector_->init(&wait_set_, memory_strategy_, &interrupt_guard_condition_);
+    RCLCPP_SCOPE_EXIT(entities_collector_->fini());
+
+    while (rclcpp::ok(this->context_)) {
+      // Do one set of work.
+      entities_collector_->refresh_wait_set(timeout_left);
+      execute_ready_executables();
+      // Check if the future is set, return SUCCESS if it is.
+      status = future.wait_for(std::chrono::seconds(0));
+      if (status == std::future_status::ready) {
+        return rclcpp::FutureReturnCode::SUCCESS;
+      }
+      // If the original timeout is < 0, then this is blocking, never TIMEOUT.
+      if (timeout_ns < std::chrono::nanoseconds::zero()) {
+        continue;
+      }
+      // Otherwise check if we still have time to wait, return TIMEOUT if not.
+      auto now = std::chrono::steady_clock::now();
+      if (now >= end_time) {
+        return rclcpp::FutureReturnCode::TIMEOUT;
+      }
+      // Subtract the elapsed time from the original timeout.
+      timeout_left = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - now);
+    }
+
+    // The future did not complete before ok() returned false, return INTERRUPTED.
+    return rclcpp::FutureReturnCode::INTERRUPTED;
+  }
 
 protected:
+  /// Check which executables in ExecutableList struct are ready from wait_set and execute them.
   /**
-   * @brief Executes ready executables from wait set.
-   * @param spin_once if true executes only the first ready executable.
-   * @return true if any executable was ready.
+   * \param[in] exec_list Structure that can hold subscriptionbases, timerbases, etc
+   * \param[in] timeout Optional timeout parameter.
    */
   RCLCPP_PUBLIC
-  bool
-  execute_ready_executables(bool spin_once = false);
-
-  RCLCPP_PUBLIC
   void
-  spin_some_impl(std::chrono::nanoseconds max_duration, bool exhaustive);
-
-  RCLCPP_PUBLIC
-  void
-  spin_once_impl(std::chrono::nanoseconds timeout) override;
+  execute_ready_executables();
 
 private:
   RCLCPP_DISABLE_COPY(StaticSingleThreadedExecutor)

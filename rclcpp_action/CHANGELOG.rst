@@ -3,141 +3,48 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-15.0.0 (2022-01-14)
--------------------
-* Fix include order and relative paths for cpplint (`#1859 <https://github.com/ros2/rclcpp/issues/1859>`_)
-* Contributors: Jacob Perron
-
-14.1.0 (2022-01-05)
--------------------
-
-14.0.0 (2021-12-17)
--------------------
-* Fixes for uncrustify 0.72 (`#1844 <https://github.com/ros2/rclcpp/issues/1844>`_)
-* Use rclcpp::guard_condition (`#1612 <https://github.com/ros2/rclcpp/issues/1612>`_)
-* Remove author by request (`#1818 <https://github.com/ros2/rclcpp/issues/1818>`_)
-* Update maintainers (`#1817 <https://github.com/ros2/rclcpp/issues/1817>`_)
-* Suppress clang dead-store warnings in the benchmarks. (`#1802 <https://github.com/ros2/rclcpp/issues/1802>`_)
-* Contributors: Chris Lalancette, Jacob Perron, mauropasse
-
-13.1.0 (2021-10-18)
--------------------
-* Deprecate the `void shared_ptr<MessageT>` subscription callback signatures (`#1713 <https://github.com/ros2/rclcpp/issues/1713>`_)
+2.4.1 (2022-01-31)
+------------------
+* Add node_waitables\_ to copy constructor (backport `#1799 <https://github.com/ros2/rclcpp/issues/1799>`_) (`#1834 <https://github.com/ros2/rclcpp/issues/1834>`_)
 * Contributors: Abrar Rahman Protyasha, Tomoya Fujita
 
-13.0.0 (2021-08-23)
--------------------
-* Use rcpputils/scope_exit.hpp and remove rclcpp/scope_exit.hpp. (`#1727 <https://github.com/ros2/rclcpp/issues/1727>`_)
-* Contributors: Christophe Bedard
-
-12.0.0 (2021-07-26)
--------------------
-
-11.2.0 (2021-07-21)
--------------------
-
-11.1.0 (2021-07-13)
--------------------
-* Fixed occasionally missing goal result caused by race condition (`#1677 <https://github.com/ros2/rclcpp/issues/1677>`_)
-* Contributors: Kaven Yau
-
-11.0.0 (2021-05-18)
--------------------
-* Bump the benchmark timeout for benchmark_action_client (`#1671 <https://github.com/ros2/rclcpp/issues/1671>`_)
-* Contributors: Scott K Logan
-
-10.0.0 (2021-05-11)
--------------------
-* Returns CancelResponse::REJECT while goal handle failed to transit to CANCELING state (`#1641 <https://github.com/ros2/rclcpp/issues/1641>`_)
-* Fix action server deadlock issue that caused by other mutexes locked in CancelCallback (`#1635 <https://github.com/ros2/rclcpp/issues/1635>`_)
-* Contributors: Kaven Yau
-
-9.0.2 (2021-04-14)
+2.4.0 (2021-09-01)
 ------------------
+* Fix occasionally missing goal result caused by race condition (`#1677 <https://github.com/ros2/rclcpp/issues/1677>`_) (`#1682 <https://github.com/ros2/rclcpp/issues/1682>`_)
+* Returns CancelResponse::REJECT while goal handle failed to transit to CANCELING state (`#1641 <https://github.com/ros2/rclcpp/issues/1641>`_) (`#1659 <https://github.com/ros2/rclcpp/issues/1659>`_)
+* Fix action server deadlock issue that caused by other mutexes locked in CancelCallback (`#1635 <https://github.com/ros2/rclcpp/issues/1635>`_) (`#1654 <https://github.com/ros2/rclcpp/issues/1654>`_)
+* Contributors: Kaven Yau, Tomoya Fujita
 
-9.0.1 (2021-04-12)
+2.3.1 (2021-04-14)
 ------------------
+* Update quality declaration links (re: `ros2/docs.ros2.org#52 <https://github.com/ros2/docs.ros2.org/issues/52>`_) (`#1616 <https://github.com/ros2/rclcpp/issues/1616>`_)
+* node_handle must be destroyed after client_handle to prevent memory leak (`#1562 <https://github.com/ros2/rclcpp/issues/1562>`_) (`#1565 <https://github.com/ros2/rclcpp/issues/1565>`_)
+* Fix action server deadlock (`#1285 <https://github.com/ros2/rclcpp/issues/1285>`_) (`#1313 <https://github.com/ros2/rclcpp/issues/1313>`_)  (`#1518 <https://github.com/ros2/rclcpp/issues/1518>`_)
+* Contributors: Chris Lalancette, Daisuke Sato, Simon Honigmann, Tomoya Fujita
 
-9.0.0 (2021-04-06)
+2.3.0 (2020-12-09)
 ------------------
-* updating quality declaration links (re: `ros2/docs.ros2.org#52 <https://github.com/ros2/docs.ros2.org/issues/52>`_) (`#1615 <https://github.com/ros2/rclcpp/issues/1615>`_)
-* Contributors: shonigmann
-
-8.2.0 (2021-03-31)
-------------------
-
-8.1.0 (2021-03-25)
-------------------
-
-8.0.0 (2021-03-23)
-------------------
-
-7.0.1 (2021-03-22)
-------------------
-
-7.0.0 (2021-03-18)
-------------------
-* Add support for rmw_connextdds (`#1574 <https://github.com/ros2/rclcpp/issues/1574>`_)
-* node_handle must be destroyed after client_handle to prevent memory leak (`#1562 <https://github.com/ros2/rclcpp/issues/1562>`_)
-* Contributors: Andrea Sorbini, Tomoya Fujita
-
-6.3.1 (2021-02-08)
-------------------
-* Finalize rcl_handle to prevent leak (`#1528 <https://github.com/ros2/rclcpp/issues/1528>`_) (`#1529 <https://github.com/ros2/rclcpp/issues/1529>`_)
-* Fix `#1526 <https://github.com/ros2/rclcpp/issues/1526>`_. (`#1527 <https://github.com/ros2/rclcpp/issues/1527>`_)
-* Contributors: y-okumura-isp
-
-6.3.0 (2021-01-25)
-------------------
-* Fix action server deadlock (`#1285 <https://github.com/ros2/rclcpp/issues/1285>`_) (`#1313 <https://github.com/ros2/rclcpp/issues/1313>`_)
-* Contributors: Daisuke Sato
-
-6.2.0 (2021-01-08)
-------------------
-* Goal response callback compatibility shim with deprecation of old signature (`#1495 <https://github.com/ros2/rclcpp/issues/1495>`_)
-* [rclcpp_action] Add warnings (`#1405 <https://github.com/ros2/rclcpp/issues/1405>`_)
-* Contributors: Audrow Nash, Ivan Santiago Paunovic
-
-6.1.0 (2020-12-10)
-------------------
-* Update QDs to QL 1 (`#1477 <https://github.com/ros2/rclcpp/issues/1477>`_)
-* Contributors: Stephen Brawner
-
-6.0.0 (2020-11-18)
-------------------
-* Add `take_data` to `Waitable` and `data` to `AnyExecutable` (`#1241 <https://github.com/ros2/rclcpp/issues/1241>`_)
-* Fix test crashes on CentOS 7 (`#1449 <https://github.com/ros2/rclcpp/issues/1449>`_)
-* Bump rclcpp packages to Quality Level 2 (`#1445 <https://github.com/ros2/rclcpp/issues/1445>`_)
+* Update QD to QL 1 (`#1480 <https://github.com/ros2/rclcpp/issues/1480>`_)
 * Add rclcpp_action action_server benchmarks (`#1433 <https://github.com/ros2/rclcpp/issues/1433>`_)
-* Contributors: Audrow Nash, Chris Lalancette, Louise Poubel, brawner
-
-5.1.0 (2020-11-02)
-------------------
 * Benchmark rclcpp_action action_client (`#1429 <https://github.com/ros2/rclcpp/issues/1429>`_)
-* Add missing locking to the rclcpp_action::ServerBase. (`#1421 <https://github.com/ros2/rclcpp/issues/1421>`_)
-* Increase test timeouts of slow running tests with rmw_connext_cpp (`#1400 <https://github.com/ros2/rclcpp/issues/1400>`_)
-* Update maintainers (`#1384 <https://github.com/ros2/rclcpp/issues/1384>`_)
-* Increase coverage rclcpp_action to 95% (`#1290 <https://github.com/ros2/rclcpp/issues/1290>`_)
-* Contributors: Chris Lalancette, Ivan Santiago Paunovic, brawner
-
-5.0.0 (2020-09-18)
-------------------
-* Pass goal handle to goal response callback instead of a future (`#1311 <https://github.com/ros2/rclcpp/issues/1311>`_)
-* Remove deprecated client goal handle method for getting result (`#1309 <https://github.com/ros2/rclcpp/issues/1309>`_)
 * Increase test timeout necessary for Connext (`#1256 <https://github.com/ros2/rclcpp/issues/1256>`_)
-* Contributors: Dirk Thomas, Jacob Perron
-
-4.0.0 (2020-07-09)
-------------------
-* Bump to QD to level 3 and fixed links (`#1158 <https://github.com/ros2/rclcpp/issues/1158>`_)
-* Contributors: Alejandro Hernández Cordero
-
-3.0.0 (2020-06-18)
-------------------
-* Add rcl_action_client_options when creating action client. (`#1133 <https://github.com/ros2/rclcpp/issues/1133>`_)
-* Fix doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_)
+* Increase coverage rclcpp_action to 95% (`#1290 <https://github.com/ros2/rclcpp/issues/1290>`_)
 * Increase rclcpp_action test coverage (`#1153 <https://github.com/ros2/rclcpp/issues/1153>`_)
-* Contributors: Alejandro Hernández Cordero, Michel Hidalgo, tomoya
+* Contributors: Alejandro Hernández Cordero, Dirk Thomas, Louise Poubel, Michel Hidalgo, Stephen Brawner, ahcorde, brawner
+
+2.2.0 (2020-10-07)
+------------------
+
+2.1.0 (2020-08-03)
+------------------
+
+2.0.2 (2020-07-07)
+------------------
+
+2.0.1 (2020-06-23)
+------------------
+* Fixed doxygen warnings (`#1163 <https://github.com/ros2/rclcpp/issues/1163>`_) (`#1191 <https://github.com/ros2/rclcpp/issues/1191>`_)
+* Contributors: Alejandro Hernández Cordero
 
 2.0.0 (2020-06-01)
 ------------------

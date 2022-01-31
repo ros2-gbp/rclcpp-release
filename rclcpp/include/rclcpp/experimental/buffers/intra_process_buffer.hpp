@@ -16,7 +16,6 @@
 #define RCLCPP__EXPERIMENTAL__BUFFERS__INTRA_PROCESS_BUFFER_HPP_
 
 #include <memory>
-#include <stdexcept>
 #include <type_traits>
 #include <utility>
 

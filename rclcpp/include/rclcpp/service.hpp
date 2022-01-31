@@ -141,9 +141,7 @@ protected:
 };
 
 template<typename ServiceT>
-class Service
-  : public ServiceBase,
-  public std::enable_shared_from_this<Service<ServiceT>>
+class Service : public ServiceBase
 {
 public:
   using CallbackType = std::function<
@@ -181,7 +179,7 @@ public:
 
     // rcl does the static memory allocation here
     service_handle_ = std::shared_ptr<rcl_service_t>(
-      new rcl_service_t, [handle = node_handle_, service_name](rcl_service_t * service)
+      new rcl_service_t, [handle = node_handle_](rcl_service_t * service)
       {
         if (rcl_service_fini(service, handle.get()) != RCL_RET_OK) {
           RCLCPP_ERROR(
@@ -216,8 +214,8 @@ public:
     }
     TRACEPOINT(
       rclcpp_service_callback_added,
-      static_cast<const void *>(get_service_handle().get()),
-      static_cast<const void *>(&any_callback_));
+      (const void *)get_service_handle().get(),
+      (const void *)&any_callback_);
 #ifndef TRACETOOLS_DISABLED
     any_callback_.register_callback_for_tracing();
 #endif
@@ -251,8 +249,8 @@ public:
     service_handle_ = service_handle;
     TRACEPOINT(
       rclcpp_service_callback_added,
-      static_cast<const void *>(get_service_handle().get()),
-      static_cast<const void *>(&any_callback_));
+      (const void *)get_service_handle().get(),
+      (const void *)&any_callback_);
 #ifndef TRACETOOLS_DISABLED
     any_callback_.register_callback_for_tracing();
 #endif
@@ -288,8 +286,8 @@ public:
     service_handle_->impl = service_handle->impl;
     TRACEPOINT(
       rclcpp_service_callback_added,
-      static_cast<const void *>(get_service_handle().get()),
-      static_cast<const void *>(&any_callback_));
+      (const void *)get_service_handle().get(),
+      (const void *)&any_callback_);
 #ifndef TRACETOOLS_DISABLED
     any_callback_.register_callback_for_tracing();
 #endif
@@ -337,10 +335,18 @@ public:
     std::shared_ptr<void> request) override
   {
     auto typed_request = std::static_pointer_cast<typename ServiceT::Request>(request);
-    auto response = any_callback_.dispatch(this->shared_from_this(), request_header, typed_request);
-    if (response) {
-      send_response(*request_header, *response);
-    }
+    auto response = std::make_shared<typename ServiceT::Response>();
+    any_callback_.dispatch(request_header, typed_request, response);
+    send_response(*request_header, *response);
+  }
+
+  [[deprecated("use the send_response() which takes references instead of shared pointers")]]
+  void
+  send_response(
+    std::shared_ptr<rmw_request_id_t> req_id,
+    std::shared_ptr<typename ServiceT::Response> response)
+  {
+    send_response(*req_id, *response);
   }
 
   void

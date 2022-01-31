@@ -51,13 +51,14 @@ QOSEventHandlerBase::get_number_of_ready_events()
 }
 
 /// Add the Waitable to a wait set.
-void
+bool
 QOSEventHandlerBase::add_to_wait_set(rcl_wait_set_t * wait_set)
 {
   rcl_ret_t ret = rcl_wait_set_add_event(wait_set, &event_handle_, &wait_set_event_index_);
   if (RCL_RET_OK != ret) {
     exceptions::throw_from_rcl_error(ret, "Couldn't add event to wait set");
   }
+  return true;
 }
 
 /// Check if the Waitable is ready.

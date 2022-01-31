@@ -12,23 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <rcl_action/action_server.h>
+#include <rcl_action/wait.h>
+
+#include <action_msgs/msg/goal_status_array.hpp>
+#include <action_msgs/srv/cancel_goal.hpp>
+#include <rclcpp/exceptions.hpp>
+#include <rclcpp/scope_exit.hpp>
+#include <rclcpp_action/server.hpp>
+
 #include <memory>
 #include <mutex>
 #include <string>
-#include <tuple>
 #include <unordered_map>
-#include <utility>
 #include <vector>
-
-#include "rcl_action/action_server.h"
-#include "rcl_action/wait.h"
-
-#include "rcpputils/scope_exit.hpp"
-
-#include "action_msgs/msg/goal_status_array.hpp"
-#include "action_msgs/srv/cancel_goal.hpp"
-#include "rclcpp/exceptions.hpp"
-#include "rclcpp_action/server.hpp"
 
 using rclcpp_action::ServerBase;
 using rclcpp_action::GoalUUID;
@@ -49,10 +46,9 @@ public:
   // Lock for action_server_
   std::recursive_mutex action_server_reentrant_mutex_;
 
-  rclcpp::Clock::SharedPtr clock_;
-
-  // Do not declare this before clock_ as this depends on clock_(see #1526)
   std::shared_ptr<rcl_action_server_t> action_server_;
+
+  rclcpp::Clock::SharedPtr clock_;
 
   size_t num_subscriptions_ = 0;
   size_t num_timers_ = 0;
@@ -164,15 +160,13 @@ ServerBase::get_number_of_ready_guard_conditions()
   return pimpl_->num_guard_conditions_;
 }
 
-void
+bool
 ServerBase::add_to_wait_set(rcl_wait_set_t * wait_set)
 {
   std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
   rcl_ret_t ret = rcl_action_wait_set_add_action_server(
     wait_set, pimpl_->action_server_.get(), NULL);
-  if (RCL_RET_OK != ret) {
-    rclcpp::exceptions::throw_from_rcl_error(ret, "ServerBase::add_to_wait_set() failed");
-  }
+  return RCL_RET_OK == ret;
 }
 
 bool
@@ -209,77 +203,15 @@ ServerBase::is_ready(rcl_wait_set_t * wait_set)
          pimpl_->goal_expired_.load();
 }
 
-std::shared_ptr<void>
-ServerBase::take_data()
-{
-  if (pimpl_->goal_request_ready_.load()) {
-    rcl_ret_t ret;
-    rcl_action_goal_info_t goal_info = rcl_action_get_zero_initialized_goal_info();
-    rmw_request_id_t request_header;
-
-    std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
-
-    std::shared_ptr<void> message = create_goal_request();
-    ret = rcl_action_take_goal_request(
-      pimpl_->action_server_.get(),
-      &request_header,
-      message.get());
-
-    return std::static_pointer_cast<void>(
-      std::make_shared
-      <std::tuple<rcl_ret_t, rcl_action_goal_info_t, rmw_request_id_t, std::shared_ptr<void>>>(
-        ret,
-        goal_info,
-        request_header, message));
-  } else if (pimpl_->cancel_request_ready_.load()) {
-    rcl_ret_t ret;
-    rmw_request_id_t request_header;
-
-    // Initialize cancel request
-    auto request = std::make_shared<action_msgs::srv::CancelGoal::Request>();
-
-    std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
-    ret = rcl_action_take_cancel_request(
-      pimpl_->action_server_.get(),
-      &request_header,
-      request.get());
-
-    return std::static_pointer_cast<void>(
-      std::make_shared
-      <std::tuple<rcl_ret_t, std::shared_ptr<action_msgs::srv::CancelGoal::Request>,
-      rmw_request_id_t>>(ret, request, request_header));
-  } else if (pimpl_->result_request_ready_.load()) {
-    rcl_ret_t ret;
-    // Get the result request message
-    rmw_request_id_t request_header;
-    std::shared_ptr<void> result_request = create_result_request();
-    std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
-    ret = rcl_action_take_result_request(
-      pimpl_->action_server_.get(), &request_header, result_request.get());
-
-    return std::static_pointer_cast<void>(
-      std::make_shared<std::tuple<rcl_ret_t, std::shared_ptr<void>, rmw_request_id_t>>(
-        ret, result_request, request_header));
-  } else if (pimpl_->goal_expired_.load()) {
-    return nullptr;
-  } else {
-    throw std::runtime_error("Taking data from action server but nothing is ready");
-  }
-}
-
 void
-ServerBase::execute(std::shared_ptr<void> & data)
+ServerBase::execute()
 {
-  if (!data && !pimpl_->goal_expired_.load()) {
-    throw std::runtime_error("'data' is empty");
-  }
-
   if (pimpl_->goal_request_ready_.load()) {
-    execute_goal_request_received(data);
+    execute_goal_request_received();
   } else if (pimpl_->cancel_request_ready_.load()) {
-    execute_cancel_request_received(data);
+    execute_cancel_request_received();
   } else if (pimpl_->result_request_ready_.load()) {
-    execute_result_request_received(data);
+    execute_result_request_received();
   } else if (pimpl_->goal_expired_.load()) {
     execute_check_expired_goals();
   } else {
@@ -288,11 +220,26 @@ ServerBase::execute(std::shared_ptr<void> & data)
 }
 
 void
-ServerBase::execute_goal_request_received(std::shared_ptr<void> & data)
+ServerBase::execute_goal_request_received()
 {
-  auto shared_ptr = std::static_pointer_cast
-    <std::tuple<rcl_ret_t, rcl_action_goal_info_t, rmw_request_id_t, std::shared_ptr<void>>>(data);
-  rcl_ret_t ret = std::get<0>(*shared_ptr);
+  rcl_ret_t ret;
+  rcl_action_goal_info_t goal_info = rcl_action_get_zero_initialized_goal_info();
+  rmw_request_id_t request_header;
+
+  std::shared_ptr<void> message = create_goal_request();
+  {
+    std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
+    ret = rcl_action_take_goal_request(
+      pimpl_->action_server_.get(),
+      &request_header,
+      message.get());
+  }
+
+  bool expected = true;
+  if (!pimpl_->goal_request_ready_.compare_exchange_strong(expected, false)) {
+    return;
+  }
+
   if (RCL_RET_ACTION_SERVER_TAKE_FAILED == ret) {
     // Ignore take failure because connext fails if it receives a sample without valid data.
     // This happens when a client shuts down and connext receives a sample saying the client is
@@ -300,14 +247,6 @@ ServerBase::execute_goal_request_received(std::shared_ptr<void> & data)
     return;
   } else if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret);
-  }
-  rcl_action_goal_info_t goal_info = std::get<1>(*shared_ptr);
-  rmw_request_id_t request_header = std::get<2>(*shared_ptr);
-  std::shared_ptr<void> message = std::get<3>(*shared_ptr);
-
-  bool expected = true;
-  if (!pimpl_->goal_request_ready_.compare_exchange_strong(expected, false)) {
-    return;
   }
 
   GoalUUID uuid = get_goal_id_from_goal_request(message.get());
@@ -359,6 +298,7 @@ ServerBase::execute_goal_request_received(std::shared_ptr<void> & data)
     // Copy out goal handle since action server storage disappears when it is fini'd
     *handle = *rcl_handle;
 
+
     {
       std::lock_guard<std::recursive_mutex> lock(pimpl_->unordered_map_mutex_);
       pimpl_->goal_handles_[uuid] = handle;
@@ -377,16 +317,30 @@ ServerBase::execute_goal_request_received(std::shared_ptr<void> & data)
     // Tell user to start executing action
     call_goal_accepted_callback(handle, uuid, message);
   }
-  data.reset();
 }
 
 void
-ServerBase::execute_cancel_request_received(std::shared_ptr<void> & data)
+ServerBase::execute_cancel_request_received()
 {
-  auto shared_ptr = std::static_pointer_cast
-    <std::tuple<rcl_ret_t, std::shared_ptr<action_msgs::srv::CancelGoal::Request>,
-      rmw_request_id_t>>(data);
-  auto ret = std::get<0>(*shared_ptr);
+  rcl_ret_t ret;
+  rmw_request_id_t request_header;
+
+  // Initialize cancel request
+  auto request = std::make_shared<action_msgs::srv::CancelGoal::Request>();
+
+  {
+    std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
+    ret = rcl_action_take_cancel_request(
+      pimpl_->action_server_.get(),
+      &request_header,
+      request.get());
+  }
+
+  bool expected = true;
+  if (!pimpl_->cancel_request_ready_.compare_exchange_strong(expected, false)) {
+    return;
+  }
+
   if (RCL_RET_ACTION_SERVER_TAKE_FAILED == ret) {
     // Ignore take failure because connext fails if it receives a sample without valid data.
     // This happens when a client shuts down and connext receives a sample saying the client is
@@ -395,8 +349,6 @@ ServerBase::execute_cancel_request_received(std::shared_ptr<void> & data)
   } else if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
-  auto request = std::get<1>(*shared_ptr);
-  auto request_header = std::get<2>(*shared_ptr);
 
   // Convert c++ message to C message
   rcl_action_cancel_request_t cancel_request = rcl_action_get_zero_initialized_cancel_request();
@@ -419,7 +371,7 @@ ServerBase::execute_cancel_request_received(std::shared_ptr<void> & data)
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
 
-  RCPPUTILS_SCOPE_EXIT(
+  RCLCPP_SCOPE_EXIT(
   {
     ret = rcl_action_cancel_response_fini(&cancel_response);
     if (RCL_RET_OK != ret) {
@@ -466,15 +418,26 @@ ServerBase::execute_cancel_request_received(std::shared_ptr<void> & data)
   if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
-  data.reset();
 }
 
 void
-ServerBase::execute_result_request_received(std::shared_ptr<void> & data)
+ServerBase::execute_result_request_received()
 {
-  auto shared_ptr = std::static_pointer_cast
-    <std::tuple<rcl_ret_t, std::shared_ptr<void>, rmw_request_id_t>>(data);
-  auto ret = std::get<0>(*shared_ptr);
+  rcl_ret_t ret;
+  // Get the result request message
+  rmw_request_id_t request_header;
+  std::shared_ptr<void> result_request = create_result_request();
+  {
+    std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
+    ret = rcl_action_take_result_request(
+      pimpl_->action_server_.get(), &request_header, result_request.get());
+  }
+
+  bool expected = true;
+  if (!pimpl_->result_request_ready_.compare_exchange_strong(expected, false)) {
+    return;
+  }
+
   if (RCL_RET_ACTION_SERVER_TAKE_FAILED == ret) {
     // Ignore take failure because connext fails if it receives a sample without valid data.
     // This happens when a client shuts down and connext receives a sample saying the client is
@@ -483,10 +446,7 @@ ServerBase::execute_result_request_received(std::shared_ptr<void> & data)
   } else if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
-  auto result_request = std::get<1>(*shared_ptr);
-  auto request_header = std::get<2>(*shared_ptr);
 
-  pimpl_->result_request_ready_ = false;
   std::shared_ptr<void> result_response;
 
   // check if the goal exists
@@ -516,13 +476,12 @@ ServerBase::execute_result_request_received(std::shared_ptr<void> & data)
   if (result_response) {
     // Send the result now
     std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
-    rcl_ret_t rcl_ret = rcl_action_send_result_response(
+    ret = rcl_action_send_result_response(
       pimpl_->action_server_.get(), &request_header, result_response.get());
-    if (RCL_RET_OK != rcl_ret) {
-      rclcpp::exceptions::throw_from_rcl_error(rcl_ret);
+    if (RCL_RET_OK != ret) {
+      rclcpp::exceptions::throw_from_rcl_error(ret);
     }
   }
-  data.reset();
 }
 
 void
@@ -584,7 +543,7 @@ ServerBase::publish_status()
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
 
-  RCPPUTILS_SCOPE_EXIT(
+  RCLCPP_SCOPE_EXIT(
   {
     ret = rcl_action_goal_status_array_fini(&c_status_array);
     if (RCL_RET_OK != ret) {

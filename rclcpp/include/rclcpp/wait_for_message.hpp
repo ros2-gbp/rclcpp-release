@@ -44,7 +44,7 @@ bool wait_for_message(
   std::chrono::duration<Rep, Period> time_to_wait = std::chrono::duration<Rep, Period>(-1))
 {
   auto gc = std::make_shared<rclcpp::GuardCondition>(context);
-  auto shutdown_callback_handle = context->add_on_shutdown_callback(
+  auto shutdown_callback = context->on_shutdown(
     [weak_gc = std::weak_ptr<rclcpp::GuardCondition>{gc}]() {
       auto strong_gc = weak_gc.lock();
       if (strong_gc) {
@@ -90,7 +90,7 @@ bool wait_for_message(
   const std::string & topic,
   std::chrono::duration<Rep, Period> time_to_wait = std::chrono::duration<Rep, Period>(-1))
 {
-  auto sub = node->create_subscription<MsgT>(topic, 1, [](const std::shared_ptr<const MsgT>) {});
+  auto sub = node->create_subscription<MsgT>(topic, 1, [](const std::shared_ptr<MsgT>) {});
   return wait_for_message<MsgT, Rep, Period>(
     out, sub, node->get_node_options().context(), time_to_wait);
 }

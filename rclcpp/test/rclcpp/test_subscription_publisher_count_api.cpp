@@ -108,7 +108,7 @@ public:
   }
 
 protected:
-  static void OnMessage(test_msgs::msg::Empty::ConstSharedPtr msg)
+  static void OnMessage(const test_msgs::msg::Empty::SharedPtr msg)
   {
     (void)msg;
   }
@@ -129,7 +129,7 @@ struct TwoContextsPerTest
 };
 
 using AllTestDescriptions = ::testing::Types<OneContextPerTest, TwoContextsPerTest>;
-TYPED_TEST_SUITE(TestSubscriptionPublisherCount, AllTestDescriptions, PrintTestDescription);
+TYPED_TEST_CASE(TestSubscriptionPublisherCount, AllTestDescriptions, PrintTestDescription);
 
 
 using test_msgs::msg::Empty;

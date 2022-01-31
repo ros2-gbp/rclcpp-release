@@ -91,17 +91,6 @@ public:
   void
   reset();
 
-  /// Indicate that we're about to execute the callback.
-  /**
-   * The multithreaded executor takes advantage of this to avoid scheduling
-   * the callback multiple times.
-   *
-   * \return `true` if the callback should be executed, `false` if the timer was canceled.
-   */
-  RCLCPP_PUBLIC
-  virtual bool
-  call() = 0;
-
   /// Call the callback function when the timer signal is emitted.
   RCLCPP_PUBLIC
   virtual void
@@ -187,12 +176,12 @@ public:
   {
     TRACEPOINT(
       rclcpp_timer_callback_added,
-      static_cast<const void *>(get_timer_handle().get()),
-      static_cast<const void *>(&callback_));
+      (const void *)get_timer_handle().get(),
+      (const void *)&callback_);
     TRACEPOINT(
       rclcpp_callback_register,
-      static_cast<const void *>(&callback_),
-      tracetools::get_symbol(callback_));
+      (const void *)&callback_,
+      get_symbol(callback_));
   }
 
   /// Default destructor.
@@ -203,31 +192,22 @@ public:
   }
 
   /**
-   * \sa rclcpp::TimerBase::call
-   * \throws std::runtime_error if it failed to notify timer that callback will occurr
-   */
-  bool
-  call() override
-  {
-    rcl_ret_t ret = rcl_timer_call(timer_handle_.get());
-    if (ret == RCL_RET_TIMER_CANCELED) {
-      return false;
-    }
-    if (ret != RCL_RET_OK) {
-      throw std::runtime_error("Failed to notify timer that callback occurred");
-    }
-    return true;
-  }
-
-  /**
    * \sa rclcpp::TimerBase::execute_callback
+   * \throws std::runtime_error if it failed to notify timer that callback occurred
    */
   void
   execute_callback() override
   {
-    TRACEPOINT(callback_start, static_cast<const void *>(&callback_), false);
+    rcl_ret_t ret = rcl_timer_call(timer_handle_.get());
+    if (ret == RCL_RET_TIMER_CANCELED) {
+      return;
+    }
+    if (ret != RCL_RET_OK) {
+      throw std::runtime_error("Failed to notify timer that callback occurred");
+    }
+    TRACEPOINT(callback_start, (const void *)&callback_, false);
     execute_callback_delegate<>();
-    TRACEPOINT(callback_end, static_cast<const void *>(&callback_));
+    TRACEPOINT(callback_end, (const void *)&callback_);
   }
 
   // void specialization

@@ -15,16 +15,16 @@
 #ifndef RCLCPP_ACTION__CREATE_SERVER_HPP_
 #define RCLCPP_ACTION__CREATE_SERVER_HPP_
 
+#include <rcl_action/action_server.h>
+
+#include <rclcpp/node.hpp>
+#include <rclcpp/node_interfaces/node_base_interface.hpp>
+#include <rclcpp/node_interfaces/node_clock_interface.hpp>
+#include <rclcpp/node_interfaces/node_logging_interface.hpp>
+#include <rclcpp/node_interfaces/node_waitables_interface.hpp>
+
 #include <memory>
 #include <string>
-
-#include "rcl_action/action_server.h"
-
-#include "rclcpp/node.hpp"
-#include "rclcpp/node_interfaces/node_base_interface.hpp"
-#include "rclcpp/node_interfaces/node_clock_interface.hpp"
-#include "rclcpp/node_interfaces/node_logging_interface.hpp"
-#include "rclcpp/node_interfaces/node_waitables_interface.hpp"
 
 #include "rclcpp_action/server.hpp"
 #include "rclcpp_action/visibility_control.hpp"
@@ -49,7 +49,7 @@ namespace rclcpp_action
  *  The return from this callback only indicates if the server will try to cancel a goal.
  *  It does not indicate if the goal was actually canceled.
  * \param[in] handle_accepted A callback that is called to give the user a handle to the goal.
- * \param[in] options Options to pass to the underlying `rcl_action_server_t`.
+ * \param[in] options options to pass to the underlying `rcl_action_server_t`.
  * \param[in] group The action server will be added to this callback group.
  *   If `nullptr`, then the action server is added to the default callback group.
  */
@@ -123,7 +123,7 @@ create_server(
  *  The return from this callback only indicates if the server will try to cancel a goal.
  *  It does not indicate if the goal was actually canceled.
  * \param[in] handle_accepted A callback that is called to give the user a handle to the goal.
- * \param[in] options Options to pass to the underlying `rcl_action_server_t`.
+ * \param[in] options options to pass to the underlying `rcl_action_server_t`.
  * \param[in] group The action server will be added to this callback group.
  *   If `nullptr`, then the action server is added to the default callback group.
  */

@@ -21,7 +21,6 @@
 
 #include "./signal_handler.hpp"
 #include "rclcpp/contexts/default_context.hpp"
-#include "rclcpp/detail/utilities.hpp"
 #include "rclcpp/exceptions.hpp"
 
 #include "rcl/error_handling.h"
@@ -31,22 +30,18 @@ namespace rclcpp
 {
 
 void
-init(
-  int argc,
-  char const * const * argv,
-  const InitOptions & init_options,
-  SignalHandlerOptions signal_handler_options)
+init(int argc, char const * const argv[], const InitOptions & init_options)
 {
   using rclcpp::contexts::get_global_default_context;
   get_global_default_context()->init(argc, argv, init_options);
   // Install the signal handlers.
-  install_signal_handlers(signal_handler_options);
+  install_signal_handlers();
 }
 
 bool
-install_signal_handlers(SignalHandlerOptions signal_handler_options)
+install_signal_handlers()
 {
-  return SignalHandler::get_global_signal_handler().install(signal_handler_options);
+  return SignalHandler::get_global_signal_handler().install();
 }
 
 bool
@@ -55,75 +50,24 @@ signal_handlers_installed()
   return SignalHandler::get_global_signal_handler().is_installed();
 }
 
-SignalHandlerOptions
-get_current_signal_handler_options()
-{
-  return SignalHandler::get_global_signal_handler().get_current_signal_handler_options();
-}
-
-
 bool
 uninstall_signal_handlers()
 {
   return SignalHandler::get_global_signal_handler().uninstall();
 }
 
-static
-std::vector<std::string>
-_remove_ros_arguments(
-  char const * const * argv,
-  const rcl_arguments_t * args,
-  rcl_allocator_t alloc)
-{
-  rcl_ret_t ret;
-  int nonros_argc = 0;
-  const char ** nonros_argv = NULL;
-
-  ret = rcl_remove_ros_arguments(
-    argv,
-    args,
-    alloc,
-    &nonros_argc,
-    &nonros_argv);
-
-  if (RCL_RET_OK != ret || nonros_argc < 0) {
-    // Not using throw_from_rcl_error, because we may need to append deallocation failures.
-    exceptions::RCLError exc(ret, rcl_get_error_state(), "");
-    rcl_reset_error();
-    if (NULL != nonros_argv) {
-      alloc.deallocate(nonros_argv, alloc.state);
-    }
-    throw exc;
-  }
-
-  std::vector<std::string> return_arguments(static_cast<size_t>(nonros_argc));
-
-  for (size_t ii = 0; ii < static_cast<size_t>(nonros_argc); ++ii) {
-    return_arguments[ii] = std::string(nonros_argv[ii]);
-  }
-
-  if (NULL != nonros_argv) {
-    alloc.deallocate(nonros_argv, alloc.state);
-  }
-
-  return return_arguments;
-}
-
 std::vector<std::string>
 init_and_remove_ros_arguments(
   int argc,
-  char const * const * argv,
+  char const * const argv[],
   const InitOptions & init_options)
 {
   init(argc, argv, init_options);
-
-  using rclcpp::contexts::get_global_default_context;
-  auto rcl_context = get_global_default_context()->get_rcl_context();
-  return _remove_ros_arguments(argv, &(rcl_context->global_arguments), rcl_get_default_allocator());
+  return remove_ros_arguments(argc, argv);
 }
 
 std::vector<std::string>
-remove_ros_arguments(int argc, char const * const * argv)
+remove_ros_arguments(int argc, char const * const argv[])
 {
   rcl_allocator_t alloc = rcl_get_default_allocator();
   rcl_arguments_t parsed_args = rcl_get_zero_initialized_arguments();
@@ -135,17 +79,40 @@ remove_ros_arguments(int argc, char const * const * argv)
     exceptions::throw_from_rcl_error(ret, "failed to parse arguments");
   }
 
-  std::vector<std::string> return_arguments;
-  try {
-    return_arguments = _remove_ros_arguments(argv, &parsed_args, alloc);
-  } catch (exceptions::RCLError & exc) {
+  int nonros_argc = 0;
+  const char ** nonros_argv = NULL;
+
+  ret = rcl_remove_ros_arguments(
+    argv,
+    &parsed_args,
+    alloc,
+    &nonros_argc,
+    &nonros_argv);
+
+  if (RCL_RET_OK != ret || nonros_argc < 0) {
+    // Not using throw_from_rcl_error, because we may need to append deallocation failures.
+    exceptions::RCLErrorBase base_exc(ret, rcl_get_error_state());
+    rcl_reset_error();
+    if (NULL != nonros_argv) {
+      alloc.deallocate(nonros_argv, alloc.state);
+    }
     if (RCL_RET_OK != rcl_arguments_fini(&parsed_args)) {
-      exc.formatted_message += std::string(
+      base_exc.formatted_message += std::string(
         ", failed also to cleanup parsed arguments, leaking memory: ") +
         rcl_get_error_string().str;
       rcl_reset_error();
     }
-    throw exc;
+    throw exceptions::RCLError(base_exc, "");
+  }
+
+  std::vector<std::string> return_arguments(static_cast<size_t>(nonros_argc));
+
+  for (size_t ii = 0; ii < static_cast<size_t>(nonros_argc); ++ii) {
+    return_arguments[ii] = std::string(nonros_argv[ii]);
+  }
+
+  if (NULL != nonros_argv) {
+    alloc.deallocate(nonros_argv, alloc.state);
   }
 
   ret = rcl_arguments_fini(&parsed_args);
@@ -165,6 +132,12 @@ ok(Context::SharedPtr context)
     context = get_global_default_context();
   }
   return context->is_valid();
+}
+
+bool
+is_initialized(Context::SharedPtr context)
+{
+  return ok(context);
 }
 
 bool

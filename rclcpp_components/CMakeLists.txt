@@ -7,10 +7,7 @@ if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
 endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(
-    -Wall -Wextra -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual
-    -Wformat=2 -Wconversion -Wshadow -Wsign-conversion -Wold-style-cast -Wcast-qual
-  )
+  add_compile_options(-Wall -Wextra -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual)
 endif()
 
 find_package(ament_cmake_ros REQUIRED)
@@ -19,15 +16,6 @@ find_package(class_loader REQUIRED)
 find_package(composition_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rcpputils REQUIRED)
-
-# Add an interface library that can be dependend upon by libraries who register components
-add_library(component INTERFACE)
-target_include_directories(component INTERFACE
-  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-  "$<INSTALL_INTERFACE:include>")
-target_link_libraries(component INTERFACE
-  class_loader::class_loader
-  rclcpp::rclcpp)
 
 add_library(
   component_manager
@@ -70,20 +58,9 @@ ament_target_dependencies(component_container_mt
   "rclcpp"
 )
 
-add_executable(
-  component_container_isolated
-  src/component_container_isolated.cpp
-)
-target_link_libraries(component_container_isolated component_manager)
-ament_target_dependencies(component_container_isolated
-  "rclcpp"
-)
-
-
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_link_libraries(component_container "stdc++fs")
   target_link_libraries(component_container_mt "stdc++fs")
-  target_link_libraries(component_container_isolated "stdc++fs")
 endif()
 
 if(BUILD_TESTING)
@@ -96,7 +73,10 @@ if(BUILD_TESTING)
 
   set(components "")
   add_library(test_component SHARED test/components/test_component.cpp)
-  target_link_libraries(test_component PRIVATE component)
+  target_include_directories(test_component PUBLIC include)
+  ament_target_dependencies(test_component
+    "class_loader"
+    "rclcpp")
   #rclcpp_components_register_nodes(test_component "test_rclcpp_components::TestComponent")
   set(components "${components}test_rclcpp_components::TestComponentFoo;$<TARGET_FILE:test_component>\n")
   set(components "${components}test_rclcpp_components::TestComponentBar;$<TARGET_FILE:test_component>\n")
@@ -144,7 +124,7 @@ if(BUILD_TESTING)
 endif()
 
 install(
-  TARGETS component component_manager EXPORT export_${PROJECT_NAME}
+  TARGETS component_manager EXPORT component_manager
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -152,7 +132,7 @@ install(
 
 # Install executables
 install(
-  TARGETS component_container component_container_mt component_container_isolated
+  TARGETS component_container component_container_mt
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -171,7 +151,7 @@ install(
 # specific order: dependents before dependencies
 ament_export_include_directories(include)
 ament_export_libraries(component_manager)
-ament_export_targets(export_${PROJECT_NAME})
+ament_export_targets(component_manager)
 ament_export_dependencies(ament_index_cpp)
 ament_export_dependencies(class_loader)
 ament_export_dependencies(composition_interfaces)

@@ -99,18 +99,15 @@ public:
    */
   RCLCPP_COMPONENTS_PUBLIC
   ComponentManager(
-    std::weak_ptr<rclcpp::Executor> executor =
-    std::weak_ptr<rclcpp::executors::MultiThreadedExecutor>(),
+    std::weak_ptr<rclcpp::Executor> executor,
     std::string node_name = "ComponentManager",
-    const rclcpp::NodeOptions & node_options = rclcpp::NodeOptions()
-    .start_parameter_services(false)
-    .start_parameter_event_publisher(false));
+    const rclcpp::NodeOptions & node_options = rclcpp::NodeOptions());
 
   RCLCPP_COMPONENTS_PUBLIC
   virtual ~ComponentManager();
 
   /// Return a list of valid loadable components in a given package.
-  /**
+  /*
    * \param package_name name of the package
    * \param resource_index name of the executable
    * \throws ComponentManagerException if the resource was not found or a invalid resource entry
@@ -123,7 +120,7 @@ public:
     const std::string & resource_index = "rclcpp_components") const;
 
   /// Instantiate a component from a dynamic library.
-  /**
+  /*
    * \param resource a component resource (class name + library path)
    * \return a NodeFactory interface
    */
@@ -131,42 +128,9 @@ public:
   virtual std::shared_ptr<rclcpp_components::NodeFactory>
   create_component_factory(const ComponentResource & resource);
 
-  /// Member function to set a executor in the component
-  /**
-   * \param executor executor to be set
-   */
-  RCLCPP_COMPONENTS_PUBLIC
-  virtual void
-  set_executor(const std::weak_ptr<rclcpp::Executor> executor);
-
 protected:
-  /// Create node options for loaded component
-  /**
-   * \param request information with the node to load
-   * \return node options
-   */
-  RCLCPP_COMPONENTS_PUBLIC
-  virtual rclcpp::NodeOptions
-  create_node_options(const std::shared_ptr<LoadNode::Request> request);
-
-  /// Add component node to executor model, it's invoked in on_load_node()
-  /**
-   * \param node_id  node_id of loaded component node in node_wrappers_
-   */
-  RCLCPP_COMPONENTS_PUBLIC
-  virtual void
-  add_node_to_executor(uint64_t node_id);
-
-  /// Remove component node from executor model, it's invoked in on_unload_node()
-  /**
-   * \param node_id  node_id of loaded component node in node_wrappers_
-   */
-  RCLCPP_COMPONENTS_PUBLIC
-  virtual void
-  remove_node_from_executor(uint64_t node_id);
-
   /// Service callback to load a new node in the component
-  /**
+  /*
    * This function allows to add parameters, remap rules, a specific node, name a namespace
    * and/or additional arguments.
    *
@@ -180,27 +144,13 @@ protected:
    */
   RCLCPP_COMPONENTS_PUBLIC
   virtual void
-  on_load_node(
+  OnLoadNode(
     const std::shared_ptr<rmw_request_id_t> request_header,
     const std::shared_ptr<LoadNode::Request> request,
     std::shared_ptr<LoadNode::Response> response);
 
-  /**
-   * \deprecated Use on_load_node() instead
-   */
-  [[deprecated("Use on_load_node() instead")]]
-  RCLCPP_COMPONENTS_PUBLIC
-  virtual void
-  OnLoadNode(
-    const std::shared_ptr<rmw_request_id_t> request_header,
-    const std::shared_ptr<LoadNode::Request> request,
-    std::shared_ptr<LoadNode::Response> response)
-  {
-    on_load_node(request_header, request, response);
-  }
-
   /// Service callback to unload a node in the component
-  /**
+  /*
    * \param request_header unused
    * \param request unique identifier to remove from the component
    * \param response true on the success field if the node unload was succefully, otherwise false
@@ -208,27 +158,13 @@ protected:
    */
   RCLCPP_COMPONENTS_PUBLIC
   virtual void
-  on_unload_node(
+  OnUnloadNode(
     const std::shared_ptr<rmw_request_id_t> request_header,
     const std::shared_ptr<UnloadNode::Request> request,
     std::shared_ptr<UnloadNode::Response> response);
 
-  /**
-   * \deprecated Use on_unload_node() instead
-   */
-  [[deprecated("Use on_unload_node() instead")]]
-  RCLCPP_COMPONENTS_PUBLIC
-  virtual void
-  OnUnloadNode(
-    const std::shared_ptr<rmw_request_id_t> request_header,
-    const std::shared_ptr<UnloadNode::Request> request,
-    std::shared_ptr<UnloadNode::Response> response)
-  {
-    on_unload_node(request_header, request, response);
-  }
-
   /// Service callback to get the list of nodes in the component
-  /**
+  /*
    * Return a two list: one with the unique identifiers and other with full name of the nodes.
    *
    * \param request_header unused
@@ -237,26 +173,12 @@ protected:
    */
   RCLCPP_COMPONENTS_PUBLIC
   virtual void
-  on_list_nodes(
+  OnListNodes(
     const std::shared_ptr<rmw_request_id_t> request_header,
     const std::shared_ptr<ListNodes::Request> request,
     std::shared_ptr<ListNodes::Response> response);
 
-  /**
-   * \deprecated Use on_list_nodes() instead
-   */
-  [[deprecated("Use on_list_nodes() instead")]]
-  RCLCPP_COMPONENTS_PUBLIC
-  virtual void
-  OnListNodes(
-    const std::shared_ptr<rmw_request_id_t> request_header,
-    const std::shared_ptr<ListNodes::Request> request,
-    std::shared_ptr<ListNodes::Response> response)
-  {
-    on_list_nodes(request_header, request, response);
-  }
-
-protected:
+private:
   std::weak_ptr<rclcpp::Executor> executor_;
 
   uint64_t unique_id_ {1};
