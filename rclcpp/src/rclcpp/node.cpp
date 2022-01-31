@@ -54,6 +54,12 @@ extend_sub_namespace(const std::string & existing_sub_namespace, const std::stri
             extension.c_str(),
             "a sub-namespace should not have a leading /",
             0);
+  } else if (existing_sub_namespace.empty() && extension.empty()) {
+    throw rclcpp::exceptions::NameValidationError(
+            "sub_namespace",
+            extension.c_str(),
+            "sub-nodes should not extend nodes by an empty sub-namespace",
+            0);
   }
 
   std::string new_sub_namespace;
@@ -79,7 +85,11 @@ create_effective_namespace(const std::string & node_namespace, const std::string
   // and do not need trimming of `/` and other things, as they were validated
   // in other functions already.
 
-  if (node_namespace.back() == '/') {
+  // A node may not have a sub_namespace if it is no sub_node. In this case,
+  // just return the original namespace
+  if (sub_namespace.empty()) {
+    return node_namespace;
+  } else if (node_namespace.back() == '/') {
     // this is the special case where node_namespace is just `/`
     return node_namespace + sub_namespace;
   } else {
@@ -158,6 +168,8 @@ Node::Node(
   node_services_(other.node_services_),
   node_clock_(other.node_clock_),
   node_parameters_(other.node_parameters_),
+  node_time_source_(other.node_time_source_),
+  node_waitables_(other.node_waitables_),
   node_options_(other.node_options_),
   sub_namespace_(extend_sub_namespace(other.get_sub_namespace(), sub_namespace)),
   effective_namespace_(create_effective_namespace(other.get_namespace(), sub_namespace_))
