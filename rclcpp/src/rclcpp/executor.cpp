@@ -414,8 +414,8 @@ void Executor::spin_some(std::chrono::nanoseconds max_duration)
 
 void Executor::spin_all(std::chrono::nanoseconds max_duration)
 {
-  if (max_duration <= 0ns) {
-    throw std::invalid_argument("max_duration must be positive");
+  if (max_duration < 0ns) {
+    throw std::invalid_argument("max_duration must be greater than or equal to 0");
   }
   return this->spin_some_impl(max_duration, true);
 }
@@ -927,4 +927,10 @@ Executor::has_node(
       auto other_ptr = other.second.lock();
       return other_ptr == node_ptr;
     }) != weak_groups_to_nodes.end();
+}
+
+bool
+Executor::is_spinning()
+{
+  return spinning;
 }
