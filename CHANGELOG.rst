@@ -2,6 +2,9 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+15.3.0 (2022-03-30)
+-------------------
+
 15.2.0 (2022-03-24)
 -------------------
 * Select executor in node registration (`#1898 <https://github.com/ros2/rclcpp/issues/1898>`_)
