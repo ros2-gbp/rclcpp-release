@@ -3,6 +3,11 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+16.0.0 (2022-04-08)
+-------------------
+* remove things that were deprecated during galactic (`#1913 <https://github.com/ros2/rclcpp/issues/1913>`_)
+* Contributors: William Woodall
+
 15.4.0 (2022-04-05)
 -------------------
 
