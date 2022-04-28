@@ -19,20 +19,35 @@
 #include <string>
 #include <utility>
 
-#include "rclcpp/logging.hpp"
 #include "rclcpp/publisher.hpp"
 
-#include "rclcpp_lifecycle/managed_entity.hpp"
-
+#include "rclcpp/logging.hpp"
 
 namespace rclcpp_lifecycle
 {
+/// base class with only
+/**
+ * pure virtual functions. A managed
+ * node can then deactivate or activate
+ * the publishing.
+ * It is more a convenient interface class
+ * than a necessary base class.
+ */
+class LifecyclePublisherInterface
+{
+public:
+  virtual ~LifecyclePublisherInterface() {}
+  virtual void on_activate() = 0;
+  virtual void on_deactivate() = 0;
+  virtual bool is_activated() = 0;
+};
+
 /// brief child class of rclcpp Publisher class.
 /**
  * Overrides all publisher functions to check for enabled/disabled state.
  */
 template<typename MessageT, typename Alloc = std::allocator<void>>
-class LifecyclePublisher : public SimpleManagedEntity,
+class LifecyclePublisher : public LifecyclePublisherInterface,
   public rclcpp::Publisher<MessageT, Alloc>
 {
 public:
@@ -49,7 +64,7 @@ public:
     const rclcpp::QoS & qos,
     const rclcpp::PublisherOptionsWithAllocator<Alloc> & options)
   : rclcpp::Publisher<MessageT, Alloc>(node_base, topic, qos, options),
-    should_log_(true),
+    enabled_(false),
     logger_(rclcpp::get_logger("LifecyclePublisher"))
   {
   }
@@ -65,8 +80,12 @@ public:
   virtual void
   publish(std::unique_ptr<MessageT, MessageDeleter> msg)
   {
-    if (!this->is_activated()) {
-      log_publisher_not_enabled();
+    if (!enabled_) {
+      RCLCPP_WARN(
+        logger_,
+        "Trying to publish message on the topic '%s', but the publisher is not activated",
+        this->get_topic_name());
+
       return;
     }
     rclcpp::Publisher<MessageT, Alloc>::publish(std::move(msg));
@@ -81,44 +100,37 @@ public:
   virtual void
   publish(const MessageT & msg)
   {
-    if (!this->is_activated()) {
-      log_publisher_not_enabled();
+    if (!enabled_) {
+      RCLCPP_WARN(
+        logger_,
+        "Trying to publish message on the topic '%s', but the publisher is not activated",
+        this->get_topic_name());
+
       return;
     }
     rclcpp::Publisher<MessageT, Alloc>::publish(msg);
   }
 
-  void
-  on_activate() override
+  virtual void
+  on_activate()
   {
-    SimpleManagedEntity::on_activate();
-    should_log_ = true;
+    enabled_ = true;
+  }
+
+  virtual void
+  on_deactivate()
+  {
+    enabled_ = false;
+  }
+
+  virtual bool
+  is_activated()
+  {
+    return enabled_;
   }
 
 private:
-  /// LifecyclePublisher log helper function
-  /**
-   * Helper function that logs a message saying that publisher can't publish
-   * because it's not enabled.
-   */
-  void log_publisher_not_enabled()
-  {
-    // Nothing to do if we are not meant to log
-    if (!should_log_) {
-      return;
-    }
-
-    // Log the message
-    RCLCPP_WARN(
-      logger_,
-      "Trying to publish message on the topic '%s', but the publisher is not activated",
-      this->get_topic_name());
-
-    // We stop logging until the flag gets enabled again
-    should_log_ = false;
-  }
-
-  bool should_log_ = true;
+  bool enabled_ = false;
   rclcpp::Logger logger_;
 };
 

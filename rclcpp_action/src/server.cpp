@@ -12,6 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <rcl_action/action_server.h>
+#include <rcl_action/wait.h>
+
+#include <action_msgs/msg/goal_status_array.hpp>
+#include <action_msgs/srv/cancel_goal.hpp>
+#include <rclcpp/exceptions.hpp>
+#include <rclcpp/scope_exit.hpp>
+#include <rclcpp_action/server.hpp>
+
 #include <memory>
 #include <mutex>
 #include <string>
@@ -19,16 +28,6 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-#include "rcl_action/action_server.h"
-#include "rcl_action/wait.h"
-
-#include "rcpputils/scope_exit.hpp"
-
-#include "action_msgs/msg/goal_status_array.hpp"
-#include "action_msgs/srv/cancel_goal.hpp"
-#include "rclcpp/exceptions.hpp"
-#include "rclcpp_action/server.hpp"
 
 using rclcpp_action::ServerBase;
 using rclcpp_action::GoalUUID;
@@ -132,7 +131,6 @@ ServerBase::ServerBase(
 
 ServerBase::~ServerBase()
 {
-  clear_on_ready_callback();
 }
 
 size_t
@@ -165,15 +163,13 @@ ServerBase::get_number_of_ready_guard_conditions()
   return pimpl_->num_guard_conditions_;
 }
 
-void
+bool
 ServerBase::add_to_wait_set(rcl_wait_set_t * wait_set)
 {
   std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
   rcl_ret_t ret = rcl_action_wait_set_add_action_server(
     wait_set, pimpl_->action_server_.get(), NULL);
-  if (RCL_RET_OK != ret) {
-    rclcpp::exceptions::throw_from_rcl_error(ret, "ServerBase::add_to_wait_set() failed");
-  }
+  return RCL_RET_OK == ret;
 }
 
 bool
@@ -266,25 +262,6 @@ ServerBase::take_data()
   } else {
     throw std::runtime_error("Taking data from action server but nothing is ready");
   }
-}
-
-std::shared_ptr<void>
-ServerBase::take_data_by_entity_id(size_t id)
-{
-  // Mark as ready the entity from which we want to take data
-  switch (static_cast<EntityType>(id)) {
-    case EntityType::GoalService:
-      pimpl_->goal_request_ready_ = true;
-      break;
-    case EntityType::ResultService:
-      pimpl_->result_request_ready_ = true;
-      break;
-    case EntityType::CancelService:
-      pimpl_->cancel_request_ready_ = true;
-      break;
-  }
-
-  return take_data();
 }
 
 void
@@ -417,7 +394,6 @@ ServerBase::execute_cancel_request_received(std::shared_ptr<void> & data)
   }
   auto request = std::get<1>(*shared_ptr);
   auto request_header = std::get<2>(*shared_ptr);
-  pimpl_->cancel_request_ready_ = false;
 
   // Convert c++ message to C message
   rcl_action_cancel_request_t cancel_request = rcl_action_get_zero_initialized_cancel_request();
@@ -440,7 +416,7 @@ ServerBase::execute_cancel_request_received(std::shared_ptr<void> & data)
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
 
-  RCPPUTILS_SCOPE_EXIT(
+  RCLCPP_SCOPE_EXIT(
   {
     ret = rcl_action_cancel_response_fini(&cancel_response);
     if (RCL_RET_OK != ret) {
@@ -605,7 +581,7 @@ ServerBase::publish_status()
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
 
-  RCPPUTILS_SCOPE_EXIT(
+  RCLCPP_SCOPE_EXIT(
   {
     ret = rcl_action_goal_status_array_fini(&c_status_array);
     if (RCL_RET_OK != ret) {
@@ -698,139 +674,4 @@ ServerBase::publish_feedback(std::shared_ptr<void> feedback_msg)
   if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret, "Failed to publish feedback");
   }
-}
-
-void
-ServerBase::set_on_ready_callback(std::function<void(size_t, int)> callback)
-{
-  if (!callback) {
-    throw std::invalid_argument(
-            "The callback passed to set_on_ready_callback "
-            "is not callable.");
-  }
-
-  set_callback_to_entity(EntityType::GoalService, callback);
-  set_callback_to_entity(EntityType::ResultService, callback);
-  set_callback_to_entity(EntityType::CancelService, callback);
-}
-
-void
-ServerBase::set_callback_to_entity(
-  EntityType entity_type,
-  std::function<void(size_t, int)> callback)
-{
-  // Note: we bind the int identifier argument to this waitable's entity types
-  auto new_callback =
-    [callback, entity_type, this](size_t number_of_events) {
-      try {
-        callback(number_of_events, static_cast<int>(entity_type));
-      } catch (const std::exception & exception) {
-        RCLCPP_ERROR_STREAM(
-          pimpl_->logger_,
-          "rclcpp_action::ServerBase@" << this <<
-            " caught " << rmw::impl::cpp::demangle(exception) <<
-            " exception in user-provided callback for the 'on ready' callback: " <<
-            exception.what());
-      } catch (...) {
-        RCLCPP_ERROR_STREAM(
-          pimpl_->logger_,
-          "rclcpp_action::ServerBase@" << this <<
-            " caught unhandled exception in user-provided callback " <<
-            "for the 'on ready' callback");
-      }
-    };
-
-
-  // Set it temporarily to the new callback, while we replace the old one.
-  // This two-step setting, prevents a gap where the old std::function has
-  // been replaced but the middleware hasn't been told about the new one yet.
-  set_on_ready_callback(
-    entity_type,
-    rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
-    static_cast<const void *>(&new_callback));
-
-  std::lock_guard<std::recursive_mutex> lock(listener_mutex_);
-  // Store the std::function to keep it in scope, also overwrites the existing one.
-  auto it = entity_type_to_on_ready_callback_.find(entity_type);
-
-  if (it != entity_type_to_on_ready_callback_.end()) {
-    it->second = new_callback;
-  } else {
-    entity_type_to_on_ready_callback_.emplace(entity_type, new_callback);
-  }
-
-  // Set it again, now using the permanent storage.
-  it = entity_type_to_on_ready_callback_.find(entity_type);
-
-  if (it != entity_type_to_on_ready_callback_.end()) {
-    auto & cb = it->second;
-    set_on_ready_callback(
-      entity_type,
-      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
-      static_cast<const void *>(&cb));
-  }
-
-  on_ready_callback_set_ = true;
-}
-
-void
-ServerBase::set_on_ready_callback(
-  EntityType entity_type,
-  rcl_event_callback_t callback,
-  const void * user_data)
-{
-  rcl_ret_t ret = RCL_RET_ERROR;
-
-  switch (entity_type) {
-    case EntityType::GoalService:
-      {
-        ret = rcl_action_server_set_goal_service_callback(
-          pimpl_->action_server_.get(),
-          callback,
-          user_data);
-        break;
-      }
-
-    case EntityType::ResultService:
-      {
-        ret = rcl_action_server_set_result_service_callback(
-          pimpl_->action_server_.get(),
-          callback,
-          user_data);
-        break;
-      }
-
-    case EntityType::CancelService:
-      {
-        ret = rcl_action_server_set_cancel_service_callback(
-          pimpl_->action_server_.get(),
-          callback,
-          user_data);
-        break;
-      }
-
-    default:
-      throw std::runtime_error("ServerBase::set_on_ready_callback: Unknown entity type.");
-      break;
-  }
-
-  if (RCL_RET_OK != ret) {
-    using rclcpp::exceptions::throw_from_rcl_error;
-    throw_from_rcl_error(ret, "failed to set the on ready callback for action client");
-  }
-}
-
-void
-ServerBase::clear_on_ready_callback()
-{
-  std::lock_guard<std::recursive_mutex> lock(listener_mutex_);
-
-  if (on_ready_callback_set_) {
-    set_on_ready_callback(EntityType::GoalService, nullptr, nullptr);
-    set_on_ready_callback(EntityType::ResultService, nullptr, nullptr);
-    set_on_ready_callback(EntityType::CancelService, nullptr, nullptr);
-    on_ready_callback_set_ = false;
-  }
-
-  entity_type_to_on_ready_callback_.clear();
 }

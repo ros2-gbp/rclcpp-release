@@ -19,34 +19,9 @@
 #include <string>
 #include <utility>
 
-// TODO(aprotyas): Figure out better way to suppress deprecation warnings.
-#define RCLCPP_AVOID_DEPRECATIONS_FOR_UNIT_TESTS 1
 #include "rclcpp/any_subscription_callback.hpp"
 #include "test_msgs/msg/empty.hpp"
 #include "test_msgs/msg/empty.h"
-
-// Type adapter to be used in tests.
-struct MyEmpty {};
-
-template<>
-struct rclcpp::TypeAdapter<MyEmpty, test_msgs::msg::Empty>
-{
-  using is_specialized = std::true_type;
-  using custom_type = MyEmpty;
-  using ros_message_type = test_msgs::msg::Empty;
-
-  static
-  void
-  convert_to_ros_message(const custom_type &, ros_message_type &)
-  {}
-
-  static
-  void
-  convert_to_custom(const ros_message_type &, custom_type &)
-  {}
-};
-
-using MyTA = rclcpp::TypeAdapter<MyEmpty, test_msgs::msg::Empty>;
 
 class TestAnySubscriptionCallback : public ::testing::Test
 {
@@ -66,23 +41,34 @@ protected:
   rclcpp::MessageInfo message_info_;
 };
 
-class TestAnySubscriptionCallbackTA : public ::testing::Test
+void construct_with_null_allocator()
 {
-public:
-  TestAnySubscriptionCallbackTA() {}
+// suppress deprecated function warning
+#if !defined(_WIN32)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#else  // !defined(_WIN32)
+# pragma warning(push)
+# pragma warning(disable: 4996)
+#endif
 
-  static
-  std::unique_ptr<MyEmpty>
-  get_unique_ptr_msg()
-  {
-    return std::make_unique<MyEmpty>();
-  }
+  // We need to wrap this in a function because `EXPECT_THROW` is a macro, and thinks
+  // that the comma in here splits macro arguments, not the template arguments.
+  rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty> any_subscription_callback(nullptr);
 
-protected:
-  rclcpp::AnySubscriptionCallback<MyEmpty> any_subscription_callback_;
-  std::shared_ptr<MyEmpty> msg_shared_ptr_{std::make_shared<MyEmpty>()};
-  rclcpp::MessageInfo message_info_;
-};
+// remove warning suppression
+#if !defined(_WIN32)
+# pragma GCC diagnostic pop
+#else  // !defined(_WIN32)
+# pragma warning(pop)
+#endif
+}
+
+TEST(AnySubscriptionCallback, null_allocator) {
+  EXPECT_THROW(
+    construct_with_null_allocator(),
+    std::runtime_error);
+}
 
 TEST_F(TestAnySubscriptionCallback, construct_destruct) {
   // Default constructor.
@@ -109,46 +95,44 @@ TEST_F(TestAnySubscriptionCallback, unset_dispatch_throw) {
 // Parameterized test to test across all callback types and dispatch types.
 //
 
-template<typename MessageT>
 class InstanceContextImpl
 {
 public:
   InstanceContextImpl() = default;
   virtual ~InstanceContextImpl() = default;
 
-  explicit InstanceContextImpl(rclcpp::AnySubscriptionCallback<MessageT> asc)
+  explicit InstanceContextImpl(rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty> asc)
   : any_subscription_callback_(asc)
   {}
 
   virtual
-  rclcpp::AnySubscriptionCallback<MessageT>
+  rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty>
   get_any_subscription_callback_to_test() const
   {
     return any_subscription_callback_;
   }
 
 protected:
-  rclcpp::AnySubscriptionCallback<MessageT> any_subscription_callback_;
+  rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty> any_subscription_callback_;
 };
 
-template<typename MessageT>
 class InstanceContext
 {
 public:
-  InstanceContext(const std::string & name, std::shared_ptr<InstanceContextImpl<MessageT>> impl)
+  InstanceContext(const std::string & name, std::shared_ptr<InstanceContextImpl> impl)
   : name(name), impl_(impl)
   {}
 
   InstanceContext(
     const std::string & name,
-    rclcpp::AnySubscriptionCallback<MessageT> asc)
-  : name(name), impl_(std::make_shared<InstanceContextImpl<MessageT>>(asc))
+    rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty> asc)
+  : name(name), impl_(std::make_shared<InstanceContextImpl>(asc))
   {}
 
   InstanceContext(const InstanceContext & other)
   : InstanceContext(other.name, other.impl_) {}
 
-  rclcpp::AnySubscriptionCallback<MessageT>
+  rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty>
   get_any_subscription_callback_to_test() const
   {
     return impl_->get_any_subscription_callback_to_test();
@@ -157,17 +141,12 @@ public:
   std::string name;
 
 protected:
-  std::shared_ptr<InstanceContextImpl<MessageT>> impl_;
+  std::shared_ptr<InstanceContextImpl> impl_;
 };
 
 class DispatchTests
   : public TestAnySubscriptionCallback,
-  public ::testing::WithParamInterface<InstanceContext<test_msgs::msg::Empty>>
-{};
-
-class DispatchTestsWithTA
-  : public TestAnySubscriptionCallbackTA,
-  public ::testing::WithParamInterface<InstanceContext<MyTA>>
+  public ::testing::WithParamInterface<InstanceContext>
 {};
 
 auto
@@ -176,75 +155,57 @@ format_parameter(const ::testing::TestParamInfo<DispatchTests::ParamType> & info
   return info.param.name;
 }
 
-auto
-format_parameter_with_ta(const ::testing::TestParamInfo<DispatchTestsWithTA::ParamType> & info)
-{
-  return info.param.name;
-}
-
-/* Testing dispatch with shared_ptr<MessageT> as input */
+// Testing dispatch with shared_ptr<MessageT> as input
 TEST_P(DispatchTests, test_inter_shared_dispatch) {
   auto any_subscription_callback_to_test = GetParam().get_any_subscription_callback_to_test();
   any_subscription_callback_to_test.dispatch(msg_shared_ptr_, message_info_);
 }
 
-/* Testing dispatch with shared_ptr<const MessageT> as input */
+// Testing dispatch with shared_ptr<const MessageT> as input
 TEST_P(DispatchTests, test_intra_shared_dispatch) {
   auto any_subscription_callback_to_test = GetParam().get_any_subscription_callback_to_test();
   any_subscription_callback_to_test.dispatch_intra_process(msg_shared_ptr_, message_info_);
 }
 
-/* Testing dispatch with unique_ptr<MessageT> as input */
+// Testing dispatch with unique_ptr<MessageT> as input
 TEST_P(DispatchTests, test_intra_unique_dispatch) {
   auto any_subscription_callback_to_test = GetParam().get_any_subscription_callback_to_test();
   any_subscription_callback_to_test.dispatch_intra_process(get_unique_ptr_msg(), message_info_);
 }
 
-/* Testing dispatch with shared_ptr<const MessageT> as input */
-TEST_P(DispatchTestsWithTA, test_intra_shared_dispatch) {
-  auto any_subscription_callback_to_test = GetParam().get_any_subscription_callback_to_test();
-  any_subscription_callback_to_test.dispatch_intra_process(msg_shared_ptr_, message_info_);
-}
-
-/* Testing dispatch with unique_ptr<MessageT> as input */
-TEST_P(DispatchTestsWithTA, test_intra_unique_dispatch) {
-  auto any_subscription_callback_to_test = GetParam().get_any_subscription_callback_to_test();
-  any_subscription_callback_to_test.dispatch_intra_process(get_unique_ptr_msg(), message_info_);
-}
-
 // Generic classes for testing callbacks using std::bind to class methods.
-template<typename MessageT, typename ... CallbackArgs>
-class BindContextImpl : public InstanceContextImpl<MessageT>
+template<typename ... CallbackArgs>
+class BindContextImpl : public InstanceContextImpl
 {
   static constexpr size_t number_of_callback_args{sizeof...(CallbackArgs)};
 
 public:
-  using InstanceContextImpl<MessageT>::InstanceContextImpl;
+  using InstanceContextImpl::InstanceContextImpl;
   virtual ~BindContextImpl() = default;
 
   void on_message(CallbackArgs ...) const {}
 
-  rclcpp::AnySubscriptionCallback<MessageT>
+  rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty>
   get_any_subscription_callback_to_test() const override
   {
     if constexpr (number_of_callback_args == 1) {
-      return rclcpp::AnySubscriptionCallback<MessageT>().set(
+      return rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty>().set(
         std::bind(&BindContextImpl::on_message, this, std::placeholders::_1)
       );
     } else {
-      return rclcpp::AnySubscriptionCallback<MessageT>().set(
+      return rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty>().set(
         std::bind(&BindContextImpl::on_message, this, std::placeholders::_1, std::placeholders::_2)
       );
     }
   }
 };
 
-template<typename MessageT, typename ... CallbackArgs>
-class BindContext : public InstanceContext<MessageT>
+template<typename ... CallbackArgs>
+class BindContext : public InstanceContext
 {
 public:
   explicit BindContext(const std::string & name)
-  : InstanceContext<MessageT>(name, std::make_shared<BindContextImpl<MessageT, CallbackArgs ...>>())
+  : InstanceContext(name, std::make_shared<BindContextImpl<CallbackArgs ...>>())
   {}
 };
 
@@ -271,51 +232,11 @@ INSTANTIATE_TEST_SUITE_P(
       rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty>().set(
         const_ref_w_info_free_func)},
     // bind function
-    BindContext<test_msgs::msg::Empty, const test_msgs::msg::Empty &>("bind_method"),
-    BindContext<test_msgs::msg::Empty, const test_msgs::msg::Empty &, const rclcpp::MessageInfo &>(
+    BindContext<const test_msgs::msg::Empty &>("bind_method"),
+    BindContext<const test_msgs::msg::Empty &, const rclcpp::MessageInfo &>(
       "bind_method_with_info")
   ),
   format_parameter
-);
-
-void const_ref_ta_free_func(const MyEmpty &) {}
-void const_ref_ta_w_info_free_func(const MyEmpty &, const rclcpp::MessageInfo &) {}
-
-INSTANTIATE_TEST_SUITE_P(
-  ConstRefTACallbackTests,
-  DispatchTestsWithTA,
-  ::testing::Values(
-    // lambda
-    InstanceContext<MyTA>{"lambda_ta", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](const MyEmpty &) {})},
-    InstanceContext<MyTA>{"lambda_ta_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](const MyEmpty &, const rclcpp::MessageInfo &) {})},
-    InstanceContext<MyTA>{"lambda", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](const test_msgs::msg::Empty &) {})},
-    InstanceContext<MyTA>{"lambda_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](const test_msgs::msg::Empty &, const rclcpp::MessageInfo &) {})},
-    // free function
-    InstanceContext<MyTA>{"free_function_ta", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        const_ref_ta_free_func)},
-    InstanceContext<MyTA>{"free_function_ta_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        const_ref_ta_w_info_free_func)},
-    InstanceContext<MyTA>{"free_function", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        const_ref_free_func)},
-    InstanceContext<MyTA>{"free_function_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        const_ref_w_info_free_func)},
-    // bind function
-    BindContext<MyTA, const MyEmpty &>("bind_method_ta"),
-    BindContext<MyTA, const MyEmpty &, const rclcpp::MessageInfo &>(
-      "bind_method_ta_with_info"),
-    BindContext<MyTA, const test_msgs::msg::Empty &>("bind_method"),
-    BindContext<MyTA, const test_msgs::msg::Empty &, const rclcpp::MessageInfo &>(
-      "bind_method_with_info")
-  ),
-  format_parameter_with_ta
 );
 
 //
@@ -343,54 +264,11 @@ INSTANTIATE_TEST_SUITE_P(
       rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty>().set(
         unique_ptr_w_info_free_func)},
     // bind function
-    BindContext<test_msgs::msg::Empty, std::unique_ptr<test_msgs::msg::Empty>>("bind_method"),
-    BindContext<
-      test_msgs::msg::Empty,
-      std::unique_ptr<test_msgs::msg::Empty>,
-      const rclcpp::MessageInfo &
-    >("bind_method_with_info")
-  ),
-  format_parameter
-);
-
-void unique_ptr_ta_free_func(std::unique_ptr<MyEmpty>) {}
-void unique_ptr_ta_w_info_free_func(std::unique_ptr<MyEmpty>, const rclcpp::MessageInfo &) {}
-
-INSTANTIATE_TEST_SUITE_P(
-  UniquePtrCallbackTests,
-  DispatchTestsWithTA,
-  ::testing::Values(
-    // lambda
-    InstanceContext<MyTA>{"lambda_ta", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::unique_ptr<MyEmpty>) {})},
-    InstanceContext<MyTA>{"lambda_ta_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::unique_ptr<MyEmpty>, const rclcpp::MessageInfo &) {})},
-    InstanceContext<MyTA>{"lambda", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::unique_ptr<test_msgs::msg::Empty>) {})},
-    InstanceContext<MyTA>{"lambda_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::unique_ptr<test_msgs::msg::Empty>, const rclcpp::MessageInfo &) {})},
-    // free function
-    InstanceContext<MyTA>{"free_function_ta", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        unique_ptr_ta_free_func)},
-    InstanceContext<MyTA>{"free_function_ta_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        unique_ptr_ta_w_info_free_func)},
-    InstanceContext<MyTA>{"free_function", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        unique_ptr_free_func)},
-    InstanceContext<MyTA>{"free_function_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        unique_ptr_w_info_free_func)},
-    // bind function
-    BindContext<MyTA, std::unique_ptr<test_msgs::msg::Empty>>("bind_method_ta"),
-    BindContext<MyTA, std::unique_ptr<test_msgs::msg::Empty>, const rclcpp::MessageInfo &>(
-      "bind_method_ta_with_info"),
-    BindContext<MyTA, std::unique_ptr<test_msgs::msg::Empty>>("bind_method"),
-    BindContext<MyTA, std::unique_ptr<test_msgs::msg::Empty>, const rclcpp::MessageInfo &>(
+    BindContext<std::unique_ptr<test_msgs::msg::Empty>>("bind_method"),
+    BindContext<std::unique_ptr<test_msgs::msg::Empty>, const rclcpp::MessageInfo &>(
       "bind_method_with_info")
   ),
-  format_parameter_with_ta
+  format_parameter
 );
 
 //
@@ -418,54 +296,11 @@ INSTANTIATE_TEST_SUITE_P(
       rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty>().set(
         shared_const_ptr_w_info_free_func)},
     // bind function
-    BindContext<test_msgs::msg::Empty, std::shared_ptr<const test_msgs::msg::Empty>>("bind_method"),
-    BindContext<test_msgs::msg::Empty, std::shared_ptr<const test_msgs::msg::Empty>,
-    const rclcpp::MessageInfo &>(
+    BindContext<std::shared_ptr<const test_msgs::msg::Empty>>("bind_method"),
+    BindContext<std::shared_ptr<const test_msgs::msg::Empty>, const rclcpp::MessageInfo &>(
       "bind_method_with_info")
   ),
   format_parameter
-);
-
-void shared_const_ptr_ta_free_func(std::shared_ptr<const MyEmpty>) {}
-void shared_const_ptr_ta_w_info_free_func(
-  std::shared_ptr<const MyEmpty>, const rclcpp::MessageInfo &)
-{}
-
-INSTANTIATE_TEST_SUITE_P(
-  SharedConstPtrCallbackTests,
-  DispatchTestsWithTA,
-  ::testing::Values(
-    // lambda
-    InstanceContext<MyTA>{"lambda_ta", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::shared_ptr<const MyEmpty>) {})},
-    InstanceContext<MyTA>{"lambda_ta_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::shared_ptr<const MyEmpty>, const rclcpp::MessageInfo &) {})},
-    InstanceContext<MyTA>{"lambda", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::shared_ptr<const test_msgs::msg::Empty>) {})},
-    InstanceContext<MyTA>{"lambda_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::shared_ptr<const test_msgs::msg::Empty>, const rclcpp::MessageInfo &) {})},
-    // free function
-    InstanceContext<MyTA>{"free_function_ta", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        shared_const_ptr_ta_free_func)},
-    InstanceContext<MyTA>{"free_function_ta_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        shared_const_ptr_ta_w_info_free_func)},
-    InstanceContext<MyTA>{"free_function", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        shared_const_ptr_free_func)},
-    InstanceContext<MyTA>{"free_function_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        shared_const_ptr_w_info_free_func)},
-    // bind function
-    BindContext<MyTA, std::shared_ptr<const MyEmpty>>("bind_method_ta"),
-    BindContext<MyTA, std::shared_ptr<const MyEmpty>, const rclcpp::MessageInfo &>(
-      "bind_method_ta_with_info"),
-    BindContext<MyTA, std::shared_ptr<const test_msgs::msg::Empty>>("bind_method"),
-    BindContext<MyTA, std::shared_ptr<const test_msgs::msg::Empty>, const rclcpp::MessageInfo &>(
-      "bind_method_with_info")
-  ),
-  format_parameter_with_ta
 );
 
 //
@@ -493,56 +328,11 @@ INSTANTIATE_TEST_SUITE_P(
       rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty>().set(
         const_ref_shared_const_ptr_w_info_free_func)},
     // bind function
-    BindContext<test_msgs::msg::Empty,
-    const std::shared_ptr<const test_msgs::msg::Empty> &>("bind_method"),
-    BindContext<test_msgs::msg::Empty, const std::shared_ptr<const test_msgs::msg::Empty> &,
-    const rclcpp::MessageInfo &>(
+    BindContext<const std::shared_ptr<const test_msgs::msg::Empty> &>("bind_method"),
+    BindContext<const std::shared_ptr<const test_msgs::msg::Empty> &, const rclcpp::MessageInfo &>(
       "bind_method_with_info")
   ),
   format_parameter
-);
-
-void const_ref_shared_const_ptr_ta_free_func(const std::shared_ptr<const MyEmpty> &) {}
-void const_ref_shared_const_ptr_ta_w_info_free_func(
-  const std::shared_ptr<const MyEmpty> &, const rclcpp::MessageInfo &)
-{}
-
-INSTANTIATE_TEST_SUITE_P(
-  ConstRefSharedConstPtrCallbackTests,
-  DispatchTestsWithTA,
-  ::testing::Values(
-    // lambda
-    InstanceContext<MyTA>{"lambda_ta", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](const std::shared_ptr<const MyEmpty> &) {})},
-    InstanceContext<MyTA>{"lambda_ta_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](const std::shared_ptr<const MyEmpty> &, const rclcpp::MessageInfo &) {})},
-    InstanceContext<MyTA>{"lambda", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](const std::shared_ptr<const test_msgs::msg::Empty> &) {})},
-    InstanceContext<MyTA>{"lambda_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](const std::shared_ptr<const test_msgs::msg::Empty> &, const rclcpp::MessageInfo &) {})},
-    // free function
-    InstanceContext<MyTA>{"free_function_ta", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        const_ref_shared_const_ptr_ta_free_func)},
-    InstanceContext<MyTA>{"free_function_ta_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        const_ref_shared_const_ptr_ta_w_info_free_func)},
-    InstanceContext<MyTA>{"free_function", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        const_ref_shared_const_ptr_free_func)},
-    InstanceContext<MyTA>{"free_function_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        const_ref_shared_const_ptr_w_info_free_func)},
-    // bind function
-    BindContext<MyTA, const std::shared_ptr<const MyEmpty> &>("bind_method_ta"),
-    BindContext<MyTA, const std::shared_ptr<const MyEmpty> &, const rclcpp::MessageInfo &>(
-      "bind_method_ta_with_info"),
-    BindContext<MyTA, const std::shared_ptr<const test_msgs::msg::Empty> &>("bind_method"),
-    BindContext<MyTA, const std::shared_ptr<const test_msgs::msg::Empty> &,
-    const rclcpp::MessageInfo &>(
-      "bind_method_with_info")
-  ),
-  format_parameter_with_ta
 );
 
 //
@@ -570,52 +360,9 @@ INSTANTIATE_TEST_SUITE_P(
       rclcpp::AnySubscriptionCallback<test_msgs::msg::Empty>().set(
         shared_ptr_w_info_free_func)},
     // bind function
-    BindContext<test_msgs::msg::Empty, std::shared_ptr<test_msgs::msg::Empty>>("bind_method"),
-    BindContext<test_msgs::msg::Empty, std::shared_ptr<test_msgs::msg::Empty>,
-    const rclcpp::MessageInfo &>(
+    BindContext<std::shared_ptr<test_msgs::msg::Empty>>("bind_method"),
+    BindContext<std::shared_ptr<test_msgs::msg::Empty>, const rclcpp::MessageInfo &>(
       "bind_method_with_info")
   ),
   format_parameter
-);
-
-void shared_ptr_ta_free_func(std::shared_ptr<MyEmpty>) {}
-void shared_ptr_ta_w_info_free_func(
-  std::shared_ptr<MyEmpty>, const rclcpp::MessageInfo &)
-{}
-
-INSTANTIATE_TEST_SUITE_P(
-  SharedPtrCallbackTests,
-  DispatchTestsWithTA,
-  ::testing::Values(
-    // lambda
-    InstanceContext<MyTA>{"lambda_ta", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::shared_ptr<MyEmpty>) {})},
-    InstanceContext<MyTA>{"lambda_ta_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::shared_ptr<MyEmpty>, const rclcpp::MessageInfo &) {})},
-    InstanceContext<MyTA>{"lambda", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::shared_ptr<test_msgs::msg::Empty>) {})},
-    InstanceContext<MyTA>{"lambda_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        [](std::shared_ptr<test_msgs::msg::Empty>, const rclcpp::MessageInfo &) {})},
-    // free function
-    InstanceContext<MyTA>{"free_function_ta", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        shared_ptr_ta_free_func)},
-    InstanceContext<MyTA>{"free_function_ta_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        shared_ptr_ta_w_info_free_func)},
-    InstanceContext<MyTA>{"free_function", rclcpp::AnySubscriptionCallback<MyTA>().set(
-        shared_ptr_free_func)},
-    InstanceContext<MyTA>{"free_function_with_info",
-      rclcpp::AnySubscriptionCallback<MyTA>().set(
-        shared_ptr_w_info_free_func)},
-    // bind function
-    BindContext<MyTA, std::shared_ptr<MyEmpty>>("bind_method_ta"),
-    BindContext<MyTA, std::shared_ptr<MyEmpty>, const rclcpp::MessageInfo &>(
-      "bind_method_ta_with_info"),
-    BindContext<MyTA, std::shared_ptr<test_msgs::msg::Empty>>("bind_method"),
-    BindContext<MyTA, std::shared_ptr<test_msgs::msg::Empty>, const rclcpp::MessageInfo &>(
-      "bind_method_with_info")
-  ),
-  format_parameter_with_ta
 );

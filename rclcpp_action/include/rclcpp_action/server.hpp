@@ -15,21 +15,20 @@
 #ifndef RCLCPP_ACTION__SERVER_HPP_
 #define RCLCPP_ACTION__SERVER_HPP_
 
+#include <rcl_action/action_server.h>
+#include <rosidl_runtime_c/action_type_support_struct.h>
+#include <rosidl_typesupport_cpp/action_type_support.hpp>
+#include <rclcpp/node_interfaces/node_base_interface.hpp>
+#include <rclcpp/node_interfaces/node_clock_interface.hpp>
+#include <rclcpp/node_interfaces/node_logging_interface.hpp>
+#include <rclcpp/waitable.hpp>
+
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
 #include <utility>
-
-#include "rcl/event_callback.h"
-#include "rcl_action/action_server.h"
-#include "rosidl_runtime_c/action_type_support_struct.h"
-#include "rosidl_typesupport_cpp/action_type_support.hpp"
-#include "rclcpp/node_interfaces/node_base_interface.hpp"
-#include "rclcpp/node_interfaces/node_clock_interface.hpp"
-#include "rclcpp/node_interfaces/node_logging_interface.hpp"
-#include "rclcpp/waitable.hpp"
 
 #include "rclcpp_action/visibility_control.hpp"
 #include "rclcpp_action/server_goal_handle.hpp"
@@ -71,14 +70,6 @@ enum class CancelResponse : int8_t
 class ServerBase : public rclcpp::Waitable
 {
 public:
-  /// Enum to identify entities belonging to the action server
-  enum class EntityType : std::size_t
-  {
-    GoalService,
-    ResultService,
-    CancelService,
-  };
-
   RCLCPP_ACTION_PUBLIC
   virtual ~ServerBase();
 
@@ -118,7 +109,7 @@ public:
   /// Add all entities to a wait set.
   /// \internal
   RCLCPP_ACTION_PUBLIC
-  void
+  bool
   add_to_wait_set(rcl_wait_set_t * wait_set) override;
 
   /// Return true if any entity belonging to the action server is ready to be executed.
@@ -131,48 +122,11 @@ public:
   std::shared_ptr<void>
   take_data() override;
 
-  RCLCPP_ACTION_PUBLIC
-  std::shared_ptr<void>
-  take_data_by_entity_id(size_t id) override;
-
   /// Act on entities in the wait set which are ready to be acted upon.
   /// \internal
   RCLCPP_ACTION_PUBLIC
   void
   execute(std::shared_ptr<void> & data) override;
-
-  /// \internal
-  /// Set a callback to be called when action server entities have an event
-  /**
-   * The callback receives a size_t which is the number of messages received
-   * since the last time this callback was called.
-   * Normally this is 1, but can be > 1 if messages were received before any
-   * callback was set.
-   *
-   * The callback also receives an int identifier argument, which identifies
-   * the action server entity which is ready.
-   * This implies that the provided callback can use the identifier to behave
-   * differently depending on which entity triggered the waitable to become ready.
-   *
-   * Calling it again will clear any previously set callback.
-   *
-   * An exception will be thrown if the callback is not callable.
-   *
-   * This function is thread-safe.
-   *
-   * If you want more information available in the callback, like the subscription
-   * or other information, you may use a lambda with captures or std::bind.
-   *
-   * \param[in] callback functor to be called when a new message is received.
-   */
-  RCLCPP_ACTION_PUBLIC
-  void
-  set_on_ready_callback(std::function<void(size_t, int)> callback) override;
-
-  /// Unset the callback to be called whenever the waitable becomes ready.
-  RCLCPP_ACTION_PUBLIC
-  void
-  clear_on_ready_callback() override;
 
   // End Waitables API
   // -----------------
@@ -302,29 +256,6 @@ private:
   /// Private implementation
   /// \internal
   std::unique_ptr<ServerBaseImpl> pimpl_;
-
-  /// Set a std::function callback to be called when the specified entity is ready
-  RCLCPP_ACTION_PUBLIC
-  void
-  set_callback_to_entity(
-    EntityType entity_type,
-    std::function<void(size_t, int)> callback);
-
-protected:
-  // Mutex to protect the callbacks storage.
-  std::recursive_mutex listener_mutex_;
-  // Storage for std::function callbacks to keep them in scope
-  std::unordered_map<EntityType, std::function<void(size_t)>> entity_type_to_on_ready_callback_;
-
-  /// Set a callback to be called when the specified entity is ready
-  RCLCPP_ACTION_PUBLIC
-  void
-  set_on_ready_callback(
-    EntityType entity_type,
-    rcl_event_callback_t callback,
-    const void * user_data);
-
-  bool on_ready_callback_set_{false};
 };
 
 /// Action Server

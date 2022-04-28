@@ -21,6 +21,7 @@
 
 #include "rclcpp/strategies/allocator_memory_strategy.hpp"
 #include "rclcpp/memory_strategy.hpp"
+#include "rclcpp/node_interfaces/node_base.hpp"
 #include "test_msgs/msg/empty.hpp"
 #include "test_msgs/srv/empty.hpp"
 
@@ -35,7 +36,7 @@ typedef std::map<rclcpp::CallbackGroup::WeakPtr,
 class TestWaitable : public rclcpp::Waitable
 {
 public:
-  void add_to_wait_set(rcl_wait_set_t *) override {}
+  bool add_to_wait_set(rcl_wait_set_t *) override {return true;}
   bool is_ready(rcl_wait_set_t *) override {return true;}
   std::shared_ptr<void> take_data() override {return nullptr;}
   void execute(std::shared_ptr<void> & data) override {(void)data;}
@@ -277,7 +278,8 @@ TEST_F(TestMemoryStrategy, get_node_by_group) {
   {
     auto node = std::make_shared<rclcpp::Node>("node", "ns");
     auto node_handle = node->get_node_base_interface();
-    node_handle->for_each_callback_group(
+    rclcpp::node_interfaces::global_for_each_callback_group(
+      node_handle.get(),
       [node_handle, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
       {
         weak_groups_to_nodes.insert(
@@ -307,8 +309,6 @@ TEST_F(TestMemoryStrategy, get_node_by_group) {
     EXPECT_EQ(
       node_handle,
       memory_strategy()->get_node_by_group(callback_group, weak_groups_to_nodes));
-    // Clear the handles to not hold NodeBase.
-    memory_strategy()->clear_handles();
   }  // Node goes out of scope
   // Callback group still exists, so lookup returns nullptr because node is destroyed.
   EXPECT_EQ(
@@ -365,9 +365,8 @@ TEST_F(TestMemoryStrategy, get_group_by_subscription) {
       callback_group,
       memory_strategy()->get_group_by_subscription(subscription, weak_groups_to_nodes));
   }  // Node goes out of scope
-  // NodeBase(SubscriptionBase->rcl_node_t->NodeBase) is still alive.
   EXPECT_EQ(
-    callback_group,
+    nullptr,
     memory_strategy()->get_group_by_subscription(subscription, weak_groups_to_nodes));
 }
 

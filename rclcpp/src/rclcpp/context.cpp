@@ -19,7 +19,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <unordered_set>
 #include <utility>
 
 #include "rcl/init.h"
@@ -31,6 +30,8 @@
 
 #include "rcutils/error_handling.h"
 #include "rcutils/macros.h"
+
+#include "rmw/impl/cpp/demangle.hpp"
 
 #include "./logging_mutex.hpp"
 
@@ -190,7 +191,7 @@ __delete_context(rcl_context_t * context)
 void
 Context::init(
   int argc,
-  char const * const * argv,
+  char const * const argv[],
   const rclcpp::InitOptions & init_options)
 {
   std::lock_guard<std::recursive_mutex> init_lock(init_mutex_);
@@ -306,15 +307,6 @@ Context::shutdown(const std::string & reason)
     // if it is not valid, then it cannot be shutdown
     return false;
   }
-
-  // call each pre-shutdown callback
-  {
-    std::lock_guard<std::mutex> lock{pre_shutdown_callbacks_mutex_};
-    for (const auto & callback : pre_shutdown_callbacks_) {
-      (*callback)();
-    }
-  }
-
   // rcl shutdown
   rcl_ret_t ret = rcl_shutdown(rcl_context_.get());
   if (RCL_RET_OK != ret) {
@@ -363,118 +355,36 @@ Context::on_shutdown(OnShutdownCallback callback)
 rclcpp::OnShutdownCallbackHandle
 Context::add_on_shutdown_callback(OnShutdownCallback callback)
 {
-  return add_shutdown_callback(ShutdownType::on_shutdown, callback);
-}
-
-bool
-Context::remove_on_shutdown_callback(const OnShutdownCallbackHandle & callback_handle)
-{
-  return remove_shutdown_callback(ShutdownType::on_shutdown, callback_handle);
-}
-
-rclcpp::PreShutdownCallbackHandle
-Context::add_pre_shutdown_callback(PreShutdownCallback callback)
-{
-  return add_shutdown_callback(ShutdownType::pre_shutdown, callback);
-}
-
-bool
-Context::remove_pre_shutdown_callback(
-  const PreShutdownCallbackHandle & callback_handle)
-{
-  return remove_shutdown_callback(ShutdownType::pre_shutdown, callback_handle);
-}
-
-rclcpp::ShutdownCallbackHandle
-Context::add_shutdown_callback(
-  ShutdownType shutdown_type,
-  ShutdownCallback callback)
-{
-  auto callback_shared_ptr =
-    std::make_shared<ShutdownCallbackHandle::ShutdownCallbackType>(callback);
-
-  switch (shutdown_type) {
-    case ShutdownType::pre_shutdown:
-      {
-        std::lock_guard<std::mutex> lock(pre_shutdown_callbacks_mutex_);
-        pre_shutdown_callbacks_.emplace(callback_shared_ptr);
-      }
-      break;
-    case ShutdownType::on_shutdown:
-      {
-        std::lock_guard<std::mutex> lock(on_shutdown_callbacks_mutex_);
-        on_shutdown_callbacks_.emplace(callback_shared_ptr);
-      }
-      break;
+  auto callback_shared_ptr = std::make_shared<OnShutdownCallback>(callback);
+  {
+    std::lock_guard<std::mutex> lock(on_shutdown_callbacks_mutex_);
+    on_shutdown_callbacks_.emplace(callback_shared_ptr);
   }
 
-  ShutdownCallbackHandle callback_handle;
+  OnShutdownCallbackHandle callback_handle;
   callback_handle.callback = callback_shared_ptr;
   return callback_handle;
 }
 
 bool
-Context::remove_shutdown_callback(
-  ShutdownType shutdown_type,
-  const ShutdownCallbackHandle & callback_handle)
+Context::remove_on_shutdown_callback(const OnShutdownCallbackHandle & callback_handle)
 {
-  std::mutex * mutex_ptr = nullptr;
-  std::unordered_set<
-    std::shared_ptr<ShutdownCallbackHandle::ShutdownCallbackType>> * callback_list_ptr;
-
-  switch (shutdown_type) {
-    case ShutdownType::pre_shutdown:
-      mutex_ptr = &pre_shutdown_callbacks_mutex_;
-      callback_list_ptr = &pre_shutdown_callbacks_;
-      break;
-    case ShutdownType::on_shutdown:
-      mutex_ptr = &on_shutdown_callbacks_mutex_;
-      callback_list_ptr = &on_shutdown_callbacks_;
-      break;
-  }
-
-  std::lock_guard<std::mutex> lock(*mutex_ptr);
+  std::lock_guard<std::mutex> lock(on_shutdown_callbacks_mutex_);
   auto callback_shared_ptr = callback_handle.callback.lock();
   if (callback_shared_ptr == nullptr) {
     return false;
   }
-  return callback_list_ptr->erase(callback_shared_ptr) == 1;
+  return on_shutdown_callbacks_.erase(callback_shared_ptr) == 1;
 }
 
 std::vector<rclcpp::Context::OnShutdownCallback>
 Context::get_on_shutdown_callbacks() const
 {
-  return get_shutdown_callback(ShutdownType::on_shutdown);
-}
+  std::vector<OnShutdownCallback> callbacks;
 
-std::vector<rclcpp::Context::PreShutdownCallback>
-Context::get_pre_shutdown_callbacks() const
-{
-  return get_shutdown_callback(ShutdownType::pre_shutdown);
-}
-
-std::vector<rclcpp::Context::ShutdownCallback>
-Context::get_shutdown_callback(ShutdownType shutdown_type) const
-{
-  std::mutex * mutex_ptr = nullptr;
-  const std::unordered_set<
-    std::shared_ptr<ShutdownCallbackHandle::ShutdownCallbackType>> * callback_list_ptr;
-
-  switch (shutdown_type) {
-    case ShutdownType::pre_shutdown:
-      mutex_ptr = &pre_shutdown_callbacks_mutex_;
-      callback_list_ptr = &pre_shutdown_callbacks_;
-      break;
-    case ShutdownType::on_shutdown:
-      mutex_ptr = &on_shutdown_callbacks_mutex_;
-      callback_list_ptr = &on_shutdown_callbacks_;
-      break;
-  }
-
-  std::vector<rclcpp::Context::ShutdownCallback> callbacks;
   {
-    std::lock_guard<std::mutex> lock(*mutex_ptr);
-    for (auto & iter : *callback_list_ptr) {
+    std::lock_guard<std::mutex> lock(on_shutdown_callbacks_mutex_);
+    for (auto & iter : on_shutdown_callbacks_) {
       callbacks.emplace_back(*iter);
     }
   }
@@ -492,15 +402,16 @@ bool
 Context::sleep_for(const std::chrono::nanoseconds & nanoseconds)
 {
   std::chrono::nanoseconds time_left = nanoseconds;
-  do {
-    {
-      std::unique_lock<std::mutex> lock(interrupt_mutex_);
-      auto start = std::chrono::steady_clock::now();
-      // this will release the lock while waiting
-      interrupt_condition_variable_.wait_for(lock, nanoseconds);
-      time_left -= std::chrono::steady_clock::now() - start;
-    }
-  } while (time_left > std::chrono::nanoseconds::zero() && this->is_valid());
+  {
+    std::unique_lock<std::mutex> lock(interrupt_mutex_);
+    auto start = std::chrono::steady_clock::now();
+    // this will release the lock while waiting
+    interrupt_condition_variable_.wait_for(lock, nanoseconds);
+    time_left -= std::chrono::steady_clock::now() - start;
+  }
+  if (time_left > std::chrono::nanoseconds::zero() && this->is_valid()) {
+    return sleep_for(time_left);
+  }
   // Return true if the timeout elapsed successfully, otherwise false.
   return this->is_valid();
 }

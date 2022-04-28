@@ -86,6 +86,7 @@ template<
   typename MessageT,
   typename CallbackT,
   typename AllocatorT,
+  typename CallbackMessageT,
   typename SubscriptionT,
   typename MessageMemoryStrategyT>
 std::shared_ptr<SubscriptionT>
@@ -220,16 +221,12 @@ Node::declare_parameter(
   // get advantage of parameter value template magic to get
   // the correct rclcpp::ParameterType from ParameterT
   rclcpp::ParameterValue value{ParameterT{}};
-  try {
-    return this->declare_parameter(
-      name,
-      value.get_type(),
-      parameter_descriptor,
-      ignore_override
-    ).get<ParameterT>();
-  } catch (const ParameterTypeException &) {
-    throw exceptions::UninitializedStaticallyTypedParameterException(name);
-  }
+  return this->declare_parameter(
+    name,
+    value.get_type(),
+    parameter_descriptor,
+    ignore_override
+  ).get<ParameterT>();
 }
 
 template<typename ParameterT>
@@ -311,17 +308,6 @@ Node::get_parameter_or(
     parameter = alternative_value;
   }
   return got_parameter;
-}
-
-template<typename ParameterT>
-ParameterT
-Node::get_parameter_or(
-  const std::string & name,
-  const ParameterT & alternative_value) const
-{
-  ParameterT parameter;
-  get_parameter_or(name, parameter, alternative_value);
-  return parameter;
 }
 
 // this is a partially-specialized version of get_parameter above,

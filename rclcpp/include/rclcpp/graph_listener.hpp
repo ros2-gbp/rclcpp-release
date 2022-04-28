@@ -24,7 +24,6 @@
 #include "rcl/guard_condition.h"
 #include "rcl/wait.h"
 #include "rclcpp/context.hpp"
-#include "rclcpp/guard_condition.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_graph_interface.hpp"
 #include "rclcpp/visibility_control.hpp"
@@ -188,7 +187,7 @@ private:
   mutable std::mutex node_graph_interfaces_mutex_;
   std::vector<rclcpp::node_interfaces::NodeGraphInterface *> node_graph_interfaces_;
 
-  rclcpp::GuardCondition interrupt_guard_condition_;
+  rcl_guard_condition_t interrupt_guard_condition_ = rcl_get_zero_initialized_guard_condition();
   rcl_wait_set_t wait_set_ = rcl_get_zero_initialized_wait_set();
 };
 

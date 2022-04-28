@@ -14,9 +14,6 @@
 
 #include <gtest/gtest.h>
 
-#include <chrono>
-#include <functional>
-#include <limits>
 #include <map>
 #include <memory>
 #include <string>
@@ -25,10 +22,10 @@
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/node.hpp"
+#include "rclcpp/scope_exit.hpp"
 #include "rclcpp/rclcpp.hpp"
 
 #include "rcpputils/filesystem_helper.hpp"
-#include "rcpputils/scope_exit.hpp"
 
 #include "rmw/validate_namespace.h"
 
@@ -97,37 +94,11 @@ TEST_F(TestNode, construction_and_destruction) {
   }
 }
 
-/*
-   Testing lifecycles of subscriptions and publishers after node dies
- */
-TEST_F(TestNode, pub_and_sub_lifecycles) {
-  using test_msgs::msg::Empty;
-  rclcpp::Publisher<Empty>::SharedPtr pub;
-  rclcpp::Subscription<Empty>::SharedPtr sub;
-  const auto callback = [](Empty::ConstSharedPtr) {};
-
-  {
-    // Create the node and context in a nested scope so that their
-    // std::shared_ptrs expire before we use pub and sub
-    auto context = std::make_shared<rclcpp::Context>();
-    context->init(0, nullptr);
-    rclcpp::NodeOptions options;
-    options.context(context);
-
-    const auto node = std::make_shared<rclcpp::Node>("my_node", "/ns", options);
-    pub = node->create_publisher<Empty>("topic", 10);
-    sub = node->create_subscription<Empty>("topic", 10, callback);
-  }
-
-  pub->publish(Empty());
-}
-
 TEST_F(TestNode, get_name_and_namespace) {
   {
     auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/ns", node->get_namespace());
-    EXPECT_STREQ("/ns", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/ns/my_node", node->get_fully_qualified_name());
   }
   {
@@ -142,35 +113,30 @@ TEST_F(TestNode, get_name_and_namespace) {
     auto node = std::make_shared<rclcpp::Node>("my_node", "ns");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/ns", node->get_namespace());
-    EXPECT_STREQ("/ns", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/ns/my_node", node->get_fully_qualified_name());
   }
   {
     auto node = std::make_shared<rclcpp::Node>("my_node");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/", node->get_namespace());
-    EXPECT_STREQ("/", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/my_node", node->get_fully_qualified_name());
   }
   {
     auto node = std::make_shared<rclcpp::Node>("my_node", "");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/", node->get_namespace());
-    EXPECT_STREQ("/", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/my_node", node->get_fully_qualified_name());
   }
   {
     auto node = std::make_shared<rclcpp::Node>("my_node", "/my/ns");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/my/ns", node->get_namespace());
-    EXPECT_STREQ("/my/ns", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/my/ns/my_node", node->get_fully_qualified_name());
   }
   {
     auto node = std::make_shared<rclcpp::Node>("my_node", "my/ns");
     EXPECT_STREQ("my_node", node->get_name());
     EXPECT_STREQ("/my/ns", node->get_namespace());
-    EXPECT_STREQ("/my/ns", node->get_effective_namespace().c_str());
     EXPECT_STREQ("/my/ns/my_node", node->get_fully_qualified_name());
   }
   {
@@ -309,13 +275,6 @@ TEST_F(TestNode, subnode_construction_and_destruction) {
       auto subnode = node->create_sub_node("~sub_ns");
     }, rclcpp::exceptions::InvalidNamespaceError);
   }
-  {
-    ASSERT_THROW(
-    {
-      auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
-      auto subnode = node->create_sub_node("");
-    }, rclcpp::exceptions::NameValidationError);
-  }
 }
 
 TEST_F(TestNode, get_logger) {
@@ -448,8 +407,7 @@ TEST_F(TestNode, declare_parameter_with_no_initial_values) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});   // always reset
     EXPECT_THROW(
       {node->declare_parameter<std::string>(name, "not an int");},
       rclcpp::exceptions::InvalidParameterValueException);
@@ -696,8 +654,7 @@ TEST_F(TestNode, declare_parameter_with_overrides) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
     EXPECT_THROW(
       {node->declare_parameter<int>(name, 43);},
       rclcpp::exceptions::InvalidParameterValueException);
@@ -714,12 +671,6 @@ TEST_F(TestNode, declare_parameter_with_overrides) {
       {node->declare_parameter(
           "parameter_type_mismatch", rclcpp::ParameterType::PARAMETER_INTEGER);},
       rclcpp::exceptions::InvalidParameterTypeException);
-  }
-  {
-    // statically typed parameter must be initialized
-    EXPECT_THROW(
-      {node->declare_parameter<std::string>("static_and_uninitialized");},
-      rclcpp::exceptions::UninitializedStaticallyTypedParameterException);
   }
   {
     // cannot pass an expected type and a descriptor with dynamic_typing=True
@@ -830,8 +781,7 @@ TEST_F(TestNode, declare_parameters_with_no_initial_values) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
     EXPECT_THROW(
       {node->declare_parameters<std::string>("", {{name, "not an int"}});},
       rclcpp::exceptions::InvalidParameterValueException);
@@ -1059,8 +1009,7 @@ TEST_F(TestNode, set_parameter_undeclared_parameters_not_allowed) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
 
     EXPECT_FALSE(node->set_parameter(rclcpp::Parameter(name, 43)).successful);
   }
@@ -1568,8 +1517,7 @@ TEST_F(TestNode, set_parameters_undeclared_parameters_not_allowed) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
 
     auto rets = node->set_parameters(
     {
@@ -1761,8 +1709,7 @@ TEST_F(TestNode, set_parameters_atomically_undeclared_parameters_not_allowed) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
 
     auto ret = node->set_parameters_atomically(
     {
@@ -1888,8 +1835,7 @@ TEST_F(TestNode, set_parameters_atomically_undeclared_parameters_allowed) {
         return result;
       };
     auto handler = node->add_on_set_parameters_callback(on_set_parameters);
-    RCPPUTILS_SCOPE_EXIT(
-      {node->remove_on_set_parameters_callback(handler.get());});  // always reset
+    RCLCPP_SCOPE_EXIT({node->remove_on_set_parameters_callback(handler.get());});    // always reset
 
     auto ret = node->set_parameters_atomically(
     {
@@ -2070,33 +2016,6 @@ TEST_F(TestNode, get_parameter_or_undeclared_parameters_allowed) {
     {
       int value;
       EXPECT_FALSE(node->get_parameter_or(name, value, 43));
-      EXPECT_EQ(value, 43);
-    }
-  }
-}
-
-// test get_parameter_or with return value
-TEST_F(TestNode, get_parameter_or_with_return_value) {
-  auto node = std::make_shared<rclcpp::Node>(
-    "test_get_parameter_or_node"_unq);
-  {
-    // normal use (declare first) still works
-    auto name = "parameter"_unq;
-
-    node->declare_parameter(name, 42);
-    EXPECT_TRUE(node->has_parameter(name));
-
-    {
-      const int value = node->get_parameter_or(name, 43);
-      EXPECT_EQ(value, 42);
-    }
-  }
-  {
-    // normal use, no declare first
-    auto name = "parameter"_unq;
-
-    {
-      const int value = node->get_parameter_or(name, 43);
       EXPECT_EQ(value, 43);
     }
   }
@@ -2594,216 +2513,6 @@ TEST_F(TestNode, get_parameter_types_undeclared_parameters_allowed) {
   }
 }
 
-// test declare parameter with int, int64_t, float and double vector
-TEST_F(TestNode, declare_parameter_with_vector) {
-  auto node = std::make_shared<rclcpp::Node>(
-    "test_declare_parameter_with_vector"_unq,
-    rclcpp::NodeOptions().allow_undeclared_parameters(true));
-  {
-    // declare parameter and then get types to check
-    auto name1 = "parameter"_unq;
-    auto name2 = "parameter"_unq;
-    auto name3 = "parameter"_unq;
-    auto name4 = "parameter"_unq;
-
-    node->declare_parameter(name1, std::vector<int>{});
-    node->declare_parameter(name2, std::vector<int64_t>{});
-    node->declare_parameter(name3, std::vector<float>{});
-    node->declare_parameter(name4, std::vector<double>{});
-
-    EXPECT_TRUE(node->has_parameter(name1));
-    EXPECT_TRUE(node->has_parameter(name2));
-    EXPECT_TRUE(node->has_parameter(name3));
-    EXPECT_TRUE(node->has_parameter(name4));
-
-    auto results = node->get_parameter_types({name1, name2, name3, name4});
-    EXPECT_EQ(results.size(), 4u);
-    EXPECT_EQ(results[0], rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER_ARRAY);
-    EXPECT_EQ(results[1], rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER_ARRAY);
-    EXPECT_EQ(results[2], rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE_ARRAY);
-    EXPECT_EQ(results[3], rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE_ARRAY);
-  }
-  {
-    // declare parameter and then get values to check
-    auto name1 = "parameter"_unq;
-    auto name2 = "parameter"_unq;
-    auto name3 = "parameter"_unq;
-    auto name4 = "parameter"_unq;
-
-    int64_t bigger_than_int = INT64_MAX - 42;
-    double bigger_than_float = std::numeric_limits<double>::max() - 42;
-    node->declare_parameter(name1, std::vector<int>{1, 2});
-    node->declare_parameter(name2, std::vector<int64_t>{3, bigger_than_int});
-    node->declare_parameter(name3, std::vector<float>{1.5f, 2.8f});
-    node->declare_parameter(name4, std::vector<double>{3.0, bigger_than_float});
-
-    std::vector<rclcpp::Parameter> expected = {
-      {name1, std::vector<int>{1, 2}},
-      {name2, std::vector<int64_t>{3, bigger_than_int}},
-      {name3, std::vector<float>{1.5f, 2.8f}},
-      {name4, std::vector<double>{3.0, bigger_than_float}},
-    };
-    EXPECT_EQ(node->get_parameters({name1, name2, name3, name4}), expected);
-  }
-}
-
-// test non-array data types for declare parameter function templates that are explicitly defined
-TEST_F(TestNode, declare_parameter_allowed_simple_types_function_templates) {
-  auto node = std::make_shared<rclcpp::Node>(
-    "test_declare_parameter_allowed_simple_types_function_templates"_unq);
-  {
-    // declare parameter and then get types to check
-    auto name1 = "parameter"_unq;
-    auto name2 = "parameter"_unq;
-    auto name3 = "parameter"_unq;
-    auto name4 = "parameter"_unq;
-    auto name5 = "parameter"_unq;
-    auto name6 = "parameter"_unq;
-    auto name7 = "parameter"_unq;
-
-    node->declare_parameter<bool>(name1, false);
-    node->declare_parameter<int>(name2, 1234);
-    node->declare_parameter<int64_t>(name3, 12340);
-    node->declare_parameter<float>(name4, static_cast<float>(12.34));
-    node->declare_parameter<double>(name5, 12.34);  // called float64 in ros2 design parameters page
-    node->declare_parameter<std::string>(name6, "test string");
-    auto str = "test param";
-    node->declare_parameter<const char *>(name7, str);
-
-    EXPECT_TRUE(node->has_parameter(name1));
-    EXPECT_TRUE(node->has_parameter(name2));
-    EXPECT_TRUE(node->has_parameter(name3));
-    EXPECT_TRUE(node->has_parameter(name4));
-    EXPECT_TRUE(node->has_parameter(name5));
-    EXPECT_TRUE(node->has_parameter(name6));
-    EXPECT_TRUE(node->has_parameter(name7));
-
-    auto results = node->get_parameter_types({name1, name2, name3, name4, name5, name6, name7});
-    EXPECT_EQ(results.size(), 7u);
-    EXPECT_EQ(results[0], rcl_interfaces::msg::ParameterType::PARAMETER_BOOL);
-    EXPECT_EQ(results[1], rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER);
-    EXPECT_EQ(results[2], rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER);
-    EXPECT_EQ(results[3], rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE);
-    EXPECT_EQ(results[4], rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE);
-    EXPECT_EQ(results[5], rcl_interfaces::msg::ParameterType::PARAMETER_STRING);
-    EXPECT_EQ(results[6], rcl_interfaces::msg::ParameterType::PARAMETER_STRING);
-  }
-  {
-    // declare parameter and then get values to check
-    auto name1 = "parameter"_unq;
-    auto name2 = "parameter"_unq;
-    auto name3 = "parameter"_unq;
-    auto name4 = "parameter"_unq;
-    auto name5 = "parameter"_unq;
-    auto name6 = "parameter"_unq;
-    auto name7 = "parameter"_unq;
-
-    node->declare_parameter<bool>(name1, false);
-    node->declare_parameter<int>(name2, 4321);
-    node->declare_parameter<int64_t>(name3, 43210);
-    node->declare_parameter<float>(name4, static_cast<float>(43.21));
-    node->declare_parameter<double>(name5, 12.34);  // called float64 in ros2 design parameters page
-    node->declare_parameter<std::string>(name6, "test string");
-    auto str = "test param";
-    node->declare_parameter<const char *>(name7, str);
-
-    std::vector<rclcpp::Parameter> expected = {
-      {name1, false},
-      {name2, 4321},
-      {name3, 43210},
-      {name4, static_cast<float>(43.21)},
-      {name5, 12.34},
-      {name6, "test string"},
-      {name7, str}
-    };
-    EXPECT_EQ(node->get_parameters({name1, name2, name3, name4, name5, name6, name7}), expected);
-  }
-}
-
-// test array data types for declare parameter function templates that are explicitly defined
-TEST_F(TestNode, declare_parameter_allowed_array_types_function_templates) {
-  auto node = std::make_shared<rclcpp::Node>(
-    "test_declare_parameter_allowed_array_types_function_templates"_unq);
-  {
-    // declare parameter and then get types to check
-    auto name1 = "parameter"_unq;
-    auto name2 = "parameter"_unq;
-    auto name3 = "parameter"_unq;
-    auto name4 = "parameter"_unq;
-    auto name5 = "parameter"_unq;
-    auto name6 = "parameter"_unq;
-    auto name7 = "parameter"_unq;
-
-    node->declare_parameter<std::vector<uint8_t>>(name1, std::vector<uint8_t>{3, 4, 5, 7, 9});
-    node->declare_parameter<std::vector<bool>>(name2, std::vector<bool>{false, true});
-    node->declare_parameter<std::vector<int>>(name3, std::vector<int>{1234, 2345});
-    node->declare_parameter<std::vector<int64_t>>(name4, std::vector<int64_t>{12340, 9876});
-    node->declare_parameter<std::vector<float>>(
-      name5, std::vector<float>{static_cast<float>(12.34),
-        static_cast<float>(98.78)});
-    node->declare_parameter<std::vector<double>>(
-      name6,
-      std::vector<double>{12.34, 55.66});  // called float64 in ros2 design parameters page
-    node->declare_parameter<std::vector<std::string>>(
-      name7, std::vector<std::string>{"test string",
-        "another test str"});
-
-    EXPECT_TRUE(node->has_parameter(name1));
-    EXPECT_TRUE(node->has_parameter(name2));
-    EXPECT_TRUE(node->has_parameter(name3));
-    EXPECT_TRUE(node->has_parameter(name4));
-    EXPECT_TRUE(node->has_parameter(name5));
-    EXPECT_TRUE(node->has_parameter(name6));
-    EXPECT_TRUE(node->has_parameter(name7));
-
-    auto results = node->get_parameter_types({name1, name2, name3, name4, name5, name6, name7});
-    EXPECT_EQ(results.size(), 7u);
-    EXPECT_EQ(results[0], rcl_interfaces::msg::ParameterType::PARAMETER_BYTE_ARRAY);
-    EXPECT_EQ(results[1], rcl_interfaces::msg::ParameterType::PARAMETER_BOOL_ARRAY);
-    EXPECT_EQ(results[2], rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER_ARRAY);
-    EXPECT_EQ(results[3], rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER_ARRAY);
-    EXPECT_EQ(results[4], rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE_ARRAY);
-    EXPECT_EQ(results[5], rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE_ARRAY);
-    EXPECT_EQ(results[6], rcl_interfaces::msg::ParameterType::PARAMETER_STRING_ARRAY);
-  }
-  {
-    // declare parameter and then get values to check
-    auto name1 = "parameter"_unq;
-    auto name2 = "parameter"_unq;
-    auto name3 = "parameter"_unq;
-    auto name4 = "parameter"_unq;
-    auto name5 = "parameter"_unq;
-    auto name6 = "parameter"_unq;
-    auto name7 = "parameter"_unq;
-
-    std::vector<uint8_t> byte_arr = {0xD, 0xE, 0xA, 0xD};
-    node->declare_parameter<std::vector<uint8_t>>(name1, byte_arr);
-    node->declare_parameter<std::vector<bool>>(name2, std::vector<bool>{true, false, true});
-    node->declare_parameter<std::vector<int>>(name3, std::vector<int>{22, 33, 55, 77});
-    node->declare_parameter<std::vector<int64_t>>(name4, std::vector<int64_t>{456, 765});
-    node->declare_parameter<std::vector<float>>(
-      name5, std::vector<float>{static_cast<float>(99.11),
-        static_cast<float>(11.99)});
-    node->declare_parameter<std::vector<double>>(
-      name6,
-      std::vector<double>{12.21, 55.55, 98.89});  // called float64 in ros2 design parameters page
-    node->declare_parameter<std::vector<std::string>>(
-      name7, std::vector<std::string>{"ros2",
-        "colcon", "ignition"});
-
-    std::vector<rclcpp::Parameter> expected = {
-      {name1, std::vector<uint8_t>{0xD, 0xE, 0xA, 0xD}},
-      {name2, std::vector<bool>{true, false, true}},
-      {name3, std::vector<int>{22, 33, 55, 77}},
-      {name4, std::vector<int64_t>{456, 765}},
-      {name5, std::vector<float>{static_cast<float>(99.11), static_cast<float>(11.99)}},
-      {name6, std::vector<double>{12.21, 55.55, 98.89}},
-      {name7, std::vector<std::string>{"ros2", "colcon", "ignition"}}
-    };
-    EXPECT_EQ(node->get_parameters({name1, name2, name3, name4, name5, name6, name7}), expected);
-  }
-}
-
 void expect_qos_profile_eq(
   const rmw_qos_profile_t & qos1, const rmw_qos_profile_t & qos2, bool is_publisher)
 {
@@ -2820,34 +2529,6 @@ void expect_qos_profile_eq(
   EXPECT_EQ(qos1.liveliness_lease_duration.sec, qos2.liveliness_lease_duration.sec);
   EXPECT_EQ(qos1.liveliness_lease_duration.nsec, qos2.liveliness_lease_duration.nsec);
 }
-
-namespace
-{
-
-constexpr std::chrono::nanoseconds DEFAULT_EVENT_TIMEOUT = std::chrono::seconds(3);
-
-constexpr std::chrono::nanoseconds DEFAULT_EVENT_SLEEP_PERIOD = std::chrono::milliseconds(100);
-
-bool wait_for_event(
-  std::shared_ptr<rclcpp::Node> node,
-  std::function<bool()> predicate,
-  std::chrono::nanoseconds timeout = DEFAULT_EVENT_TIMEOUT,
-  std::chrono::nanoseconds sleep_period = DEFAULT_EVENT_SLEEP_PERIOD)
-{
-  auto start = std::chrono::steady_clock::now();
-  std::chrono::nanoseconds time_slept(0);
-
-  bool predicate_result;
-  while (!(predicate_result = predicate()) && time_slept < timeout) {
-    rclcpp::Event::SharedPtr graph_event = node->get_graph_event();
-    node->wait_for_graph_change(graph_event, sleep_period);
-    time_slept = std::chrono::duration_cast<std::chrono::nanoseconds>(
-      std::chrono::steady_clock::now() - start);
-  }
-  return predicate_result;
-}
-
-}  // namespace
 
 // test that calling get_publishers_info_by_topic and get_subscriptions_info_by_topic
 TEST_F(TestNode, get_publishers_subscriptions_info_by_topic) {
@@ -2880,10 +2561,6 @@ TEST_F(TestNode, get_publishers_subscriptions_info_by_topic) {
   };
   rclcpp::QoS qos = rclcpp::QoS(qos_initialization, rmw_qos_profile_default);
   auto publisher = node->create_publisher<test_msgs::msg::BasicTypes>(topic_name, qos);
-  // Wait for the underlying RMW implementation to catch up with graph changes
-  auto topic_is_published =
-    [&]() {return node->get_publishers_info_by_topic(fq_topic_name).size() > 0u;};
-  ASSERT_TRUE(wait_for_event(node, topic_is_published));
   // List should have one item
   auto publisher_list = node->get_publishers_info_by_topic(fq_topic_name);
   ASSERT_EQ(publisher_list.size(), (size_t)1);
@@ -2924,10 +2601,7 @@ TEST_F(TestNode, get_publishers_subscriptions_info_by_topic) {
     };
   auto subscriber =
     node->create_subscription<test_msgs::msg::BasicTypes>(topic_name, qos2, callback);
-  // Wait for the underlying RMW implementation to catch up with graph changes
-  auto topic_is_subscribed =
-    [&]() {return node->get_subscriptions_info_by_topic(fq_topic_name).size() > 0u;};
-  ASSERT_TRUE(wait_for_event(node, topic_is_subscribed));
+
   // Both lists should have one item
   publisher_list = node->get_publishers_info_by_topic(fq_topic_name);
   auto subscription_list = node->get_subscriptions_info_by_topic(fq_topic_name);
@@ -3137,5 +2811,21 @@ TEST_F(TestNode, static_and_dynamic_typing) {
       node->declare_parameter(
         "uninitialized_not_valid_except_dynamic_typing", rclcpp::ParameterValue{}),
       rclcpp::exceptions::InvalidParameterTypeException);
+  }
+  {
+#ifndef _WIN32
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#else
+# pragma warning(push)
+# pragma warning(disable: 4996)
+#endif
+    auto param = node->declare_parameter("deprecated_way_dynamic_typing");
+    EXPECT_EQ(param, rclcpp::ParameterValue{});
+#ifndef _WIN32
+# pragma GCC diagnostic pop
+#else
+# pragma warning(pop)
+#endif
   }
 }

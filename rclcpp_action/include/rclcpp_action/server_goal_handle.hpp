@@ -15,14 +15,14 @@
 #ifndef RCLCPP_ACTION__SERVER_GOAL_HANDLE_HPP_
 #define RCLCPP_ACTION__SERVER_GOAL_HANDLE_HPP_
 
+#include <rcl_action/types.h>
+#include <rcl_action/goal_handle.h>
+
+#include <action_msgs/msg/goal_status.hpp>
+
 #include <functional>
 #include <memory>
 #include <mutex>
-
-#include "rcl_action/types.h"
-#include "rcl_action/goal_handle.h"
-
-#include "action_msgs/msg/goal_status.hpp"
 
 #include "rclcpp_action/visibility_control.hpp"
 #include "rclcpp_action/types.hpp"
@@ -273,7 +273,7 @@ protected:
   /// A unique id for the goal request.
   const GoalUUID uuid_;
 
-  friend class Server<ActionT>;
+  friend Server<ActionT>;
 
   std::function<void(const GoalUUID &, std::shared_ptr<void>)> on_terminal_state_;
   std::function<void(const GoalUUID &)> on_executing_;

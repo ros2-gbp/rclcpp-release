@@ -19,10 +19,10 @@
 #include <memory>
 #include <vector>
 
-#include "rcpputils/scope_exit.hpp"
-
 #include "rclcpp/utilities.hpp"
+#include "rclcpp/scope_exit.hpp"
 
+using rclcpp::detail::MutexTwoPriorities;
 using rclcpp::executors::MultiThreadedExecutor;
 
 MultiThreadedExecutor::MultiThreadedExecutor(
@@ -48,11 +48,12 @@ MultiThreadedExecutor::spin()
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
+  RCLCPP_SCOPE_EXIT(this->spinning.store(false); );
   std::vector<std::thread> threads;
   size_t thread_id = 0;
   {
-    std::lock_guard wait_lock{wait_mutex_};
+    auto low_priority_wait_mutex = wait_mutex_.get_low_priority_lockable();
+    std::lock_guard<MutexTwoPriorities::LowPriorityLockable> wait_lock(low_priority_wait_mutex);
     for (; thread_id < number_of_threads_ - 1; ++thread_id) {
       auto func = std::bind(&MultiThreadedExecutor::run, this, thread_id);
       threads.emplace_back(func);
@@ -72,18 +73,30 @@ MultiThreadedExecutor::get_number_of_threads()
 }
 
 void
-MultiThreadedExecutor::run(size_t this_thread_number)
+MultiThreadedExecutor::run(size_t)
 {
-  (void)this_thread_number;
   while (rclcpp::ok(this->context_) && spinning.load()) {
     rclcpp::AnyExecutable any_exec;
     {
-      std::lock_guard wait_lock{wait_mutex_};
+      auto low_priority_wait_mutex = wait_mutex_.get_low_priority_lockable();
+      std::lock_guard<MutexTwoPriorities::LowPriorityLockable> wait_lock(low_priority_wait_mutex);
       if (!rclcpp::ok(this->context_) || !spinning.load()) {
         return;
       }
       if (!get_next_executable(any_exec, next_exec_timeout_)) {
         continue;
+      }
+      if (any_exec.timer) {
+        // Guard against multiple threads getting the same timer.
+        if (scheduled_timers_.count(any_exec.timer) != 0) {
+          // Make sure that any_exec's callback group is reset before
+          // the lock is released.
+          if (any_exec.callback_group) {
+            any_exec.callback_group->can_be_taken_from().store(true);
+          }
+          continue;
+        }
+        scheduled_timers_.insert(any_exec.timer);
       }
     }
     if (yield_before_execute_) {
@@ -92,6 +105,14 @@ MultiThreadedExecutor::run(size_t this_thread_number)
 
     execute_any_executable(any_exec);
 
+    if (any_exec.timer) {
+      auto high_priority_wait_mutex = wait_mutex_.get_high_priority_lockable();
+      std::lock_guard<MutexTwoPriorities::HighPriorityLockable> wait_lock(high_priority_wait_mutex);
+      auto it = scheduled_timers_.find(any_exec.timer);
+      if (it != scheduled_timers_.end()) {
+        scheduled_timers_.erase(it);
+      }
+    }
     // Clear the callback_group to prevent the AnyExecutable destructor from
     // resetting the callback group `can_be_taken_from`
     any_exec.callback_group.reset();

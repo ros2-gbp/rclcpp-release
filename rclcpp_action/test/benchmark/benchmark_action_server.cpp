@@ -67,7 +67,6 @@ BENCHMARK_F(ActionServerPerformanceTest, construct_server_without_client)(benchm
 {
   constexpr char action_name[] = "no_corresponding_client";
   for (auto _ : state) {
-    (void)_;
     auto action_server = rclcpp_action::create_server<Fibonacci>(
       node, action_name,
       [](const GoalUUID &, std::shared_ptr<const Fibonacci::Goal>) {
@@ -89,7 +88,6 @@ BENCHMARK_F(ActionServerPerformanceTest, construct_server_without_client)(benchm
 BENCHMARK_F(ActionServerPerformanceTest, construct_server_with_client)(benchmark::State & state)
 {
   for (auto _ : state) {
-    (void)_;
     auto action_server = rclcpp_action::create_server<Fibonacci>(
       node, fibonacci_action_name,
       [](const GoalUUID &, std::shared_ptr<const Fibonacci::Goal>) {
@@ -111,7 +109,6 @@ BENCHMARK_F(ActionServerPerformanceTest, construct_server_with_client)(benchmark
 BENCHMARK_F(ActionServerPerformanceTest, destroy_server)(benchmark::State & state)
 {
   for (auto _ : state) {
-    (void)_;
     state.PauseTiming();
     auto action_server = rclcpp_action::create_server<Fibonacci>(
       node, fibonacci_action_name,
@@ -147,7 +144,6 @@ BENCHMARK_F(ActionServerPerformanceTest, action_server_accept_goal)(benchmark::S
 
   reset_heap_counters();
   for (auto _ : state) {
-    (void)_;
     state.PauseTiming();
     auto client_goal_handle_future = AsyncSendGoalOfOrder(1);
     state.ResumeTiming();
@@ -180,7 +176,6 @@ BENCHMARK_F(ActionServerPerformanceTest, action_server_cancel_goal)(benchmark::S
 
   reset_heap_counters();
   for (auto _ : state) {
-    (void)_;
     state.PauseTiming();
     auto client_goal_handle_future = AsyncSendGoalOfOrder(1);
     // This spin completes when the goal has been accepted, but not executed because server
@@ -217,7 +212,6 @@ BENCHMARK_F(ActionServerPerformanceTest, action_server_execute_goal)(benchmark::
 
   reset_heap_counters();
   for (auto _ : state) {
-    (void)_;
     state.PauseTiming();
     auto client_goal_handle_future = AsyncSendGoalOfOrder(1);
 
@@ -263,7 +257,6 @@ BENCHMARK_F(ActionServerPerformanceTest, action_server_set_success)(benchmark::S
 
   reset_heap_counters();
   for (auto _ : state) {
-    (void)_;
     state.PauseTiming();
     auto client_goal_handle_future = AsyncSendGoalOfOrder(goal_order);
 
@@ -308,7 +301,6 @@ BENCHMARK_F(ActionServerPerformanceTest, action_server_abort)(benchmark::State &
 
   reset_heap_counters();
   for (auto _ : state) {
-    (void)_;
     state.PauseTiming();
     auto client_goal_handle_future = AsyncSendGoalOfOrder(goal_order);
 

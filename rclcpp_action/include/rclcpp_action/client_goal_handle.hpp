@@ -15,16 +15,16 @@
 #ifndef RCLCPP_ACTION__CLIENT_GOAL_HANDLE_HPP_
 #define RCLCPP_ACTION__CLIENT_GOAL_HANDLE_HPP_
 
+#include <rcl_action/action_client.h>
+
+#include <action_msgs/msg/goal_status.hpp>
+#include <rclcpp/macros.hpp>
+#include <rclcpp/time.hpp>
+
 #include <functional>
 #include <future>
 #include <memory>
 #include <mutex>
-
-#include "rcl_action/action_client.h"
-
-#include "action_msgs/msg/goal_status.hpp"
-#include "rclcpp/macros.hpp"
-#include "rclcpp/time.hpp"
 
 #include "rclcpp_action/exceptions.hpp"
 #include "rclcpp_action/types.hpp"
@@ -62,7 +62,7 @@ public:
   RCLCPP_SMART_PTR_DEFINITIONS_NOT_COPYABLE(ClientGoalHandle)
 
   // A wrapper that defines the result of an action
-  struct WrappedResult
+  typedef struct WrappedResult
   {
     /// The unique identifier of the goal
     GoalUUID goal_id;
@@ -70,7 +70,7 @@ public:
     ResultCode code;
     /// User defined fields sent back with an action
     typename ActionT::Result::SharedPtr result;
-  };
+  } WrappedResult;
 
   using Feedback = typename ActionT::Feedback;
   using Result = typename ActionT::Result;
@@ -104,7 +104,7 @@ public:
 
 private:
   // The templated Client creates goal handles
-  friend class Client<ActionT>;
+  friend Client<ActionT>;
 
   ClientGoalHandle(
     const GoalInfo & info,

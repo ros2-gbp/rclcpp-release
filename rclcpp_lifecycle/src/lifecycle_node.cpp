@@ -183,6 +183,24 @@ LifecycleNode::declare_parameter(
 }
 
 const rclcpp::ParameterValue &
+LifecycleNode::declare_parameter(const std::string & name)
+{
+#ifndef _WIN32
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#else
+# pragma warning(push)
+# pragma warning(disable: 4996)
+#endif
+  return this->node_parameters_->declare_parameter(name);
+#ifndef _WIN32
+# pragma GCC diagnostic pop
+#else
+# pragma warning(pop)
+#endif
+}
+
+const rclcpp::ParameterValue &
 LifecycleNode::declare_parameter(
   const std::string & name,
   rclcpp::ParameterType type,
@@ -347,11 +365,10 @@ LifecycleNode::get_subscriptions_info_by_topic(const std::string & topic_name, b
   return node_graph_->get_subscriptions_info_by_topic(topic_name, no_mangle);
 }
 
-void
-LifecycleNode::for_each_callback_group(
-  const rclcpp::node_interfaces::NodeBaseInterface::CallbackGroupFunction & func)
+const std::vector<rclcpp::CallbackGroup::WeakPtr> &
+LifecycleNode::get_callback_groups() const
 {
-  node_base_->for_each_callback_group(func);
+  return node_base_->get_callback_groups();
 }
 
 rclcpp::Event::SharedPtr
@@ -621,31 +638,24 @@ LifecycleNode::shutdown(LifecycleNodeInterface::CallbackReturn & cb_return_code)
     rcl_lifecycle_shutdown_label, cb_return_code);
 }
 
-node_interfaces::LifecycleNodeInterface::CallbackReturn
-LifecycleNode::on_activate(const State &)
-{
-  impl_->on_activate();
-  return LifecycleNodeInterface::CallbackReturn::SUCCESS;
-}
-
-node_interfaces::LifecycleNodeInterface::CallbackReturn
-LifecycleNode::on_deactivate(const State &)
-{
-  impl_->on_deactivate();
-  return LifecycleNodeInterface::CallbackReturn::SUCCESS;
-}
-
 void
-LifecycleNode::add_managed_entity(
-  std::weak_ptr<rclcpp_lifecycle::ManagedEntityInterface> managed_entity)
+LifecycleNode::add_publisher_handle(
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisherInterface> pub)
 {
-  impl_->add_managed_entity(managed_entity);
+  impl_->add_publisher_handle(pub);
 }
 
 void
 LifecycleNode::add_timer_handle(std::shared_ptr<rclcpp::TimerBase> timer)
 {
   impl_->add_timer_handle(timer);
+}
+
+void
+LifecycleNode::for_each_callback_group(
+  const rclcpp::node_interfaces::NodeBaseInterface::CallbackGroupFunction & func)
+{
+  rclcpp::node_interfaces::global_for_each_callback_group(node_base_.get(), func);
 }
 
 }  // namespace rclcpp_lifecycle

@@ -7,13 +7,10 @@ add_definitions(-DTEST_RESOURCES_DIRECTORY="${TEST_RESOURCES_DIRECTORY}")
 rosidl_generate_interfaces(${PROJECT_NAME}_test_msgs
   ../msg/Header.msg
   ../msg/MessageWithHeader.msg
-  ../msg/String.msg
   DEPENDENCIES builtin_interfaces
   LIBRARY_NAME ${PROJECT_NAME}
   SKIP_INSTALL
 )
-# Need the target name to depend on generated interface libraries
-rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}_test_msgs" "rosidl_typesupport_cpp")
 
 ament_add_gtest(
   test_allocator_common
@@ -358,42 +355,6 @@ if(TARGET test_publisher)
   )
   target_link_libraries(test_publisher ${PROJECT_NAME} mimick)
 endif()
-
-set(append_library_dirs "${CMAKE_CURRENT_BINARY_DIR}")
-if(WIN32)
-  set(append_library_dirs "${append_library_dirs}/$<CONFIG>")
-endif()
-
-ament_add_gtest(test_publisher_with_type_adapter test_publisher_with_type_adapter.cpp
-  APPEND_LIBRARY_DIRS "${append_library_dirs}"
-)
-if(TARGET test_publisher_with_type_adapter)
-  target_link_libraries(test_publisher_with_type_adapter
-    ${PROJECT_NAME}
-    ${cpp_typesupport_target})
-endif()
-
-ament_add_gtest(test_subscription_with_type_adapter test_subscription_with_type_adapter.cpp
-  APPEND_LIBRARY_DIRS "${append_library_dirs}"
-)
-if(TARGET test_subscription_with_type_adapter)
-  target_link_libraries(test_subscription_with_type_adapter
-    ${PROJECT_NAME}
-    ${cpp_typesupport_target})
-endif()
-
-ament_add_gtest(test_subscription_publisher_with_same_type_adapter test_subscription_publisher_with_same_type_adapter.cpp
-  APPEND_LIBRARY_DIRS "${append_library_dirs}"
-)
-if(TARGET test_subscription_publisher_with_same_type_adapter)
-  ament_target_dependencies(test_subscription_publisher_with_same_type_adapter
-    "statistics_msgs"
-  )
-  target_link_libraries(test_subscription_publisher_with_same_type_adapter
-    ${PROJECT_NAME}
-    ${cpp_typesupport_target})
-endif()
-
 ament_add_gtest(test_publisher_subscription_count_api test_publisher_subscription_count_api.cpp)
 if(TARGET test_publisher_subscription_count_api)
   ament_target_dependencies(test_publisher_subscription_count_api
@@ -546,6 +507,11 @@ if(TARGET test_find_weak_nodes)
   target_link_libraries(test_find_weak_nodes ${PROJECT_NAME})
 endif()
 
+set(append_library_dirs "${CMAKE_CURRENT_BINARY_DIR}")
+if(WIN32)
+  set(append_library_dirs "${append_library_dirs}/$<CONFIG>")
+endif()
+
 ament_add_gtest(test_externally_defined_services test_externally_defined_services.cpp)
 ament_target_dependencies(test_externally_defined_services
   "rcl"
@@ -680,9 +646,8 @@ if(TARGET test_subscription_topic_statistics)
     "rosidl_typesupport_cpp"
     "statistics_msgs"
     "test_msgs")
-  target_link_libraries(test_subscription_topic_statistics
-    ${PROJECT_NAME}
-    ${cpp_typesupport_target})
+  rosidl_target_interfaces(test_subscription_topic_statistics ${PROJECT_NAME}_test_msgs "rosidl_typesupport_cpp")
+  target_link_libraries(test_subscription_topic_statistics ${PROJECT_NAME})
 endif()
 
 ament_add_gtest(test_subscription_options test_subscription_options.cpp)
@@ -733,21 +698,3 @@ ament_add_gtest(test_graph_listener test_graph_listener.cpp)
 if(TARGET test_graph_listener)
   target_link_libraries(test_graph_listener ${PROJECT_NAME} mimick)
 endif()
-
-function(test_subscription_content_filter_for_rmw_implementation)
-  set(rmw_implementation_env_var RMW_IMPLEMENTATION=${rmw_implementation})
-  ament_add_gmock(test_subscription_content_filter${target_suffix}
-    test_subscription_content_filter.cpp
-    ENV ${rmw_implementation_env_var}
-    TIMEOUT 120
-  )
-  if(TARGET test_subscription_content_filter${target_suffix})
-    target_link_libraries(test_subscription_content_filter${target_suffix} ${PROJECT_NAME} mimick)
-    ament_target_dependencies(test_subscription_content_filter${target_suffix}
-      "rcpputils"
-      "rosidl_typesupport_cpp"
-      "test_msgs"
-    )
-  endif()
-endfunction()
-call_for_each_rmw_implementation(test_subscription_content_filter_for_rmw_implementation)
