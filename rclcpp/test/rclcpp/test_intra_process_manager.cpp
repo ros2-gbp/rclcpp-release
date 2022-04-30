@@ -22,6 +22,7 @@
 
 #define RCLCPP_BUILDING_LIBRARY 1
 #include "rclcpp/allocator/allocator_common.hpp"
+#include "rclcpp/context.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/qos.hpp"
 #include "rmw/types.h"
@@ -52,8 +53,8 @@ class PublisherBase
 public:
   RCLCPP_SMART_PTR_DEFINITIONS(PublisherBase)
 
-  PublisherBase()
-  : qos(rclcpp::QoS(10)),
+  explicit PublisherBase(rclcpp::QoS qos = rclcpp::QoS(10))
+  : qos_profile(qos),
     topic_name("topic")
   {}
 
@@ -76,7 +77,7 @@ public:
   rclcpp::QoS
   get_actual_qos() const
   {
-    return qos;
+    return qos_profile;
   }
 
   bool
@@ -93,7 +94,7 @@ public:
     return false;
   }
 
-  rclcpp::QoS qos;
+  rclcpp::QoS qos_profile;
   std::string topic_name;
   uint64_t intra_process_publisher_id_;
   IntraProcessManagerWeakPtr weak_ipm_;
@@ -111,9 +112,9 @@ public:
 
   RCLCPP_SMART_PTR_DEFINITIONS(Publisher<T, Alloc>)
 
-  Publisher()
+  explicit Publisher(rclcpp::QoS qos = rclcpp::QoS(10))
+  : PublisherBase(qos)
   {
-    qos = rclcpp::QoS(10);
     auto allocator = std::make_shared<Alloc>();
     message_allocator_ = std::make_shared<MessageAlloc>(*allocator.get());
   }
@@ -136,7 +137,10 @@ namespace buffers
 {
 namespace mock
 {
-template<typename MessageT>
+template<
+  typename MessageT,
+  typename Alloc = std::allocator<void>,
+  typename MessageDeleter = std::default_delete<MessageT>>
 class IntraProcessBuffer
 {
 public:
@@ -191,16 +195,21 @@ class SubscriptionIntraProcessBase
 public:
   RCLCPP_SMART_PTR_ALIASES_ONLY(SubscriptionIntraProcessBase)
 
-  SubscriptionIntraProcessBase()
-  : qos_profile(rmw_qos_profile_default), topic_name("topic")
-  {}
+  explicit SubscriptionIntraProcessBase(
+    rclcpp::Context::SharedPtr context,
+    const std::string & topic = "topic",
+    rclcpp::QoS qos = rclcpp::QoS(10))
+  : qos_profile(qos), topic_name(topic)
+  {
+    (void)context;
+  }
 
   virtual ~SubscriptionIntraProcessBase() {}
 
   virtual bool
   use_take_shared_method() const = 0;
 
-  rmw_qos_profile_t
+  QoS
   get_actual_qos()
   {
     return qos_profile;
@@ -209,24 +218,26 @@ public:
   const char *
   get_topic_name()
   {
-    return topic_name;
+    return topic_name.c_str();
   }
 
-  rmw_qos_profile_t qos_profile;
-  const char * topic_name;
+  rclcpp::QoS qos_profile;
+  std::string topic_name;
 };
 
 template<
   typename MessageT,
   typename Alloc = std::allocator<void>,
-  typename Deleter = std::default_delete<MessageT>>
-class SubscriptionIntraProcess : public SubscriptionIntraProcessBase
+  typename Deleter = std::default_delete<MessageT>,
+  typename ROSMessageType = MessageT
+>
+class SubscriptionIntraProcessBuffer : public SubscriptionIntraProcessBase
 {
 public:
-  RCLCPP_SMART_PTR_DEFINITIONS(SubscriptionIntraProcess)
+  RCLCPP_SMART_PTR_DEFINITIONS(SubscriptionIntraProcessBuffer)
 
-  SubscriptionIntraProcess()
-  : take_shared_method(false)
+  explicit SubscriptionIntraProcessBuffer(rclcpp::QoS qos)
+  : SubscriptionIntraProcessBase(nullptr, "topic", qos), take_shared_method(false)
   {
     buffer = std::make_unique<rclcpp::experimental::buffers::mock::IntraProcessBuffer<MessageT>>();
   }
@@ -239,6 +250,18 @@ public:
 
   void
   provide_intra_process_message(std::unique_ptr<MessageT> msg)
+  {
+    buffer->add(std::move(msg));
+  }
+
+  void
+  provide_intra_process_data(std::shared_ptr<const MessageT> msg)
+  {
+    buffer->add(msg);
+  }
+
+  void
+  provide_intra_process_data(std::unique_ptr<MessageT> msg)
   {
     buffer->add(std::move(msg));
   }
@@ -262,6 +285,25 @@ public:
   typename rclcpp::experimental::buffers::mock::IntraProcessBuffer<MessageT>::UniquePtr buffer;
 };
 
+template<
+  typename MessageT,
+  typename Alloc = std::allocator<MessageT>,
+  typename Deleter = std::default_delete<MessageT>>
+class SubscriptionIntraProcess : public SubscriptionIntraProcessBuffer<
+    MessageT,
+    Alloc,
+    Deleter
+>
+{
+public:
+  RCLCPP_SMART_PTR_DEFINITIONS(SubscriptionIntraProcess)
+
+  explicit SubscriptionIntraProcess(rclcpp::QoS qos = rclcpp::QoS(10))
+  : SubscriptionIntraProcessBuffer<MessageT, Alloc, Deleter>(qos)
+  {
+  }
+};
+
 }  // namespace mock
 }  // namespace experimental
 }  // namespace rclcpp
@@ -270,14 +312,16 @@ public:
 #define RCLCPP__PUBLISHER_HPP_
 #define RCLCPP__PUBLISHER_BASE_HPP_
 #define RCLCPP__EXPERIMENTAL__SUBSCRIPTION_INTRA_PROCESS_HPP_
+#define RCLCPP__EXPERIMENTAL__SUBSCRIPTION_INTRA_PROCESS_BUFFER_HPP_
 #define RCLCPP__EXPERIMENTAL__SUBSCRIPTION_INTRA_PROCESS_BASE_HPP_
 // Force ipm to use our mock publisher class.
 #define Publisher mock::Publisher
 #define PublisherBase mock::PublisherBase
 #define IntraProcessBuffer mock::IntraProcessBuffer
 #define SubscriptionIntraProcessBase mock::SubscriptionIntraProcessBase
+#define SubscriptionIntraProcessBuffer mock::SubscriptionIntraProcessBuffer
 #define SubscriptionIntraProcess mock::SubscriptionIntraProcess
-#include "../src/rclcpp/intra_process_manager.cpp"
+#include "../src/rclcpp/intra_process_manager.cpp"  // NOLINT
 #undef Publisher
 #undef PublisherBase
 #undef IntraProcessBuffer
@@ -304,10 +348,10 @@ void Publisher<T, Alloc>::publish(MessageUniquePtr msg)
     throw std::runtime_error("cannot publish msg which is a null pointer");
   }
 
-  ipm->template do_intra_process_publish<T, Alloc>(
+  ipm->template do_intra_process_publish<T, T, Alloc>(
     intra_process_publisher_id_,
     std::move(msg),
-    message_allocator_);
+    *message_allocator_);
 }
 
 }  // namespace mock
@@ -335,15 +379,12 @@ TEST(TestIntraProcessManager, add_pub_sub) {
 
   auto ipm = std::make_shared<IntraProcessManagerT>();
 
-  auto p1 = std::make_shared<PublisherT>();
-  p1->qos.get_rmw_qos_profile().reliability = RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT;
+  auto p1 = std::make_shared<PublisherT>(rclcpp::QoS(10).best_effort());
 
-  auto p2 = std::make_shared<PublisherT>();
-  p2->qos.get_rmw_qos_profile().reliability = RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT;
+  auto p2 = std::make_shared<PublisherT>(rclcpp::QoS(10).best_effort());
   p2->topic_name = "different_topic_name";
 
-  auto s1 = std::make_shared<SubscriptionIntraProcessT>();
-  s1->qos_profile.reliability = RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT;
+  auto s1 = std::make_shared<SubscriptionIntraProcessT>(rclcpp::QoS(10).best_effort());
 
   auto p1_id = ipm->add_publisher(p1);
   auto p2_id = ipm->add_publisher(p2);
@@ -359,11 +400,9 @@ TEST(TestIntraProcessManager, add_pub_sub) {
   ASSERT_EQ(0u, p2_subs);
   ASSERT_EQ(0u, non_existing_pub_subs);
 
-  auto p3 = std::make_shared<PublisherT>();
-  p3->qos.get_rmw_qos_profile().reliability = RMW_QOS_POLICY_RELIABILITY_RELIABLE;
+  auto p3 = std::make_shared<PublisherT>(rclcpp::QoS(10).reliable());
 
-  auto s2 = std::make_shared<SubscriptionIntraProcessT>();
-  s2->qos_profile.reliability = RMW_QOS_POLICY_RELIABILITY_RELIABLE;
+  auto s2 = std::make_shared<SubscriptionIntraProcessT>(rclcpp::QoS(10).reliable());
 
   auto s2_id = ipm->add_subscription(s2);
   auto p3_id = ipm->add_publisher(p3);

@@ -21,9 +21,8 @@
 
 #include "gtest/gtest.h"
 
-#include "rclcpp/scope_exit.hpp"
 #include "rclcpp/strategies/allocator_memory_strategy.hpp"
-#include "rclcpp/node_interfaces/node_base.hpp"
+#include "rcpputils/scope_exit.hpp"
 #include "test_msgs/msg/empty.hpp"
 #include "test_msgs/srv/empty.hpp"
 
@@ -40,9 +39,11 @@ static bool test_waitable_result = false;
 class TestWaitable : public rclcpp::Waitable
 {
 public:
-  bool add_to_wait_set(rcl_wait_set_t *) override
+  void add_to_wait_set(rcl_wait_set_t *) override
   {
-    return test_waitable_result;
+    if (!test_waitable_result) {
+      throw std::runtime_error("TestWaitable add_to_wait_set failed");
+    }
   }
 
   bool is_ready(rcl_wait_set_t *) override
@@ -264,7 +265,7 @@ protected:
              "Calling rcl_wait_set_init() with expected sufficient capacities failed";
     }
 
-    RCLCPP_SCOPE_EXIT(
+    RCPPUTILS_SCOPE_EXIT(
     {
       EXPECT_EQ(RCL_RET_OK, rcl_wait_set_fini(&wait_set));
     });
@@ -292,7 +293,7 @@ protected:
              "Calling rcl_wait_set_init() with expected insufficient capacities failed";
     }
 
-    RCLCPP_SCOPE_EXIT(
+    RCPPUTILS_SCOPE_EXIT(
     {
       EXPECT_EQ(RCL_RET_OK, rcl_wait_set_fini(&wait_set_no_capacity));
     });
@@ -377,8 +378,7 @@ protected:
     auto basic_node_base = basic_node->get_node_base_interface();
     auto node_base = node_with_entity->get_node_base_interface();
     WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
-    rclcpp::node_interfaces::global_for_each_callback_group(
-      basic_node_base.get(),
+    basic_node_base->for_each_callback_group(
       [basic_node_base, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
       {
         weak_groups_to_nodes.insert(
@@ -387,8 +387,7 @@ protected:
             group_ptr,
             basic_node_base));
       });
-    rclcpp::node_interfaces::global_for_each_callback_group(
-      node_base.get(),
+    node_base->for_each_callback_group(
       [node_base, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
       {
         weak_groups_to_nodes.insert(
@@ -456,19 +455,19 @@ TEST_F(TestAllocatorMemoryStrategy, construct_destruct) {
 }
 
 TEST_F(TestAllocatorMemoryStrategy, add_remove_guard_conditions) {
-  rcl_guard_condition_t guard_condition1 = rcl_get_zero_initialized_guard_condition();
-  rcl_guard_condition_t guard_condition2 = rcl_get_zero_initialized_guard_condition();
-  rcl_guard_condition_t guard_condition3 = rcl_get_zero_initialized_guard_condition();
+  rclcpp::GuardCondition guard_condition1;
+  rclcpp::GuardCondition guard_condition2;
+  rclcpp::GuardCondition guard_condition3;
 
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition1));
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition2));
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition3));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition1));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition2));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition3));
   EXPECT_EQ(3u, allocator_memory_strategy()->number_of_guard_conditions());
 
   // Adding a second time should not add to vector
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition1));
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition2));
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition3));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition1));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition2));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition3));
   EXPECT_EQ(3u, allocator_memory_strategy()->number_of_guard_conditions());
 
   EXPECT_NO_THROW(allocator_memory_strategy()->remove_guard_condition(&guard_condition1));
@@ -498,14 +497,8 @@ TEST_F(TestAllocatorMemoryStrategy, add_remove_waitables) {
 TEST_F(TestAllocatorMemoryStrategy, number_of_entities_with_subscription) {
   RclWaitSetSizes expected_sizes = {};
   expected_sizes.size_of_subscriptions = 1;
-  const std::string implementation_identifier = rmw_get_implementation_identifier();
-  if (implementation_identifier == "rmw_cyclonedds_cpp" ||
-    implementation_identifier == "rmw_connextdds")
-  {
-    // For cyclonedds and connext, a subscription will also add an event and waitable
-    expected_sizes.size_of_events += 1;
-    expected_sizes.size_of_waitables += 1;
-  }
+  expected_sizes.size_of_events = 1;
+  expected_sizes.size_of_waitables = 1;
   auto node_with_subscription = create_node_with_subscription("subscription_node");
   EXPECT_TRUE(TestNumberOfEntitiesAfterCollection(node_with_subscription, expected_sizes));
 }
@@ -572,24 +565,17 @@ TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_client) {
 
 TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_guard_condition) {
   auto node = create_node_with_disabled_callback_groups("node");
-  rcl_guard_condition_t guard_condition = rcl_get_zero_initialized_guard_condition();
   auto context = node->get_node_base_interface()->get_context();
-  rcl_context_t * rcl_context = context->get_rcl_context().get();
-  rcl_guard_condition_options_t guard_condition_options = {
-    rcl_get_default_allocator()};
 
-  EXPECT_EQ(
-    RCL_RET_OK,
-    rcl_guard_condition_init(&guard_condition, rcl_context, guard_condition_options));
-  RCLCPP_SCOPE_EXIT(
-  {
-    EXPECT_EQ(RCL_RET_OK, rcl_guard_condition_fini(&guard_condition));
-  });
+  rclcpp::GuardCondition guard_condition(context);
 
-  allocator_memory_strategy()->add_guard_condition(&guard_condition);
+  EXPECT_NO_THROW(rclcpp::GuardCondition guard_condition(context););
+
+  allocator_memory_strategy()->add_guard_condition(guard_condition);
+
   RclWaitSetSizes insufficient_capacities = SufficientWaitSetCapacities();
   insufficient_capacities.size_of_guard_conditions = 0;
-  EXPECT_TRUE(TestAddHandlesToWaitSet(node, insufficient_capacities));
+  EXPECT_THROW(TestAddHandlesToWaitSet(node, insufficient_capacities), std::runtime_error);
 }
 
 TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_timer) {
@@ -610,7 +596,9 @@ TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_waitable) {
   EXPECT_TRUE(allocator_memory_strategy()->add_handles_to_wait_set(nullptr));
 
   test_waitable_result = false;
-  EXPECT_FALSE(allocator_memory_strategy()->add_handles_to_wait_set(nullptr));
+  EXPECT_THROW(
+    allocator_memory_strategy()->add_handles_to_wait_set(nullptr),
+    std::runtime_error);
 
   // This calls TestWaitable's functions, so rcl errors are not set
   EXPECT_FALSE(rcl_error_is_set());
