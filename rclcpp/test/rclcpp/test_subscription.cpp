@@ -29,12 +29,16 @@
 
 #include "test_msgs/msg/empty.hpp"
 
+// Note: This is a long running test with rmw_connext_cpp, if you change this file, please check
+// that this test can complete fully, or adjust the timeout as necessary.
+// See https://github.com/ros2/rmw_connext/issues/325 for resolution
+
 using namespace std::chrono_literals;
 
 class TestSubscription : public ::testing::Test
 {
 public:
-  void OnMessage(test_msgs::msg::Empty::ConstSharedPtr msg)
+  void OnMessage(const test_msgs::msg::Empty::SharedPtr msg)
   {
     (void)msg;
   }
@@ -80,7 +84,7 @@ class TestSubscriptionInvalidIntraprocessQos
 class TestSubscriptionSub : public ::testing::Test
 {
 public:
-  void OnMessage(test_msgs::msg::Empty::ConstSharedPtr msg)
+  void OnMessage(const test_msgs::msg::Empty::SharedPtr msg)
   {
     (void)msg;
   }
@@ -113,7 +117,7 @@ public:
   {
   }
 
-  void OnMessage(test_msgs::msg::Empty::ConstSharedPtr msg)
+  void OnMessage(const test_msgs::msg::Empty::SharedPtr msg)
   {
     (void)msg;
   }
@@ -130,7 +134,7 @@ public:
 class SubscriptionClass
 {
 public:
-  void OnMessage(test_msgs::msg::Empty::ConstSharedPtr msg)
+  void OnMessage(const test_msgs::msg::Empty::SharedPtr msg)
   {
     (void)msg;
   }
@@ -150,7 +154,7 @@ public:
 TEST_F(TestSubscription, construction_and_destruction) {
   initialize();
   using test_msgs::msg::Empty;
-  auto callback = [](Empty::ConstSharedPtr msg) {
+  auto callback = [](const Empty::SharedPtr msg) {
       (void)msg;
     };
   {
@@ -162,7 +166,7 @@ TEST_F(TestSubscription, construction_and_destruction) {
     // get_subscription_handle()
     const rclcpp::SubscriptionBase * const_sub = sub.get();
     EXPECT_NE(nullptr, const_sub->get_subscription_handle());
-    EXPECT_TRUE(sub->use_take_shared_method());
+    EXPECT_FALSE(sub->use_take_shared_method());
 
     EXPECT_NE(nullptr, sub->get_message_type_support_handle().typesupport_identifier);
     EXPECT_NE(nullptr, sub->get_message_type_support_handle().data);
@@ -182,7 +186,7 @@ TEST_F(TestSubscription, construction_and_destruction) {
  */
 TEST_F(TestSubscriptionSub, construction_and_destruction) {
   using test_msgs::msg::Empty;
-  auto callback = [](Empty::ConstSharedPtr msg) {
+  auto callback = [](const Empty::SharedPtr msg) {
       (void)msg;
     };
   {
@@ -216,7 +220,7 @@ TEST_F(TestSubscriptionSub, construction_and_destruction) {
 TEST_F(TestSubscription, various_creation_signatures) {
   initialize();
   using test_msgs::msg::Empty;
-  auto cb = [](test_msgs::msg::Empty::ConstSharedPtr) {};
+  auto cb = [](test_msgs::msg::Empty::SharedPtr) {};
   {
     auto sub = node->create_subscription<Empty>("topic", 1, cb);
     (void)sub;
@@ -441,146 +445,6 @@ TEST_F(TestSubscription, handle_loaned_message) {
 }
 
 /*
-   Testing on_new_message callbacks.
- */
-TEST_F(TestSubscription, on_new_message_callback) {
-  initialize(rclcpp::NodeOptions().use_intra_process_comms(false));
-  using test_msgs::msg::Empty;
-
-  auto do_nothing = [](std::shared_ptr<const test_msgs::msg::Empty>) {FAIL();};
-  auto sub = node->create_subscription<test_msgs::msg::Empty>("~/test_take", 10, do_nothing);
-
-  std::atomic<size_t> c1 {0};
-  auto increase_c1_cb = [&c1](size_t count_msgs) {c1 += count_msgs;};
-  sub->set_on_new_message_callback(increase_c1_cb);
-
-  auto pub = node->create_publisher<test_msgs::msg::Empty>("~/test_take", 3);
-  {
-    test_msgs::msg::Empty msg;
-    pub->publish(msg);
-  }
-
-  auto start = std::chrono::steady_clock::now();
-  do {
-    std::this_thread::sleep_for(100ms);
-  } while (c1 == 0 && std::chrono::steady_clock::now() - start < 10s);
-
-  EXPECT_EQ(c1.load(), 1u);
-
-  std::atomic<size_t> c2 {0};
-  auto increase_c2_cb = [&c2](size_t count_msgs) {c2 += count_msgs;};
-  sub->set_on_new_message_callback(increase_c2_cb);
-
-  {
-    test_msgs::msg::Empty msg;
-    pub->publish(msg);
-  }
-
-  start = std::chrono::steady_clock::now();
-  do {
-    std::this_thread::sleep_for(100ms);
-  } while (c2 == 0 && std::chrono::steady_clock::now() - start < 10s);
-
-  EXPECT_EQ(c1.load(), 1u);
-  EXPECT_EQ(c2.load(), 1u);
-
-  sub->clear_on_new_message_callback();
-
-  {
-    test_msgs::msg::Empty msg;
-    pub->publish(msg);
-    pub->publish(msg);
-    pub->publish(msg);
-  }
-
-  std::atomic<size_t> c3 {0};
-  auto increase_c3_cb = [&c3](size_t count_msgs) {c3 += count_msgs;};
-  sub->set_on_new_message_callback(increase_c3_cb);
-
-  start = std::chrono::steady_clock::now();
-  do {
-    std::this_thread::sleep_for(100ms);
-  } while (c3 < 3 && std::chrono::steady_clock::now() - start < 10s);
-
-  EXPECT_EQ(c1.load(), 1u);
-  EXPECT_EQ(c2.load(), 1u);
-  EXPECT_EQ(c3.load(), 3u);
-
-  std::function<void(size_t)> invalid_cb = nullptr;
-  EXPECT_THROW(sub->set_on_new_message_callback(invalid_cb), std::invalid_argument);
-}
-
-/*
-   Testing on_new_intra_process_message callbacks.
- */
-TEST_F(TestSubscription, on_new_intra_process_message_callback) {
-  initialize(rclcpp::NodeOptions().use_intra_process_comms(true));
-  using test_msgs::msg::Empty;
-
-  auto do_nothing = [](std::shared_ptr<const test_msgs::msg::Empty>) {FAIL();};
-  auto sub = node->create_subscription<test_msgs::msg::Empty>("~/test_take", 10, do_nothing);
-
-  std::atomic<size_t> c1 {0};
-  auto increase_c1_cb = [&c1](size_t count_msgs) {c1 += count_msgs;};
-  sub->set_on_new_intra_process_message_callback(increase_c1_cb);
-
-  auto pub = node->create_publisher<test_msgs::msg::Empty>("~/test_take", 1);
-  {
-    test_msgs::msg::Empty msg;
-    pub->publish(msg);
-  }
-
-  auto start = std::chrono::steady_clock::now();
-  do {
-    std::this_thread::sleep_for(100ms);
-  } while (c1 == 0 && std::chrono::steady_clock::now() - start < 10s);
-
-  EXPECT_EQ(c1.load(), 1u);
-
-  std::atomic<size_t> c2 {0};
-  auto increase_c2_cb = [&c2](size_t count_msgs) {c2 += count_msgs;};
-  sub->set_on_new_intra_process_message_callback(increase_c2_cb);
-
-  {
-    test_msgs::msg::Empty msg;
-    pub->publish(msg);
-  }
-
-  start = std::chrono::steady_clock::now();
-  do {
-    std::this_thread::sleep_for(100ms);
-  } while (c2 == 0 && std::chrono::steady_clock::now() - start < 10s);
-
-  EXPECT_EQ(c1.load(), 1u);
-  EXPECT_EQ(c2.load(), 1u);
-
-  sub->clear_on_new_intra_process_message_callback();
-
-  {
-    test_msgs::msg::Empty msg;
-    pub->publish(msg);
-    pub->publish(msg);
-    pub->publish(msg);
-  }
-
-  std::atomic<size_t> c3 {0};
-  auto increase_c3_cb = [&c3](size_t count_msgs) {c3 += count_msgs;};
-  sub->set_on_new_intra_process_message_callback(increase_c3_cb);
-
-  start = std::chrono::steady_clock::now();
-  do {
-    std::this_thread::sleep_for(100ms);
-  } while (c3 == 0 && std::chrono::steady_clock::now() - start < 10s);
-
-  EXPECT_EQ(c1.load(), 1u);
-  EXPECT_EQ(c2.load(), 1u);
-  EXPECT_EQ(c3.load(), 3u);
-
-  std::function<void(size_t)> invalid_cb = nullptr;
-  EXPECT_THROW(sub->set_on_new_intra_process_message_callback(invalid_cb), std::invalid_argument);
-}
-
-/*
    Testing subscription with intraprocess enabled and invalid QoS
  */
 TEST_P(TestSubscriptionInvalidIntraprocessQos, test_subscription_throws) {
@@ -642,41 +506,7 @@ static std::vector<TestParameters> invalid_qos_profiles()
   return parameters;
 }
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
   TestSubscriptionThrows, TestSubscriptionInvalidIntraprocessQos,
   ::testing::ValuesIn(invalid_qos_profiles()),
   ::testing::PrintToStringParamName());
-
-TEST_F(TestSubscription, get_network_flow_endpoints_errors) {
-  initialize();
-  const rclcpp::QoS subscription_qos(1);
-  auto subscription_callback = [](test_msgs::msg::Empty::ConstSharedPtr msg) {
-      (void)msg;
-    };
-  auto subscription = node->create_subscription<test_msgs::msg::Empty>(
-    "topic", subscription_qos, subscription_callback);
-
-  {
-    auto mock = mocking_utils::patch_and_return(
-      "lib:rclcpp", rcl_subscription_get_network_flow_endpoints, RCL_RET_ERROR);
-    auto mock_network_flow_endpoint_array_fini = mocking_utils::patch_and_return(
-      "lib:rclcpp", rcl_network_flow_endpoint_array_fini, RCL_RET_ERROR);
-    EXPECT_THROW(
-      subscription->get_network_flow_endpoints(),
-      rclcpp::exceptions::RCLError);
-  }
-  {
-    auto mock_network_flow_endpoint_array_fini = mocking_utils::patch_and_return(
-      "lib:rclcpp", rcl_network_flow_endpoint_array_fini, RCL_RET_ERROR);
-    EXPECT_THROW(
-      subscription->get_network_flow_endpoints(),
-      rclcpp::exceptions::RCLError);
-  }
-  {
-    auto mock = mocking_utils::patch_and_return(
-      "lib:rclcpp", rcl_subscription_get_network_flow_endpoints, RCL_RET_OK);
-    auto mock_network_flow_endpoint_array_fini = mocking_utils::patch_and_return(
-      "lib:rclcpp", rcl_network_flow_endpoint_array_fini, RCL_RET_OK);
-    EXPECT_NO_THROW(subscription->get_network_flow_endpoints());
-  }
-}

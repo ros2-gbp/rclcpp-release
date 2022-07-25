@@ -108,18 +108,8 @@ public:
   declare_parameter(
     const std::string & name,
     const rclcpp::ParameterValue & default_value,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor{},
-    bool ignore_override = false) override;
-
-  RCLCPP_PUBLIC
-  const rclcpp::ParameterValue &
-  declare_parameter(
-    const std::string & name,
-    rclcpp::ParameterType type,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor(),
-    bool ignore_override = false) override;
+    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+    bool ignore_override) override;
 
   RCLCPP_PUBLIC
   void
@@ -179,6 +169,11 @@ public:
   RCLCPP_PUBLIC
   void
   remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const handler) override;
+
+  [[deprecated("use add_on_set_parameters_callback(OnParametersSetCallbackType callback) instead")]]
+  RCLCPP_PUBLIC
+  OnParametersSetCallbackType
+  set_on_parameters_set_callback(OnParametersSetCallbackType callback) override;
 
   RCLCPP_PUBLIC
   const std::map<std::string, rclcpp::ParameterValue> &

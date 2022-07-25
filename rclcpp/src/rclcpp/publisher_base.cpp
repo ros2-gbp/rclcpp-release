@@ -22,7 +22,6 @@
 #include <mutex>
 #include <sstream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "rcutils/logging_macros.h"
@@ -35,7 +34,6 @@
 #include "rclcpp/experimental/intra_process_manager.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/macros.hpp"
-#include "rclcpp/network_flow_endpoint.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/qos_event.hpp"
 
@@ -47,9 +45,7 @@ PublisherBase::PublisherBase(
   const rosidl_message_type_support_t & type_support,
   const rcl_publisher_options_t & publisher_options)
 : rcl_node_handle_(node_base->get_shared_rcl_node_handle()),
-  intra_process_is_enabled_(false),
-  intra_process_publisher_id_(0),
-  type_support_(type_support)
+  intra_process_is_enabled_(false), intra_process_publisher_id_(0)
 {
   auto custom_deleter = [node_handle = this->rcl_node_handle_](rcl_publisher_t * rcl_pub)
     {
@@ -102,11 +98,6 @@ PublisherBase::PublisherBase(
 
 PublisherBase::~PublisherBase()
 {
-  for (const auto & pair : event_handlers_) {
-    rcl_publisher_event_type_t event_type = pair.first;
-    clear_on_new_qos_event_callback(event_type);
-  }
-
   // must fini the events before fini-ing the publisher
   event_handlers_.clear();
 
@@ -162,8 +153,7 @@ PublisherBase::get_publisher_handle() const
   return publisher_handle_;
 }
 
-const
-std::unordered_map<rcl_publisher_event_type_t, std::shared_ptr<rclcpp::QOSEventHandlerBase>> &
+const std::vector<std::shared_ptr<rclcpp::QOSEventHandlerBase>> &
 PublisherBase::get_event_handlers() const
 {
   return event_handlers_;
@@ -272,45 +262,7 @@ PublisherBase::default_incompatible_qos_callback(
   std::string policy_name = qos_policy_name_from_kind(event.last_policy_kind);
   RCLCPP_WARN(
     rclcpp::get_logger(rcl_node_get_logger_name(rcl_node_handle_.get())),
-    "New subscription discovered on topic '%s', requesting incompatible QoS. "
+    "New subscription discovered on this topic, requesting incompatible QoS. "
     "No messages will be sent to it. "
-    "Last incompatible policy: %s",
-    get_topic_name(),
-    policy_name.c_str());
-}
-
-std::vector<rclcpp::NetworkFlowEndpoint> PublisherBase::get_network_flow_endpoints() const
-{
-  rcutils_allocator_t allocator = rcutils_get_default_allocator();
-  rcl_network_flow_endpoint_array_t network_flow_endpoint_array =
-    rcl_get_zero_initialized_network_flow_endpoint_array();
-  rcl_ret_t ret = rcl_publisher_get_network_flow_endpoints(
-    publisher_handle_.get(), &allocator, &network_flow_endpoint_array);
-  if (RCL_RET_OK != ret) {
-    auto error_msg = std::string("error obtaining network flows of publisher: ") +
-      rcl_get_error_string().str;
-    rcl_reset_error();
-    if (RCL_RET_OK !=
-      rcl_network_flow_endpoint_array_fini(&network_flow_endpoint_array))
-    {
-      error_msg += std::string(", also error cleaning up network flow array: ") +
-        rcl_get_error_string().str;
-      rcl_reset_error();
-    }
-    rclcpp::exceptions::throw_from_rcl_error(ret, error_msg);
-  }
-
-  std::vector<rclcpp::NetworkFlowEndpoint> network_flow_endpoint_vector;
-  for (size_t i = 0; i < network_flow_endpoint_array.size; ++i) {
-    network_flow_endpoint_vector.push_back(
-      rclcpp::NetworkFlowEndpoint(
-        network_flow_endpoint_array.network_flow_endpoint[i]));
-  }
-
-  ret = rcl_network_flow_endpoint_array_fini(&network_flow_endpoint_array);
-  if (RCL_RET_OK != ret) {
-    rclcpp::exceptions::throw_from_rcl_error(ret, "error cleaning up network flow array");
-  }
-
-  return network_flow_endpoint_vector;
+    "Last incompatible policy: %s", policy_name.c_str());
 }

@@ -37,6 +37,11 @@ Duration::Duration(int32_t seconds, uint32_t nanoseconds)
   rcl_duration_.nanoseconds += nanoseconds;
 }
 
+Duration::Duration(int64_t nanoseconds)
+{
+  rcl_duration_.nanoseconds = nanoseconds;
+}
+
 Duration::Duration(std::chrono::nanoseconds nanoseconds)
 {
   rcl_duration_.nanoseconds = nanoseconds.count();
@@ -157,7 +162,7 @@ Duration::operator+(const rclcpp::Duration & rhs) const
     this->rcl_duration_.nanoseconds,
     rhs.rcl_duration_.nanoseconds,
     std::numeric_limits<rcl_duration_value_t>::max());
-  return Duration::from_nanoseconds(
+  return Duration(
     rcl_duration_.nanoseconds + rhs.rcl_duration_.nanoseconds);
 }
 
@@ -186,7 +191,7 @@ Duration::operator-(const rclcpp::Duration & rhs) const
     rhs.rcl_duration_.nanoseconds,
     std::numeric_limits<rcl_duration_value_t>::max());
 
-  return Duration::from_nanoseconds(
+  return Duration(
     rcl_duration_.nanoseconds - rhs.rcl_duration_.nanoseconds);
 }
 
@@ -217,7 +222,7 @@ Duration::operator*(double scale) const
     scale,
     std::numeric_limits<rcl_duration_value_t>::max());
   long double scale_ld = static_cast<long double>(scale);
-  return Duration::from_nanoseconds(
+  return Duration(
     static_cast<rcl_duration_value_t>(
       static_cast<long double>(rcl_duration_.nanoseconds) * scale_ld));
 }
@@ -259,40 +264,9 @@ Duration::to_rmw_time() const
 }
 
 Duration
-Duration::from_rmw_time(rmw_time_t duration)
-{
-  Duration ret;
-  constexpr rcl_duration_value_t limit_ns = std::numeric_limits<rcl_duration_value_t>::max();
-  constexpr rcl_duration_value_t limit_sec = RCL_NS_TO_S(limit_ns);
-  if (duration.sec > limit_sec || duration.nsec > limit_ns) {
-    // saturate if will overflow
-    ret.rcl_duration_.nanoseconds = limit_ns;
-    return ret;
-  }
-  uint64_t total_ns = RCL_S_TO_NS(duration.sec) + duration.nsec;
-  if (total_ns > limit_ns) {
-    // saturate if will overflow
-    ret.rcl_duration_.nanoseconds = limit_ns;
-    return ret;
-  }
-  ret.rcl_duration_.nanoseconds = static_cast<rcl_duration_value_t>(total_ns);
-  return ret;
-}
-
-Duration
 Duration::from_seconds(double seconds)
 {
-  Duration ret;
-  ret.rcl_duration_.nanoseconds = static_cast<int64_t>(RCL_S_TO_NS(seconds));
-  return ret;
-}
-
-Duration
-Duration::from_nanoseconds(rcl_duration_value_t nanoseconds)
-{
-  Duration ret;
-  ret.rcl_duration_.nanoseconds = nanoseconds;
-  return ret;
+  return Duration(static_cast<int64_t>(RCL_S_TO_NS(seconds)));
 }
 
 }  // namespace rclcpp

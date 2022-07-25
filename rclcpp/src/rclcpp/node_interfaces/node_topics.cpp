@@ -14,18 +14,9 @@
 
 #include "rclcpp/node_interfaces/node_topics.hpp"
 
-#include <stdexcept>
 #include <string>
 
-#include "rclcpp/callback_group.hpp"
 #include "rclcpp/exceptions.hpp"
-#include "rclcpp/node_interfaces/node_base_interface.hpp"
-#include "rclcpp/node_interfaces/node_timers_interface.hpp"
-#include "rclcpp/publisher_base.hpp"
-#include "rclcpp/publisher_factory.hpp"
-#include "rclcpp/subscription_base.hpp"
-#include "rclcpp/subscription_factory.hpp"
-#include "rclcpp/qos.hpp"
 
 using rclcpp::exceptions::throw_from_rcl_error;
 
@@ -64,18 +55,18 @@ NodeTopics::add_publisher(
     callback_group = node_base_->get_default_callback_group();
   }
 
-  for (auto & key_event_pair : publisher->get_event_handlers()) {
-    auto publisher_event = key_event_pair.second;
+  for (auto & publisher_event : publisher->get_event_handlers()) {
     callback_group->add_waitable(publisher_event);
   }
 
   // Notify the executor that a new publisher was created using the parent Node.
-  auto & node_gc = node_base_->get_notify_guard_condition();
-  try {
-    node_gc.trigger();
-  } catch (const rclcpp::exceptions::RCLError & ex) {
-    throw std::runtime_error(
-            std::string("failed to notify wait set on publisher creation: ") + ex.what());
+  {
+    auto notify_guard_condition_lock = node_base_->acquire_notify_guard_condition_lock();
+    if (rcl_trigger_guard_condition(node_base_->get_notify_guard_condition()) != RCL_RET_OK) {
+      throw std::runtime_error(
+              std::string("Failed to notify wait set on publisher creation: ") +
+              rmw_get_error_string().str);
+    }
   }
 }
 
@@ -106,8 +97,7 @@ NodeTopics::add_subscription(
 
   callback_group->add_subscription(subscription);
 
-  for (auto & key_event_pair : subscription->get_event_handlers()) {
-    auto subscription_event = key_event_pair.second;
+  for (auto & subscription_event : subscription->get_event_handlers()) {
     callback_group->add_waitable(subscription_event);
   }
 
@@ -118,12 +108,13 @@ NodeTopics::add_subscription(
   }
 
   // Notify the executor that a new subscription was created using the parent Node.
-  auto & node_gc = node_base_->get_notify_guard_condition();
-  try {
-    node_gc.trigger();
-  } catch (const rclcpp::exceptions::RCLError & ex) {
-    throw std::runtime_error(
-            std::string("failed to notify wait set on subscription creation: ") + ex.what());
+  {
+    auto notify_guard_condition_lock = node_base_->acquire_notify_guard_condition_lock();
+    auto ret = rcl_trigger_guard_condition(node_base_->get_notify_guard_condition());
+    if (ret != RCL_RET_OK) {
+      using rclcpp::exceptions::throw_from_rcl_error;
+      throw_from_rcl_error(ret, "failed to notify wait set on subscription creation");
+    }
   }
 }
 
@@ -137,10 +128,4 @@ rclcpp::node_interfaces::NodeTimersInterface *
 NodeTopics::get_node_timers_interface() const
 {
   return node_timers_;
-}
-
-std::string
-NodeTopics::resolve_topic_name(const std::string & name, bool only_expand) const
-{
-  return node_base_->resolve_topic_or_service_name(name, false, only_expand);
 }

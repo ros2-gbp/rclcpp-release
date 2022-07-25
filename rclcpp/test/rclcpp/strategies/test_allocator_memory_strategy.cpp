@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <list>
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,15 +20,13 @@
 
 #include "gtest/gtest.h"
 
+#include "rclcpp/scope_exit.hpp"
 #include "rclcpp/strategies/allocator_memory_strategy.hpp"
-#include "rcpputils/scope_exit.hpp"
 #include "test_msgs/msg/empty.hpp"
 #include "test_msgs/srv/empty.hpp"
 
 using rclcpp::memory_strategies::allocator_memory_strategy::AllocatorMemoryStrategy;
-typedef std::map<rclcpp::CallbackGroup::WeakPtr,
-    rclcpp::node_interfaces::NodeBaseInterface::WeakPtr,
-    std::owner_less<rclcpp::CallbackGroup::WeakPtr>> WeakCallbackGroupsToNodesMap;
+using WeakNodeList = std::list<rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>;
 
 static bool test_waitable_result = false;
 
@@ -39,11 +36,9 @@ static bool test_waitable_result = false;
 class TestWaitable : public rclcpp::Waitable
 {
 public:
-  void add_to_wait_set(rcl_wait_set_t *) override
+  bool add_to_wait_set(rcl_wait_set_t *) override
   {
-    if (!test_waitable_result) {
-      throw std::runtime_error("TestWaitable add_to_wait_set failed");
-    }
+    return test_waitable_result;
   }
 
   bool is_ready(rcl_wait_set_t *) override
@@ -51,16 +46,7 @@ public:
     return test_waitable_result;
   }
 
-  std::shared_ptr<void>
-  take_data() override
-  {
-    return nullptr;
-  }
-
-  void execute(std::shared_ptr<void> & data) override
-  {
-    (void) data;
-  }
+  void execute() override {}
 };
 
 struct RclWaitSetSizes
@@ -116,17 +102,18 @@ protected:
   {
     auto node = std::make_shared<rclcpp::Node>(name, "ns");
 
-    node->for_each_callback_group(
-      [](rclcpp::CallbackGroup::SharedPtr group)
-      {
+    for (auto & group_weak_ptr : node->get_callback_groups()) {
+      auto group = group_weak_ptr.lock();
+      if (group) {
         group->can_be_taken_from() = false;
-      });
+      }
+    }
     return node;
   }
 
   std::shared_ptr<rclcpp::Node> create_node_with_subscription(const std::string & name)
   {
-    auto subscription_callback = [](test_msgs::msg::Empty::ConstSharedPtr) {};
+    auto subscription_callback = [](const test_msgs::msg::Empty::SharedPtr) {};
     const rclcpp::QoS qos(10);
     auto node_with_subscription = create_node_with_disabled_callback_groups(name);
 
@@ -201,17 +188,10 @@ protected:
     std::shared_ptr<rclcpp::Node> node,
     const RclWaitSetSizes & expected)
   {
-    WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
-    node->for_each_callback_group(
-      [node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            node->get_node_base_interface()));
-      });
-    allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+    WeakNodeList nodes;
+    nodes.push_back(node->get_node_base_interface());
+
+    allocator_memory_strategy()->collect_entities(nodes);
     EXPECT_EQ(
       expected.size_of_subscriptions, allocator_memory_strategy()->number_of_ready_subscriptions());
     EXPECT_EQ(
@@ -232,17 +212,9 @@ protected:
     std::shared_ptr<rclcpp::Node> node,
     const RclWaitSetSizes & insufficient_capacities)
   {
-    WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
-    node->for_each_callback_group(
-      [node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            node->get_node_base_interface()));
-      });
-    allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+    WeakNodeList nodes;
+    nodes.push_back(node->get_node_base_interface());
+    allocator_memory_strategy()->collect_entities(nodes);
 
     auto context = node->get_node_base_interface()->get_context();
     rcl_context_t * rcl_context = context->get_rcl_context().get();
@@ -265,7 +237,7 @@ protected:
              "Calling rcl_wait_set_init() with expected sufficient capacities failed";
     }
 
-    RCPPUTILS_SCOPE_EXIT(
+    RCLCPP_SCOPE_EXIT(
     {
       EXPECT_EQ(RCL_RET_OK, rcl_wait_set_fini(&wait_set));
     });
@@ -293,7 +265,7 @@ protected:
              "Calling rcl_wait_set_init() with expected insufficient capacities failed";
     }
 
-    RCPPUTILS_SCOPE_EXIT(
+    RCLCPP_SCOPE_EXIT(
     {
       EXPECT_EQ(RCL_RET_OK, rcl_wait_set_fini(&wait_set_no_capacity));
     });
@@ -309,58 +281,26 @@ protected:
   ::testing::AssertionResult TestGetNextEntity(
     std::shared_ptr<rclcpp::Node> node_with_entity1,
     std::shared_ptr<rclcpp::Node> node_with_entity2,
-    std::function<rclcpp::AnyExecutable(WeakCallbackGroupsToNodesMap)> get_next_entity_func)
+    std::function<rclcpp::AnyExecutable(WeakNodeList)> get_next_entity_func)
   {
-    auto basic_node = create_node_with_disabled_callback_groups("basic_node");
-    WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
-    basic_node->for_each_callback_group(
-      [basic_node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            basic_node->get_node_base_interface()));
-      });
-    node_with_entity1->for_each_callback_group(
-      [node_with_entity1, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            node_with_entity1->get_node_base_interface()));
-      });
-    allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+    WeakNodeList nodes;
+    auto basic_node = std::make_shared<rclcpp::Node>("basic_node", "ns");
+    nodes.push_back(node_with_entity1->get_node_base_interface());
+    nodes.push_back(basic_node->get_node_base_interface());
+    allocator_memory_strategy()->collect_entities(nodes);
 
-    rclcpp::AnyExecutable result = get_next_entity_func(weak_groups_to_nodes);
+    rclcpp::AnyExecutable result = get_next_entity_func(nodes);
     if (result.node_base != node_with_entity1->get_node_base_interface()) {
       return ::testing::AssertionFailure() <<
              "Failed to get expected entity with specified get_next_*() function";
     }
 
+    WeakNodeList uncollected_nodes;
     auto basic_node2 = std::make_shared<rclcpp::Node>("basic_node2", "ns");
-    WeakCallbackGroupsToNodesMap weak_groups_to_uncollected_nodes;
-    basic_node2->for_each_callback_group(
-      [basic_node2, &weak_groups_to_uncollected_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_uncollected_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            basic_node2->get_node_base_interface()));
-      });
-    node_with_entity2->for_each_callback_group(
-      [node_with_entity2,
-      &weak_groups_to_uncollected_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_uncollected_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            node_with_entity2->get_node_base_interface()));
-      });
-    rclcpp::AnyExecutable failed_result = get_next_entity_func(weak_groups_to_uncollected_nodes);
+    uncollected_nodes.push_back(node_with_entity2->get_node_base_interface());
+    uncollected_nodes.push_back(basic_node2->get_node_base_interface());
+
+    rclcpp::AnyExecutable failed_result = get_next_entity_func(uncollected_nodes);
     if (nullptr != failed_result.node_base) {
       return ::testing::AssertionFailure() <<
              "A node was retrieved with the specified get_next_*() function despite"
@@ -372,31 +312,16 @@ protected:
 
   ::testing::AssertionResult TestGetNextEntityMutuallyExclusive(
     std::shared_ptr<rclcpp::Node> node_with_entity,
-    std::function<rclcpp::AnyExecutable(WeakCallbackGroupsToNodesMap)> get_next_entity_func)
+    std::function<rclcpp::AnyExecutable(WeakNodeList)> get_next_entity_func)
   {
+    WeakNodeList nodes;
     auto basic_node = std::make_shared<rclcpp::Node>("basic_node", "ns");
-    auto basic_node_base = basic_node->get_node_base_interface();
+
     auto node_base = node_with_entity->get_node_base_interface();
-    WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
-    basic_node_base->for_each_callback_group(
-      [basic_node_base, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            basic_node_base));
-      });
-    node_base->for_each_callback_group(
-      [node_base, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            node_base));
-      });
-    allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+    auto basic_node_base = basic_node->get_node_base_interface();
+    nodes.push_back(node_base);
+    nodes.push_back(basic_node_base);
+    allocator_memory_strategy()->collect_entities(nodes);
 
     // It's important that these be set after collect_entities() otherwise collect_entities() will
     // not do anything
@@ -406,7 +331,7 @@ protected:
       callback_group->can_be_taken_from() = false;
     }
 
-    rclcpp::AnyExecutable result = get_next_entity_func(weak_groups_to_nodes);
+    rclcpp::AnyExecutable result = get_next_entity_func(nodes);
 
     if (nullptr != result.node_base) {
       return ::testing::AssertionFailure() <<
@@ -433,18 +358,10 @@ private:
 };
 
 TEST_F(TestAllocatorMemoryStrategy, construct_destruct) {
+  WeakNodeList nodes;
   auto basic_node = create_node_with_disabled_callback_groups("basic_node");
-  WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
-  basic_node->for_each_callback_group(
-    [basic_node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-    {
-      weak_groups_to_nodes.insert(
-        std::pair<rclcpp::CallbackGroup::WeakPtr,
-        rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-          group_ptr,
-          basic_node->get_node_base_interface()));
-    });
-  allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+  nodes.push_back(basic_node->get_node_base_interface());
+  allocator_memory_strategy()->collect_entities(nodes);
   EXPECT_EQ(0u, allocator_memory_strategy()->number_of_ready_subscriptions());
   EXPECT_EQ(0u, allocator_memory_strategy()->number_of_ready_services());
   EXPECT_EQ(0u, allocator_memory_strategy()->number_of_ready_events());
@@ -455,19 +372,19 @@ TEST_F(TestAllocatorMemoryStrategy, construct_destruct) {
 }
 
 TEST_F(TestAllocatorMemoryStrategy, add_remove_guard_conditions) {
-  rclcpp::GuardCondition guard_condition1;
-  rclcpp::GuardCondition guard_condition2;
-  rclcpp::GuardCondition guard_condition3;
+  rcl_guard_condition_t guard_condition1 = rcl_get_zero_initialized_guard_condition();
+  rcl_guard_condition_t guard_condition2 = rcl_get_zero_initialized_guard_condition();
+  rcl_guard_condition_t guard_condition3 = rcl_get_zero_initialized_guard_condition();
 
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition1));
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition2));
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition3));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition1));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition2));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition3));
   EXPECT_EQ(3u, allocator_memory_strategy()->number_of_guard_conditions());
 
   // Adding a second time should not add to vector
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition1));
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition2));
-  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(guard_condition3));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition1));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition2));
+  EXPECT_NO_THROW(allocator_memory_strategy()->add_guard_condition(&guard_condition3));
   EXPECT_EQ(3u, allocator_memory_strategy()->number_of_guard_conditions());
 
   EXPECT_NO_THROW(allocator_memory_strategy()->remove_guard_condition(&guard_condition1));
@@ -497,8 +414,14 @@ TEST_F(TestAllocatorMemoryStrategy, add_remove_waitables) {
 TEST_F(TestAllocatorMemoryStrategy, number_of_entities_with_subscription) {
   RclWaitSetSizes expected_sizes = {};
   expected_sizes.size_of_subscriptions = 1;
-  expected_sizes.size_of_events = 1;
-  expected_sizes.size_of_waitables = 1;
+  const std::string implementation_identifier = rmw_get_implementation_identifier();
+  if (implementation_identifier == "rmw_connext_cpp" ||
+    implementation_identifier == "rmw_cyclonedds_cpp")
+  {
+    // For connext, a subscription will also add an event and waitable
+    expected_sizes.size_of_events += 1;
+    expected_sizes.size_of_waitables += 1;
+  }
   auto node_with_subscription = create_node_with_subscription("subscription_node");
   EXPECT_TRUE(TestNumberOfEntitiesAfterCollection(node_with_subscription, expected_sizes));
 }
@@ -526,17 +449,9 @@ TEST_F(TestAllocatorMemoryStrategy, number_of_entities_with_timer) {
 
 TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_bad_arguments) {
   auto node = create_node_with_subscription("subscription_node");
-  WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
-  node->for_each_callback_group(
-    [node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-    {
-      weak_groups_to_nodes.insert(
-        std::pair<rclcpp::CallbackGroup::WeakPtr,
-        rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-          group_ptr,
-          node->get_node_base_interface()));
-    });
-  allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+  WeakNodeList nodes;
+  nodes.push_back(node->get_node_base_interface());
+  allocator_memory_strategy()->collect_entities(nodes);
   EXPECT_FALSE(allocator_memory_strategy()->add_handles_to_wait_set(nullptr));
   EXPECT_TRUE(rcl_error_is_set());
   rcl_reset_error();
@@ -565,17 +480,24 @@ TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_client) {
 
 TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_guard_condition) {
   auto node = create_node_with_disabled_callback_groups("node");
+  rcl_guard_condition_t guard_condition = rcl_get_zero_initialized_guard_condition();
   auto context = node->get_node_base_interface()->get_context();
+  rcl_context_t * rcl_context = context->get_rcl_context().get();
+  rcl_guard_condition_options_t guard_condition_options = {
+    rcl_get_default_allocator()};
 
-  rclcpp::GuardCondition guard_condition(context);
+  EXPECT_EQ(
+    RCL_RET_OK,
+    rcl_guard_condition_init(&guard_condition, rcl_context, guard_condition_options));
+  RCLCPP_SCOPE_EXIT(
+  {
+    EXPECT_EQ(RCL_RET_OK, rcl_guard_condition_fini(&guard_condition));
+  });
 
-  EXPECT_NO_THROW(rclcpp::GuardCondition guard_condition(context););
-
-  allocator_memory_strategy()->add_guard_condition(guard_condition);
-
+  allocator_memory_strategy()->add_guard_condition(&guard_condition);
   RclWaitSetSizes insufficient_capacities = SufficientWaitSetCapacities();
   insufficient_capacities.size_of_guard_conditions = 0;
-  EXPECT_THROW(TestAddHandlesToWaitSet(node, insufficient_capacities), std::runtime_error);
+  EXPECT_TRUE(TestAddHandlesToWaitSet(node, insufficient_capacities));
 }
 
 TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_timer) {
@@ -596,9 +518,7 @@ TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_waitable) {
   EXPECT_TRUE(allocator_memory_strategy()->add_handles_to_wait_set(nullptr));
 
   test_waitable_result = false;
-  EXPECT_THROW(
-    allocator_memory_strategy()->add_handles_to_wait_set(nullptr),
-    std::runtime_error);
+  EXPECT_FALSE(allocator_memory_strategy()->add_handles_to_wait_set(nullptr));
 
   // This calls TestWaitable's functions, so rcl errors are not set
   EXPECT_FALSE(rcl_error_is_set());
@@ -608,9 +528,9 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_subscription) {
   auto node1 = create_node_with_subscription("node1");
   auto node2 = create_node_with_subscription("node2");
 
-  auto get_next_entity = [this](const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) {
+  auto get_next_entity = [this](const WeakNodeList & nodes) {
       rclcpp::AnyExecutable result;
-      allocator_memory_strategy()->get_next_subscription(result, weak_groups_to_nodes);
+      allocator_memory_strategy()->get_next_subscription(result, nodes);
       return result;
     };
 
@@ -621,9 +541,9 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_service) {
   auto node1 = create_node_with_service("node1");
   auto node2 = create_node_with_service("node2");
 
-  auto get_next_entity = [this](const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) {
+  auto get_next_entity = [this](const WeakNodeList & nodes) {
       rclcpp::AnyExecutable result;
-      allocator_memory_strategy()->get_next_service(result, weak_groups_to_nodes);
+      allocator_memory_strategy()->get_next_service(result, nodes);
       return result;
     };
 
@@ -634,9 +554,9 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_client) {
   auto node1 = create_node_with_client("node1");
   auto node2 = create_node_with_client("node2");
 
-  auto get_next_entity = [this](const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) {
+  auto get_next_entity = [this](const WeakNodeList & nodes) {
       rclcpp::AnyExecutable result;
-      allocator_memory_strategy()->get_next_client(result, weak_groups_to_nodes);
+      allocator_memory_strategy()->get_next_client(result, nodes);
       return result;
     };
 
@@ -647,9 +567,9 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_timer) {
   auto node1 = create_node_with_timer("node1");
   auto node2 = create_node_with_timer("node2");
 
-  auto get_next_entity = [this](const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) {
+  auto get_next_entity = [this](const WeakNodeList & nodes) {
       rclcpp::AnyExecutable result;
-      allocator_memory_strategy()->get_next_timer(result, weak_groups_to_nodes);
+      allocator_memory_strategy()->get_next_timer(result, nodes);
       return result;
     };
 
@@ -664,9 +584,9 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_waitable) {
   node1->get_node_waitables_interface()->add_waitable(waitable1, nullptr);
   node2->get_node_waitables_interface()->add_waitable(waitable2, nullptr);
 
-  auto get_next_entity = [this](const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) {
+  auto get_next_entity = [this](const WeakNodeList & nodes) {
       rclcpp::AnyExecutable result;
-      allocator_memory_strategy()->get_next_waitable(result, weak_groups_to_nodes);
+      allocator_memory_strategy()->get_next_waitable(result, nodes);
       return result;
     };
 
@@ -676,9 +596,9 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_waitable) {
 TEST_F(TestAllocatorMemoryStrategy, get_next_subscription_mutually_exclusive) {
   auto node = create_node_with_subscription("node");
 
-  auto get_next_entity = [this](const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) {
+  auto get_next_entity = [this](const WeakNodeList & nodes) {
       rclcpp::AnyExecutable result;
-      allocator_memory_strategy()->get_next_subscription(result, weak_groups_to_nodes);
+      allocator_memory_strategy()->get_next_subscription(result, nodes);
       return result;
     };
 
@@ -688,9 +608,9 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_subscription_mutually_exclusive) {
 TEST_F(TestAllocatorMemoryStrategy, get_next_service_mutually_exclusive) {
   auto node = create_node_with_service("node");
 
-  auto get_next_entity = [this](const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) {
+  auto get_next_entity = [this](const WeakNodeList & nodes) {
       rclcpp::AnyExecutable result;
-      allocator_memory_strategy()->get_next_service(result, weak_groups_to_nodes);
+      allocator_memory_strategy()->get_next_service(result, nodes);
       return result;
     };
 
@@ -700,9 +620,9 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_service_mutually_exclusive) {
 TEST_F(TestAllocatorMemoryStrategy, get_next_client_mutually_exclusive) {
   auto node = create_node_with_client("node");
 
-  auto get_next_entity = [this](const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) {
+  auto get_next_entity = [this](const WeakNodeList & nodes) {
       rclcpp::AnyExecutable result;
-      allocator_memory_strategy()->get_next_client(result, weak_groups_to_nodes);
+      allocator_memory_strategy()->get_next_client(result, nodes);
       return result;
     };
 
@@ -712,9 +632,9 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_client_mutually_exclusive) {
 TEST_F(TestAllocatorMemoryStrategy, get_next_timer_mutually_exclusive) {
   auto node = create_node_with_timer("node");
 
-  auto get_next_entity = [this](const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) {
+  auto get_next_entity = [this](const WeakNodeList & nodes) {
       rclcpp::AnyExecutable result;
-      allocator_memory_strategy()->get_next_timer(result, weak_groups_to_nodes);
+      allocator_memory_strategy()->get_next_timer(result, nodes);
       return result;
     };
 
@@ -728,14 +648,13 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_waitable_mutually_exclusive) {
     node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   node->get_node_waitables_interface()->add_waitable(waitable, callback_group);
 
-  auto get_next_entity =
-    [this, callback_group](const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) {
+  auto get_next_entity = [this, callback_group](const WeakNodeList & nodes) {
       // This callback group isn't in the base class' callback_group list, so this needs to be done
       // before get_next_waitable() is called.
       callback_group->can_be_taken_from() = false;
 
       rclcpp::AnyExecutable result;
-      allocator_memory_strategy()->get_next_waitable(result, weak_groups_to_nodes);
+      allocator_memory_strategy()->get_next_waitable(result, nodes);
       return result;
     };
 
@@ -743,8 +662,9 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_waitable_mutually_exclusive) {
 }
 
 TEST_F(TestAllocatorMemoryStrategy, get_next_subscription_out_of_scope) {
-  WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
+  WeakNodeList nodes;
   auto node = create_node_with_disabled_callback_groups("node");
+  nodes.push_back(node->get_node_base_interface());
   // Force subscription to go out of scope and cleanup after collecting entities.
   {
     rclcpp::SubscriptionOptions subscription_options;
@@ -755,34 +675,26 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_subscription_out_of_scope) {
 
     subscription_options.callback_group = callback_group;
 
-    auto subscription_callback = [](test_msgs::msg::Empty::ConstSharedPtr) {};
+    auto subscription_callback = [](const test_msgs::msg::Empty::SharedPtr) {};
     const rclcpp::QoS qos(10);
 
     auto subscription = node->create_subscription<
       test_msgs::msg::Empty, decltype(subscription_callback)>(
       "topic", qos, std::move(subscription_callback), subscription_options);
 
-    node->for_each_callback_group(
-      [node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            node->get_node_base_interface()));
-      });
-    allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+    allocator_memory_strategy()->collect_entities(nodes);
   }
   EXPECT_EQ(1u, allocator_memory_strategy()->number_of_ready_subscriptions());
 
   rclcpp::AnyExecutable result;
-  allocator_memory_strategy()->get_next_subscription(result, weak_groups_to_nodes);
+  allocator_memory_strategy()->get_next_subscription(result, nodes);
   EXPECT_EQ(nullptr, result.node_base);
 }
 
 TEST_F(TestAllocatorMemoryStrategy, get_next_service_out_of_scope) {
-  WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
+  WeakNodeList nodes;
   auto node = create_node_with_disabled_callback_groups("node");
+  nodes.push_back(node->get_node_base_interface());
   // Force service to go out of scope and cleanup after collecting entities.
   {
     auto callback_group =
@@ -795,36 +707,19 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_service_out_of_scope) {
     auto service = node->create_service<test_msgs::srv::Empty>(
       "service", std::move(service_callback), rmw_qos_profile_services_default, callback_group);
 
-    node->for_each_callback_group(
-      [node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            node->get_node_base_interface()));
-      });
-    allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+    allocator_memory_strategy()->collect_entities(nodes);
   }
   EXPECT_EQ(1u, allocator_memory_strategy()->number_of_ready_services());
 
   rclcpp::AnyExecutable result;
-  allocator_memory_strategy()->get_next_service(result, weak_groups_to_nodes);
+  allocator_memory_strategy()->get_next_service(result, nodes);
   EXPECT_EQ(nullptr, result.node_base);
 }
 
 TEST_F(TestAllocatorMemoryStrategy, get_next_client_out_of_scope) {
+  WeakNodeList nodes;
   auto node = create_node_with_disabled_callback_groups("node");
-  WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
-  node->for_each_callback_group(
-    [node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-    {
-      weak_groups_to_nodes.insert(
-        std::pair<rclcpp::CallbackGroup::WeakPtr,
-        rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-          group_ptr,
-          node->get_node_base_interface()));
-    });
+  nodes.push_back(node->get_node_base_interface());
   // Force client to go out of scope and cleanup after collecting entities.
   {
     auto callback_group =
@@ -833,67 +728,49 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_client_out_of_scope) {
     auto client = node->create_client<test_msgs::srv::Empty>(
       "service", rmw_qos_profile_services_default, callback_group);
 
-    weak_groups_to_nodes.insert(
-      std::pair<rclcpp::CallbackGroup::WeakPtr,
-      rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-        rclcpp::CallbackGroup::WeakPtr(callback_group),
-        node->get_node_base_interface()));
-
-    allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+    allocator_memory_strategy()->collect_entities(nodes);
   }
   EXPECT_EQ(1u, allocator_memory_strategy()->number_of_ready_clients());
 
   rclcpp::AnyExecutable result;
-  allocator_memory_strategy()->get_next_client(result, weak_groups_to_nodes);
+  allocator_memory_strategy()->get_next_client(result, nodes);
   EXPECT_EQ(nullptr, result.node_base);
 }
 
 TEST_F(TestAllocatorMemoryStrategy, get_next_timer_out_of_scope) {
+  WeakNodeList nodes;
   auto node = create_node_with_disabled_callback_groups("node");
-  WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
+  nodes.push_back(node->get_node_base_interface());
+
   // Force timer to go out of scope and cleanup after collecting entities.
   {
     auto callback_group =
       node->create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive);
+
     auto timer = node->create_wall_timer(
       std::chrono::seconds(10), []() {}, callback_group);
-    node->for_each_callback_group(
-      [node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            node->get_node_base_interface()));
-      });
-    allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+
+    allocator_memory_strategy()->collect_entities(nodes);
   }
   EXPECT_EQ(1u, allocator_memory_strategy()->number_of_ready_timers());
 
   rclcpp::AnyExecutable result;
-  allocator_memory_strategy()->get_next_timer(result, weak_groups_to_nodes);
+  allocator_memory_strategy()->get_next_timer(result, nodes);
   EXPECT_EQ(nullptr, result.node_base);
 }
 
 TEST_F(TestAllocatorMemoryStrategy, get_next_waitable_out_of_scope) {
+  WeakNodeList nodes;
   auto node = create_node_with_disabled_callback_groups("node");
-  WeakCallbackGroupsToNodesMap weak_groups_to_nodes;
+  nodes.push_back(node->get_node_base_interface());
+
   // Force waitable to go out of scope and cleanup after collecting entities.
   {
     auto callback_group =
       node->create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive);
-    node->for_each_callback_group(
-      [node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
-      {
-        weak_groups_to_nodes.insert(
-          std::pair<rclcpp::CallbackGroup::WeakPtr,
-          rclcpp::node_interfaces::NodeBaseInterface::WeakPtr>(
-            group_ptr,
-            node->get_node_base_interface()));
-      });
-    allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
+    allocator_memory_strategy()->collect_entities(nodes);
     auto waitable = std::make_shared<TestWaitable>();
     node->get_node_waitables_interface()->add_waitable(waitable, callback_group);
     allocator_memory_strategy()->add_waitable_handle(waitable);
@@ -902,6 +779,6 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_waitable_out_of_scope) {
   EXPECT_EQ(1u, allocator_memory_strategy()->number_of_waitables());
 
   rclcpp::AnyExecutable result;
-  allocator_memory_strategy()->get_next_waitable(result, weak_groups_to_nodes);
+  allocator_memory_strategy()->get_next_waitable(result, nodes);
   EXPECT_EQ(nullptr, result.node_base);
 }

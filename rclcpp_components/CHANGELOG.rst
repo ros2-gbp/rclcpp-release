@@ -2,155 +2,44 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-16.2.0 (2022-05-03)
--------------------
-
-16.1.0 (2022-04-29)
--------------------
-
-16.0.1 (2022-04-13)
--------------------
-
-16.0.0 (2022-04-08)
--------------------
-
-15.4.0 (2022-04-05)
--------------------
-
-15.3.0 (2022-03-30)
--------------------
-
-15.2.0 (2022-03-24)
--------------------
-* Select executor in node registration (`#1898 <https://github.com/ros2/rclcpp/issues/1898>`_)
-* Fix rosdoc2 issues in rclcpp (`#1897 <https://github.com/ros2/rclcpp/issues/1897>`_)
-* Fix bugprone-exception-escape in node_main.cpp.in (`#1895 <https://github.com/ros2/rclcpp/issues/1895>`_)
-* Contributors: Alberto Soragna, Chris Lalancette, Hirokazu Ishida
-
-15.1.0 (2022-03-01)
--------------------
-* small improvements to node_main.cpp.in
-* Install headers to include/${PROJECT_NAME} (`#1888 <https://github.com/ros2/rclcpp/issues/1888>`_)
-* Use spin() in component_manager_isolated.hpp (`#1881 <https://github.com/ros2/rclcpp/issues/1881>`_)
-* add use_global_arguments for node options of component nodes (`#1776 <https://github.com/ros2/rclcpp/issues/1776>`_)
-* Contributors: Alberto Soragna, Shane Loretz, gezp
-
-15.0.0 (2022-01-14)
--------------------
-* Add rclcpp_components::component (`#1855 <https://github.com/ros2/rclcpp/issues/1855>`_)
-* Contributors: Shane Loretz
-
-14.1.0 (2022-01-05)
--------------------
-
-14.0.0 (2021-12-17)
--------------------
-* Add parameter to configure number of thread (`#1708 <https://github.com/ros2/rclcpp/issues/1708>`_)
-* remove RCLCPP_COMPONENTS_PUBLIC in class ComponentManagerIsolated (`#1843 <https://github.com/ros2/rclcpp/issues/1843>`_)
-* create component_container_isolated (`#1781 <https://github.com/ros2/rclcpp/issues/1781>`_)
-* Remove author by request (`#1818 <https://github.com/ros2/rclcpp/issues/1818>`_)
-* Update maintainers (`#1817 <https://github.com/ros2/rclcpp/issues/1817>`_)
-* Suppress clang dead-store warnings in the benchmarks. (`#1802 <https://github.com/ros2/rclcpp/issues/1802>`_)
-* Contributors: Chris Lalancette, Daisuke Nishimatsu, Jacob Perron, gezp
-
-13.1.0 (2021-10-18)
--------------------
-
-13.0.0 (2021-08-23)
--------------------
-* Update client API to be able to remove pending requests. (`#1734 <https://github.com/ros2/rclcpp/issues/1734>`_)
-* Contributors: Ivan Santiago Paunovic
-
-12.0.0 (2021-07-26)
--------------------
-
-11.2.0 (2021-07-21)
--------------------
-* Deprecate method names that use CamelCase in rclcpp_components. (`#1716 <https://github.com/ros2/rclcpp/issues/1716>`_)
-* Contributors: Rebecca Butler
-
-11.1.0 (2021-07-13)
--------------------
-* Added a hook to generate node options in ComponentManager (`#1702 <https://github.com/ros2/rclcpp/issues/1702>`_)
-* Contributors: Rebecca Butler
-
-11.0.0 (2021-05-18)
--------------------
-
-10.0.0 (2021-05-11)
--------------------
-
-9.0.2 (2021-04-14)
+2.4.2 (2022-07-25)
 ------------------
 
-9.0.1 (2021-04-12)
+2.4.1 (2022-01-31)
 ------------------
 
-9.0.0 (2021-04-06)
-------------------
-* updating quality declaration links (re: `ros2/docs.ros2.org#52 <https://github.com/ros2/docs.ros2.org/issues/52>`_) (`#1615 <https://github.com/ros2/rclcpp/issues/1615>`_)
-* Contributors: shonigmann
-
-8.2.0 (2021-03-31)
+2.4.0 (2021-09-01)
 ------------------
 
-8.1.0 (2021-03-25)
+2.3.1 (2021-04-14)
+------------------
+* Update quality declaration links (re: `ros2/docs.ros2.org#52 <https://github.com/ros2/docs.ros2.org/issues/52>`_) (`#1616 <https://github.com/ros2/rclcpp/issues/1616>`_)
+* Contributors: Simon Honigmann
+
+2.3.0 (2020-12-09)
+------------------
+* Update QD to QL 1 (`#1480 <https://github.com/ros2/rclcpp/issues/1480>`_)
+* Add benchmarks for components (`#1479 <https://github.com/ros2/rclcpp/issues/1479>`_)
+* Contributors: Alejandro Hernández Cordero, Louise Poubel, Scott K Logan, Stephen Brawner
+
+2.2.0 (2020-10-07)
+------------------
+* Include original exception in ComponentManagerException (`#1157 <https://github.com/ros2/rclcpp/issues/1157>`_) (`#1223 <https://github.com/ros2/rclcpp/issues/1223>`_)
+* Contributors: Dereck Wonnacott
+
+2.1.0 (2020-08-03)
 ------------------
 
-8.0.0 (2021-03-23)
+2.0.2 (2020-07-07)
 ------------------
 
-7.0.1 (2021-03-22)
-------------------
-
-7.0.0 (2021-03-18)
-------------------
-
-6.3.1 (2021-02-08)
-------------------
-
-6.3.0 (2021-01-25)
-------------------
-
-6.2.0 (2021-01-08)
-------------------
-* Use std compliant non-method std::filesystem::exists function (`#1502 <https://github.com/ros2/rclcpp/issues/1502>`_)
-* Fix string literal warnings (`#1442 <https://github.com/ros2/rclcpp/issues/1442>`_)
-* Contributors: Audrow Nash, Josh Langsfeld
-
-6.1.0 (2020-12-10)
-------------------
-* Update QDs to QL 1 (`#1477 <https://github.com/ros2/rclcpp/issues/1477>`_)
-* Add benchmarks for components (`#1476 <https://github.com/ros2/rclcpp/issues/1476>`_)
-* Contributors: Scott K Logan, Stephen Brawner
-
-6.0.0 (2020-11-18)
-------------------
-* Bump rclcpp packages to Quality Level 2 (`#1445 <https://github.com/ros2/rclcpp/issues/1445>`_)
-* Contributors: Louise Poubel
-
-5.1.0 (2020-11-02)
-------------------
-* Update maintainers (`#1384 <https://github.com/ros2/rclcpp/issues/1384>`_)
-* ComponentManager: switch off parameter services and event publisher (`#1333 <https://github.com/ros2/rclcpp/issues/1333>`_)
-* Contributors: Ivan Santiago Paunovic, Martijn Buijs
-
-5.0.0 (2020-09-18)
-------------------
-
-4.0.0 (2020-07-09)
-------------------
-* Bump to QD to level 3 and fixed links (`#1158 <https://github.com/ros2/rclcpp/issues/1158>`_)
-* Include original exception in ComponentManagerException (`#1157 <https://github.com/ros2/rclcpp/issues/1157>`_)
-* Contributors: Alejandro Hernández Cordero, Martijn Buijs, Tomoya Fujita
-
-3.0.0 (2020-06-18)
+2.0.1 (2020-06-23)
 ------------------
 
 2.0.0 (2020-06-01)
 ------------------
-* Added missing virtual destructors. (`#1149 <https://github.com/ros2/rclcpp/issues/1149>`_)
-* Add Security Vulnerability Policy pointing to REP-2006. (`#1130 <https://github.com/ros2/rclcpp/issues/1130>`_)
+* Added missing virtual destructors (`#1149 <https://github.com/ros2/rclcpp/issues/1149>`_)
+* Add Security Vulnerability Policy pointing to REP-2006 (`#1130 <https://github.com/ros2/rclcpp/issues/1130>`_)
 * Contributors: Chris Lalancette, Ivan Santiago Paunovic
 
 1.1.0 (2020-05-26)

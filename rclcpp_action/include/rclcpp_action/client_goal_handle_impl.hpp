@@ -57,6 +57,13 @@ ClientGoalHandle<ActionT>::get_goal_stamp() const
 
 template<typename ActionT>
 std::shared_future<typename ClientGoalHandle<ActionT>::WrappedResult>
+ClientGoalHandle<ActionT>::async_result()
+{
+  return this->async_get_result();
+}
+
+template<typename ActionT>
+std::shared_future<typename ClientGoalHandle<ActionT>::WrappedResult>
 ClientGoalHandle<ActionT>::async_get_result()
 {
   std::lock_guard<std::mutex> guard(handle_mutex_);
@@ -138,24 +145,11 @@ ClientGoalHandle<ActionT>::set_result_awareness(bool awareness)
 
 template<typename ActionT>
 void
-ClientGoalHandle<ActionT>::invalidate(const exceptions::UnawareGoalHandleError & ex)
+ClientGoalHandle<ActionT>::invalidate()
 {
   std::lock_guard<std::mutex> guard(handle_mutex_);
-  // Guard against multiple calls
-  if (is_invalidated()) {
-    return;
-  }
-  is_result_aware_ = false;
-  invalidate_exception_ = std::make_exception_ptr(ex);
   status_ = GoalStatus::STATUS_UNKNOWN;
-  result_promise_.set_exception(invalidate_exception_);
-}
-
-template<typename ActionT>
-bool
-ClientGoalHandle<ActionT>::is_invalidated() const
-{
-  return invalidate_exception_ != nullptr;
+  result_promise_.set_exception(std::make_exception_ptr(exceptions::UnawareGoalHandleError()));
 }
 
 template<typename ActionT>
