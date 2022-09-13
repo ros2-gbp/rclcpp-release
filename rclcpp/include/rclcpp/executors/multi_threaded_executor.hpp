@@ -22,7 +22,6 @@
 #include <thread>
 #include <unordered_map>
 
-#include "rclcpp/detail/mutex_two_priorities.hpp"
 #include "rclcpp/executor.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/memory_strategies.hpp"
@@ -53,7 +52,7 @@ public:
    * \param timeout maximum time to wait
    */
   RCLCPP_PUBLIC
-  MultiThreadedExecutor(
+  explicit MultiThreadedExecutor(
     const rclcpp::ExecutorOptions & options = rclcpp::ExecutorOptions(),
     size_t number_of_threads = 0,
     bool yield_before_execute = false,
@@ -82,17 +81,10 @@ protected:
 private:
   RCLCPP_DISABLE_COPY(MultiThreadedExecutor)
 
-  std::mutex wait_mutex_;  // Unused. Leave it for ABI compatibility.
+  std::mutex wait_mutex_;
   size_t number_of_threads_;
   bool yield_before_execute_;
   std::chrono::nanoseconds next_exec_timeout_;
-
-  std::set<TimerBase::SharedPtr> scheduled_timers_;
-  static std::unordered_map<MultiThreadedExecutor *,
-    std::shared_ptr<detail::MutexTwoPriorities>> wait_mutex_set_;
-  static std::mutex shared_wait_mutex_;
-  // These variables are declared as static variables for ABI-compatibiliity.
-  // And they mimic member variables needed to backport from master.
 };
 
 }  // namespace executors

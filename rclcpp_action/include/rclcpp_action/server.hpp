@@ -15,20 +15,21 @@
 #ifndef RCLCPP_ACTION__SERVER_HPP_
 #define RCLCPP_ACTION__SERVER_HPP_
 
-#include <rcl_action/action_server.h>
-#include <rosidl_runtime_c/action_type_support_struct.h>
-#include <rosidl_typesupport_cpp/action_type_support.hpp>
-#include <rclcpp/node_interfaces/node_base_interface.hpp>
-#include <rclcpp/node_interfaces/node_clock_interface.hpp>
-#include <rclcpp/node_interfaces/node_logging_interface.hpp>
-#include <rclcpp/waitable.hpp>
-
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
 #include <utility>
+
+#include "rcl/event_callback.h"
+#include "rcl_action/action_server.h"
+#include "rosidl_runtime_c/action_type_support_struct.h"
+#include "rosidl_typesupport_cpp/action_type_support.hpp"
+#include "rclcpp/node_interfaces/node_base_interface.hpp"
+#include "rclcpp/node_interfaces/node_clock_interface.hpp"
+#include "rclcpp/node_interfaces/node_logging_interface.hpp"
+#include "rclcpp/waitable.hpp"
 
 #include "rclcpp_action/visibility_control.hpp"
 #include "rclcpp_action/server_goal_handle.hpp"
@@ -70,6 +71,14 @@ enum class CancelResponse : int8_t
 class ServerBase : public rclcpp::Waitable
 {
 public:
+  /// Enum to identify entities belonging to the action server
+  enum class EntityType : std::size_t
+  {
+    GoalService,
+    ResultService,
+    CancelService,
+  };
+
   RCLCPP_ACTION_PUBLIC
   virtual ~ServerBase();
 
@@ -109,7 +118,7 @@ public:
   /// Add all entities to a wait set.
   /// \internal
   RCLCPP_ACTION_PUBLIC
-  bool
+  void
   add_to_wait_set(rcl_wait_set_t * wait_set) override;
 
   /// Return true if any entity belonging to the action server is ready to be executed.
@@ -118,11 +127,52 @@ public:
   bool
   is_ready(rcl_wait_set_t *) override;
 
+  RCLCPP_ACTION_PUBLIC
+  std::shared_ptr<void>
+  take_data() override;
+
+  RCLCPP_ACTION_PUBLIC
+  std::shared_ptr<void>
+  take_data_by_entity_id(size_t id) override;
+
   /// Act on entities in the wait set which are ready to be acted upon.
   /// \internal
   RCLCPP_ACTION_PUBLIC
   void
-  execute() override;
+  execute(std::shared_ptr<void> & data) override;
+
+  /// \internal
+  /// Set a callback to be called when action server entities have an event
+  /**
+   * The callback receives a size_t which is the number of messages received
+   * since the last time this callback was called.
+   * Normally this is 1, but can be > 1 if messages were received before any
+   * callback was set.
+   *
+   * The callback also receives an int identifier argument, which identifies
+   * the action server entity which is ready.
+   * This implies that the provided callback can use the identifier to behave
+   * differently depending on which entity triggered the waitable to become ready.
+   *
+   * Calling it again will clear any previously set callback.
+   *
+   * An exception will be thrown if the callback is not callable.
+   *
+   * This function is thread-safe.
+   *
+   * If you want more information available in the callback, like the subscription
+   * or other information, you may use a lambda with captures or std::bind.
+   *
+   * \param[in] callback functor to be called when a new message is received.
+   */
+  RCLCPP_ACTION_PUBLIC
+  void
+  set_on_ready_callback(std::function<void(size_t, int)> callback) override;
+
+  /// Unset the callback to be called whenever the waitable becomes ready.
+  RCLCPP_ACTION_PUBLIC
+  void
+  clear_on_ready_callback() override;
 
   // End Waitables API
   // -----------------
@@ -229,19 +279,19 @@ private:
   /// \internal
   RCLCPP_ACTION_PUBLIC
   void
-  execute_goal_request_received();
+  execute_goal_request_received(std::shared_ptr<void> & data);
 
   /// Handle a request to cancel goals on the server
   /// \internal
   RCLCPP_ACTION_PUBLIC
   void
-  execute_cancel_request_received();
+  execute_cancel_request_received(std::shared_ptr<void> & data);
 
   /// Handle a request to get the result of an action
   /// \internal
   RCLCPP_ACTION_PUBLIC
   void
-  execute_result_request_received();
+  execute_result_request_received(std::shared_ptr<void> & data);
 
   /// Handle a timeout indicating a completed goal should be forgotten by the server
   /// \internal
@@ -252,6 +302,29 @@ private:
   /// Private implementation
   /// \internal
   std::unique_ptr<ServerBaseImpl> pimpl_;
+
+  /// Set a std::function callback to be called when the specified entity is ready
+  RCLCPP_ACTION_PUBLIC
+  void
+  set_callback_to_entity(
+    EntityType entity_type,
+    std::function<void(size_t, int)> callback);
+
+protected:
+  // Mutex to protect the callbacks storage.
+  std::recursive_mutex listener_mutex_;
+  // Storage for std::function callbacks to keep them in scope
+  std::unordered_map<EntityType, std::function<void(size_t)>> entity_type_to_on_ready_callback_;
+
+  /// Set a callback to be called when the specified entity is ready
+  RCLCPP_ACTION_PUBLIC
+  void
+  set_on_ready_callback(
+    EntityType entity_type,
+    rcl_event_callback_t callback,
+    const void * user_data);
+
+  bool on_ready_callback_set_{false};
 };
 
 /// Action Server
@@ -296,7 +369,7 @@ public:
    * \param[in] name the name of an action.
    *  The same name and type must be used by both the action client and action server to
    *  communicate.
-   * \param[in] options options to pass to the underlying `rcl_action_server_t`.
+   * \param[in] options Options to pass to the underlying `rcl_action_server_t`.
    * \param[in] handle_goal a callback that decides if a goal should be accepted or rejected.
    * \param[in] handle_cancel a callback that decides if a goal should be attemted to be canceled.
    *  The return from this callback only indicates if the server will try to cancel a goal.
@@ -388,31 +461,31 @@ protected:
     std::weak_ptr<Server<ActionT>> weak_this = this->shared_from_this();
 
     std::function<void(const GoalUUID &, std::shared_ptr<void>)> on_terminal_state =
-      [weak_this](const GoalUUID & uuid, std::shared_ptr<void> result_message)
+      [weak_this](const GoalUUID & goal_uuid, std::shared_ptr<void> result_message)
       {
         std::shared_ptr<Server<ActionT>> shared_this = weak_this.lock();
         if (!shared_this) {
           return;
         }
         // Send result message to anyone that asked
-        shared_this->publish_result(uuid, result_message);
+        shared_this->publish_result(goal_uuid, result_message);
         // Publish a status message any time a goal handle changes state
         shared_this->publish_status();
         // notify base so it can recalculate the expired goal timer
         shared_this->notify_goal_terminal_state();
         // Delete data now (ServerBase and rcl_action_server_t keep data until goal handle expires)
         std::lock_guard<std::mutex> lock(shared_this->goal_handles_mutex_);
-        shared_this->goal_handles_.erase(uuid);
+        shared_this->goal_handles_.erase(goal_uuid);
       };
 
     std::function<void(const GoalUUID &)> on_executing =
-      [weak_this](const GoalUUID & uuid)
+      [weak_this](const GoalUUID & goal_uuid)
       {
         std::shared_ptr<Server<ActionT>> shared_this = weak_this.lock();
         if (!shared_this) {
           return;
         }
-        (void)uuid;
+        (void)goal_uuid;
         // Publish a status message any time a goal handle changes state
         shared_this->publish_status();
       };

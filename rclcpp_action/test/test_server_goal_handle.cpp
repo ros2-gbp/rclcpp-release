@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rclcpp/exceptions.hpp>
-#include <rclcpp/node.hpp>
-#include <rclcpp/rclcpp.hpp>
-#include <test_msgs/action/fibonacci.hpp>
-
-#include <gtest/gtest.h>
-
 #include <memory>
 #include <vector>
 
+#include "gtest/gtest.h"
+
+#include "rclcpp/exceptions.hpp"
+#include "rclcpp/node.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "test_msgs/action/fibonacci.hpp"
+
 #include "action_msgs/msg/goal_info.h"
 #include "rclcpp_action/server_goal_handle.hpp"
-#include "./mocking_utils/patch.hpp"
+#include "mocking_utils/patch.hpp"
 
 class FibonacciServerGoalHandle
   : public rclcpp_action::ServerGoalHandle<test_msgs::action::Fibonacci>
@@ -56,7 +56,16 @@ public:
   void SetUp()
   {
     std::shared_ptr<rcl_action_goal_handle_t> rcl_handle =
-      std::make_shared<rcl_action_goal_handle_t>();
+      std::shared_ptr<rcl_action_goal_handle_t>(
+      new rcl_action_goal_handle_t,
+      [](rcl_action_goal_handle_t * p) {
+        if (nullptr == p) {
+          return;
+        }
+        rcl_ret_t ret = rcl_action_goal_handle_fini(p);
+        EXPECT_EQ(ret, RCL_RET_OK) << rcl_get_error_string().str;
+        delete p;
+      });
     *rcl_handle.get() = rcl_action_get_zero_initialized_goal_handle();
     rcutils_allocator_t allocator = rcutils_get_default_allocator();
     rcl_action_goal_info_t goal_info = rcl_action_get_zero_initialized_goal_info();

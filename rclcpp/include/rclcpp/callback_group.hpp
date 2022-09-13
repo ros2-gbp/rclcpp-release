@@ -56,8 +56,44 @@ class CallbackGroup
 public:
   RCLCPP_SMART_PTR_DEFINITIONS(CallbackGroup)
 
+  /// Constructor for CallbackGroup.
+  /**
+   * Callback Groups have a type, either 'Mutually Exclusive' or 'Reentrant'
+   * and when creating one the type must be specified.
+   *
+   * Callbacks in Reentrant Callback Groups must be able to:
+   *   - run at the same time as themselves (reentrant)
+   *   - run at the same time as other callbacks in their group
+   *   - run at the same time as other callbacks in other groups
+   *
+   * Callbacks in Mutually Exclusive Callback Groups:
+   *   - will not be run multiple times simultaneously (non-reentrant)
+   *   - will not be run at the same time as other callbacks in their group
+   *   - but must run at the same time as callbacks in other groups
+   *
+   * Additionally, callback groups have a property which determines whether or
+   * not they are added to an executor with their associated node automatically.
+   * When creating a callback group the automatically_add_to_executor_with_node
+   * argument determines this behavior, and if true it will cause the newly
+   * created callback group to be added to an executor with the node when the
+   * Executor::add_node method is used.
+   * If false, this callback group will not be added automatically and would
+   * have to be added to an executor manually using the
+   * Executor::add_callback_group method.
+   *
+   * Whether the node was added to the executor before creating the callback
+   * group, or after, is irrelevant; the callback group will be automatically
+   * added to the executor in either case.
+   *
+   * \param[in] group_type The type of the callback group.
+   * \param[in] automatically_add_to_executor_with_node A boolean that
+   *   determines whether a callback group is automatically added to an executor
+   *   with the node with which it is associated.
+   */
   RCLCPP_PUBLIC
-  explicit CallbackGroup(CallbackGroupType group_type);
+  explicit CallbackGroup(
+    CallbackGroupType group_type,
+    bool automatically_add_to_executor_with_node = true);
 
   template<typename Function>
   rclcpp::SubscriptionBase::SharedPtr
@@ -102,6 +138,39 @@ public:
   const CallbackGroupType &
   type() const;
 
+  RCLCPP_PUBLIC
+  void collect_all_ptrs(
+    std::function<void(const rclcpp::SubscriptionBase::SharedPtr &)> sub_func,
+    std::function<void(const rclcpp::ServiceBase::SharedPtr &)> service_func,
+    std::function<void(const rclcpp::ClientBase::SharedPtr &)> client_func,
+    std::function<void(const rclcpp::TimerBase::SharedPtr &)> timer_func,
+    std::function<void(const rclcpp::Waitable::SharedPtr &)> waitable_func) const;
+
+  /// Return a reference to the 'associated with executor' atomic boolean.
+  /**
+   * When a callback group is added to an executor this boolean is checked
+   * to ensure it has not already been added to another executor.
+   * If it has not been, then this boolean is set to true to indicate it is
+   * now associated with an executor.
+   *
+   * When the callback group is removed from the executor, this atomic boolean
+   * is set back to false.
+   *
+   * \return the 'associated with executor' atomic boolean
+   */
+  RCLCPP_PUBLIC
+  std::atomic_bool &
+  get_associated_with_executor_atomic();
+
+  /// Return true if this callback group should be automatically added to an executor by the node.
+  /**
+   * \return boolean true if this callback group should be automatically added
+   *   to an executor when the associated node is added, otherwise false.
+   */
+  RCLCPP_PUBLIC
+  bool
+  automatically_add_to_executor_with_node() const;
+
 protected:
   RCLCPP_DISABLE_COPY(CallbackGroup)
 
@@ -136,12 +205,14 @@ protected:
   CallbackGroupType type_;
   // Mutex to protect the subsequent vectors of pointers.
   mutable std::mutex mutex_;
+  std::atomic_bool associated_with_executor_;
   std::vector<rclcpp::SubscriptionBase::WeakPtr> subscription_ptrs_;
   std::vector<rclcpp::TimerBase::WeakPtr> timer_ptrs_;
   std::vector<rclcpp::ServiceBase::WeakPtr> service_ptrs_;
   std::vector<rclcpp::ClientBase::WeakPtr> client_ptrs_;
   std::vector<rclcpp::Waitable::WeakPtr> waitable_ptrs_;
   std::atomic_bool can_be_taken_from_;
+  const bool automatically_add_to_executor_with_node_;
 
 private:
   template<typename TypeT, typename Function>
@@ -159,13 +230,6 @@ private:
   }
 };
 
-namespace callback_group
-{
-
-using CallbackGroupType [[deprecated("use rclcpp::CallbackGroupType instead")]] = CallbackGroupType;
-using CallbackGroup [[deprecated("use rclcpp::CallbackGroup instead")]] = CallbackGroup;
-
-}  // namespace callback_group
 }  // namespace rclcpp
 
 #endif  // RCLCPP__CALLBACK_GROUP_HPP_

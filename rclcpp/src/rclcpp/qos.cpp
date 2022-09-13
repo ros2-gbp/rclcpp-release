@@ -16,7 +16,9 @@
 
 #include <string>
 
+#include "rmw/error_handling.h"
 #include "rmw/types.h"
+#include "rmw/qos_profiles.h"
 
 namespace rclcpp
 {
@@ -100,6 +102,13 @@ QoS::history(rmw_qos_history_policy_t history)
 }
 
 QoS &
+QoS::history(HistoryPolicy history)
+{
+  rmw_qos_profile_.history = static_cast<rmw_qos_history_policy_t>(history);
+  return *this;
+}
+
+QoS &
 QoS::keep_last(size_t depth)
 {
   rmw_qos_profile_.history = RMW_QOS_POLICY_HISTORY_KEEP_LAST;
@@ -123,6 +132,13 @@ QoS::reliability(rmw_qos_reliability_policy_t reliability)
 }
 
 QoS &
+QoS::reliability(ReliabilityPolicy reliability)
+{
+  rmw_qos_profile_.reliability = static_cast<rmw_qos_reliability_policy_t>(reliability);
+  return *this;
+}
+
+QoS &
 QoS::reliable()
 {
   return this->reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
@@ -135,9 +151,22 @@ QoS::best_effort()
 }
 
 QoS &
+QoS::reliability_best_available()
+{
+  return this->reliability(RMW_QOS_POLICY_RELIABILITY_BEST_AVAILABLE);
+}
+
+QoS &
 QoS::durability(rmw_qos_durability_policy_t durability)
 {
   rmw_qos_profile_.durability = durability;
+  return *this;
+}
+
+QoS &
+QoS::durability(DurabilityPolicy durability)
+{
+  rmw_qos_profile_.durability = static_cast<rmw_qos_durability_policy_t>(durability);
   return *this;
 }
 
@@ -151,6 +180,12 @@ QoS &
 QoS::transient_local()
 {
   return this->durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL);
+}
+
+QoS &
+QoS::durability_best_available()
+{
+  return this->durability(RMW_QOS_POLICY_DURABILITY_BEST_AVAILABLE);
 }
 
 QoS &
@@ -187,6 +222,14 @@ QoS::liveliness(rmw_qos_liveliness_policy_t liveliness)
 }
 
 QoS &
+QoS::liveliness(LivelinessPolicy liveliness)
+{
+  rmw_qos_profile_.liveliness = static_cast<rmw_qos_liveliness_policy_t>(liveliness);
+  return *this;
+}
+
+
+QoS &
 QoS::liveliness_lease_duration(rmw_time_t liveliness_lease_duration)
 {
   rmw_qos_profile_.liveliness_lease_duration = liveliness_lease_duration;
@@ -204,6 +247,51 @@ QoS::avoid_ros_namespace_conventions(bool avoid_ros_namespace_conventions)
 {
   rmw_qos_profile_.avoid_ros_namespace_conventions = avoid_ros_namespace_conventions;
   return *this;
+}
+
+HistoryPolicy
+QoS::history() const
+{
+  return static_cast<HistoryPolicy>(rmw_qos_profile_.history);
+}
+
+size_t
+QoS::depth() const {return rmw_qos_profile_.depth;}
+
+ReliabilityPolicy
+QoS::reliability() const
+{
+  return static_cast<ReliabilityPolicy>(rmw_qos_profile_.reliability);
+}
+
+DurabilityPolicy
+QoS::durability() const
+{
+  return static_cast<DurabilityPolicy>(rmw_qos_profile_.durability);
+}
+
+Duration
+QoS::deadline() const {return Duration::from_rmw_time(rmw_qos_profile_.deadline);}
+
+Duration
+QoS::lifespan() const {return Duration::from_rmw_time(rmw_qos_profile_.lifespan);}
+
+LivelinessPolicy
+QoS::liveliness() const
+{
+  return static_cast<LivelinessPolicy>(rmw_qos_profile_.liveliness);
+}
+
+Duration
+QoS::liveliness_lease_duration() const
+{
+  return Duration::from_rmw_time(rmw_qos_profile_.liveliness_lease_duration);
+}
+
+bool
+QoS::avoid_ros_namespace_conventions() const
+{
+  return rmw_qos_profile_.avoid_ros_namespace_conventions;
 }
 
 namespace
@@ -235,6 +323,51 @@ bool operator!=(const QoS & left, const QoS & right)
   return !(left == right);
 }
 
+QoSCheckCompatibleResult
+qos_check_compatible(const QoS & publisher_qos, const QoS & subscription_qos)
+{
+  rmw_qos_compatibility_type_t compatible;
+  const size_t reason_size = 2048u;
+  char reason_c_str[reason_size] = "";
+  rmw_ret_t ret = rmw_qos_profile_check_compatible(
+    publisher_qos.get_rmw_qos_profile(),
+    subscription_qos.get_rmw_qos_profile(),
+    &compatible,
+    reason_c_str,
+    reason_size);
+  if (RMW_RET_OK != ret) {
+    std::string error_str(rmw_get_error_string().str);
+    rmw_reset_error();
+    throw rclcpp::exceptions::QoSCheckCompatibleException{error_str};
+  }
+
+  QoSCheckCompatibleResult result;
+  result.reason = std::string(reason_c_str);
+
+  switch (compatible) {
+    case RMW_QOS_COMPATIBILITY_OK:
+      result.compatibility = QoSCompatibility::Ok;
+      break;
+    case RMW_QOS_COMPATIBILITY_WARNING:
+      result.compatibility = QoSCompatibility::Warning;
+      break;
+    case RMW_QOS_COMPATIBILITY_ERROR:
+      result.compatibility = QoSCompatibility::Error;
+      break;
+    default:
+      throw rclcpp::exceptions::QoSCheckCompatibleException{
+              "Unexpected compatibility value returned by rmw '" + std::to_string(compatible) +
+              "'"};
+  }
+  return result;
+}
+
+ClockQoS::ClockQoS(const QoSInitialization & qos_initialization)
+// Using `rmw_qos_profile_sensor_data` intentionally.
+// It's best effort and `qos_initialization` is overriding the depth to 1.
+: QoS(qos_initialization, rmw_qos_profile_sensor_data)
+{}
+
 SensorDataQoS::SensorDataQoS(const QoSInitialization & qos_initialization)
 : QoS(qos_initialization, rmw_qos_profile_sensor_data)
 {}
@@ -251,8 +384,16 @@ ParameterEventsQoS::ParameterEventsQoS(const QoSInitialization & qos_initializat
 : QoS(qos_initialization, rmw_qos_profile_parameter_events)
 {}
 
+RosoutQoS::RosoutQoS(const QoSInitialization & rosout_initialization)
+: QoS(rosout_initialization, rcl_qos_profile_rosout_default)
+{}
+
 SystemDefaultsQoS::SystemDefaultsQoS(const QoSInitialization & qos_initialization)
 : QoS(qos_initialization, rmw_qos_profile_system_default)
+{}
+
+BestAvailableQoS::BestAvailableQoS(const QoSInitialization & qos_initialization)
+: QoS(qos_initialization, rmw_qos_profile_best_available)
 {}
 
 }  // namespace rclcpp

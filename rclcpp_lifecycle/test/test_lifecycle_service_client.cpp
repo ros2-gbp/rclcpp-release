@@ -37,6 +37,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
+#include "rcpputils/scope_exit.hpp"
+
 #include "./mocking_utils/patch.hpp"
 
 using namespace std::chrono_literals;
@@ -96,8 +98,9 @@ public:
       return unknown_state;
     }
 
-    if (future_result.get()) {
-      return future_result.get()->current_state;
+    auto result = future_result.get();
+    if (result) {
+      return result->current_state;
     } else {
       return unknown_state;
     }
@@ -138,9 +141,9 @@ public:
     if (future_status != std::future_status::ready) {
       return std::vector<lifecycle_msgs::msg::State>();
     }
-
-    if (future_result.get()) {
-      return future_result.get()->available_states;
+    auto result = future_result.get();
+    if (result) {
+      return result->available_states;
     }
 
     return std::vector<lifecycle_msgs::msg::State>();
@@ -162,8 +165,9 @@ public:
       return std::vector<lifecycle_msgs::msg::TransitionDescription>();
     }
 
-    if (future_result.get()) {
-      return future_result.get()->available_transitions;
+    auto result = future_result.get();
+    if (result) {
+      return result->available_transitions;
     }
 
     return std::vector<lifecycle_msgs::msg::TransitionDescription>();
@@ -185,8 +189,9 @@ public:
       return std::vector<lifecycle_msgs::msg::TransitionDescription>();
     }
 
-    if (future_result.get()) {
-      return future_result.get()->available_transitions;
+    auto result = future_result.get();
+    if (result) {
+      return result->available_transitions;
     }
 
     return std::vector<lifecycle_msgs::msg::TransitionDescription>();
@@ -372,6 +377,14 @@ TEST_F(TestLifecycleServiceClient, get_service_names_and_types_by_node)
     std::runtime_error);
   auto service_names_and_types1 = node_graph->get_service_names_and_types_by_node("client1", "/");
   auto service_names_and_types2 = node_graph->get_service_names_and_types_by_node("client2", "/");
+  auto start = std::chrono::steady_clock::now();
+  while (0 == service_names_and_types1.size() ||
+    service_names_and_types1.size() != service_names_and_types2.size() ||
+    (std::chrono::steady_clock::now() - start) < std::chrono::seconds(1))
+  {
+    service_names_and_types1 = node_graph->get_service_names_and_types_by_node("client1", "/");
+    service_names_and_types2 = node_graph->get_service_names_and_types_by_node("client2", "/");
+  }
   EXPECT_EQ(service_names_and_types1.size(), service_names_and_types2.size());
 }
 
@@ -387,7 +400,8 @@ TEST_F(TestLifecycleServiceClient, declare_parameter_with_no_initial_values)
     };
 
   auto handler = node1->add_on_set_parameters_callback(on_set_parameters);
-  RCLCPP_SCOPE_EXIT({node1->remove_on_set_parameters_callback(handler.get());});    // always reset
+  RCPPUTILS_SCOPE_EXIT(
+    {node1->remove_on_set_parameters_callback(handler.get());});  // always reset
 }
 
 TEST_F(TestLifecycleServiceClient, wait_for_graph_change)

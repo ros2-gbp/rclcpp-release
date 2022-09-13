@@ -21,6 +21,8 @@
 #include "rclcpp/visibility_control.hpp"
 
 #include "rcl/node.h"
+#include "rcutils/logging.h"
+#include "rcpputils/filesystem_helper.hpp"
 
 /**
  * \def RCLCPP_LOGGING_ENABLED
@@ -74,8 +76,32 @@ RCLCPP_PUBLIC
 Logger
 get_node_logger(const rcl_node_t * node);
 
+/// Get the current logging directory.
+/**
+ * For more details of how the logging directory is determined,
+ * see rcl_logging_get_logging_directory().
+ *
+ * \returns the logging directory being used.
+ * \throws rclcpp::exceptions::RCLError if an unexpected error occurs.
+ */
+RCLCPP_PUBLIC
+rcpputils::fs::path
+get_logging_directory();
+
 class Logger
 {
+public:
+  /// An enum for the type of logger level.
+  enum class Level
+  {
+    Unset = RCUTILS_LOG_SEVERITY_UNSET,  ///< The unset log level
+    Debug = RCUTILS_LOG_SEVERITY_DEBUG,  ///< The debug log level
+    Info = RCUTILS_LOG_SEVERITY_INFO,    ///< The info log level
+    Warn = RCUTILS_LOG_SEVERITY_WARN,    ///< The warn log level
+    Error = RCUTILS_LOG_SEVERITY_ERROR,  ///< The error log level
+    Fatal = RCUTILS_LOG_SEVERITY_FATAL,  ///< The fatal log level
+  };
+
 private:
   friend Logger rclcpp::get_logger(const std::string & name);
   friend ::rclcpp::node_interfaces::NodeLogging;
@@ -138,6 +164,16 @@ public:
     }
     return Logger(*name_ + "." + suffix);
   }
+
+  /// Set level for current logger.
+  /**
+   * \param[in] level the logger's level
+   * \throws rclcpp::exceptions::RCLInvalidArgument if level is invalid.
+   * \throws rclcpp::exceptions::RCLError if other error happens.
+   */
+  RCLCPP_PUBLIC
+  void
+  set_level(Level level);
 };
 
 }  // namespace rclcpp

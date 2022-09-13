@@ -43,7 +43,7 @@ InitOptions::InitOptions(const rcl_init_options_t & init_options)
 InitOptions::InitOptions(const InitOptions & other)
 : InitOptions(*other.get_rcl_init_options())
 {
-  shutdown_on_sigint = other.shutdown_on_sigint;
+  shutdown_on_signal = other.shutdown_on_signal;
   initialize_logging_ = other.initialize_logging_;
 }
 
@@ -64,12 +64,13 @@ InitOptions &
 InitOptions::operator=(const InitOptions & other)
 {
   if (this != &other) {
-    this->finalize_init_options();
+    std::lock_guard<std::mutex> init_options_lock(init_options_mutex_);
+    this->finalize_init_options_impl();
     rcl_ret_t ret = rcl_init_options_copy(other.get_rcl_init_options(), init_options_.get());
     if (RCL_RET_OK != ret) {
       rclcpp::exceptions::throw_from_rcl_error(ret, "failed to copy rcl init options");
     }
-    this->shutdown_on_sigint = other.shutdown_on_sigint;
+    this->shutdown_on_signal = other.shutdown_on_signal;
     this->initialize_logging_ = other.initialize_logging_;
   }
   return *this;
@@ -82,6 +83,13 @@ InitOptions::~InitOptions()
 
 void
 InitOptions::finalize_init_options()
+{
+  std::lock_guard<std::mutex> init_options_lock(init_options_mutex_);
+  this->finalize_init_options_impl();
+}
+
+void
+InitOptions::finalize_init_options_impl()
 {
   if (init_options_) {
     rcl_ret_t ret = rcl_init_options_fini(init_options_.get());
@@ -99,6 +107,40 @@ const rcl_init_options_t *
 InitOptions::get_rcl_init_options() const
 {
   return init_options_.get();
+}
+
+void
+InitOptions::use_default_domain_id()
+{
+  size_t domain_id = RCL_DEFAULT_DOMAIN_ID;
+  rcl_ret_t ret = rcl_get_default_domain_id(&domain_id);
+  if (RCL_RET_OK != ret) {
+    rclcpp::exceptions::throw_from_rcl_error(ret, "failed to get default domain id");
+  }
+  set_domain_id(domain_id);
+}
+
+void
+InitOptions::set_domain_id(size_t domain_id)
+{
+  std::lock_guard<std::mutex> init_options_lock(init_options_mutex_);
+  rcl_ret_t ret = rcl_init_options_set_domain_id(init_options_.get(), domain_id);
+  if (RCL_RET_OK != ret) {
+    rclcpp::exceptions::throw_from_rcl_error(ret, "failed to set domain id to rcl init options");
+  }
+}
+
+size_t
+InitOptions::get_domain_id() const
+{
+  std::lock_guard<std::mutex> init_options_lock(init_options_mutex_);
+  size_t domain_id;
+  rcl_ret_t ret = rcl_init_options_get_domain_id(init_options_.get(), &domain_id);
+  if (RCL_RET_OK != ret) {
+    rclcpp::exceptions::throw_from_rcl_error(ret, "failed to get domain id from rcl init options");
+  }
+
+  return domain_id;
 }
 
 }  // namespace rclcpp

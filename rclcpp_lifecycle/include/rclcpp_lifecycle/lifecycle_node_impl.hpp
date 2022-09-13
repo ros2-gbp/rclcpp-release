@@ -22,12 +22,15 @@
 #include <vector>
 
 #include "rclcpp/contexts/default_context.hpp"
-#include "rclcpp/event.hpp"
-#include "rclcpp/experimental/intra_process_manager.hpp"
-#include "rclcpp/parameter.hpp"
+#include "rclcpp/create_client.hpp"
+#include "rclcpp/create_generic_publisher.hpp"
+#include "rclcpp/create_generic_subscription.hpp"
 #include "rclcpp/create_publisher.hpp"
 #include "rclcpp/create_service.hpp"
 #include "rclcpp/create_subscription.hpp"
+#include "rclcpp/event.hpp"
+#include "rclcpp/experimental/intra_process_manager.hpp"
+#include "rclcpp/parameter.hpp"
 #include "rclcpp/subscription_options.hpp"
 #include "rclcpp/type_support_decl.hpp"
 
@@ -47,11 +50,13 @@ LifecycleNode::create_publisher(
   const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options)
 {
   using PublisherT = rclcpp_lifecycle::LifecyclePublisher<MessageT, AllocatorT>;
-  return rclcpp::create_publisher<MessageT, AllocatorT, PublisherT>(
+  auto pub = rclcpp::create_publisher<MessageT, AllocatorT, PublisherT>(
     *this,
     topic_name,
     qos,
     options);
+  this->add_managed_entity(pub);
+  return pub;
 }
 
 // TODO(karsten1987): Create LifecycleSubscriber
@@ -59,7 +64,6 @@ template<
   typename MessageT,
   typename CallbackT,
   typename AllocatorT,
-  typename CallbackMessageT,
   typename SubscriptionT,
   typename MessageMemoryStrategyT>
 std::shared_ptr<SubscriptionT>
@@ -86,11 +90,28 @@ LifecycleNode::create_wall_timer(
   CallbackT callback,
   rclcpp::CallbackGroup::SharedPtr group)
 {
-  auto timer = rclcpp::WallTimer<CallbackT>::make_shared(
-    std::chrono::duration_cast<std::chrono::nanoseconds>(period),
-    std::move(callback), this->node_base_->get_context());
-  node_timers_->add_timer(timer, group);
-  return timer;
+  return rclcpp::create_wall_timer(
+    period,
+    std::move(callback),
+    group,
+    this->node_base_.get(),
+    this->node_timers_.get());
+}
+
+template<typename DurationRepT, typename DurationT, typename CallbackT>
+typename rclcpp::GenericTimer<CallbackT>::SharedPtr
+LifecycleNode::create_timer(
+  std::chrono::duration<DurationRepT, DurationT> period,
+  CallbackT callback,
+  rclcpp::CallbackGroup::SharedPtr group)
+{
+  return rclcpp::create_timer(
+    this->get_clock(),
+    period,
+    std::move(callback),
+    group,
+    this->node_base_.get(),
+    this->node_timers_.get());
 }
 
 template<typename ServiceT>
@@ -100,21 +121,21 @@ LifecycleNode::create_client(
   const rmw_qos_profile_t & qos_profile,
   rclcpp::CallbackGroup::SharedPtr group)
 {
-  rcl_client_options_t options = rcl_client_get_default_options();
-  options.qos = qos_profile;
+  return rclcpp::create_client<ServiceT>(
+    node_base_, node_graph_, node_services_,
+    service_name, qos_profile, group);
+}
 
-  using rclcpp::Client;
-  using rclcpp::ClientBase;
-
-  auto cli = Client<ServiceT>::make_shared(
-    node_base_.get(),
-    node_graph_,
-    service_name,
-    options);
-
-  auto cli_base_ptr = std::dynamic_pointer_cast<ClientBase>(cli);
-  node_services_->add_client(cli_base_ptr, group);
-  return cli;
+template<typename ServiceT>
+typename rclcpp::Client<ServiceT>::SharedPtr
+LifecycleNode::create_client(
+  const std::string & service_name,
+  const rclcpp::QoS & qos,
+  rclcpp::CallbackGroup::SharedPtr group)
+{
+  return rclcpp::create_client<ServiceT>(
+    node_base_, node_graph_, node_services_,
+    service_name, qos, group);
 }
 
 template<typename ServiceT, typename CallbackT>
@@ -130,17 +151,90 @@ LifecycleNode::create_service(
     service_name, std::forward<CallbackT>(callback), qos_profile, group);
 }
 
+template<typename ServiceT, typename CallbackT>
+typename rclcpp::Service<ServiceT>::SharedPtr
+LifecycleNode::create_service(
+  const std::string & service_name,
+  CallbackT && callback,
+  const rclcpp::QoS & qos,
+  rclcpp::CallbackGroup::SharedPtr group)
+{
+  return rclcpp::create_service<ServiceT, CallbackT>(
+    node_base_, node_services_,
+    service_name, std::forward<CallbackT>(callback), qos, group);
+}
+
+template<typename AllocatorT>
+std::shared_ptr<rclcpp::GenericPublisher>
+LifecycleNode::create_generic_publisher(
+  const std::string & topic_name,
+  const std::string & topic_type,
+  const rclcpp::QoS & qos,
+  const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options)
+{
+  return rclcpp::create_generic_publisher(
+    node_topics_,
+    // TODO(karsten1987): LifecycleNode is currently not supporting subnamespaces
+    // see https://github.com/ros2/rclcpp/issues/1614
+    topic_name,
+    topic_type,
+    qos,
+    options
+  );
+}
+
+template<typename AllocatorT>
+std::shared_ptr<rclcpp::GenericSubscription>
+LifecycleNode::create_generic_subscription(
+  const std::string & topic_name,
+  const std::string & topic_type,
+  const rclcpp::QoS & qos,
+  std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
+  const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
+{
+  return rclcpp::create_generic_subscription(
+    node_topics_,
+    // TODO(karsten1987): LifecycleNode is currently not supporting subnamespaces
+    // see https://github.com/ros2/rclcpp/issues/1614
+    topic_name,
+    topic_type,
+    qos,
+    std::move(callback),
+    options
+  );
+}
+
 template<typename ParameterT>
 auto
 LifecycleNode::declare_parameter(
   const std::string & name,
   const ParameterT & default_value,
-  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor)
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+  bool ignore_override)
 {
   return this->declare_parameter(
     name,
     rclcpp::ParameterValue(default_value),
-    parameter_descriptor
+    parameter_descriptor,
+    ignore_override
+  ).get<ParameterT>();
+}
+
+template<typename ParameterT>
+auto
+LifecycleNode::declare_parameter(
+  const std::string & name,
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+  bool ignore_override)
+{
+  // get advantage of parameter value template magic to get
+  // the correct rclcpp::ParameterType from ParameterT
+  rclcpp::ParameterValue value{ParameterT{}};
+  return this->declare_parameter(
+    name,
+    value.get_type(),
+    parameter_descriptor,
+    ignore_override
   ).get<ParameterT>();
 }
 

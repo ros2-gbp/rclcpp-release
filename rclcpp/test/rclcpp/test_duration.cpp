@@ -52,8 +52,22 @@ TEST_F(TestDuration, operators) {
   EXPECT_EQ(sub.nanoseconds(), young.nanoseconds() - old.nanoseconds());
   EXPECT_EQ(sub, young - old);
 
+  rclcpp::Duration addequal = old;
+  addequal += young;
+  EXPECT_EQ(addequal.nanoseconds(), old.nanoseconds() + young.nanoseconds());
+  EXPECT_EQ(addequal, old + young);
+
+  rclcpp::Duration subequal = young;
+  subequal -= old;
+  EXPECT_EQ(subequal.nanoseconds(), young.nanoseconds() - old.nanoseconds());
+  EXPECT_EQ(subequal, young - old);
+
   rclcpp::Duration scale = old * 3;
   EXPECT_EQ(scale.nanoseconds(), old.nanoseconds() * 3);
+
+  rclcpp::Duration scaleequal = old;
+  scaleequal *= 3;
+  EXPECT_EQ(scaleequal.nanoseconds(), old.nanoseconds() * 3);
 
   rclcpp::Duration time = rclcpp::Duration(0, 0);
   rclcpp::Duration copy_constructor_duration(time);
@@ -68,7 +82,7 @@ TEST_F(TestDuration, operators) {
 TEST_F(TestDuration, chrono_overloads) {
   int64_t ns = 123456789l;
   auto chrono_ns = std::chrono::nanoseconds(ns);
-  auto d1 = rclcpp::Duration(ns);
+  auto d1 = rclcpp::Duration::from_nanoseconds(ns);
   auto d2 = rclcpp::Duration(chrono_ns);
   auto d3 = rclcpp::Duration(123456789ns);
   EXPECT_EQ(d1, d2);
@@ -85,11 +99,11 @@ TEST_F(TestDuration, chrono_overloads) {
 }
 
 TEST_F(TestDuration, overflows) {
-  rclcpp::Duration max(std::numeric_limits<rcl_duration_value_t>::max());
-  rclcpp::Duration min(std::numeric_limits<rcl_duration_value_t>::min());
+  auto max = rclcpp::Duration::from_nanoseconds(std::numeric_limits<rcl_duration_value_t>::max());
+  auto min = rclcpp::Duration::from_nanoseconds(std::numeric_limits<rcl_duration_value_t>::min());
 
-  rclcpp::Duration one(1);
-  rclcpp::Duration negative_one(-1);
+  rclcpp::Duration one(1ns);
+  rclcpp::Duration negative_one(-1ns);
 
   EXPECT_THROW(max + one, std::overflow_error);
   EXPECT_THROW(min - one, std::underflow_error);
@@ -106,7 +120,7 @@ TEST_F(TestDuration, overflows) {
 }
 
 TEST_F(TestDuration, negative_duration) {
-  rclcpp::Duration assignable_duration = rclcpp::Duration(0) - rclcpp::Duration(5, 0);
+  rclcpp::Duration assignable_duration = rclcpp::Duration(0ns) - rclcpp::Duration(5, 0);
 
   {
     // avoid windows converting a literal number less than -INT_MAX to unsigned int C4146
@@ -141,22 +155,52 @@ static const int64_t ONE_AND_HALF_SEC_IN_NS = 3 * HALF_SEC_IN_NS;
 static const int64_t MAX_NANOSECONDS = std::numeric_limits<int64_t>::max();
 
 TEST_F(TestDuration, from_seconds) {
-  EXPECT_EQ(rclcpp::Duration(0), rclcpp::Duration::from_seconds(0.0));
-  EXPECT_EQ(rclcpp::Duration(0), rclcpp::Duration::from_seconds(0));
+  EXPECT_EQ(rclcpp::Duration(0ns), rclcpp::Duration::from_seconds(0.0));
+  EXPECT_EQ(rclcpp::Duration(0ns), rclcpp::Duration::from_seconds(0));
   EXPECT_EQ(rclcpp::Duration(1, HALF_SEC_IN_NS), rclcpp::Duration::from_seconds(1.5));
-  EXPECT_EQ(rclcpp::Duration(-ONE_AND_HALF_SEC_IN_NS), rclcpp::Duration::from_seconds(-1.5));
+  EXPECT_EQ(
+    rclcpp::Duration::from_nanoseconds(-ONE_AND_HALF_SEC_IN_NS),
+    rclcpp::Duration::from_seconds(-1.5));
+}
+
+TEST_F(TestDuration, from_rmw_time) {
+  constexpr auto max_rcl_duration = std::numeric_limits<rcl_duration_value_t>::max();
+  {
+    rmw_time_t rmw_duration{};
+    rmw_duration.sec = RCL_NS_TO_S(max_rcl_duration) + 1uLL;
+    EXPECT_EQ(rclcpp::Duration::from_rmw_time(rmw_duration).nanoseconds(), max_rcl_duration);
+  }
+  {
+    rmw_time_t rmw_duration{};
+    rmw_duration.nsec = max_rcl_duration + 1uLL;
+    EXPECT_EQ(rclcpp::Duration::from_rmw_time(rmw_duration).nanoseconds(), max_rcl_duration);
+  }
+  {
+    rmw_time_t rmw_duration{};
+    rmw_duration.nsec = max_rcl_duration;
+    rmw_duration.sec = RCL_NS_TO_S(max_rcl_duration);
+    EXPECT_EQ(rclcpp::Duration::from_rmw_time(rmw_duration).nanoseconds(), max_rcl_duration);
+  }
+  {
+    rmw_time_t rmw_duration{};
+    rmw_duration.sec = 1u;
+    rmw_duration.nsec = 1000u;
+    EXPECT_EQ(
+      rclcpp::Duration::from_rmw_time(rmw_duration).nanoseconds(),
+      static_cast<rcl_duration_value_t>(RCL_S_TO_NS(rmw_duration.sec) + rmw_duration.nsec));
+  }
 }
 
 TEST_F(TestDuration, std_chrono_constructors) {
-  EXPECT_EQ(rclcpp::Duration(0), rclcpp::Duration(0.0s));
-  EXPECT_EQ(rclcpp::Duration(0), rclcpp::Duration(0s));
+  EXPECT_EQ(rclcpp::Duration(0ns), rclcpp::Duration(0.0s));
+  EXPECT_EQ(rclcpp::Duration(0ns), rclcpp::Duration(0s));
   EXPECT_EQ(rclcpp::Duration(1, HALF_SEC_IN_NS), rclcpp::Duration(1.5s));
   EXPECT_EQ(rclcpp::Duration(-1, 0), rclcpp::Duration(-1s));
 }
 
 TEST_F(TestDuration, conversions) {
   {
-    const rclcpp::Duration duration(HALF_SEC_IN_NS);
+    auto duration = rclcpp::Duration::from_nanoseconds(HALF_SEC_IN_NS);
     const auto duration_msg = static_cast<builtin_interfaces::msg::Duration>(duration);
     EXPECT_EQ(duration_msg.sec, 0);
     EXPECT_EQ(duration_msg.nanosec, HALF_SEC_IN_NS);
@@ -171,7 +215,7 @@ TEST_F(TestDuration, conversions) {
   }
 
   {
-    const rclcpp::Duration duration(ONE_SEC_IN_NS);
+    auto duration = rclcpp::Duration::from_nanoseconds(ONE_SEC_IN_NS);
     const auto duration_msg = static_cast<builtin_interfaces::msg::Duration>(duration);
     EXPECT_EQ(duration_msg.sec, 1);
     EXPECT_EQ(duration_msg.nanosec, 0u);
@@ -186,7 +230,7 @@ TEST_F(TestDuration, conversions) {
   }
 
   {
-    const rclcpp::Duration duration(ONE_AND_HALF_SEC_IN_NS);
+    auto duration = rclcpp::Duration::from_nanoseconds(ONE_AND_HALF_SEC_IN_NS);
     auto duration_msg = static_cast<builtin_interfaces::msg::Duration>(duration);
     EXPECT_EQ(duration_msg.sec, 1);
     EXPECT_EQ(duration_msg.nanosec, HALF_SEC_IN_NS);
@@ -201,7 +245,7 @@ TEST_F(TestDuration, conversions) {
   }
 
   {
-    rclcpp::Duration duration(-HALF_SEC_IN_NS);
+    auto duration = rclcpp::Duration::from_nanoseconds(-HALF_SEC_IN_NS);
     auto duration_msg = static_cast<builtin_interfaces::msg::Duration>(duration);
     EXPECT_EQ(duration_msg.sec, -1);
     EXPECT_EQ(duration_msg.nanosec, HALF_SEC_IN_NS);
@@ -214,7 +258,7 @@ TEST_F(TestDuration, conversions) {
   }
 
   {
-    rclcpp::Duration duration(-ONE_SEC_IN_NS);
+    auto duration = rclcpp::Duration::from_nanoseconds(-ONE_SEC_IN_NS);
     auto duration_msg = static_cast<builtin_interfaces::msg::Duration>(duration);
     EXPECT_EQ(duration_msg.sec, -1);
     EXPECT_EQ(duration_msg.nanosec, 0u);
@@ -227,7 +271,7 @@ TEST_F(TestDuration, conversions) {
   }
 
   {
-    rclcpp::Duration duration(-ONE_AND_HALF_SEC_IN_NS);
+    auto duration = rclcpp::Duration::from_nanoseconds(-ONE_AND_HALF_SEC_IN_NS);
     auto duration_msg = static_cast<builtin_interfaces::msg::Duration>(duration);
     EXPECT_EQ(duration_msg.sec, -2);
     EXPECT_EQ(duration_msg.nanosec, HALF_SEC_IN_NS);
@@ -240,7 +284,7 @@ TEST_F(TestDuration, conversions) {
   }
 
   {
-    auto duration = rclcpp::Duration(MAX_NANOSECONDS);
+    auto duration = rclcpp::Duration::from_nanoseconds(MAX_NANOSECONDS);
 
     const auto duration_msg = static_cast<builtin_interfaces::msg::Duration>(duration);
     EXPECT_EQ(duration_msg.sec, std::numeric_limits<int32_t>::max());
@@ -255,7 +299,7 @@ TEST_F(TestDuration, conversions) {
   }
 
   {
-    auto duration = rclcpp::Duration(-MAX_NANOSECONDS);
+    auto duration = rclcpp::Duration::from_nanoseconds(-MAX_NANOSECONDS);
 
     const auto duration_msg = static_cast<builtin_interfaces::msg::Duration>(duration);
     EXPECT_EQ(duration_msg.sec, std::numeric_limits<int32_t>::min());
@@ -282,9 +326,10 @@ TEST_F(TestDuration, test_some_constructors) {
 }
 
 TEST_F(TestDuration, test_some_exceptions) {
-  rclcpp::Duration test_duration(0u);
+  rclcpp::Duration test_duration(0ns);
   RCLCPP_EXPECT_THROW_EQ(
-    test_duration = rclcpp::Duration(INT64_MAX) - rclcpp::Duration(-1),
+    test_duration =
+    rclcpp::Duration::from_nanoseconds(INT64_MAX) - rclcpp::Duration(-1ns),
     std::overflow_error("duration subtraction leads to int64_t overflow"));
   RCLCPP_EXPECT_THROW_EQ(
     test_duration = test_duration * (std::numeric_limits<double>::infinity()),

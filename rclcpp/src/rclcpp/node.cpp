@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <map>
 #include <memory>
@@ -20,6 +21,9 @@
 #include <utility>
 #include <vector>
 
+#include "rcl/arguments.h"
+
+#include "rclcpp/detail/qos_parameters.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/graph_listener.hpp"
 #include "rclcpp/node.hpp"
@@ -33,12 +37,18 @@
 #include "rclcpp/node_interfaces/node_timers.hpp"
 #include "rclcpp/node_interfaces/node_topics.hpp"
 #include "rclcpp/node_interfaces/node_waitables.hpp"
+#include "rclcpp/qos_overriding_options.hpp"
 
 #include "rmw/validate_namespace.h"
+
+#include "./detail/resolve_parameter_overrides.hpp"
 
 using rclcpp::Node;
 using rclcpp::NodeOptions;
 using rclcpp::exceptions::throw_from_rcl_error;
+
+namespace
+{
 
 RCLCPP_LOCAL
 std::string
@@ -47,18 +57,18 @@ extend_sub_namespace(const std::string & existing_sub_namespace, const std::stri
   // Assumption is that the existing_sub_namespace does not need checking
   // because it would be checked already when it was set with this function.
 
-  // check if the new sub-namespace extension is absolute
-  if (extension.front() == '/') {
-    throw rclcpp::exceptions::NameValidationError(
-            "sub_namespace",
-            extension.c_str(),
-            "a sub-namespace should not have a leading /",
-            0);
-  } else if (existing_sub_namespace.empty() && extension.empty()) {
+  if (extension.empty()) {
     throw rclcpp::exceptions::NameValidationError(
             "sub_namespace",
             extension.c_str(),
             "sub-nodes should not extend nodes by an empty sub-namespace",
+            0);
+  } else if (extension.front() == '/') {
+    // check if the new sub-namespace extension is absolute
+    throw rclcpp::exceptions::NameValidationError(
+            "sub_namespace",
+            extension.c_str(),
+            "a sub-namespace should not have a leading /",
             0);
   }
 
@@ -69,7 +79,7 @@ extend_sub_namespace(const std::string & existing_sub_namespace, const std::stri
     new_sub_namespace = existing_sub_namespace + "/" + extension;
   }
 
-  // remove any trailing `/` so that new extensions do no result in `//`
+  // remove any trailing `/` so that new extensions do not result in `//`
   if (new_sub_namespace.back() == '/') {
     new_sub_namespace = new_sub_namespace.substr(0, new_sub_namespace.size() - 1);
   }
@@ -97,11 +107,52 @@ create_effective_namespace(const std::string & node_namespace, const std::string
   }
 }
 
+}  // namespace
+
 Node::Node(
   const std::string & node_name,
   const NodeOptions & options)
 : Node(node_name, "", options)
 {
+}
+
+static
+rclcpp::QoS
+get_parameter_events_qos(
+  rclcpp::node_interfaces::NodeBaseInterface & node_base,
+  const rclcpp::NodeOptions & options)
+{
+  auto final_qos = options.parameter_event_qos();
+  const rcl_arguments_t * global_args = nullptr;
+  auto * rcl_options = options.get_rcl_node_options();
+  if (rcl_options->use_global_arguments) {
+    auto context_ptr = node_base.get_context()->get_rcl_context();
+    global_args = &(context_ptr->global_arguments);
+  }
+
+  auto parameter_overrides = rclcpp::detail::resolve_parameter_overrides(
+    node_base.get_fully_qualified_name(),
+    options.parameter_overrides(),
+    &rcl_options->arguments,
+    global_args);
+
+  auto final_topic_name = node_base.resolve_topic_or_service_name("/parameter_events", false);
+  auto prefix = "qos_overrides." + final_topic_name + ".";
+  std::array<rclcpp::QosPolicyKind, 4> policies = {
+    rclcpp::QosPolicyKind::Depth,
+    rclcpp::QosPolicyKind::Durability,
+    rclcpp::QosPolicyKind::History,
+    rclcpp::QosPolicyKind::Reliability,
+  };
+  for (const auto & policy : policies) {
+    auto param_name = prefix + rclcpp::qos_policy_kind_to_cstr(policy);
+    auto it = parameter_overrides.find(param_name);
+    auto value = it != parameter_overrides.end() ?
+      it->second :
+      rclcpp::detail::get_default_qos_param_value(policy, options.parameter_event_qos());
+    rclcpp::detail::apply_qos_override(policy, value, final_qos);
+  }
+  return final_qos;
 }
 
 Node::Node(
@@ -136,7 +187,9 @@ Node::Node(
       options.parameter_overrides(),
       options.start_parameter_services(),
       options.start_parameter_event_publisher(),
-      options.parameter_event_qos(),
+      // This is needed in order to apply parameter overrides to the qos profile provided in
+      // options.
+      get_parameter_events_qos(*node_base_, options),
       options.parameter_event_publisher_options(),
       options.allow_undeclared_parameters(),
       options.automatically_declare_parameters_from_overrides()
@@ -148,13 +201,29 @@ Node::Node(
       node_services_,
       node_logging_,
       node_clock_,
-      node_parameters_
+      node_parameters_,
+      options.clock_qos(),
+      options.use_clock_thread()
     )),
   node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
   node_options_(options),
   sub_namespace_(""),
   effective_namespace_(create_effective_namespace(this->get_namespace(), sub_namespace_))
 {
+  // we have got what we wanted directly from the overrides,
+  // but declare the parameters anyway so they are visible.
+  rclcpp::detail::declare_qos_parameters(
+    rclcpp::QosOverridingOptions
+  {
+    QosPolicyKind::Depth,
+    QosPolicyKind::Durability,
+    QosPolicyKind::History,
+    QosPolicyKind::Reliability,
+  },
+    node_parameters_,
+    node_topics_->resolve_topic_name("/parameter_events"),
+    options.parameter_event_qos(),
+    rclcpp::detail::PublisherQosParametersTraits{});
 }
 
 Node::Node(
@@ -234,15 +303,11 @@ Node::get_logger() const
 }
 
 rclcpp::CallbackGroup::SharedPtr
-Node::create_callback_group(rclcpp::CallbackGroupType group_type)
+Node::create_callback_group(
+  rclcpp::CallbackGroupType group_type,
+  bool automatically_add_to_executor_with_node)
 {
-  return node_base_->create_callback_group(group_type);
-}
-
-bool
-Node::group_in_node(rclcpp::CallbackGroup::SharedPtr group)
-{
-  return node_base_->callback_group_in_node(group);
+  return node_base_->create_callback_group(group_type, automatically_add_to_executor_with_node);
 }
 
 const rclcpp::ParameterValue &
@@ -255,6 +320,20 @@ Node::declare_parameter(
   return this->node_parameters_->declare_parameter(
     name,
     default_value,
+    parameter_descriptor,
+    ignore_override);
+}
+
+const rclcpp::ParameterValue &
+Node::declare_parameter(
+  const std::string & name,
+  rclcpp::ParameterType type,
+  const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+  bool ignore_override)
+{
+  return this->node_parameters_->declare_parameter(
+    name,
+    type,
     parameter_descriptor,
     ignore_override);
 }
@@ -274,7 +353,7 @@ Node::has_parameter(const std::string & name) const
 rcl_interfaces::msg::SetParametersResult
 Node::set_parameter(const rclcpp::Parameter & parameter)
 {
-  return this->set_parameters_atomically({parameter});
+  return node_parameters_->set_parameters_atomically({parameter});
 }
 
 std::vector<rcl_interfaces::msg::SetParametersResult>
@@ -339,39 +418,41 @@ Node::list_parameters(const std::vector<std::string> & prefixes, uint64_t depth)
   return node_parameters_->list_parameters(prefixes, depth);
 }
 
+rclcpp::Node::PreSetParametersCallbackHandle::SharedPtr
+Node::add_pre_set_parameters_callback(PreSetParametersCallbackType callback)
+{
+  return node_parameters_->add_pre_set_parameters_callback(callback);
+}
+
 rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
-Node::add_on_set_parameters_callback(OnParametersSetCallbackType callback)
+Node::add_on_set_parameters_callback(OnSetParametersCallbackType callback)
 {
   return node_parameters_->add_on_set_parameters_callback(callback);
 }
 
+rclcpp::Node::PostSetParametersCallbackHandle::SharedPtr
+Node::add_post_set_parameters_callback(PostSetParametersCallbackType callback)
+{
+  return node_parameters_->add_post_set_parameters_callback(callback);
+}
+
 void
-Node::remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const callback)
+Node::remove_pre_set_parameters_callback(const PreSetParametersCallbackHandle * const handler)
 {
-  return node_parameters_->remove_on_set_parameters_callback(callback);
+  node_parameters_->remove_pre_set_parameters_callback(handler);
 }
 
-// suppress deprecated function warning
-#if !defined(_WIN32)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else  // !defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-
-rclcpp::Node::OnParametersSetCallbackType
-Node::set_on_parameters_set_callback(rclcpp::Node::OnParametersSetCallbackType callback)
+void
+Node::remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const handler)
 {
-  return node_parameters_->set_on_parameters_set_callback(callback);
+  node_parameters_->remove_on_set_parameters_callback(handler);
 }
 
-// remove warning suppression
-#if !defined(_WIN32)
-# pragma GCC diagnostic pop
-#else  // !defined(_WIN32)
-# pragma warning(pop)
-#endif
+void
+Node::remove_post_set_parameters_callback(const PostSetParametersCallbackHandle * const handler)
+{
+  node_parameters_->remove_post_set_parameters_callback(handler);
+}
 
 std::vector<std::string>
 Node::get_node_names() const
@@ -424,10 +505,11 @@ Node::get_subscriptions_info_by_topic(const std::string & topic_name, bool no_ma
   return node_graph_->get_subscriptions_info_by_topic(topic_name, no_mangle);
 }
 
-const std::vector<rclcpp::CallbackGroup::WeakPtr> &
-Node::get_callback_groups() const
+void
+Node::for_each_callback_group(
+  const node_interfaces::NodeBaseInterface::CallbackGroupFunction & func)
 {
-  return node_base_->get_callback_groups();
+  node_base_->for_each_callback_group(func);
 }
 
 rclcpp::Event::SharedPtr

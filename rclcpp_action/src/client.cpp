@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rcl_action/action_client.h>
-#include <rcl_action/wait.h>
-#include <rclcpp/node_interfaces/node_base_interface.hpp>
-#include <rclcpp/node_interfaces/node_logging_interface.hpp>
-
 #include <algorithm>
 #include <map>
 #include <memory>
 #include <random>
 #include <string>
+#include <tuple>
+#include <utility>
+
+#include "rcl_action/action_client.h"
+#include "rcl_action/wait.h"
+#include "rclcpp/node_interfaces/node_base_interface.hpp"
+#include "rclcpp/node_interfaces/node_logging_interface.hpp"
 
 #include "rclcpp_action/client.hpp"
 #include "rclcpp_action/exceptions.hpp"
@@ -42,7 +44,7 @@ public:
   : node_graph_(node_graph),
     node_handle(node_base->get_shared_rcl_node_handle()),
     logger(node_logging->get_logger().get_child("rclcpp_action")),
-    random_bytes_generator(std::random_device{} ())
+    random_bytes_generator(std::random_device{}())
   {
     std::weak_ptr<rcl_node_t> weak_node_handle(node_handle);
     client_handle = std::shared_ptr<rcl_action_client_t>(
@@ -134,6 +136,7 @@ ClientBase::ClientBase(
 
 ClientBase::~ClientBase()
 {
+  clear_on_ready_callback();
 }
 
 bool
@@ -250,12 +253,14 @@ ClientBase::get_number_of_ready_services()
   return pimpl_->num_services;
 }
 
-bool
+void
 ClientBase::add_to_wait_set(rcl_wait_set_t * wait_set)
 {
   rcl_ret_t ret = rcl_action_wait_set_add_action_client(
     wait_set, pimpl_->client_handle.get(), nullptr, nullptr);
-  return RCL_RET_OK == ret;
+  if (RCL_RET_OK != ret) {
+    rclcpp::exceptions::throw_from_rcl_error(ret, "ClientBase::add_to_wait_set() failed");
+  }
 }
 
 bool
@@ -382,57 +387,292 @@ ClientBase::generate_goal_id()
 }
 
 void
-ClientBase::execute()
+ClientBase::set_on_ready_callback(std::function<void(size_t, int)> callback)
+{
+  if (!callback) {
+    throw std::invalid_argument(
+            "The callback passed to set_on_ready_callback "
+            "is not callable.");
+  }
+
+  set_callback_to_entity(EntityType::GoalClient, callback);
+  set_callback_to_entity(EntityType::ResultClient, callback);
+  set_callback_to_entity(EntityType::CancelClient, callback);
+  set_callback_to_entity(EntityType::FeedbackSubscription, callback);
+  set_callback_to_entity(EntityType::StatusSubscription, callback);
+}
+
+void
+ClientBase::set_callback_to_entity(
+  EntityType entity_type,
+  std::function<void(size_t, int)> callback)
+{
+  // Note: we bind the int identifier argument to this waitable's entity types
+  auto new_callback =
+    [callback, entity_type, this](size_t number_of_events) {
+      try {
+        callback(number_of_events, static_cast<int>(entity_type));
+      } catch (const std::exception & exception) {
+        RCLCPP_ERROR_STREAM(
+          pimpl_->logger,
+          "rclcpp_action::ClientBase@" << this <<
+            " caught " << rmw::impl::cpp::demangle(exception) <<
+            " exception in user-provided callback for the 'on ready' callback: " <<
+            exception.what());
+      } catch (...) {
+        RCLCPP_ERROR_STREAM(
+          pimpl_->logger,
+          "rclcpp_action::ClientBase@" << this <<
+            " caught unhandled exception in user-provided callback " <<
+            "for the 'on ready' callback");
+      }
+    };
+
+
+  // Set it temporarily to the new callback, while we replace the old one.
+  // This two-step setting, prevents a gap where the old std::function has
+  // been replaced but the middleware hasn't been told about the new one yet.
+  set_on_ready_callback(
+    entity_type,
+    rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
+    static_cast<const void *>(&new_callback));
+
+  std::lock_guard<std::recursive_mutex> lock(listener_mutex_);
+  // Store the std::function to keep it in scope, also overwrites the existing one.
+  auto it = entity_type_to_on_ready_callback_.find(entity_type);
+
+  if (it != entity_type_to_on_ready_callback_.end()) {
+    it->second = new_callback;
+  } else {
+    entity_type_to_on_ready_callback_.emplace(entity_type, new_callback);
+  }
+
+  // Set it again, now using the permanent storage.
+  it = entity_type_to_on_ready_callback_.find(entity_type);
+
+  if (it != entity_type_to_on_ready_callback_.end()) {
+    auto & cb = it->second;
+    set_on_ready_callback(
+      entity_type,
+      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
+      static_cast<const void *>(&cb));
+  }
+
+  on_ready_callback_set_ = true;
+}
+
+void
+ClientBase::set_on_ready_callback(
+  EntityType entity_type,
+  rcl_event_callback_t callback,
+  const void * user_data)
+{
+  rcl_ret_t ret = RCL_RET_ERROR;
+
+  switch (entity_type) {
+    case EntityType::GoalClient:
+      {
+        ret = rcl_action_client_set_goal_client_callback(
+          pimpl_->client_handle.get(),
+          callback,
+          user_data);
+        break;
+      }
+
+    case EntityType::ResultClient:
+      {
+        ret = rcl_action_client_set_result_client_callback(
+          pimpl_->client_handle.get(),
+          callback,
+          user_data);
+        break;
+      }
+
+    case EntityType::CancelClient:
+      {
+        ret = rcl_action_client_set_cancel_client_callback(
+          pimpl_->client_handle.get(),
+          callback,
+          user_data);
+        break;
+      }
+
+    case EntityType::FeedbackSubscription:
+      {
+        ret = rcl_action_client_set_feedback_subscription_callback(
+          pimpl_->client_handle.get(),
+          callback,
+          user_data);
+        break;
+      }
+
+    case EntityType::StatusSubscription:
+      {
+        ret = rcl_action_client_set_status_subscription_callback(
+          pimpl_->client_handle.get(),
+          callback,
+          user_data);
+        break;
+      }
+
+    default:
+      throw std::runtime_error("ClientBase::set_on_ready_callback: Unknown entity type.");
+      break;
+  }
+
+  if (RCL_RET_OK != ret) {
+    using rclcpp::exceptions::throw_from_rcl_error;
+    throw_from_rcl_error(ret, "failed to set the on ready callback for action client");
+  }
+}
+
+void
+ClientBase::clear_on_ready_callback()
+{
+  std::lock_guard<std::recursive_mutex> lock(listener_mutex_);
+
+  if (on_ready_callback_set_) {
+    set_on_ready_callback(EntityType::GoalClient, nullptr, nullptr);
+    set_on_ready_callback(EntityType::ResultClient, nullptr, nullptr);
+    set_on_ready_callback(EntityType::CancelClient, nullptr, nullptr);
+    set_on_ready_callback(EntityType::FeedbackSubscription, nullptr, nullptr);
+    set_on_ready_callback(EntityType::StatusSubscription, nullptr, nullptr);
+    on_ready_callback_set_ = false;
+  }
+
+  entity_type_to_on_ready_callback_.clear();
+}
+
+std::shared_ptr<void>
+ClientBase::take_data()
 {
   if (pimpl_->is_feedback_ready) {
     std::shared_ptr<void> feedback_message = this->create_feedback_message();
     rcl_ret_t ret = rcl_action_take_feedback(
       pimpl_->client_handle.get(), feedback_message.get());
-    pimpl_->is_feedback_ready = false;
-    if (RCL_RET_OK == ret) {
-      this->handle_feedback_message(feedback_message);
-    } else if (RCL_RET_ACTION_CLIENT_TAKE_FAILED != ret) {
-      rclcpp::exceptions::throw_from_rcl_error(ret, "error taking feedback");
-    }
+    return std::static_pointer_cast<void>(
+      std::make_shared<std::tuple<rcl_ret_t, std::shared_ptr<void>>>(
+        ret, feedback_message));
   } else if (pimpl_->is_status_ready) {
     std::shared_ptr<void> status_message = this->create_status_message();
     rcl_ret_t ret = rcl_action_take_status(
       pimpl_->client_handle.get(), status_message.get());
-    pimpl_->is_status_ready = false;
-    if (RCL_RET_OK == ret) {
-      this->handle_status_message(status_message);
-    } else if (RCL_RET_ACTION_CLIENT_TAKE_FAILED != ret) {
-      rclcpp::exceptions::throw_from_rcl_error(ret, "error taking status");
-    }
+    return std::static_pointer_cast<void>(
+      std::make_shared<std::tuple<rcl_ret_t, std::shared_ptr<void>>>(
+        ret, status_message));
   } else if (pimpl_->is_goal_response_ready) {
     rmw_request_id_t response_header;
     std::shared_ptr<void> goal_response = this->create_goal_response();
     rcl_ret_t ret = rcl_action_take_goal_response(
       pimpl_->client_handle.get(), &response_header, goal_response.get());
-    pimpl_->is_goal_response_ready = false;
-    if (RCL_RET_OK == ret) {
-      this->handle_goal_response(response_header, goal_response);
-    } else if (RCL_RET_ACTION_CLIENT_TAKE_FAILED != ret) {
-      rclcpp::exceptions::throw_from_rcl_error(ret, "error taking goal response");
-    }
+    return std::static_pointer_cast<void>(
+      std::make_shared<std::tuple<rcl_ret_t, rmw_request_id_t, std::shared_ptr<void>>>(
+        ret, response_header, goal_response));
   } else if (pimpl_->is_result_response_ready) {
     rmw_request_id_t response_header;
     std::shared_ptr<void> result_response = this->create_result_response();
     rcl_ret_t ret = rcl_action_take_result_response(
       pimpl_->client_handle.get(), &response_header, result_response.get());
-    pimpl_->is_result_response_ready = false;
-    if (RCL_RET_OK == ret) {
-      this->handle_result_response(response_header, result_response);
-    } else if (RCL_RET_ACTION_CLIENT_TAKE_FAILED != ret) {
-      rclcpp::exceptions::throw_from_rcl_error(ret, "error taking result response");
-    }
+    return std::static_pointer_cast<void>(
+      std::make_shared<std::tuple<rcl_ret_t, rmw_request_id_t, std::shared_ptr<void>>>(
+        ret, response_header, result_response));
   } else if (pimpl_->is_cancel_response_ready) {
     rmw_request_id_t response_header;
     std::shared_ptr<void> cancel_response = this->create_cancel_response();
     rcl_ret_t ret = rcl_action_take_cancel_response(
       pimpl_->client_handle.get(), &response_header, cancel_response.get());
+    return std::static_pointer_cast<void>(
+      std::make_shared<std::tuple<rcl_ret_t, rmw_request_id_t, std::shared_ptr<void>>>(
+        ret, response_header, cancel_response));
+  } else {
+    throw std::runtime_error("Taking data from action client but nothing is ready");
+  }
+}
+
+std::shared_ptr<void>
+ClientBase::take_data_by_entity_id(size_t id)
+{
+  // Mark as ready the entity from which we want to take data
+  switch (static_cast<EntityType>(id)) {
+    case EntityType::GoalClient:
+      pimpl_->is_goal_response_ready = true;
+      break;
+    case EntityType::ResultClient:
+      pimpl_->is_result_response_ready = true;
+      break;
+    case EntityType::CancelClient:
+      pimpl_->is_cancel_response_ready = true;
+      break;
+    case EntityType::FeedbackSubscription:
+      pimpl_->is_feedback_ready = true;
+      break;
+    case EntityType::StatusSubscription:
+      pimpl_->is_status_ready = true;
+      break;
+  }
+
+  return take_data();
+}
+
+void
+ClientBase::execute(std::shared_ptr<void> & data)
+{
+  if (!data) {
+    throw std::runtime_error("'data' is empty");
+  }
+
+  if (pimpl_->is_feedback_ready) {
+    auto shared_ptr = std::static_pointer_cast<std::tuple<rcl_ret_t, std::shared_ptr<void>>>(data);
+    auto ret = std::get<0>(*shared_ptr);
+    pimpl_->is_feedback_ready = false;
+    if (RCL_RET_OK == ret) {
+      auto feedback_message = std::get<1>(*shared_ptr);
+      this->handle_feedback_message(feedback_message);
+    } else if (RCL_RET_ACTION_CLIENT_TAKE_FAILED != ret) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "error taking feedback");
+    }
+  } else if (pimpl_->is_status_ready) {
+    auto shared_ptr = std::static_pointer_cast<std::tuple<rcl_ret_t, std::shared_ptr<void>>>(data);
+    auto ret = std::get<0>(*shared_ptr);
+    pimpl_->is_status_ready = false;
+    if (RCL_RET_OK == ret) {
+      auto status_message = std::get<1>(*shared_ptr);
+      this->handle_status_message(status_message);
+    } else if (RCL_RET_ACTION_CLIENT_TAKE_FAILED != ret) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "error taking status");
+    }
+  } else if (pimpl_->is_goal_response_ready) {
+    auto shared_ptr = std::static_pointer_cast<
+      std::tuple<rcl_ret_t, rmw_request_id_t, std::shared_ptr<void>>>(data);
+    auto ret = std::get<0>(*shared_ptr);
+    pimpl_->is_goal_response_ready = false;
+    if (RCL_RET_OK == ret) {
+      auto response_header = std::get<1>(*shared_ptr);
+      auto goal_response = std::get<2>(*shared_ptr);
+      this->handle_goal_response(response_header, goal_response);
+    } else if (RCL_RET_ACTION_CLIENT_TAKE_FAILED != ret) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "error taking goal response");
+    }
+  } else if (pimpl_->is_result_response_ready) {
+    auto shared_ptr = std::static_pointer_cast<
+      std::tuple<rcl_ret_t, rmw_request_id_t, std::shared_ptr<void>>>(data);
+    auto ret = std::get<0>(*shared_ptr);
+    pimpl_->is_result_response_ready = false;
+    if (RCL_RET_OK == ret) {
+      auto response_header = std::get<1>(*shared_ptr);
+      auto result_response = std::get<2>(*shared_ptr);
+      this->handle_result_response(response_header, result_response);
+    } else if (RCL_RET_ACTION_CLIENT_TAKE_FAILED != ret) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "error taking result response");
+    }
+  } else if (pimpl_->is_cancel_response_ready) {
+    auto shared_ptr = std::static_pointer_cast<
+      std::tuple<rcl_ret_t, rmw_request_id_t, std::shared_ptr<void>>>(data);
+    auto ret = std::get<0>(*shared_ptr);
     pimpl_->is_cancel_response_ready = false;
     if (RCL_RET_OK == ret) {
+      auto response_header = std::get<1>(*shared_ptr);
+      auto cancel_response = std::get<2>(*shared_ptr);
       this->handle_cancel_response(response_header, cancel_response);
     } else if (RCL_RET_ACTION_CLIENT_TAKE_FAILED != ret) {
       rclcpp::exceptions::throw_from_rcl_error(ret, "error taking cancel response");

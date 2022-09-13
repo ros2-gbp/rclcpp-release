@@ -42,6 +42,20 @@ std::string to_string(T value)
 
 namespace rclcpp
 {
+
+/// Option to indicate which signal handlers rclcpp should install.
+enum class SignalHandlerOptions
+{
+  /// Install both sigint and sigterm, this is the default behavior.
+  All,
+  /// Install only a sigint handler.
+  SigInt,
+  /// Install only a sigterm handler.
+  SigTerm,
+  /// Do not install any signal handler.
+  None,
+};
+
 /// Initialize communications via the rmw implementation and set up a global signal handler.
 /**
  * Initializes the global context which is accessible via the function
@@ -50,10 +64,19 @@ namespace rclcpp
  * rclcpp::install_signal_handlers().
  *
  * \sa rclcpp::Context::init() for more details on arguments and possible exceptions
+ *
+ * \param[in] argc number of command-line arguments to parse.
+ * \param[in] argv array of command-line arguments to parse.
+ * \param[in] init_options initialization options to apply.
+ * \param[in] signal_handler_options option to indicate which signal handlers should be installed.
  */
 RCLCPP_PUBLIC
 void
-init(int argc, char const * const argv[], const InitOptions & init_options = InitOptions());
+init(
+  int argc,
+  char const * const * argv,
+  const InitOptions & init_options = InitOptions(),
+  SignalHandlerOptions signal_handler_options = SignalHandlerOptions::All);
 
 /// Install the global signal handler for rclcpp.
 /**
@@ -67,16 +90,25 @@ init(int argc, char const * const argv[], const InitOptions & init_options = Ini
  *
  * This function is thread-safe.
  *
+ * \param[in] signal_handler_options option to indicate which signal handlers should be installed.
  * \return true if signal handler was installed by this function, false if already installed.
  */
 RCLCPP_PUBLIC
 bool
-install_signal_handlers();
+install_signal_handlers(SignalHandlerOptions signal_handler_options = SignalHandlerOptions::All);
 
 /// Return true if the signal handlers are installed, otherwise false.
 RCLCPP_PUBLIC
 bool
 signal_handlers_installed();
+
+/// Get the current signal handler options.
+/**
+ * If no signal handler is installed, SignalHandlerOptions::None is returned.
+ */
+RCLCPP_PUBLIC
+SignalHandlerOptions
+get_current_signal_handler_options();
 
 /// Uninstall the global signal handler for rclcpp.
 /**
@@ -107,7 +139,7 @@ RCLCPP_PUBLIC
 std::vector<std::string>
 init_and_remove_ros_arguments(
   int argc,
-  char const * const argv[],
+  char const * const * argv,
   const InitOptions & init_options = InitOptions());
 
 /// Remove ROS-specific arguments from argument vector.
@@ -125,7 +157,7 @@ init_and_remove_ros_arguments(
  */
 RCLCPP_PUBLIC
 std::vector<std::string>
-remove_ros_arguments(int argc, char const * const argv[]);
+remove_ros_arguments(int argc, char const * const * argv);
 
 /// Check rclcpp's status.
 /**
@@ -137,26 +169,11 @@ remove_ros_arguments(int argc, char const * const argv[]);
  * the context initialized by rclcpp::init().
  *
  * \param[in] context Optional check for shutdown of this Context.
- * \return true if shutdown has been called, false otherwise
+ * \return false if shutdown has been called, true otherwise
  */
 RCLCPP_PUBLIC
 bool
 ok(rclcpp::Context::SharedPtr context = nullptr);
-
-/// Return true if init() has already been called for the given context.
-/**
- * If nullptr is given for the context, then the global context is used, i.e.
- * the context initialized by rclcpp::init().
- *
- * Deprecated, as it is no longer different from rcl_ok().
- *
- * \param[in] context Optional check for initialization of this Context.
- * \return true if the context is initialized, and false otherwise
- */
-[[deprecated("use the function ok() instead, which has the same usage.")]]
-RCLCPP_PUBLIC
-bool
-is_initialized(rclcpp::Context::SharedPtr context = nullptr);
 
 /// Shutdown rclcpp context, invalidating it for derived entities.
 /**
@@ -303,6 +320,15 @@ get_c_string(const char * string_in);
 RCLCPP_PUBLIC
 const char *
 get_c_string(const std::string & string_in);
+
+/// Return the std::vector of C string from the given std::vector<std::string>.
+/**
+ * \param[in] strings_in is a std::vector of std::string
+ * \return the std::vector of C string from the std::vector<std::string>
+ */
+RCLCPP_PUBLIC
+std::vector<const char *>
+get_c_vector_string(const std::vector<std::string> & strings_in);
 
 }  // namespace rclcpp
 
