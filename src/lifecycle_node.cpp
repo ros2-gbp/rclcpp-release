@@ -14,14 +14,21 @@
 
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
-#include <string>
+#include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
-#include <vector>
+#include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "lifecycle_msgs/msg/state.hpp"
 #include "lifecycle_msgs/msg/transition.hpp"
+
+#include "rcl_interfaces/msg/list_parameters_result.hpp"
+#include "rcl_interfaces/msg/parameter_descriptor.hpp"
+#include "rcl_interfaces/msg/set_parameters_result.hpp"
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/graph_listener.hpp"
@@ -528,25 +535,25 @@ LifecycleNode::register_on_error(
 }
 
 const State &
-LifecycleNode::get_current_state()
+LifecycleNode::get_current_state() const
 {
   return impl_->get_current_state();
 }
 
 std::vector<State>
-LifecycleNode::get_available_states()
+LifecycleNode::get_available_states() const
 {
   return impl_->get_available_states();
 }
 
 std::vector<Transition>
-LifecycleNode::get_available_transitions()
+LifecycleNode::get_available_transitions() const
 {
   return impl_->get_available_transitions();
 }
 
 std::vector<Transition>
-LifecycleNode::get_transition_graph()
+LifecycleNode::get_transition_graph() const
 {
   return impl_->get_transition_graph();
 }
