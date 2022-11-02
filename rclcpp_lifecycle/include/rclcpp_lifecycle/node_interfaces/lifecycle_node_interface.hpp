@@ -17,8 +17,6 @@
 
 #include "lifecycle_msgs/msg/transition.hpp"
 
-#include "rcl_lifecycle/rcl_lifecycle.h"
-
 #include "rclcpp_lifecycle/state.hpp"
 #include "rclcpp_lifecycle/visibility_control.h"
 
@@ -55,7 +53,7 @@ public:
 
   /// Callback function for configure transition
   /*
-   * \return true by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -63,7 +61,7 @@ public:
 
   /// Callback function for cleanup transition
   /*
-   * \return true by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -71,7 +69,7 @@ public:
 
   /// Callback function for shutdown transition
   /*
-   * \return true by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -79,7 +77,7 @@ public:
 
   /// Callback function for activate transition
   /*
-   * \return true by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -87,7 +85,7 @@ public:
 
   /// Callback function for deactivate transition
   /*
-   * \return true by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -95,7 +93,7 @@ public:
 
   /// Callback function for errorneous transition
   /*
-   * \return false by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
