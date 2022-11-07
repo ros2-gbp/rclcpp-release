@@ -151,12 +151,6 @@ QoS::best_effort()
 }
 
 QoS &
-QoS::reliability_best_available()
-{
-  return this->reliability(RMW_QOS_POLICY_RELIABILITY_BEST_AVAILABLE);
-}
-
-QoS &
 QoS::durability(rmw_qos_durability_policy_t durability)
 {
   rmw_qos_profile_.durability = durability;
@@ -180,12 +174,6 @@ QoS &
 QoS::transient_local()
 {
   return this->durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL);
-}
-
-QoS &
-QoS::durability_best_available()
-{
-  return this->durability(RMW_QOS_POLICY_DURABILITY_BEST_AVAILABLE);
 }
 
 QoS &
@@ -390,10 +378,6 @@ RosoutQoS::RosoutQoS(const QoSInitialization & rosout_initialization)
 
 SystemDefaultsQoS::SystemDefaultsQoS(const QoSInitialization & qos_initialization)
 : QoS(qos_initialization, rmw_qos_profile_system_default)
-{}
-
-BestAvailableQoS::BestAvailableQoS(const QoSInitialization & qos_initialization)
-: QoS(qos_initialization, rmw_qos_profile_best_available)
 {}
 
 }  // namespace rclcpp

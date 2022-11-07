@@ -130,7 +130,7 @@ public:
     rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph);
 
   RCLCPP_PUBLIC
-  virtual ~ClientBase() = default;
+  virtual ~ClientBase();
 
   /// Take the next response for this client as a type erased pointer.
   /**

@@ -55,7 +55,7 @@ public:
   explicit ServiceBase(std::shared_ptr<rcl_node_t> node_handle);
 
   RCLCPP_PUBLIC
-  virtual ~ServiceBase() = default;
+  virtual ~ServiceBase();
 
   /// Return the name of the service.
   /** \return The name of the service. */

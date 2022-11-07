@@ -191,9 +191,7 @@ SignalHandler::uninstall()
     signal_handlers_options_ = SignalHandlerOptions::None;
     RCLCPP_DEBUG(get_logger(), "SignalHandler::uninstall(): notifying deferred signal handler");
     notify_signal_handler();
-    if (signal_handler_thread_.joinable()) {
-      signal_handler_thread_.join();
-    }
+    signal_handler_thread_.join();
     teardown_wait_for_signal();
   } catch (...) {
     installed_.exchange(true);

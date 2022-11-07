@@ -14,7 +14,6 @@
 
 #include "rclcpp_lifecycle/state.hpp"
 
-#include <stdexcept>
 #include <string>
 
 #include "lifecycle_msgs/msg/state.hpp"
@@ -71,7 +70,6 @@ State::State(
   if (!rcl_lifecycle_state_handle) {
     throw std::runtime_error("rcl_lifecycle_state_handle is null");
   }
-
   state_handle_ = const_cast<rcl_lifecycle_state_t *>(rcl_lifecycle_state_handle);
 }
 
@@ -95,8 +93,6 @@ State::operator=(const State & rhs)
     return *this;
   }
 
-  // hold the lock until state_handle_ is reconstructed
-  std::lock_guard<std::recursive_mutex> lock(state_handle_mutex_);
   // reset all currently used resources
   reset();
 
@@ -132,7 +128,6 @@ State::operator=(const State & rhs)
 uint8_t
 State::id() const
 {
-  std::lock_guard<std::recursive_mutex> lock(state_handle_mutex_);
   if (!state_handle_) {
     throw std::runtime_error("Error in state! Internal state_handle is NULL.");
   }
@@ -142,7 +137,6 @@ State::id() const
 std::string
 State::label() const
 {
-  std::lock_guard<std::recursive_mutex> lock(state_handle_mutex_);
   if (!state_handle_) {
     throw std::runtime_error("Error in state! Internal state_handle is NULL.");
   }
@@ -152,7 +146,6 @@ State::label() const
 void
 State::reset() noexcept
 {
-  std::lock_guard<std::recursive_mutex> lock(state_handle_mutex_);
   if (!owns_rcl_state_handle_) {
     state_handle_ = nullptr;
   }

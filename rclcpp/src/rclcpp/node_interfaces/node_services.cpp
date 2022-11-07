@@ -35,17 +35,15 @@ NodeServices::add_service(
       // TODO(jacquelinekay): use custom exception
       throw std::runtime_error("Cannot create service, group not in node.");
     }
+    group->add_service(service_base_ptr);
   } else {
-    group = node_base_->get_default_callback_group();
+    node_base_->get_default_callback_group()->add_service(service_base_ptr);
   }
-
-  group->add_service(service_base_ptr);
 
   // Notify the executor that a new service was created using the parent Node.
   auto & node_gc = node_base_->get_notify_guard_condition();
   try {
     node_gc.trigger();
-    group->trigger_notify_guard_condition();
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string("failed to notify wait set on service creation: ") + ex.what());
@@ -62,17 +60,15 @@ NodeServices::add_client(
       // TODO(jacquelinekay): use custom exception
       throw std::runtime_error("Cannot create client, group not in node.");
     }
+    group->add_client(client_base_ptr);
   } else {
-    group = node_base_->get_default_callback_group();
+    node_base_->get_default_callback_group()->add_client(client_base_ptr);
   }
-
-  group->add_client(client_base_ptr);
 
   // Notify the executor that a new client was created using the parent Node.
   auto & node_gc = node_base_->get_notify_guard_condition();
   try {
     node_gc.trigger();
-    group->trigger_notify_guard_condition();
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string("failed to notify wait set on client creation: ") + ex.what());
