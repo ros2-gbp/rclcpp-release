@@ -192,10 +192,10 @@ tracks:
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc} --os-name rhel
     devel_branch: humble
-    last_version: 16.0.1
+    last_version: 16.0.2
     name: rclcpp
     patches: null
-    release_inc: '2'
+    release_inc: '1'
     release_repo_url: https://github.com/ros2-gbp/rclcpp-release.git
     release_tag: :{version}
     ros_distro: humble
