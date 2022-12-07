@@ -47,11 +47,11 @@ template<
   typename MessageT,
   typename CallbackT,
   typename AllocatorT,
+  typename CallbackMessageT,
   typename SubscriptionT,
   typename MessageMemoryStrategyT,
   typename NodeParametersT,
-  typename NodeTopicsT,
-  typename ROSMessageType = typename SubscriptionT::ROSMessageType>
+  typename NodeTopicsT>
 typename std::shared_ptr<SubscriptionT>
 create_subscription(
   NodeParametersT & node_parameters,
@@ -70,7 +70,7 @@ create_subscription(
   using rclcpp::node_interfaces::get_node_topics_interface;
   auto node_topics_interface = get_node_topics_interface(node_topics);
 
-  std::shared_ptr<rclcpp::topic_statistics::SubscriptionTopicStatistics<ROSMessageType>>
+  std::shared_ptr<rclcpp::topic_statistics::SubscriptionTopicStatistics<CallbackMessageT>>
   subscription_topic_stats = nullptr;
 
   if (rclcpp::detail::resolve_enable_topic_statistics(
@@ -92,11 +92,11 @@ create_subscription(
       qos);
 
     subscription_topic_stats = std::make_shared<
-      rclcpp::topic_statistics::SubscriptionTopicStatistics<ROSMessageType>
+      rclcpp::topic_statistics::SubscriptionTopicStatistics<CallbackMessageT>
       >(node_topics_interface->get_node_base_interface()->get_name(), publisher);
 
     std::weak_ptr<
-      rclcpp::topic_statistics::SubscriptionTopicStatistics<ROSMessageType>
+      rclcpp::topic_statistics::SubscriptionTopicStatistics<CallbackMessageT>
     > weak_subscription_topic_stats(subscription_topic_stats);
     auto sub_call_back = [weak_subscription_topic_stats]() {
         auto subscription_topic_stats = weak_subscription_topic_stats.lock();
@@ -153,6 +153,7 @@ create_subscription(
  * \tparam MessageT
  * \tparam CallbackT
  * \tparam AllocatorT
+ * \tparam CallbackMessageT
  * \tparam SubscriptionT
  * \tparam MessageMemoryStrategyT
  * \tparam NodeT
@@ -170,8 +171,13 @@ template<
   typename MessageT,
   typename CallbackT,
   typename AllocatorT = std::allocator<void>,
-  typename SubscriptionT = rclcpp::Subscription<MessageT, AllocatorT>,
-  typename MessageMemoryStrategyT = typename SubscriptionT::MessageMemoryStrategyType,
+  typename CallbackMessageT =
+  typename rclcpp::subscription_traits::has_message_type<CallbackT>::type,
+  typename SubscriptionT = rclcpp::Subscription<CallbackMessageT, AllocatorT>,
+  typename MessageMemoryStrategyT = rclcpp::message_memory_strategy::MessageMemoryStrategy<
+    CallbackMessageT,
+    AllocatorT
+  >,
   typename NodeT>
 typename std::shared_ptr<SubscriptionT>
 create_subscription(
@@ -188,7 +194,7 @@ create_subscription(
 )
 {
   return rclcpp::detail::create_subscription<
-    MessageT, CallbackT, AllocatorT, SubscriptionT, MessageMemoryStrategyT>(
+    MessageT, CallbackT, AllocatorT, CallbackMessageT, SubscriptionT, MessageMemoryStrategyT>(
     node, node, topic_name, qos, std::forward<CallbackT>(callback), options, msg_mem_strat);
 }
 
@@ -200,8 +206,13 @@ template<
   typename MessageT,
   typename CallbackT,
   typename AllocatorT = std::allocator<void>,
-  typename SubscriptionT = rclcpp::Subscription<MessageT, AllocatorT>,
-  typename MessageMemoryStrategyT = typename SubscriptionT::MessageMemoryStrategyType>
+  typename CallbackMessageT =
+  typename rclcpp::subscription_traits::has_message_type<CallbackT>::type,
+  typename SubscriptionT = rclcpp::Subscription<CallbackMessageT, AllocatorT>,
+  typename MessageMemoryStrategyT = rclcpp::message_memory_strategy::MessageMemoryStrategy<
+    CallbackMessageT,
+    AllocatorT
+  >>
 typename std::shared_ptr<SubscriptionT>
 create_subscription(
   rclcpp::node_interfaces::NodeParametersInterface::SharedPtr & node_parameters,
@@ -218,7 +229,7 @@ create_subscription(
 )
 {
   return rclcpp::detail::create_subscription<
-    MessageT, CallbackT, AllocatorT, SubscriptionT, MessageMemoryStrategyT>(
+    MessageT, CallbackT, AllocatorT, CallbackMessageT, SubscriptionT, MessageMemoryStrategyT>(
     node_parameters, node_topics, topic_name, qos,
     std::forward<CallbackT>(callback), options, msg_mem_strat);
 }

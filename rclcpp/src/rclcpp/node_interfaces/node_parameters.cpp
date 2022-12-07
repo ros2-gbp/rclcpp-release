@@ -32,6 +32,7 @@
 #include "rcl_interfaces/srv/list_parameters.hpp"
 #include "rclcpp/create_publisher.hpp"
 #include "rclcpp/parameter_map.hpp"
+#include "rclcpp/scope_exit.hpp"
 #include "rcutils/logging_macros.h"
 #include "rmw/qos_profiles.h"
 
@@ -235,9 +236,6 @@ __check_parameters(
       }
     } else {
       descriptor = parameter_infos[name].descriptor;
-    }
-    if (descriptor.name.empty()) {
-      descriptor.name = name;
     }
     const auto new_type = parameter.get_type();
     const auto specified_type = static_cast<rclcpp::ParameterType>(descriptor.type);
@@ -465,6 +463,14 @@ declare_parameter_helper(
   }
 
   return parameters.at(name).value;
+}
+
+const rclcpp::ParameterValue &
+NodeParameters::declare_parameter(const std::string & name)
+{
+  rcl_interfaces::msg::ParameterDescriptor descriptor;
+  descriptor.dynamic_typing = true;
+  return this->declare_parameter(name, rclcpp::ParameterValue{}, descriptor, false);
 }
 
 const rclcpp::ParameterValue &

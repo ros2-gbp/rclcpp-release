@@ -12,6 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <gtest/gtest.h>
+
+#include <rcl/allocator.h>
+#include <rcl/time.h>
+#include <rcl/types.h>
+
+#include <rcl_action/names.h>
+#include <rcl_action/default_qos.h>
+#include <rcl_action/wait.h>
+
+#include <rclcpp/clock.hpp>
+#include <rclcpp/exceptions.hpp>
+#include <rclcpp/executors.hpp>
+#include <rclcpp/node.hpp>
+#include <rclcpp/publisher.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp/service.hpp>
+#include <rclcpp/time.hpp>
+
+#include <test_msgs/action/fibonacci.hpp>
+
 #include <future>
 #include <map>
 #include <memory>
@@ -20,34 +41,13 @@
 #include <thread>
 #include <chrono>
 
-#include "gtest/gtest.h"
-
-#include "rcl/allocator.h"
-#include "rcl/time.h"
-#include "rcl/types.h"
-
-#include "rcl_action/names.h"
-#include "rcl_action/default_qos.h"
-#include "rcl_action/wait.h"
-
-#include "rclcpp/clock.hpp"
-#include "rclcpp/exceptions.hpp"
-#include "rclcpp/executors.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/publisher.hpp"
-#include "rclcpp/rclcpp.hpp"
-#include "rclcpp/service.hpp"
-#include "rclcpp/time.hpp"
-
-#include "test_msgs/action/fibonacci.hpp"
-
 #include "rclcpp_action/exceptions.hpp"
 #include "rclcpp_action/create_client.hpp"
 #include "rclcpp_action/client.hpp"
 #include "rclcpp_action/qos.hpp"
 #include "rclcpp_action/types.hpp"
 
-#include "mocking_utils/patch.hpp"
+#include "./mocking_utils/patch.hpp"
 
 using namespace std::chrono_literals;
 
@@ -397,7 +397,7 @@ TEST_F(TestClient, is_ready) {
   ASSERT_EQ(
     RCL_RET_OK,
     rcl_wait_set_init(&wait_set, 10, 10, 10, 10, 10, 10, rcl_context, allocator));
-  ASSERT_NO_THROW(action_client->add_to_wait_set(&wait_set));
+  ASSERT_TRUE(action_client->add_to_wait_set(&wait_set));
   EXPECT_TRUE(action_client->is_ready(&wait_set));
 
   {
@@ -506,6 +506,64 @@ TEST_F(TestClientAgainstServer, async_send_goal_with_goal_response_callback_wait
         goal_response_received = true;
       }
     };
+
+  {
+    ActionGoal bad_goal;
+    bad_goal.order = -1;
+    auto future_goal_handle = action_client->async_send_goal(bad_goal, send_goal_ops);
+    dual_spin_until_future_complete(future_goal_handle);
+    auto goal_handle = future_goal_handle.get();
+    EXPECT_FALSE(goal_response_received);
+    EXPECT_EQ(nullptr, goal_handle);
+  }
+
+  {
+    ActionGoal goal;
+    goal.order = 4;
+    auto future_goal_handle = action_client->async_send_goal(goal, send_goal_ops);
+    dual_spin_until_future_complete(future_goal_handle);
+    auto goal_handle = future_goal_handle.get();
+    EXPECT_TRUE(goal_response_received);
+    EXPECT_EQ(rclcpp_action::GoalStatus::STATUS_ACCEPTED, goal_handle->get_status());
+    EXPECT_FALSE(goal_handle->is_feedback_aware());
+    EXPECT_FALSE(goal_handle->is_result_aware());
+    auto future_result = action_client->async_get_result(goal_handle);
+    EXPECT_TRUE(goal_handle->is_result_aware());
+    dual_spin_until_future_complete(future_result);
+    auto wrapped_result = future_result.get();
+    ASSERT_EQ(5u, wrapped_result.result->sequence.size());
+    EXPECT_EQ(3, wrapped_result.result->sequence.back());
+  }
+}
+
+TEST_F(TestClientAgainstServer, async_send_goal_with_deprecated_goal_response_callback)
+{
+  auto action_client = rclcpp_action::create_client<ActionType>(client_node, action_name);
+  ASSERT_TRUE(action_client->wait_for_action_server(WAIT_FOR_SERVER_TIMEOUT));
+
+  bool goal_response_received = false;
+  auto send_goal_ops = rclcpp_action::Client<ActionType>::SendGoalOptions();
+
+#if !defined(_WIN32)
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#else
+# pragma warning(push)
+# pragma warning(disable: 4996)
+#endif
+  send_goal_ops.goal_response_callback =
+    [&goal_response_received]
+      (std::shared_future<typename ActionGoalHandle::SharedPtr> goal_future)
+    {
+      if (goal_future.get()) {
+        goal_response_received = true;
+      }
+    };
+#if !defined(_WIN32)
+# pragma GCC diagnostic pop
+#else
+# pragma warning(pop)
+#endif
 
   {
     ActionGoal bad_goal;

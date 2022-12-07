@@ -18,7 +18,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <utility>
 
 #include "test_msgs/msg/empty.hpp"
@@ -31,7 +30,7 @@
 static uint32_t num_allocs = 0;
 static uint32_t num_deallocs = 0;
 // A very simple custom allocator. Counts calls to allocate and deallocate.
-template<typename T>
+template<typename T = void>
 struct MyAllocator
 {
 public:
@@ -69,33 +68,6 @@ public:
     }
     num_deallocs++;
     std::free(ptr);
-  }
-
-  template<typename U>
-  struct rebind
-  {
-    typedef MyAllocator<U> other;
-  };
-};
-
-// Explicit specialization for void
-template<>
-struct MyAllocator<void>
-{
-public:
-  using value_type = void;
-  using pointer = void *;
-  using const_pointer = const void *;
-
-  MyAllocator() noexcept
-  {
-  }
-
-  ~MyAllocator() noexcept {}
-
-  template<typename U>
-  MyAllocator(const MyAllocator<U> &) noexcept
-  {
   }
 
   template<typename U>
@@ -196,6 +168,7 @@ do_custom_allocator_test(
     test_msgs::msg::Empty,
     decltype(callback),
     SubscriptionAllocatorT,
+    CallbackMessageT,
     rclcpp::Subscription<CallbackMessageT, SubscriptionAllocatorT>,
     rclcpp::message_memory_strategy::MessageMemoryStrategy<
       CallbackMessageT,

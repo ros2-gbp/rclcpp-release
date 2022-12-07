@@ -192,7 +192,21 @@ public:
     rclcpp::CallbackGroupType group_type,
     bool automatically_add_to_executor_with_node = true);
 
-  /// Iterate over the callback groups in the node, calling func on each valid one.
+  /// Return the list of callback groups in the node.
+  /**
+   * \return list of callback groups in the node.
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  const std::vector<rclcpp::CallbackGroup::WeakPtr> &
+  get_callback_groups() const;
+
+  /// Iterate over the callback groups in the node, calling the given function on each valid one.
+  /**
+   * This method is called in a thread-safe way, and also makes sure to only call the given
+   * function on those items that are still valid.
+   *
+   * \param[in] func The callback function to call on each valid callback group.
+   */
   RCLCPP_LIFECYCLE_PUBLIC
   void
   for_each_callback_group(
@@ -228,8 +242,13 @@ public:
     typename MessageT,
     typename CallbackT,
     typename AllocatorT = std::allocator<void>,
+    typename CallbackMessageT =
+    typename rclcpp::subscription_traits::has_message_type<CallbackT>::type,
     typename SubscriptionT = rclcpp::Subscription<MessageT, AllocatorT>,
-    typename MessageMemoryStrategyT = typename SubscriptionT::MessageMemoryStrategyType>
+    typename MessageMemoryStrategyT = rclcpp::message_memory_strategy::MessageMemoryStrategy<
+      CallbackMessageT,
+      AllocatorT
+    >>
   std::shared_ptr<SubscriptionT>
   create_subscription(
     const std::string & topic_name,
@@ -332,6 +351,22 @@ public:
     const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
     rcl_interfaces::msg::ParameterDescriptor{},
     bool ignore_override = false);
+
+  /// Declare a parameter
+  [[deprecated(
+    "declare_parameter() with only a name is deprecated and will be deleted in the future.\n" \
+    "If you want to declare a parameter that won't change type without a default value use:\n" \
+    "`node->declare_parameter<ParameterT>(name)`, where e.g. ParameterT=int64_t.\n\n" \
+    "If you want to declare a parameter that can dynamically change type use:\n" \
+    "```\n" \
+    "rcl_interfaces::msg::ParameterDescriptor descriptor;\n" \
+    "descriptor.dynamic_typing = true;\n" \
+    "node->declare_parameter(name, rclcpp::ParameterValue{}, descriptor);\n" \
+    "```"
+  )]]
+  RCLCPP_LIFECYCLE_PUBLIC
+  const rclcpp::ParameterValue &
+  declare_parameter(const std::string & name);
 
   /// Declare and initialize a parameter with a type.
   /**
@@ -952,18 +987,10 @@ public:
   bool
   register_on_error(std::function<LifecycleNodeInterface::CallbackReturn(const State &)> fcn);
 
-  RCLCPP_LIFECYCLE_PUBLIC
-  CallbackReturn
-  on_activate(const State & previous_state) override;
-
-  RCLCPP_LIFECYCLE_PUBLIC
-  CallbackReturn
-  on_deactivate(const State & previous_state) override;
-
 protected:
   RCLCPP_LIFECYCLE_PUBLIC
   void
-  add_managed_entity(std::weak_ptr<rclcpp_lifecycle::ManagedEntityInterface> managed_entity);
+  add_publisher_handle(std::shared_ptr<rclcpp_lifecycle::LifecyclePublisherInterface> pub);
 
   RCLCPP_LIFECYCLE_PUBLIC
   void

@@ -27,8 +27,6 @@
 
 #include "../mocking_utils/patch.hpp"
 
-using namespace std::chrono_literals;
-
 class TestQosEvent : public ::testing::Test
 {
 protected:
@@ -39,6 +37,9 @@ protected:
 
   void SetUp()
   {
+    is_fastrtps =
+      std::string(rmw_get_implementation_identifier()).find("rmw_fastrtps") != std::string::npos;
+
     node = std::make_shared<rclcpp::Node>("test_qos_event", "/ns");
 
     message_callback = [node = node.get()](test_msgs::msg::Empty::ConstSharedPtr /*msg*/) {
@@ -53,6 +54,7 @@ protected:
 
   static constexpr char topic_name[] = "test_topic";
   rclcpp::Node::SharedPtr node;
+  bool is_fastrtps;
   std::function<void(test_msgs::msg::Empty::ConstSharedPtr)> message_callback;
 };
 
@@ -99,8 +101,12 @@ TEST_F(TestQosEvent, test_publisher_constructor)
         "Offered incompatible qos - total %d (delta %d), last_policy_kind: %d",
         event.total_count, event.total_count_change, event.last_policy_kind);
     };
-  publisher = node->create_publisher<test_msgs::msg::Empty>(
-    topic_name, 10, options);
+  try {
+    publisher = node->create_publisher<test_msgs::msg::Empty>(
+      topic_name, 10, options);
+  } catch (const rclcpp::UnsupportedEventTypeException & /*exc*/) {
+    EXPECT_TRUE(is_fastrtps);
+  }
 }
 
 /*
@@ -145,8 +151,12 @@ TEST_F(TestQosEvent, test_subscription_constructor)
         "Requested incompatible qos - total %d (delta %d), last_policy_kind: %d",
         event.total_count, event.total_count_change, event.last_policy_kind);
     };
-  subscription = node->create_subscription<test_msgs::msg::Empty>(
-    topic_name, 10, message_callback, options);
+  try {
+    subscription = node->create_subscription<test_msgs::msg::Empty>(
+      topic_name, 10, message_callback, options);
+  } catch (const rclcpp::UnsupportedEventTypeException & /*exc*/) {
+    EXPECT_TRUE(is_fastrtps);
+  }
 }
 
 /*
@@ -200,17 +210,22 @@ TEST_F(TestQosEvent, test_default_incompatible_qos_callbacks)
   ex.add_node(node->get_node_base_interface());
 
   // This future won't complete on fastrtps, so just timeout immediately
-  const auto timeout = std::chrono::seconds(10);
+  const auto timeout = (is_fastrtps) ? std::chrono::milliseconds(5) : std::chrono::seconds(10);
   ex.spin_until_future_complete(log_msgs_future, timeout);
 
-  EXPECT_EQ(
-    "New subscription discovered on topic '/ns/test_topic', requesting incompatible QoS. "
-    "No messages will be sent to it. Last incompatible policy: DURABILITY_QOS_POLICY",
-    pub_log_msg);
-  EXPECT_EQ(
-    "New publisher discovered on topic '/ns/test_topic', offering incompatible QoS. "
-    "No messages will be sent to it. Last incompatible policy: DURABILITY_QOS_POLICY",
-    sub_log_msg);
+  if (is_fastrtps) {
+    EXPECT_EQ("", pub_log_msg);
+    EXPECT_EQ("", sub_log_msg);
+  } else {
+    EXPECT_EQ(
+      "New subscription discovered on topic '/ns/test_topic', requesting incompatible QoS. "
+      "No messages will be sent to it. Last incompatible policy: DURABILITY_QOS_POLICY",
+      pub_log_msg);
+    EXPECT_EQ(
+      "New publisher discovered on topic '/ns/test_topic', offering incompatible QoS. "
+      "No messages will be sent to it. Last incompatible policy: DURABILITY_QOS_POLICY",
+      sub_log_msg);
+  }
 
   rcutils_logging_set_output_handler(original_output_handler);
 }
@@ -300,7 +315,7 @@ TEST_F(TestQosEvent, add_to_wait_set) {
   {
     rcl_wait_set_t wait_set = rcl_get_zero_initialized_wait_set();
     auto mock = mocking_utils::patch_and_return("lib:rclcpp", rcl_wait_set_add_event, RCL_RET_OK);
-    EXPECT_NO_THROW(handler.add_to_wait_set(&wait_set));
+    EXPECT_TRUE(handler.add_to_wait_set(&wait_set));
   }
 
   {
@@ -309,107 +324,4 @@ TEST_F(TestQosEvent, add_to_wait_set) {
       "lib:rclcpp", rcl_wait_set_add_event, RCL_RET_ERROR);
     EXPECT_THROW(handler.add_to_wait_set(&wait_set), rclcpp::exceptions::RCLError);
   }
-}
-
-TEST_F(TestQosEvent, test_on_new_event_callback)
-{
-  auto offered_deadline = rclcpp::Duration(std::chrono::milliseconds(1));
-  auto requested_deadline = rclcpp::Duration(std::chrono::milliseconds(2));
-
-  rclcpp::QoS qos_profile_publisher(10);
-  qos_profile_publisher.deadline(offered_deadline);
-  rclcpp::PublisherOptions pub_options;
-  pub_options.event_callbacks.deadline_callback = [](auto) {FAIL();};
-  auto publisher = node->create_publisher<test_msgs::msg::Empty>(
-    topic_name, qos_profile_publisher, pub_options);
-
-  rclcpp::QoS qos_profile_subscription(10);
-  qos_profile_subscription.deadline(requested_deadline);
-  rclcpp::SubscriptionOptions sub_options;
-  sub_options.event_callbacks.deadline_callback = [](auto) {FAIL();};
-  auto subscription = node->create_subscription<test_msgs::msg::Empty>(
-    topic_name, qos_profile_subscription, message_callback, sub_options);
-
-  std::atomic<size_t> c1 {0};
-  auto increase_c1_cb = [&c1](size_t count_events) {c1 += count_events;};
-  publisher->set_on_new_qos_event_callback(increase_c1_cb, RCL_PUBLISHER_OFFERED_DEADLINE_MISSED);
-
-  {
-    test_msgs::msg::Empty msg;
-    publisher->publish(msg);
-  }
-
-  std::this_thread::sleep_for(std::chrono::seconds(1));
-
-  EXPECT_GT(c1, 1u);
-
-  std::atomic<size_t> c2 {0};
-  auto increase_c2_cb = [&c2](size_t count_events) {c2 += count_events;};
-  subscription->set_on_new_qos_event_callback(
-    increase_c2_cb,
-    RCL_SUBSCRIPTION_REQUESTED_DEADLINE_MISSED);
-
-  EXPECT_GT(c2, 1u);
-}
-
-TEST_F(TestQosEvent, test_invalid_on_new_event_callback)
-{
-  auto pub = node->create_publisher<test_msgs::msg::Empty>(topic_name, 10);
-  auto sub = node->create_subscription<test_msgs::msg::Empty>(topic_name, 10, message_callback);
-  auto dummy_cb = [](size_t count_events) {(void)count_events;};
-
-  EXPECT_NO_THROW(
-    pub->set_on_new_qos_event_callback(dummy_cb, RCL_PUBLISHER_OFFERED_DEADLINE_MISSED));
-
-  EXPECT_NO_THROW(
-    pub->clear_on_new_qos_event_callback(RCL_PUBLISHER_OFFERED_DEADLINE_MISSED));
-
-  EXPECT_NO_THROW(
-    pub->set_on_new_qos_event_callback(dummy_cb, RCL_PUBLISHER_LIVELINESS_LOST));
-
-  EXPECT_NO_THROW(
-    pub->clear_on_new_qos_event_callback(RCL_PUBLISHER_LIVELINESS_LOST));
-
-  EXPECT_NO_THROW(
-    pub->set_on_new_qos_event_callback(dummy_cb, RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS));
-
-  EXPECT_NO_THROW(
-    pub->clear_on_new_qos_event_callback(RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS));
-
-  EXPECT_NO_THROW(
-    sub->set_on_new_qos_event_callback(dummy_cb, RCL_SUBSCRIPTION_REQUESTED_DEADLINE_MISSED));
-
-  EXPECT_NO_THROW(
-    sub->clear_on_new_qos_event_callback(RCL_SUBSCRIPTION_REQUESTED_DEADLINE_MISSED));
-
-  EXPECT_NO_THROW(
-    sub->set_on_new_qos_event_callback(dummy_cb, RCL_SUBSCRIPTION_LIVELINESS_CHANGED));
-
-  EXPECT_NO_THROW(
-    sub->clear_on_new_qos_event_callback(RCL_SUBSCRIPTION_LIVELINESS_CHANGED));
-
-  EXPECT_NO_THROW(
-    sub->set_on_new_qos_event_callback(dummy_cb, RCL_SUBSCRIPTION_REQUESTED_INCOMPATIBLE_QOS));
-
-  EXPECT_NO_THROW(
-    sub->clear_on_new_qos_event_callback(RCL_SUBSCRIPTION_REQUESTED_INCOMPATIBLE_QOS));
-
-  std::function<void(size_t)> invalid_cb;
-
-  rclcpp::SubscriptionOptions sub_options;
-  sub_options.event_callbacks.deadline_callback = [](auto) {};
-  sub = node->create_subscription<test_msgs::msg::Empty>(
-    topic_name, 10, message_callback, sub_options);
-
-  EXPECT_THROW(
-    sub->set_on_new_qos_event_callback(invalid_cb, RCL_SUBSCRIPTION_REQUESTED_DEADLINE_MISSED),
-    std::invalid_argument);
-
-  rclcpp::PublisherOptions pub_options;
-  pub_options.event_callbacks.deadline_callback = [](auto) {};
-  pub = node->create_publisher<test_msgs::msg::Empty>(topic_name, 10, pub_options);
-
-  EXPECT_THROW(
-    pub->set_on_new_qos_event_callback(invalid_cb, RCL_PUBLISHER_OFFERED_DEADLINE_MISSED),
-    std::invalid_argument);
 }

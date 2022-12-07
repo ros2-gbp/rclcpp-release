@@ -13,19 +13,16 @@
 // limitations under the License.
 
 #include "rclcpp/experimental/subscription_intra_process_base.hpp"
-#include "rclcpp/detail/add_guard_condition_to_rcl_wait_set.hpp"
 
 using rclcpp::experimental::SubscriptionIntraProcessBase;
 
-SubscriptionIntraProcessBase::~SubscriptionIntraProcessBase()
-{
-  clear_on_ready_callback();
-}
-
-void
+bool
 SubscriptionIntraProcessBase::add_to_wait_set(rcl_wait_set_t * wait_set)
 {
-  detail::add_guard_condition_to_rcl_wait_set(*wait_set, gc_);
+  std::lock_guard<std::recursive_mutex> lock(reentrant_mutex_);
+
+  rcl_ret_t ret = rcl_wait_set_add_guard_condition(wait_set, &gc_, NULL);
+  return RCL_RET_OK == ret;
 }
 
 const char *
@@ -34,7 +31,7 @@ SubscriptionIntraProcessBase::get_topic_name() const
   return topic_name_.c_str();
 }
 
-rclcpp::QoS
+rmw_qos_profile_t
 SubscriptionIntraProcessBase::get_actual_qos() const
 {
   return qos_profile_;
