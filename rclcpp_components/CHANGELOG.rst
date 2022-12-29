@@ -2,20 +2,99 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-9.2.2 (2022-12-06)
-------------------
+18.0.0 (2022-12-29)
+-------------------
+* Update maintainers (`#2043 <https://github.com/ros2/rclcpp/issues/2043>`_)
+* Contributors: Audrow Nash
 
-9.2.1 (2022-04-28)
-------------------
+17.1.0 (2022-11-02)
+-------------------
+* use unique ptr and remove unuseful container (`#2013 <https://github.com/ros2/rclcpp/issues/2013>`_)
+* Contributors: Chen Lihui
 
-9.2.0 (2021-09-17)
-------------------
+17.0.0 (2022-09-13)
+-------------------
+* Revert "Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)" (`#1956 <https://github.com/ros2/rclcpp/issues/1956>`_)
+* Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)
+* Contributors: Hubert Liberacki, William Woodall
 
-9.1.0 (2021-05-20)
-------------------
+16.2.0 (2022-05-03)
+-------------------
 
-9.0.3 (2021-05-10)
-------------------
+16.1.0 (2022-04-29)
+-------------------
+
+16.0.1 (2022-04-13)
+-------------------
+
+16.0.0 (2022-04-08)
+-------------------
+
+15.4.0 (2022-04-05)
+-------------------
+
+15.3.0 (2022-03-30)
+-------------------
+
+15.2.0 (2022-03-24)
+-------------------
+* Select executor in node registration (`#1898 <https://github.com/ros2/rclcpp/issues/1898>`_)
+* Fix rosdoc2 issues in rclcpp (`#1897 <https://github.com/ros2/rclcpp/issues/1897>`_)
+* Fix bugprone-exception-escape in node_main.cpp.in (`#1895 <https://github.com/ros2/rclcpp/issues/1895>`_)
+* Contributors: Alberto Soragna, Chris Lalancette, Hirokazu Ishida
+
+15.1.0 (2022-03-01)
+-------------------
+* small improvements to node_main.cpp.in
+* Install headers to include/${PROJECT_NAME} (`#1888 <https://github.com/ros2/rclcpp/issues/1888>`_)
+* Use spin() in component_manager_isolated.hpp (`#1881 <https://github.com/ros2/rclcpp/issues/1881>`_)
+* add use_global_arguments for node options of component nodes (`#1776 <https://github.com/ros2/rclcpp/issues/1776>`_)
+* Contributors: Alberto Soragna, Shane Loretz, gezp
+
+15.0.0 (2022-01-14)
+-------------------
+* Add rclcpp_components::component (`#1855 <https://github.com/ros2/rclcpp/issues/1855>`_)
+* Contributors: Shane Loretz
+
+14.1.0 (2022-01-05)
+-------------------
+
+14.0.0 (2021-12-17)
+-------------------
+* Add parameter to configure number of thread (`#1708 <https://github.com/ros2/rclcpp/issues/1708>`_)
+* remove RCLCPP_COMPONENTS_PUBLIC in class ComponentManagerIsolated (`#1843 <https://github.com/ros2/rclcpp/issues/1843>`_)
+* create component_container_isolated (`#1781 <https://github.com/ros2/rclcpp/issues/1781>`_)
+* Remove author by request (`#1818 <https://github.com/ros2/rclcpp/issues/1818>`_)
+* Update maintainers (`#1817 <https://github.com/ros2/rclcpp/issues/1817>`_)
+* Suppress clang dead-store warnings in the benchmarks. (`#1802 <https://github.com/ros2/rclcpp/issues/1802>`_)
+* Contributors: Chris Lalancette, Daisuke Nishimatsu, Jacob Perron, gezp
+
+13.1.0 (2021-10-18)
+-------------------
+
+13.0.0 (2021-08-23)
+-------------------
+* Update client API to be able to remove pending requests. (`#1734 <https://github.com/ros2/rclcpp/issues/1734>`_)
+* Contributors: Ivan Santiago Paunovic
+
+12.0.0 (2021-07-26)
+-------------------
+
+11.2.0 (2021-07-21)
+-------------------
+* Deprecate method names that use CamelCase in rclcpp_components. (`#1716 <https://github.com/ros2/rclcpp/issues/1716>`_)
+* Contributors: Rebecca Butler
+
+11.1.0 (2021-07-13)
+-------------------
+* Added a hook to generate node options in ComponentManager (`#1702 <https://github.com/ros2/rclcpp/issues/1702>`_)
+* Contributors: Rebecca Butler
+
+11.0.0 (2021-05-18)
+-------------------
+
+10.0.0 (2021-05-11)
+-------------------
 
 9.0.2 (2021-04-14)
 ------------------

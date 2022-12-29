@@ -24,6 +24,7 @@
 #include "rcl/guard_condition.h"
 #include "rcl/wait.h"
 #include "rclcpp/context.hpp"
+#include "rclcpp/guard_condition.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_graph_interface.hpp"
 #include "rclcpp/visibility_control.hpp"
@@ -127,6 +128,11 @@ public:
    * If start_if_not_started() was never called, this function still succeeds,
    * but start_if_not_started() still cannot be called after this function.
    *
+   * Note that if you override this method, but leave shutdown to be called in
+   * the destruction of this base class, it will not call the overridden
+   * version from your base class.
+   * So you need to ensure you call your class's shutdown() in its destructor.
+   *
    * \throws rclcpp::execptions::RCLError from rcl_guard_condition_fini()
    * \throws rclcpp::execptions::RCLError from rcl_wait_set_fini()
    * \throws std::system_error anything std::mutex::lock() throws
@@ -187,7 +193,7 @@ private:
   mutable std::mutex node_graph_interfaces_mutex_;
   std::vector<rclcpp::node_interfaces::NodeGraphInterface *> node_graph_interfaces_;
 
-  rcl_guard_condition_t interrupt_guard_condition_ = rcl_get_zero_initialized_guard_condition();
+  rclcpp::GuardCondition interrupt_guard_condition_;
   rcl_wait_set_t wait_set_ = rcl_get_zero_initialized_wait_set();
 };
 

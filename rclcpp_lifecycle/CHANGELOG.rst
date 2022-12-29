@@ -3,24 +3,123 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-9.2.2 (2022-12-06)
-------------------
+18.0.0 (2022-12-29)
+-------------------
+* Implement Unified Node Interface (NodeInterfaces class) (`#2041 <https://github.com/ros2/rclcpp/issues/2041>`_)
+* Add clock type to node_options (`#1982 <https://github.com/ros2/rclcpp/issues/1982>`_)
+* Update maintainers (`#2043 <https://github.com/ros2/rclcpp/issues/2043>`_)
+* Contributors: Audrow Nash, Jeffery Hsu, methylDragon
 
-9.2.1 (2022-04-28)
-------------------
+17.1.0 (2022-11-02)
+-------------------
+* LifecycleNode on_configure doc fix. (`#2034 <https://github.com/ros2/rclcpp/issues/2034>`_)
+* Bugfix 20210810 get current state (`#1756 <https://github.com/ros2/rclcpp/issues/1756>`_)
+* Make lifecycle impl get_current_state() const. (`#2031 <https://github.com/ros2/rclcpp/issues/2031>`_)
+* Cleanup the lifecycle implementation (`#2027 <https://github.com/ros2/rclcpp/issues/2027>`_)
+* Cleanup the rclcpp_lifecycle dependencies. (`#2021 <https://github.com/ros2/rclcpp/issues/2021>`_)
+* Contributors: Chris Lalancette, Tomoya Fujita
 
-9.2.0 (2021-09-17)
-------------------
-* Added thread safe for_each_callback_group method (`#1741 <https://github.com/ros2/rclcpp/issues/1741>`_)
-* Contributors: Aditya Pande
+17.0.0 (2022-09-13)
+-------------------
+* Revert "Revert "Add a create_timer method to Node and `LifecycleNode` classes (`#1975 <https://github.com/ros2/rclcpp/issues/1975>`_)" (`#2009 <https://github.com/ros2/rclcpp/issues/2009>`_) (`#2010 <https://github.com/ros2/rclcpp/issues/2010>`_)
+* Revert "Add a `create_timer` method to `Node` and `LifecycleNode` classes (`#1975 <https://github.com/ros2/rclcpp/issues/1975>`_)" (`#2009 <https://github.com/ros2/rclcpp/issues/2009>`_)
+* Add a `create_timer` method to `Node` and `LifecycleNode` classes (`#1975 <https://github.com/ros2/rclcpp/issues/1975>`_)
+* Support pre-set and post-set parameter callbacks in addition to on-set-parameter-callback. (`#1947 <https://github.com/ros2/rclcpp/issues/1947>`_)
+* Make create_service accept rclcpp::QoS (`#1969 <https://github.com/ros2/rclcpp/issues/1969>`_)
+* Make create_client accept rclcpp::QoS (`#1964 <https://github.com/ros2/rclcpp/issues/1964>`_)
+* Contributors: Andrew Symington, Deepanshu Bansal, Ivan Santiago Paunovic, Shane Loretz
 
-9.1.0 (2021-05-20)
-------------------
-* Fix destruction order in lifecycle benchmark (`#1676 <https://github.com/ros2/rclcpp/issues/1676>`_)
+16.2.0 (2022-05-03)
+-------------------
+
+16.1.0 (2022-04-29)
+-------------------
+
+16.0.1 (2022-04-13)
+-------------------
+
+16.0.0 (2022-04-08)
+-------------------
+* remove things that were deprecated during galactic (`#1913 <https://github.com/ros2/rclcpp/issues/1913>`_)
+* Contributors: William Woodall
+
+15.4.0 (2022-04-05)
+-------------------
+
+15.3.0 (2022-03-30)
+-------------------
+
+15.2.0 (2022-03-24)
+-------------------
+* Fix rosdoc2 issues (`#1897 <https://github.com/ros2/rclcpp/issues/1897>`_)
+* Contributors: Chris Lalancette
+
+15.1.0 (2022-03-01)
+-------------------
+* Install headers to include/${PROJECT_NAME} (`#1888 <https://github.com/ros2/rclcpp/issues/1888>`_)
+* LifecycleNode::on_deactivate deactivate all managed entities. (`#1885 <https://github.com/ros2/rclcpp/issues/1885>`_)
+* Contributors: Shane Loretz, Tomoya Fujita
+
+15.0.0 (2022-01-14)
+-------------------
+* Automatically transition lifecycle entities when node transitions (`#1863 <https://github.com/ros2/rclcpp/issues/1863>`_)
+* Contributors: Ivan Santiago Paunovic
+
+14.1.0 (2022-01-05)
+-------------------
+
+14.0.0 (2021-12-17)
+-------------------
+* Remove author by request (`#1818 <https://github.com/ros2/rclcpp/issues/1818>`_)
+* Update maintainers (`#1817 <https://github.com/ros2/rclcpp/issues/1817>`_)
+* Suppress clang dead-store warnings in the benchmarks. (`#1802 <https://github.com/ros2/rclcpp/issues/1802>`_)
+* Contributors: Chris Lalancette, Jacob Perron
+
+13.1.0 (2021-10-18)
+-------------------
+* Update forward declarations of `rcl_lifecycle` types (`#1788 <https://github.com/ros2/rclcpp/issues/1788>`_)
+* Deprecate the `void shared_ptr<MessageT>` subscription callback signatures (`#1713 <https://github.com/ros2/rclcpp/issues/1713>`_)
+* Contributors: Abrar Rahman Protyasha, Michel Hidalgo
+
+13.0.0 (2021-08-23)
+-------------------
+* Update client API to be able to remove pending requests. (`#1734 <https://github.com/ros2/rclcpp/issues/1734>`_)
+* Change log level for lifecycle_publisher. (`#1715 <https://github.com/ros2/rclcpp/issues/1715>`_)
+* Fix: RCLCPP_PUBLIC -> RCLCPP_LIFECYCLE_PUBLIC (`#1732 <https://github.com/ros2/rclcpp/issues/1732>`_)
+* Use rcpputils/scope_exit.hpp and remove rclcpp/scope_exit.hpp (`#1727 <https://github.com/ros2/rclcpp/issues/1727>`_)
+* Contributors: Alberto Soragna, Christophe Bedard, Ivan Santiago Paunovic, Shane Loretz
+
+12.0.0 (2021-07-26)
+-------------------
+* Remove unsafe get_callback_groups API.
+  Callers should change to using for_each_callback_group(), or
+  store the callback groups they need internally.
+* Add in callback_groups_for_each.
+  The main reason to add this method in is to make accesses to the
+  callback_groups\_ vector thread-safe.  By having a
+  callback_groups_for_each that accepts a std::function, we can
+  just have the callers give us the callback they are interested
+  in, and we can take care of the locking.
+  The rest of this fairly large PR is cleaning up all of the places
+  that use get_callback_groups() to instead use
+  callback_groups_for_each().
+* Contributors: Chris Lalancette
+
+11.2.0 (2021-07-21)
+-------------------
+
+11.1.0 (2021-07-13)
+-------------------
+
+11.0.0 (2021-05-18)
+-------------------
+* Fix destruction order in lifecycle benchmark (`#1675 <https://github.com/ros2/rclcpp/issues/1675>`_)
 * Contributors: Scott K Logan
 
-9.0.3 (2021-05-10)
-------------------
+10.0.0 (2021-05-11)
+-------------------
+* [rclcpp] Type Adaptation feature (`#1557 <https://github.com/ros2/rclcpp/issues/1557>`_)
+* Contributors: Audrow Nash, William Woodall
 
 9.0.2 (2021-04-14)
 ------------------

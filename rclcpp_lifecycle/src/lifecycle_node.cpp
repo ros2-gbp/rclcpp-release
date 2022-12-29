@@ -14,14 +14,21 @@
 
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
-#include <string>
+#include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
-#include <vector>
+#include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "lifecycle_msgs/msg/state.hpp"
 #include "lifecycle_msgs/msg/transition.hpp"
+
+#include "rcl_interfaces/msg/list_parameters_result.hpp"
+#include "rcl_interfaces/msg/parameter_descriptor.hpp"
+#include "rcl_interfaces/msg/set_parameters_result.hpp"
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/graph_listener.hpp"
@@ -78,7 +85,8 @@ LifecycleNode::LifecycleNode(
       node_topics_,
       node_graph_,
       node_services_,
-      node_logging_
+      node_logging_,
+      options.clock_type()
     )),
   node_parameters_(new rclcpp::node_interfaces::NodeParameters(
       node_base_,
@@ -183,24 +191,6 @@ LifecycleNode::declare_parameter(
 }
 
 const rclcpp::ParameterValue &
-LifecycleNode::declare_parameter(const std::string & name)
-{
-#ifndef _WIN32
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-  return this->node_parameters_->declare_parameter(name);
-#ifndef _WIN32
-# pragma GCC diagnostic pop
-#else
-# pragma warning(pop)
-#endif
-}
-
-const rclcpp::ParameterValue &
 LifecycleNode::declare_parameter(
   const std::string & name,
   rclcpp::ParameterType type,
@@ -301,10 +291,29 @@ LifecycleNode::list_parameters(
   return node_parameters_->list_parameters(prefixes, depth);
 }
 
+rclcpp::Node::PreSetParametersCallbackHandle::SharedPtr
+LifecycleNode::add_pre_set_parameters_callback(PreSetParametersCallbackType callback)
+{
+  return node_parameters_->add_pre_set_parameters_callback(callback);
+}
+
 rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
-LifecycleNode::add_on_set_parameters_callback(OnParametersSetCallbackType callback)
+LifecycleNode::add_on_set_parameters_callback(OnSetParametersCallbackType callback)
 {
   return node_parameters_->add_on_set_parameters_callback(callback);
+}
+
+rclcpp::Node::PostSetParametersCallbackHandle::SharedPtr
+LifecycleNode::add_post_set_parameters_callback(PostSetParametersCallbackType callback)
+{
+  return node_parameters_->add_post_set_parameters_callback(callback);
+}
+
+void
+LifecycleNode::remove_pre_set_parameters_callback(
+  const PreSetParametersCallbackHandle * const callback)
+{
+  node_parameters_->remove_pre_set_parameters_callback(callback);
 }
 
 void
@@ -312,6 +321,13 @@ LifecycleNode::remove_on_set_parameters_callback(
   const OnSetParametersCallbackHandle * const callback)
 {
   node_parameters_->remove_on_set_parameters_callback(callback);
+}
+
+void
+LifecycleNode::remove_post_set_parameters_callback(
+  const PostSetParametersCallbackHandle * const callback)
+{
+  node_parameters_->remove_post_set_parameters_callback(callback);
 }
 
 std::vector<std::string>
@@ -365,10 +381,11 @@ LifecycleNode::get_subscriptions_info_by_topic(const std::string & topic_name, b
   return node_graph_->get_subscriptions_info_by_topic(topic_name, no_mangle);
 }
 
-const std::vector<rclcpp::CallbackGroup::WeakPtr> &
-LifecycleNode::get_callback_groups() const
+void
+LifecycleNode::for_each_callback_group(
+  const rclcpp::node_interfaces::NodeBaseInterface::CallbackGroupFunction & func)
 {
-  return node_base_->get_callback_groups();
+  node_base_->for_each_callback_group(func);
 }
 
 rclcpp::Event::SharedPtr
@@ -519,25 +536,25 @@ LifecycleNode::register_on_error(
 }
 
 const State &
-LifecycleNode::get_current_state()
+LifecycleNode::get_current_state() const
 {
   return impl_->get_current_state();
 }
 
 std::vector<State>
-LifecycleNode::get_available_states()
+LifecycleNode::get_available_states() const
 {
   return impl_->get_available_states();
 }
 
 std::vector<Transition>
-LifecycleNode::get_available_transitions()
+LifecycleNode::get_available_transitions() const
 {
   return impl_->get_available_transitions();
 }
 
 std::vector<Transition>
-LifecycleNode::get_transition_graph()
+LifecycleNode::get_transition_graph() const
 {
   return impl_->get_transition_graph();
 }
@@ -638,24 +655,31 @@ LifecycleNode::shutdown(LifecycleNodeInterface::CallbackReturn & cb_return_code)
     rcl_lifecycle_shutdown_label, cb_return_code);
 }
 
-void
-LifecycleNode::add_publisher_handle(
-  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisherInterface> pub)
+node_interfaces::LifecycleNodeInterface::CallbackReturn
+LifecycleNode::on_activate(const State &)
 {
-  impl_->add_publisher_handle(pub);
+  impl_->on_activate();
+  return LifecycleNodeInterface::CallbackReturn::SUCCESS;
+}
+
+node_interfaces::LifecycleNodeInterface::CallbackReturn
+LifecycleNode::on_deactivate(const State &)
+{
+  impl_->on_deactivate();
+  return LifecycleNodeInterface::CallbackReturn::SUCCESS;
+}
+
+void
+LifecycleNode::add_managed_entity(
+  std::weak_ptr<rclcpp_lifecycle::ManagedEntityInterface> managed_entity)
+{
+  impl_->add_managed_entity(managed_entity);
 }
 
 void
 LifecycleNode::add_timer_handle(std::shared_ptr<rclcpp::TimerBase> timer)
 {
   impl_->add_timer_handle(timer);
-}
-
-void
-LifecycleNode::for_each_callback_group(
-  const rclcpp::node_interfaces::NodeBaseInterface::CallbackGroupFunction & func)
-{
-  rclcpp::node_interfaces::global_for_each_callback_group(node_base_.get(), func);
 }
 
 }  // namespace rclcpp_lifecycle

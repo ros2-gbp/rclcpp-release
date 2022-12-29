@@ -47,6 +47,9 @@ using rclcpp::Node;
 using rclcpp::NodeOptions;
 using rclcpp::exceptions::throw_from_rcl_error;
 
+namespace
+{
+
 RCLCPP_LOCAL
 std::string
 extend_sub_namespace(const std::string & existing_sub_namespace, const std::string & extension)
@@ -54,18 +57,18 @@ extend_sub_namespace(const std::string & existing_sub_namespace, const std::stri
   // Assumption is that the existing_sub_namespace does not need checking
   // because it would be checked already when it was set with this function.
 
-  // check if the new sub-namespace extension is absolute
-  if (extension.front() == '/') {
-    throw rclcpp::exceptions::NameValidationError(
-            "sub_namespace",
-            extension.c_str(),
-            "a sub-namespace should not have a leading /",
-            0);
-  } else if (existing_sub_namespace.empty() && extension.empty()) {
+  if (extension.empty()) {
     throw rclcpp::exceptions::NameValidationError(
             "sub_namespace",
             extension.c_str(),
             "sub-nodes should not extend nodes by an empty sub-namespace",
+            0);
+  } else if (extension.front() == '/') {
+    // check if the new sub-namespace extension is absolute
+    throw rclcpp::exceptions::NameValidationError(
+            "sub_namespace",
+            extension.c_str(),
+            "a sub-namespace should not have a leading /",
             0);
   }
 
@@ -76,7 +79,7 @@ extend_sub_namespace(const std::string & existing_sub_namespace, const std::stri
     new_sub_namespace = existing_sub_namespace + "/" + extension;
   }
 
-  // remove any trailing `/` so that new extensions do no result in `//`
+  // remove any trailing `/` so that new extensions do not result in `//`
   if (new_sub_namespace.back() == '/') {
     new_sub_namespace = new_sub_namespace.substr(0, new_sub_namespace.size() - 1);
   }
@@ -103,6 +106,8 @@ create_effective_namespace(const std::string & node_namespace, const std::string
     return node_namespace + "/" + sub_namespace;
   }
 }
+
+}  // namespace
 
 Node::Node(
   const std::string & node_name,
@@ -171,7 +176,8 @@ Node::Node(
       node_topics_,
       node_graph_,
       node_services_,
-      node_logging_
+      node_logging_,
+      options.clock_type()
     )),
   node_parameters_(new rclcpp::node_interfaces::NodeParameters(
       node_base_,
@@ -232,6 +238,8 @@ Node::Node(
   node_services_(other.node_services_),
   node_clock_(other.node_clock_),
   node_parameters_(other.node_parameters_),
+  node_time_source_(other.node_time_source_),
+  node_waitables_(other.node_waitables_),
   node_options_(other.node_options_),
   sub_namespace_(extend_sub_namespace(other.get_sub_namespace(), sub_namespace)),
   effective_namespace_(create_effective_namespace(other.get_namespace(), sub_namespace_))
@@ -304,24 +312,6 @@ Node::create_callback_group(
 }
 
 const rclcpp::ParameterValue &
-Node::declare_parameter(const std::string & name)
-{
-#ifndef _WIN32
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-  return this->node_parameters_->declare_parameter(name);
-#ifndef _WIN32
-# pragma GCC diagnostic pop
-#else
-# pragma warning(pop)
-#endif
-}
-
-const rclcpp::ParameterValue &
 Node::declare_parameter(
   const std::string & name,
   const rclcpp::ParameterValue & default_value,
@@ -364,7 +354,7 @@ Node::has_parameter(const std::string & name) const
 rcl_interfaces::msg::SetParametersResult
 Node::set_parameter(const rclcpp::Parameter & parameter)
 {
-  return this->set_parameters_atomically({parameter});
+  return node_parameters_->set_parameters_atomically({parameter});
 }
 
 std::vector<rcl_interfaces::msg::SetParametersResult>
@@ -429,16 +419,40 @@ Node::list_parameters(const std::vector<std::string> & prefixes, uint64_t depth)
   return node_parameters_->list_parameters(prefixes, depth);
 }
 
+rclcpp::Node::PreSetParametersCallbackHandle::SharedPtr
+Node::add_pre_set_parameters_callback(PreSetParametersCallbackType callback)
+{
+  return node_parameters_->add_pre_set_parameters_callback(callback);
+}
+
 rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
-Node::add_on_set_parameters_callback(OnParametersSetCallbackType callback)
+Node::add_on_set_parameters_callback(OnSetParametersCallbackType callback)
 {
   return node_parameters_->add_on_set_parameters_callback(callback);
 }
 
-void
-Node::remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const callback)
+rclcpp::Node::PostSetParametersCallbackHandle::SharedPtr
+Node::add_post_set_parameters_callback(PostSetParametersCallbackType callback)
 {
-  return node_parameters_->remove_on_set_parameters_callback(callback);
+  return node_parameters_->add_post_set_parameters_callback(callback);
+}
+
+void
+Node::remove_pre_set_parameters_callback(const PreSetParametersCallbackHandle * const handler)
+{
+  node_parameters_->remove_pre_set_parameters_callback(handler);
+}
+
+void
+Node::remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const handler)
+{
+  node_parameters_->remove_on_set_parameters_callback(handler);
+}
+
+void
+Node::remove_post_set_parameters_callback(const PostSetParametersCallbackHandle * const handler)
+{
+  node_parameters_->remove_post_set_parameters_callback(handler);
 }
 
 std::vector<std::string>
@@ -492,10 +506,11 @@ Node::get_subscriptions_info_by_topic(const std::string & topic_name, bool no_ma
   return node_graph_->get_subscriptions_info_by_topic(topic_name, no_mangle);
 }
 
-const std::vector<rclcpp::CallbackGroup::WeakPtr> &
-Node::get_callback_groups() const
+void
+Node::for_each_callback_group(
+  const node_interfaces::NodeBaseInterface::CallbackGroupFunction & func)
 {
-  return node_base_->get_callback_groups();
+  node_base_->for_each_callback_group(func);
 }
 
 rclcpp::Event::SharedPtr
@@ -614,10 +629,4 @@ const NodeOptions &
 Node::get_node_options() const
 {
   return this->node_options_;
-}
-
-void Node::for_each_callback_group(
-  const node_interfaces::NodeBaseInterface::CallbackGroupFunction & func)
-{
-  rclcpp::node_interfaces::global_for_each_callback_group(node_base_.get(), func);
 }

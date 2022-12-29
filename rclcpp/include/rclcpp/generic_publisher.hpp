@@ -31,6 +31,8 @@
 #include "rclcpp/typesupport_helpers.hpp"
 #include "rclcpp/visibility_control.hpp"
 
+#include "rmw/rmw.h"
+
 namespace rclcpp
 {
 
@@ -60,7 +62,6 @@ public:
    * \param topic_name Topic name
    * \param topic_type Topic type
    * \param qos %QoS settings
-   * \param callback Callback for new messages of serialized form
    * \param options %Publisher options.
    * Not all publisher options are currently respected, the only relevant options for this
    * publisher are `event_callbacks`, `use_default_callbacks`, and `%callback_group`.
@@ -77,38 +78,12 @@ public:
       node_base,
       topic_name,
       *rclcpp::get_typesupport_handle(topic_type, "rosidl_typesupport_cpp", *ts_lib),
-      options.template to_rcl_publisher_options<rclcpp::SerializedMessage>(qos)),
+      options.template to_rcl_publisher_options<rclcpp::SerializedMessage>(qos),
+      // NOTE(methylDragon): Passing these args separately is necessary for event binding
+      options.event_callbacks,
+      options.use_default_callbacks),
     ts_lib_(ts_lib)
-  {
-    // This is unfortunately duplicated with the code in publisher.hpp.
-    // TODO(nnmm): Deduplicate by moving this into PublisherBase.
-    if (options.event_callbacks.deadline_callback) {
-      this->add_event_handler(
-        options.event_callbacks.deadline_callback,
-        RCL_PUBLISHER_OFFERED_DEADLINE_MISSED);
-    }
-    if (options.event_callbacks.liveliness_callback) {
-      this->add_event_handler(
-        options.event_callbacks.liveliness_callback,
-        RCL_PUBLISHER_LIVELINESS_LOST);
-    }
-    if (options.event_callbacks.incompatible_qos_callback) {
-      this->add_event_handler(
-        options.event_callbacks.incompatible_qos_callback,
-        RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS);
-    } else if (options.use_default_callbacks) {
-      // Register default callback when not specified
-      try {
-        this->add_event_handler(
-          [this](QOSOfferedIncompatibleQoSInfo & info) {
-            this->default_incompatible_qos_callback(info);
-          },
-          RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS);
-      } catch (UnsupportedEventTypeException & /*exc*/) {
-        // pass
-      }
-    }
-  }
+  {}
 
   RCLCPP_PUBLIC
   virtual ~GenericPublisher() = default;
@@ -117,9 +92,24 @@ public:
   RCLCPP_PUBLIC
   void publish(const rclcpp::SerializedMessage & message);
 
+  /**
+   * Publish a rclcpp::SerializedMessage via loaned message after de-serialization.
+   *
+   * \param message a serialized message
+   * \throws anything rclcpp::exceptions::throw_from_rcl_error can show
+   */
+  RCLCPP_PUBLIC
+  void publish_as_loaned_msg(const rclcpp::SerializedMessage & message);
+
 private:
   // The type support library should stay loaded, so it is stored in the GenericPublisher
   std::shared_ptr<rcpputils::SharedLibrary> ts_lib_;
+
+  void * borrow_loaned_message();
+  void deserialize_message(
+    const rmw_serialized_message_t & serialized_message,
+    void * deserialized_msg);
+  void publish_loaned_message(void * loaned_message);
 };
 
 }  // namespace rclcpp

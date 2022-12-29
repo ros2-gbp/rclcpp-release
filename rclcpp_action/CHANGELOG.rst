@@ -3,28 +3,104 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-9.2.2 (2022-12-06)
-------------------
+18.0.0 (2022-12-29)
+-------------------
+* Explicitly set callback type (`#2059 <https://github.com/ros2/rclcpp/issues/2059>`_)
+* Update maintainers (`#2043 <https://github.com/ros2/rclcpp/issues/2043>`_)
+* Contributors: Audrow Nash, mauropasse
 
-9.2.1 (2022-04-28)
-------------------
+17.1.0 (2022-11-02)
+-------------------
+* Do not clear entities callbacks on destruction (`#2002 <https://github.com/ros2/rclcpp/issues/2002>`_)
+* Contributors: mauropasse
 
-9.2.0 (2021-09-17)
-------------------
-* Fixed a bug where it would occasionally miss a goal result, which was caused by race condition (`#1677 <https://github.com/ros2/rclcpp/issues/1677>`_) (`#1683 <https://github.com/ros2/rclcpp/issues/1683>`_)
-  * Co-authored-by: Kaven Yau <kavenyau@foxmail.com>
-* Contributors: Tomoya Fujita
+17.0.0 (2022-09-13)
+-------------------
+* Revert "Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)" (`#1956 <https://github.com/ros2/rclcpp/issues/1956>`_)
+* Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)
+* Contributors: Hubert Liberacki, William Woodall
 
-9.1.0 (2021-05-20)
-------------------
-* Bump the benchmark timeout for benchmark_action_client (`#1672 <https://github.com/ros2/rclcpp/issues/1672>`_)
+16.2.0 (2022-05-03)
+-------------------
+
+16.1.0 (2022-04-29)
+-------------------
+
+16.0.1 (2022-04-13)
+-------------------
+
+16.0.0 (2022-04-08)
+-------------------
+* remove things that were deprecated during galactic (`#1913 <https://github.com/ros2/rclcpp/issues/1913>`_)
+* Contributors: William Woodall
+
+15.4.0 (2022-04-05)
+-------------------
+* add take_data_by_entity_id API to waitable (`#1892 <https://github.com/ros2/rclcpp/issues/1892>`_)
+* Contributors: Alberto Soragna
+
+15.3.0 (2022-03-30)
+-------------------
+
+15.2.0 (2022-03-24)
+-------------------
+* Fix rosdoc2 issues (`#1897 <https://github.com/ros2/rclcpp/issues/1897>`_)
+* Contributors: Chris Lalancette
+
+15.1.0 (2022-03-01)
+-------------------
+* Add RMW listener APIs (`#1579 <https://github.com/ros2/rclcpp/issues/1579>`_)
+* Install headers to include/${PROJECT_NAME} (`#1888 <https://github.com/ros2/rclcpp/issues/1888>`_)
+* Contributors: Shane Loretz, iRobot ROS
+
+15.0.0 (2022-01-14)
+-------------------
+* Fix include order and relative paths for cpplint (`#1859 <https://github.com/ros2/rclcpp/issues/1859>`_)
+* Contributors: Jacob Perron
+
+14.1.0 (2022-01-05)
+-------------------
+
+14.0.0 (2021-12-17)
+-------------------
+* Fixes for uncrustify 0.72 (`#1844 <https://github.com/ros2/rclcpp/issues/1844>`_)
+* Use rclcpp::guard_condition (`#1612 <https://github.com/ros2/rclcpp/issues/1612>`_)
+* Remove author by request (`#1818 <https://github.com/ros2/rclcpp/issues/1818>`_)
+* Update maintainers (`#1817 <https://github.com/ros2/rclcpp/issues/1817>`_)
+* Suppress clang dead-store warnings in the benchmarks. (`#1802 <https://github.com/ros2/rclcpp/issues/1802>`_)
+* Contributors: Chris Lalancette, Jacob Perron, mauropasse
+
+13.1.0 (2021-10-18)
+-------------------
+* Deprecate the `void shared_ptr<MessageT>` subscription callback signatures (`#1713 <https://github.com/ros2/rclcpp/issues/1713>`_)
+* Contributors: Abrar Rahman Protyasha, Tomoya Fujita
+
+13.0.0 (2021-08-23)
+-------------------
+* Use rcpputils/scope_exit.hpp and remove rclcpp/scope_exit.hpp. (`#1727 <https://github.com/ros2/rclcpp/issues/1727>`_)
+* Contributors: Christophe Bedard
+
+12.0.0 (2021-07-26)
+-------------------
+
+11.2.0 (2021-07-21)
+-------------------
+
+11.1.0 (2021-07-13)
+-------------------
+* Fixed occasionally missing goal result caused by race condition (`#1677 <https://github.com/ros2/rclcpp/issues/1677>`_)
+* Contributors: Kaven Yau
+
+11.0.0 (2021-05-18)
+-------------------
+* Bump the benchmark timeout for benchmark_action_client (`#1671 <https://github.com/ros2/rclcpp/issues/1671>`_)
 * Contributors: Scott K Logan
 
-9.0.3 (2021-05-10)
-------------------
-* Returns CancelResponse::REJECT while goal handle failed to transit to CANCELING state (`#1641 <https://github.com/ros2/rclcpp/issues/1641>`_) (`#1653 <https://github.com/ros2/rclcpp/issues/1653>`_)
-* Fix action server deadlock issue that caused by other mutexes locked in CancelCallback (`#1635 <https://github.com/ros2/rclcpp/issues/1635>`_) (`#1646 <https://github.com/ros2/rclcpp/issues/1646>`_)
-* Contributors: Jacob Perron, Kaven Yau, William Woodall
+10.0.0 (2021-05-11)
+-------------------
+* Returns CancelResponse::REJECT while goal handle failed to transit to CANCELING state (`#1641 <https://github.com/ros2/rclcpp/issues/1641>`_)
+* Fix action server deadlock issue that caused by other mutexes locked in CancelCallback (`#1635 <https://github.com/ros2/rclcpp/issues/1635>`_)
+* Contributors: Kaven Yau
 
 9.0.2 (2021-04-14)
 ------------------

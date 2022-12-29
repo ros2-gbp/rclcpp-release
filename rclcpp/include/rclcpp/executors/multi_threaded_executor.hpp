@@ -22,7 +22,6 @@
 #include <thread>
 #include <unordered_map>
 
-#include "rclcpp/detail/mutex_two_priorities.hpp"
 #include "rclcpp/executor.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/memory_strategies.hpp"
@@ -48,12 +47,12 @@ public:
    *
    * \param options common options for all executors
    * \param number_of_threads number of threads to have in the thread pool,
-   *   the default 0 will use the number of cpu cores found instead
+   *   the default 0 will use the number of cpu cores found (minimum of 2)
    * \param yield_before_execute if true std::this_thread::yield() is called
    * \param timeout maximum time to wait
    */
   RCLCPP_PUBLIC
-  MultiThreadedExecutor(
+  explicit MultiThreadedExecutor(
     const rclcpp::ExecutorOptions & options = rclcpp::ExecutorOptions(),
     size_t number_of_threads = 0,
     bool yield_before_execute = false,
@@ -82,12 +81,10 @@ protected:
 private:
   RCLCPP_DISABLE_COPY(MultiThreadedExecutor)
 
-  detail::MutexTwoPriorities wait_mutex_;
+  std::mutex wait_mutex_;
   size_t number_of_threads_;
   bool yield_before_execute_;
   std::chrono::nanoseconds next_exec_timeout_;
-
-  std::set<TimerBase::SharedPtr> scheduled_timers_;
 };
 
 }  // namespace executors

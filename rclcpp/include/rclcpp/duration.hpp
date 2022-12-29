@@ -38,13 +38,6 @@ public:
    */
   Duration(int32_t seconds, uint32_t nanoseconds);
 
-  /// Construct duration from the specified nanoseconds.
-  [[deprecated(
-    "Use Duration::from_nanoseconds instead or std::chrono_literals. For example:"
-    "rclcpp::Duration::from_nanoseconds(int64_variable);"
-    "rclcpp::Duration(0ns);")]]
-  explicit Duration(rcl_duration_value_t nanoseconds);
-
   /// Construct duration from the specified std::chrono::nanoseconds.
   explicit Duration(std::chrono::nanoseconds nanoseconds);
 
@@ -99,8 +92,12 @@ public:
   Duration
   operator+(const rclcpp::Duration & rhs) const;
 
+  Duration & operator+=(const rclcpp::Duration & rhs);
+
   Duration
   operator-(const rclcpp::Duration & rhs) const;
+
+  Duration & operator-=(const rclcpp::Duration & rhs);
 
   /// Get the maximum representable value.
   /**
@@ -112,6 +109,9 @@ public:
 
   Duration
   operator*(double scale) const;
+
+  Duration &
+  operator*=(double scale);
 
   /// Get duration in nanosecods
   /**

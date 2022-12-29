@@ -86,6 +86,9 @@ struct ParameterEventCallbackHandle
  * the ROS node supplied in the ParameterEventHandler constructor.
  * The callback, a lambda function in this case, simply prints out the value of the parameter.
  *
+ * Note: the object returned from add_parameter_callback must be captured or the callback will
+ * be immediately unregistered.
+ *
  * You may also monitor for changes to parameters in other nodes by supplying the node
  * name to add_parameter_callback:
  *
@@ -103,8 +106,8 @@ struct ParameterEventCallbackHandle
  * In this case, the callback will be invoked whenever "some_remote_param_name" changes
  * on remote node "some_remote_node_name".
  *
- * To remove a parameter callback, call remove_parameter_callback, passing the handle returned
- * from add_parameter_callback:
+ * To remove a parameter callback, reset the callback handle smart pointer or call
+ * remove_parameter_callback, passing the handle returned from add_parameter_callback:
  *
  *   param_handler->remove_parameter_callback(handle2);
  *
@@ -152,9 +155,12 @@ struct ParameterEventCallbackHandle
  * For both parameter callbacks and parameter event callbacks, when multiple callbacks are added,
  * the callbacks are invoked last-in, first-called order (LIFO).
  *
- * To remove a parameter event callback, use:
+ * Note: the callback handle returned from add_parameter_event_callback must be captured or
+ * the callback will immediately be unregistered.
  *
- *   param_handler->remove_event_parameter_callback(handle);
+ * To remove a parameter event callback, reset the callback smart pointer or use:
+ *
+ *   param_handler->remove_event_parameter_callback(handle3);
  */
 class ParameterEventHandler
 {
@@ -165,17 +171,21 @@ public:
    * \param[in] qos The QoS settings to use for any subscriptions.
    */
   template<typename NodeT>
-  ParameterEventHandler(
+  explicit ParameterEventHandler(
     NodeT node,
     const rclcpp::QoS & qos =
     rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_parameter_events)))
+  : node_base_(rclcpp::node_interfaces::get_node_base_interface(node))
   {
-    node_base_ = rclcpp::node_interfaces::get_node_base_interface(node);
     auto node_topics = rclcpp::node_interfaces::get_node_topics_interface(node);
+
+    callbacks_ = std::make_shared<Callbacks>();
 
     event_subscription_ = rclcpp::create_subscription<rcl_interfaces::msg::ParameterEvent>(
       node_topics, "/parameter_events", qos,
-      std::bind(&ParameterEventHandler::event_callback, this, std::placeholders::_1));
+      [callbacks = callbacks_](const rcl_interfaces::msg::ParameterEvent & event) {
+        callbacks->event_callback(event);
+      });
   }
 
   using ParameterEventCallbackType =
@@ -185,10 +195,14 @@ public:
   /**
    * This function may be called multiple times to set multiple parameter event callbacks.
    *
+   * Note: if the returned callback handle smart pointer is not captured, the callback is
+   * immediatedly unregistered. A compiler warning should be generated to warn of this.
+   *
    * \param[in] callback Function callback to be invoked on parameter updates.
    * \returns A handle used to refer to the callback.
    */
   RCLCPP_PUBLIC
+  RCUTILS_WARN_UNUSED
   ParameterEventCallbackHandle::SharedPtr
   add_parameter_event_callback(
     ParameterEventCallbackType callback);
@@ -208,12 +222,17 @@ public:
   /**
    * If a node_name is not provided, defaults to the current node.
    *
+   * Note: if the returned callback handle smart pointer is not captured, the callback
+   * is immediately unregistered. A compiler warning should be generated to warn
+   * of this.
+   *
    * \param[in] parameter_name Name of parameter to monitor.
    * \param[in] callback Function callback to be invoked upon parameter update.
    * \param[in] node_name Name of node which hosts the parameter.
    * \returns A handle used to refer to the callback.
    */
   RCLCPP_PUBLIC
+  RCUTILS_WARN_UNUSED
   ParameterCallbackHandle::SharedPtr
   add_parameter_callback(
     const std::string & parameter_name,
@@ -249,8 +268,8 @@ public:
   get_parameter_from_event(
     const rcl_interfaces::msg::ParameterEvent & event,
     rclcpp::Parameter & parameter,
-    const std::string parameter_name,
-    const std::string node_name = "");
+    const std::string & parameter_name,
+    const std::string & node_name = "");
 
   /// Get an rclcpp::Parameter from parameter event
   /**
@@ -264,13 +283,14 @@ public:
    * \param[in] parameter_name Name of parameter.
    * \param[in] node_name Name of node which hosts the parameter.
    * \returns The resultant rclcpp::Parameter from the event.
+   * \throws std::runtime_error if input node name doesn't match the node name in parameter event.
    */
   RCLCPP_PUBLIC
   static rclcpp::Parameter
   get_parameter_from_event(
     const rcl_interfaces::msg::ParameterEvent & event,
-    const std::string parameter_name,
-    const std::string node_name = "");
+    const std::string & parameter_name,
+    const std::string & node_name = "");
 
   /// Get all rclcpp::Parameter values from a parameter event
   /**
@@ -285,17 +305,6 @@ public:
   using CallbacksContainerType = std::list<ParameterCallbackHandle::WeakPtr>;
 
 protected:
-  /// Callback for parameter events subscriptions.
-  RCLCPP_PUBLIC
-  void
-  event_callback(const rcl_interfaces::msg::ParameterEvent & event);
-
-  // Utility function for resolving node path.
-  std::string resolve_path(const std::string & path);
-
-  // Node interface used for base functionality
-  std::shared_ptr<rclcpp::node_interfaces::NodeBaseInterface> node_base_;
-
   // *INDENT-OFF* Uncrustify doesn't handle indented public/private labels
   // Hash function for string pair required in std::unordered_map
   // See: https://stackoverflow.com/questions/35985960/c-why-is-boosthash-combine-the-best-way-to-combine-hash-values
@@ -319,18 +328,34 @@ protected:
   };
   // *INDENT-ON*
 
-  // Map container for registered parameters
-  std::unordered_map<
-    std::pair<std::string, std::string>,
-    CallbacksContainerType,
-    StringPairHash
-  > parameter_callbacks_;
+  struct Callbacks
+  {
+    std::recursive_mutex mutex_;
+
+    // Map container for registered parameters
+    std::unordered_map<
+      std::pair<std::string, std::string>,
+      CallbacksContainerType,
+      StringPairHash
+    > parameter_callbacks_;
+
+    std::list<ParameterEventCallbackHandle::WeakPtr> event_callbacks_;
+
+    /// Callback for parameter events subscriptions.
+    RCLCPP_PUBLIC
+    void
+    event_callback(const rcl_interfaces::msg::ParameterEvent & event);
+  };
+
+  std::shared_ptr<Callbacks> callbacks_;
+
+  // Utility function for resolving node path.
+  std::string resolve_path(const std::string & path);
+
+  // Node interface used for base functionality
+  std::shared_ptr<rclcpp::node_interfaces::NodeBaseInterface> node_base_;
 
   rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>::SharedPtr event_subscription_;
-
-  std::list<ParameterEventCallbackHandle::WeakPtr> event_callbacks_;
-
-  std::recursive_mutex mutex_;
 };
 
 }  // namespace rclcpp
