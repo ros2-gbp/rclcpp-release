@@ -19,7 +19,6 @@
 #include <string>
 #include <vector>
 
-#include "rcl/time.h"
 #include "rcl/node_options.h"
 #include "rclcpp/context.hpp"
 #include "rclcpp/contexts/default_context.hpp"
@@ -47,7 +46,6 @@ public:
    *   - enable_topic_statistics = false
    *   - start_parameter_services = true
    *   - start_parameter_event_publisher = true
-   *   - clock_type = RCL_ROS_TIME
    *   - clock_qos = rclcpp::ClockQoS()
    *   - use_clock_thread = true
    *   - rosout_qos = rclcpp::RosoutQoS()
@@ -248,19 +246,6 @@ public:
   NodeOptions &
   start_parameter_event_publisher(bool start_parameter_event_publisher);
 
-  /// Return a reference to the clock type.
-  RCLCPP_PUBLIC
-  const rcl_clock_type_t &
-  clock_type() const;
-
-  /// Set the clock type.
-  /**
-   * The clock type to be used by the node.
-   */
-  RCLCPP_PUBLIC
-  NodeOptions &
-  clock_type(const rcl_clock_type_t & clock_type);
-
   /// Return a reference to the clock QoS.
   RCLCPP_PUBLIC
   const rclcpp::QoS &
@@ -414,8 +399,6 @@ private:
   bool start_parameter_services_ {true};
 
   bool start_parameter_event_publisher_ {true};
-
-  rcl_clock_type_t clock_type_ {RCL_ROS_TIME};
 
   rclcpp::QoS clock_qos_ = rclcpp::ClockQoS();
 

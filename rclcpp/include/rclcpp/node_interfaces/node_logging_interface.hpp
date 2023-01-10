@@ -19,7 +19,6 @@
 
 #include "rclcpp/logger.hpp"
 #include "rclcpp/macros.hpp"
-#include "rclcpp/node_interfaces/detail/node_interfaces_helpers.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
@@ -38,18 +37,14 @@ public:
   ~NodeLoggingInterface() = default;
 
   /// Return the logger of the node.
-  /**
-   * \return The logger of the node.
-   */
+  /** \return The logger of the node. */
   RCLCPP_PUBLIC
   virtual
   rclcpp::Logger
   get_logger() const = 0;
 
   /// Return the logger name associated with the node.
-  /**
-   * \return The logger name associated with the node.
-   */
+  /** \return The logger name associated with the node. */
   RCLCPP_PUBLIC
   virtual
   const char *
@@ -58,7 +53,5 @@ public:
 
 }  // namespace node_interfaces
 }  // namespace rclcpp
-
-RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(rclcpp::node_interfaces::NodeLoggingInterface, logging)
 
 #endif  // RCLCPP__NODE_INTERFACES__NODE_LOGGING_INTERFACE_HPP_

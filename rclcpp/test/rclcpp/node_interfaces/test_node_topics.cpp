@@ -36,14 +36,16 @@ const rosidl_message_type_support_t EmptyTypeSupport()
   return *rosidl_typesupport_cpp::get_message_type_support_handle<test_msgs::msg::Empty>();
 }
 
-const rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> PublisherOptions()
+const rcl_publisher_options_t PublisherOptions()
 {
-  return rclcpp::PublisherOptionsWithAllocator<std::allocator<void>>();
+  return rclcpp::PublisherOptionsWithAllocator<std::allocator<void>>().template
+         to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10));
 }
 
-const rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>> SubscriptionOptions()
+const rcl_subscription_options_t SubscriptionOptions()
 {
-  return rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>>();
+  return rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>>().template
+         to_rcl_subscription_options<test_msgs::msg::Empty>(rclcpp::QoS(10));
 }
 
 }  // namespace
@@ -53,9 +55,7 @@ class TestPublisher : public rclcpp::PublisherBase
 public:
   explicit TestPublisher(rclcpp::Node * node)
   : rclcpp::PublisherBase(
-      node->get_node_base_interface().get(), "topic", EmptyTypeSupport(),
-      PublisherOptions().to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10)),
-      PublisherOptions().event_callbacks, PublisherOptions().use_default_callbacks) {}
+      node->get_node_base_interface().get(), "topic", EmptyTypeSupport(), PublisherOptions()) {}
 };
 
 class TestSubscription : public rclcpp::SubscriptionBase
@@ -63,9 +63,7 @@ class TestSubscription : public rclcpp::SubscriptionBase
 public:
   explicit TestSubscription(rclcpp::Node * node)
   : rclcpp::SubscriptionBase(
-      node->get_node_base_interface().get(), EmptyTypeSupport(), "topic",
-      SubscriptionOptions().to_rcl_subscription_options(rclcpp::QoS(10)),
-      SubscriptionOptions().event_callbacks, SubscriptionOptions().use_default_callbacks) {}
+      node->get_node_base_interface().get(), EmptyTypeSupport(), "topic", SubscriptionOptions()) {}
   std::shared_ptr<void> create_message() override {return nullptr;}
 
   std::shared_ptr<rclcpp::SerializedMessage>

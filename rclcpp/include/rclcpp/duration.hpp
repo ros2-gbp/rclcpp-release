@@ -92,12 +92,8 @@ public:
   Duration
   operator+(const rclcpp::Duration & rhs) const;
 
-  Duration & operator+=(const rclcpp::Duration & rhs);
-
   Duration
   operator-(const rclcpp::Duration & rhs) const;
-
-  Duration & operator-=(const rclcpp::Duration & rhs);
 
   /// Get the maximum representable value.
   /**
@@ -109,9 +105,6 @@ public:
 
   Duration
   operator*(double scale) const;
-
-  Duration &
-  operator*=(double scale);
 
   /// Get duration in nanosecods
   /**

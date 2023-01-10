@@ -136,6 +136,7 @@ ClientBase::ClientBase(
 
 ClientBase::~ClientBase()
 {
+  clear_on_ready_callback();
 }
 
 bool
@@ -433,7 +434,7 @@ ClientBase::set_callback_to_entity(
   // been replaced but the middleware hasn't been told about the new one yet.
   set_on_ready_callback(
     entity_type,
-    rclcpp::detail::cpp_callback_trampoline<decltype(new_callback), const void *, size_t>,
+    rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
     static_cast<const void *>(&new_callback));
 
   std::lock_guard<std::recursive_mutex> lock(listener_mutex_);
@@ -453,7 +454,7 @@ ClientBase::set_callback_to_entity(
     auto & cb = it->second;
     set_on_ready_callback(
       entity_type,
-      rclcpp::detail::cpp_callback_trampoline<decltype(it->second), const void *, size_t>,
+      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
       static_cast<const void *>(&cb));
   }
 

@@ -161,13 +161,6 @@ Duration::operator+(const rclcpp::Duration & rhs) const
     rcl_duration_.nanoseconds + rhs.rcl_duration_.nanoseconds);
 }
 
-Duration &
-Duration::operator+=(const rclcpp::Duration & rhs)
-{
-  *this = *this + rhs;
-  return *this;
-}
-
 void
 bounds_check_duration_difference(int64_t lhsns, int64_t rhsns, uint64_t max)
 {
@@ -195,13 +188,6 @@ Duration::operator-(const rclcpp::Duration & rhs) const
 
   return Duration::from_nanoseconds(
     rcl_duration_.nanoseconds - rhs.rcl_duration_.nanoseconds);
-}
-
-Duration &
-Duration::operator-=(const rclcpp::Duration & rhs)
-{
-  *this = *this - rhs;
-  return *this;
 }
 
 void
@@ -234,13 +220,6 @@ Duration::operator*(double scale) const
   return Duration::from_nanoseconds(
     static_cast<rcl_duration_value_t>(
       static_cast<long double>(rcl_duration_.nanoseconds) * scale_ld));
-}
-
-Duration &
-Duration::operator*=(double scale)
-{
-  *this = *this * scale;
-  return *this;
 }
 
 rcl_duration_value_t
