@@ -2,6 +2,9 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+19.1.0 (2023-02-14)
+-------------------
+
 19.0.0 (2023-01-30)
 -------------------
 * Improve component_manager_isolated shutdown (`#2085 <https://github.com/ros2/rclcpp/issues/2085>`_)
