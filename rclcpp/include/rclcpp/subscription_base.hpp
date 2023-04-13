@@ -31,13 +31,16 @@
 
 #include "rclcpp/any_subscription_callback.hpp"
 #include "rclcpp/detail/cpp_callback_trampoline.hpp"
+#include "rclcpp/dynamic_typesupport/dynamic_message.hpp"
+#include "rclcpp/dynamic_typesupport/dynamic_message_type.hpp"
+#include "rclcpp/dynamic_typesupport/dynamic_serialization_support.hpp"
 #include "rclcpp/experimental/intra_process_manager.hpp"
 #include "rclcpp/experimental/subscription_intra_process_base.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/message_info.hpp"
 #include "rclcpp/network_flow_endpoint.hpp"
 #include "rclcpp/qos.hpp"
-#include "rclcpp/qos_event.hpp"
+#include "rclcpp/event_handler.hpp"
 #include "rclcpp/serialized_message.hpp"
 #include "rclcpp/subscription_content_filter_options.hpp"
 #include "rclcpp/type_support_decl.hpp"
@@ -60,6 +63,15 @@ namespace experimental
 class IntraProcessManager;
 }  // namespace experimental
 
+enum class SubscriptionType : uint8_t
+{
+  INVALID = 0,  // The subscription type is most likely uninitialized
+  ROS_MESSAGE = 1,  // take message as ROS message and handle as ROS message
+  SERIALIZED_MESSAGE = 2,  // take message as serialized and handle as serialized
+  DYNAMIC_MESSAGE_DIRECT = 3,  // take message as DynamicMessage and handle as DynamicMessage
+  DYNAMIC_MESSAGE_FROM_SERIALIZED = 4  // take message as serialized and handle as DynamicMessage
+};
+
 /// Virtual base class for subscriptions. This pattern allows us to iterate over different template
 /// specializations of Subscription, among other things.
 class SubscriptionBase : public std::enable_shared_from_this<SubscriptionBase>
@@ -76,7 +88,7 @@ public:
    * \param[in] type_support_handle rosidl type support struct, for the Message type of the topic.
    * \param[in] topic_name Name of the topic to subscribe to.
    * \param[in] subscription_options Options for the subscription.
-   * \param[in] is_serialized is true if the message will be delivered still serialized
+   * \param[in] subscription_type Enum flag to change how the message will be received and delivered
    */
   RCLCPP_PUBLIC
   SubscriptionBase(
@@ -86,7 +98,7 @@ public:
     const rcl_subscription_options_t & subscription_options,
     const SubscriptionEventCallbacks & event_callbacks,
     bool use_default_callbacks,
-    bool is_serialized = false);
+    SubscriptionType subscription_type = SubscriptionType::ROS_MESSAGE);
 
   /// Destructor.
   RCLCPP_PUBLIC
@@ -115,7 +127,7 @@ public:
   /** \return The map of QoS event handlers. */
   RCLCPP_PUBLIC
   const
-  std::unordered_map<rcl_subscription_event_type_t, std::shared_ptr<rclcpp::QOSEventHandlerBase>> &
+  std::unordered_map<rcl_subscription_event_type_t, std::shared_ptr<rclcpp::EventHandlerBase>> &
   get_event_handlers() const;
 
   /// Get the actual QoS settings, after the defaults have been determined.
@@ -234,6 +246,14 @@ public:
   RCLCPP_PUBLIC
   bool
   is_serialized() const;
+
+  /// Return the type of the subscription.
+  /**
+   * \return `SubscriptionType`, which adjusts how messages are received and delivered.
+   */
+  RCLCPP_PUBLIC
+  SubscriptionType
+  get_subscription_type() const;
 
   /// Get matching publisher count.
   /** \return The number of publishers on this topic. */
@@ -457,7 +477,7 @@ public:
    * If you want more information available in the callback, like the qos event
    * or other information, you may use a lambda with captures or std::bind.
    *
-   * \sa rclcpp::QOSEventHandlerBase::set_on_ready_callback
+   * \sa rclcpp::EventHandlerBase::set_on_ready_callback
    *
    * \param[in] callback functor to be called when a new event occurs
    * \param[in] event_type identifier for the qos event we want to attach the callback to
@@ -535,6 +555,49 @@ public:
   rclcpp::ContentFilterOptions
   get_content_filter() const;
 
+  // DYNAMIC TYPE ==================================================================================
+  // TODO(methylDragon): Reorder later
+  RCLCPP_PUBLIC
+  virtual
+  rclcpp::dynamic_typesupport::DynamicMessageType::SharedPtr
+  get_shared_dynamic_message_type() = 0;
+
+  RCLCPP_PUBLIC
+  virtual
+  rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr
+  get_shared_dynamic_message() = 0;
+
+  RCLCPP_PUBLIC
+  virtual
+  rclcpp::dynamic_typesupport::DynamicSerializationSupport::SharedPtr
+  get_shared_dynamic_serialization_support() = 0;
+
+  /// Borrow a new serialized message (this clones!)
+  /** \return Shared pointer to a rclcpp::dynamic_typesupport::DynamicMessage. */
+  RCLCPP_PUBLIC
+  virtual
+  rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr
+  create_dynamic_message() = 0;
+
+  RCLCPP_PUBLIC
+  virtual
+  void
+  return_dynamic_message(rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message) = 0;
+
+  RCLCPP_PUBLIC
+  virtual
+  void
+  handle_dynamic_message(
+    const rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message,
+    const rclcpp::MessageInfo & message_info) = 0;
+
+  RCLCPP_PUBLIC
+  bool
+  take_dynamic_message(
+    rclcpp::dynamic_typesupport::DynamicMessage & message_out,
+    rclcpp::MessageInfo & message_info_out);
+  // ===============================================================================================
+
 protected:
   template<typename EventCallbackT>
   void
@@ -542,7 +605,7 @@ protected:
     const EventCallbackT & callback,
     const rcl_subscription_event_type_t event_type)
   {
-    auto handler = std::make_shared<QOSEventHandler<EventCallbackT,
+    auto handler = std::make_shared<EventHandler<EventCallbackT,
         std::shared_ptr<rcl_subscription_t>>>(
       callback,
       rcl_subscription_event_init,
@@ -554,6 +617,9 @@ protected:
 
   RCLCPP_PUBLIC
   void default_incompatible_qos_callback(QOSRequestedIncompatibleQoSInfo & info) const;
+
+  RCLCPP_PUBLIC
+  void default_incompatible_type_callback(IncompatibleTypeInfo & info) const;
 
   RCLCPP_PUBLIC
   bool
@@ -571,7 +637,7 @@ protected:
   rclcpp::Logger node_logger_;
 
   std::unordered_map<rcl_subscription_event_type_t,
-    std::shared_ptr<rclcpp::QOSEventHandlerBase>> event_handlers_;
+    std::shared_ptr<rclcpp::EventHandlerBase>> event_handlers_;
 
   bool use_intra_process_;
   IntraProcessManagerWeakPtr weak_ipm_;
@@ -584,11 +650,11 @@ private:
   RCLCPP_DISABLE_COPY(SubscriptionBase)
 
   rosidl_message_type_support_t type_support_;
-  bool is_serialized_;
+  SubscriptionType subscription_type_;
 
   std::atomic<bool> subscription_in_use_by_wait_set_{false};
   std::atomic<bool> intra_process_subscription_waitable_in_use_by_wait_set_{false};
-  std::unordered_map<rclcpp::QOSEventHandlerBase *,
+  std::unordered_map<rclcpp::EventHandlerBase *,
     std::atomic<bool>> qos_events_in_use_by_wait_set_;
 
   std::recursive_mutex callback_mutex_;
