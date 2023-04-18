@@ -618,6 +618,14 @@ if(TARGET test_timer)
   target_link_libraries(test_timer ${PROJECT_NAME} mimick)
 endif()
 
+ament_add_gtest(test_timers_manager test_timers_manager.cpp
+  APPEND_LIBRARY_DIRS "${append_library_dirs}")
+if(TARGET test_timers_manager)
+  ament_target_dependencies(test_timers_manager
+    "rcl")
+  target_link_libraries(test_timers_manager ${PROJECT_NAME} mimick)
+endif()
+
 ament_add_gtest(test_time_source test_time_source.cpp
   APPEND_LIBRARY_DIRS "${append_library_dirs}")
 if(TARGET test_time_source)
@@ -639,6 +647,13 @@ if(TARGET test_wait_for_message)
   ament_target_dependencies(test_wait_for_message
     "test_msgs")
   target_link_libraries(test_wait_for_message ${PROJECT_NAME})
+endif()
+
+ament_add_gtest(test_logger_service test_logger_service.cpp)
+if(TARGET test_logger_service)
+  ament_target_dependencies(test_logger_service
+    "rcl_interfaces")
+  target_link_libraries(test_logger_service ${PROJECT_NAME})
 endif()
 
 ament_add_gtest(test_interface_traits test_interface_traits.cpp
@@ -686,6 +701,39 @@ if(TARGET test_static_executor_entities_collector)
     "rcl"
     "test_msgs")
   target_link_libraries(test_static_executor_entities_collector ${PROJECT_NAME} mimick)
+endif()
+
+ament_add_gtest(test_entities_collector executors/test_entities_collector.cpp
+  APPEND_LIBRARY_DIRS "${append_library_dirs}" TIMEOUT 120)
+if(TARGET test_entities_collector)
+  ament_target_dependencies(test_entities_collector
+    "rcl"
+    "test_msgs")
+  target_link_libraries(test_entities_collector ${PROJECT_NAME} mimick)
+endif()
+
+ament_add_gtest(test_executor_notify_waitable executors/test_executor_notify_waitable.cpp
+  APPEND_LIBRARY_DIRS "${append_library_dirs}" TIMEOUT 120)
+if(TARGET test_executor_notify_waitable)
+  ament_target_dependencies(test_executor_notify_waitable
+    "rcl"
+    "test_msgs")
+  target_link_libraries(test_executor_notify_waitable ${PROJECT_NAME} mimick)
+endif()
+
+ament_add_gtest(test_events_executor executors/test_events_executor.cpp TIMEOUT 5)
+if(TARGET test_events_executor)
+  ament_target_dependencies(test_events_executor
+    "test_msgs")
+  target_link_libraries(test_events_executor ${PROJECT_NAME})
+endif()
+
+ament_add_gtest(test_events_queue executors/test_events_queue.cpp
+  APPEND_LIBRARY_DIRS "${append_library_dirs}")
+if(TARGET test_events_queue)
+  ament_target_dependencies(test_events_queue
+    "test_msgs")
+  target_link_libraries(test_events_queue ${PROJECT_NAME})
 endif()
 
 ament_add_gtest(test_guard_condition test_guard_condition.cpp
