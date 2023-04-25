@@ -15,6 +15,8 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_TOPICS_INTERFACE_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_TOPICS_INTERFACE_HPP_
 
+#include <functional>
+#include <memory>
 #include <string>
 
 #include "rcl/publisher.h"
@@ -22,7 +24,6 @@
 
 #include "rclcpp/callback_group.hpp"
 #include "rclcpp/macros.hpp"
-#include "rclcpp/node_interfaces/detail/node_interfaces_helpers.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/node_interfaces/node_timers_interface.hpp"
 #include "rclcpp/publisher.hpp"
@@ -95,7 +96,5 @@ public:
 
 }  // namespace node_interfaces
 }  // namespace rclcpp
-
-RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(rclcpp::node_interfaces::NodeTopicsInterface, topics)
 
 #endif  // RCLCPP__NODE_INTERFACES__NODE_TOPICS_INTERFACE_HPP_

@@ -25,7 +25,6 @@
 #include "rclcpp/logging.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/visibility_control.hpp"
-#include "tracetools/tracetools.h"
 
 namespace rclcpp
 {
@@ -52,7 +51,6 @@ public:
     if (capacity == 0) {
       throw std::invalid_argument("capacity must be a positive, non-zero value");
     }
-    TRACEPOINT(rclcpp_construct_ring_buffer, static_cast<const void *>(this), capacity_);
   }
 
   virtual ~RingBufferImplementation() {}
@@ -69,12 +67,6 @@ public:
 
     write_index_ = next_(write_index_);
     ring_buffer_[write_index_] = std::move(request);
-    TRACEPOINT(
-      rclcpp_ring_buffer_enqueue,
-      static_cast<const void *>(this),
-      write_index_,
-      size_ + 1,
-      is_full_());
 
     if (is_full_()) {
       read_index_ = next_(read_index_);
@@ -98,11 +90,6 @@ public:
     }
 
     auto request = std::move(ring_buffer_[read_index_]);
-    TRACEPOINT(
-      rclcpp_ring_buffer_dequeue,
-      static_cast<const void *>(this),
-      read_index_,
-      size_ - 1);
     read_index_ = next_(read_index_);
 
     size_--;
@@ -148,10 +135,7 @@ public:
     return is_full_();
   }
 
-  void clear()
-  {
-    TRACEPOINT(rclcpp_ring_buffer_clear, static_cast<const void *>(this));
-  }
+  void clear() {}
 
 private:
   /// Get the next index value for the ring buffer
