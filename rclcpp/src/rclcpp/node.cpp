@@ -167,7 +167,7 @@ Node::Node(
       options.use_intra_process_comms(),
       options.enable_topic_statistics())),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),
-  node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_.get())),
+  node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_)),
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
   node_topics_(new rclcpp::node_interfaces::NodeTopics(node_base_.get(), node_timers_.get())),
   node_services_(new rclcpp::node_interfaces::NodeServices(node_base_.get())),
@@ -176,7 +176,8 @@ Node::Node(
       node_topics_,
       node_graph_,
       node_services_,
-      node_logging_
+      node_logging_,
+      options.clock_type()
     )),
   node_parameters_(new rclcpp::node_interfaces::NodeParameters(
       node_base_,
@@ -224,6 +225,10 @@ Node::Node(
     node_topics_->resolve_topic_name("/parameter_events"),
     options.parameter_event_qos(),
     rclcpp::detail::PublisherQosParametersTraits{});
+
+  if (options.enable_logger_service()) {
+    node_logging_->create_logger_services(node_services_);
+  }
 }
 
 Node::Node(
@@ -353,7 +358,7 @@ Node::has_parameter(const std::string & name) const
 rcl_interfaces::msg::SetParametersResult
 Node::set_parameter(const rclcpp::Parameter & parameter)
 {
-  return this->set_parameters_atomically({parameter});
+  return node_parameters_->set_parameters_atomically({parameter});
 }
 
 std::vector<rcl_interfaces::msg::SetParametersResult>
@@ -418,16 +423,40 @@ Node::list_parameters(const std::vector<std::string> & prefixes, uint64_t depth)
   return node_parameters_->list_parameters(prefixes, depth);
 }
 
+rclcpp::Node::PreSetParametersCallbackHandle::SharedPtr
+Node::add_pre_set_parameters_callback(PreSetParametersCallbackType callback)
+{
+  return node_parameters_->add_pre_set_parameters_callback(callback);
+}
+
 rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr
-Node::add_on_set_parameters_callback(OnParametersSetCallbackType callback)
+Node::add_on_set_parameters_callback(OnSetParametersCallbackType callback)
 {
   return node_parameters_->add_on_set_parameters_callback(callback);
 }
 
-void
-Node::remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const callback)
+rclcpp::Node::PostSetParametersCallbackHandle::SharedPtr
+Node::add_post_set_parameters_callback(PostSetParametersCallbackType callback)
 {
-  return node_parameters_->remove_on_set_parameters_callback(callback);
+  return node_parameters_->add_post_set_parameters_callback(callback);
+}
+
+void
+Node::remove_pre_set_parameters_callback(const PreSetParametersCallbackHandle * const handler)
+{
+  node_parameters_->remove_pre_set_parameters_callback(handler);
+}
+
+void
+Node::remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const handler)
+{
+  node_parameters_->remove_on_set_parameters_callback(handler);
+}
+
+void
+Node::remove_post_set_parameters_callback(const PostSetParametersCallbackHandle * const handler)
+{
+  node_parameters_->remove_post_set_parameters_callback(handler);
 }
 
 std::vector<std::string>

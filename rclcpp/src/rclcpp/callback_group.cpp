@@ -31,10 +31,12 @@ using rclcpp::CallbackGroupType;
 
 CallbackGroup::CallbackGroup(
   CallbackGroupType group_type,
+  std::function<rclcpp::Context::SharedPtr(void)> get_context,
   bool automatically_add_to_executor_with_node)
 : type_(group_type), associated_with_executor_(false),
   can_be_taken_from_(true),
-  automatically_add_to_executor_with_node_(automatically_add_to_executor_with_node)
+  automatically_add_to_executor_with_node_(automatically_add_to_executor_with_node),
+  get_context_(get_context)
 {}
 
 CallbackGroup::~CallbackGroup()
@@ -54,6 +56,16 @@ CallbackGroup::type() const
   return type_;
 }
 
+size_t
+CallbackGroup::size() const
+{
+  return
+    subscription_ptrs_.size() +
+    service_ptrs_.size() +
+    client_ptrs_.size() +
+    timer_ptrs_.size() +
+    waitable_ptrs_.size();
+}
 void CallbackGroup::collect_all_ptrs(
   std::function<void(const rclcpp::SubscriptionBase::SharedPtr &)> sub_func,
   std::function<void(const rclcpp::ServiceBase::SharedPtr &)> service_func,
@@ -111,6 +123,7 @@ CallbackGroup::automatically_add_to_executor_with_node() const
   return automatically_add_to_executor_with_node_;
 }
 
+// \TODO(mjcarroll) Deprecated, remove on tock
 rclcpp::GuardCondition::SharedPtr
 CallbackGroup::get_notify_guard_condition(const rclcpp::Context::SharedPtr context_ptr)
 {
@@ -127,6 +140,29 @@ CallbackGroup::get_notify_guard_condition(const rclcpp::Context::SharedPtr conte
   }
 
   return notify_guard_condition_;
+}
+
+rclcpp::GuardCondition::SharedPtr
+CallbackGroup::get_notify_guard_condition()
+{
+  std::lock_guard<std::recursive_mutex> lock(notify_guard_condition_mutex_);
+  if (!this->get_context_) {
+    throw std::runtime_error("Callback group was created without context and not passed context");
+  }
+  auto context_ptr = this->get_context_();
+  if (context_ptr && context_ptr->is_valid()) {
+    if (notify_guard_condition_ && context_ptr != notify_guard_condition_->get_context()) {
+      if (associated_with_executor_) {
+        trigger_notify_guard_condition();
+      }
+      notify_guard_condition_ = nullptr;
+    }
+    if (!notify_guard_condition_) {
+      notify_guard_condition_ = std::make_shared<rclcpp::GuardCondition>(context_ptr);
+    }
+    return notify_guard_condition_;
+  }
+  return nullptr;
 }
 
 void
