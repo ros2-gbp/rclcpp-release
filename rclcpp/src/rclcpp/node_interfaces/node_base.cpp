@@ -37,26 +37,39 @@ NodeBase::NodeBase(
   rclcpp::Context::SharedPtr context,
   const rcl_node_options_t & rcl_node_options,
   bool use_intra_process_default,
-  bool enable_topic_statistics_default,
-  rclcpp::CallbackGroup::SharedPtr default_callback_group)
+  bool enable_topic_statistics_default)
 : context_(context),
   use_intra_process_default_(use_intra_process_default),
   enable_topic_statistics_default_(enable_topic_statistics_default),
   node_handle_(nullptr),
-  default_callback_group_(default_callback_group),
+  default_callback_group_(nullptr),
   associated_with_executor_(false),
-  notify_guard_condition_(std::make_shared<rclcpp::GuardCondition>(context)),
   notify_guard_condition_is_valid_(false)
 {
+  // Setup the guard condition that is notified when changes occur in the graph.
+  rcl_guard_condition_options_t guard_condition_options = rcl_guard_condition_get_default_options();
+  rcl_ret_t ret = rcl_guard_condition_init(
+    &notify_guard_condition_, context_->get_rcl_context().get(), guard_condition_options);
+  if (ret != RCL_RET_OK) {
+    throw_from_rcl_error(ret, "failed to create interrupt guard condition");
+  }
+
+  // Setup a safe exit lamda to clean up the guard condition in case of an error here.
+  auto finalize_notify_guard_condition = [this]() {
+      // Finalize the interrupt guard condition.
+      if (rcl_guard_condition_fini(&notify_guard_condition_) != RCL_RET_OK) {
+        RCUTILS_LOG_ERROR_NAMED(
+          "rclcpp",
+          "failed to destroy guard condition: %s", rcl_get_error_string().str);
+      }
+    };
+
   // Create the rcl node and store it in a shared_ptr with a custom destructor.
   std::unique_ptr<rcl_node_t> rcl_node(new rcl_node_t(rcl_get_zero_initialized_node()));
 
   std::shared_ptr<std::recursive_mutex> logging_mutex = get_global_logging_mutex();
-
-  rcl_ret_t ret;
   {
     std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
-    // TODO(ivanpauno): /rosout Qos should be reconfigurable.
     // TODO(ivanpauno): Instead of mutually excluding rcl_node_init with the global logger mutex,
     // rcl_logging_rosout_init_publisher_for_node could be decoupled from there and be called
     // here directly.
@@ -66,6 +79,9 @@ NodeBase::NodeBase(
       context_->get_rcl_context().get(), &rcl_node_options);
   }
   if (ret != RCL_RET_OK) {
+    // Finalize the interrupt guard condition.
+    finalize_notify_guard_condition();
+
     if (ret == RCL_RET_NODE_INVALID_NAME) {
       rcl_reset_error();  // discard rcl_node_init error
       int validation_result;
@@ -129,14 +145,9 @@ NodeBase::NodeBase(
       delete node;
     });
 
-  // Create the default callback group, if needed.
-  if (nullptr == default_callback_group_) {
-    using rclcpp::CallbackGroupType;
-    // Default callback group is mutually exclusive and automatically associated with
-    // any executors that this node is added to.
-    default_callback_group_ =
-      NodeBase::create_callback_group(CallbackGroupType::MutuallyExclusive, true);
-  }
+  // Create the default callback group.
+  using rclcpp::CallbackGroupType;
+  default_callback_group_ = create_callback_group(CallbackGroupType::MutuallyExclusive);
 
   // Indicate the notify_guard_condition is now valid.
   notify_guard_condition_is_valid_ = true;
@@ -148,6 +159,11 @@ NodeBase::~NodeBase()
   {
     std::lock_guard<std::recursive_mutex> notify_condition_lock(notify_guard_condition_mutex_);
     notify_guard_condition_is_valid_ = false;
+    if (rcl_guard_condition_fini(&notify_guard_condition_) != RCL_RET_OK) {
+      RCUTILS_LOG_ERROR_NAMED(
+        "rclcpp",
+        "failed to destroy guard condition: %s", rcl_get_error_string().str);
+    }
   }
 }
 
@@ -190,41 +206,22 @@ NodeBase::get_rcl_node_handle() const
 std::shared_ptr<rcl_node_t>
 NodeBase::get_shared_rcl_node_handle()
 {
-  return std::shared_ptr<rcl_node_t>(shared_from_this(), node_handle_.get());
+  return node_handle_;
 }
 
 std::shared_ptr<const rcl_node_t>
 NodeBase::get_shared_rcl_node_handle() const
 {
-  return std::shared_ptr<const rcl_node_t>(shared_from_this(), node_handle_.get());
+  return node_handle_;
 }
 
 rclcpp::CallbackGroup::SharedPtr
-NodeBase::create_callback_group(
-  rclcpp::CallbackGroupType group_type,
-  bool automatically_add_to_executor_with_node)
+NodeBase::create_callback_group(rclcpp::CallbackGroupType group_type)
 {
-  auto weak_context = this->get_context()->weak_from_this();
-  auto get_node_context = [weak_context]() -> rclcpp::Context::SharedPtr {
-      return weak_context.lock();
-    };
-
-  auto group = std::make_shared<rclcpp::CallbackGroup>(
-    group_type,
-    get_node_context,
-    automatically_add_to_executor_with_node);
-  std::lock_guard<std::mutex> lock(callback_groups_mutex_);
+  using rclcpp::CallbackGroup;
+  using rclcpp::CallbackGroupType;
+  auto group = CallbackGroup::SharedPtr(new CallbackGroup(group_type));
   callback_groups_.push_back(group);
-
-  // This guard condition is generally used to signal to this node's executor that a callback
-  // group has been added that should be considered for new entities.
-  // If this is creating the default callback group, then the notify guard condition won't be
-  // ready or needed yet, as the node is not done being constructed and therefore cannot be added.
-  // If the callback group is not automatically associated with this node's executors, then
-  // triggering the guard condition is also unnecessary, it will be manually added to an exector.
-  if (notify_guard_condition_is_valid_ && automatically_add_to_executor_with_node) {
-    this->trigger_notify_guard_condition();
-  }
   return group;
 }
 
@@ -237,25 +234,20 @@ NodeBase::get_default_callback_group()
 bool
 NodeBase::callback_group_in_node(rclcpp::CallbackGroup::SharedPtr group)
 {
-  std::lock_guard<std::mutex> lock(callback_groups_mutex_);
+  bool group_belongs_to_this_node = false;
   for (auto & weak_group : this->callback_groups_) {
     auto cur_group = weak_group.lock();
     if (cur_group && (cur_group == group)) {
-      return true;
+      group_belongs_to_this_node = true;
     }
   }
-  return false;
+  return group_belongs_to_this_node;
 }
 
-void NodeBase::for_each_callback_group(const CallbackGroupFunction & func)
+const std::vector<rclcpp::CallbackGroup::WeakPtr> &
+NodeBase::get_callback_groups() const
 {
-  std::lock_guard<std::mutex> lock(callback_groups_mutex_);
-  for (rclcpp::CallbackGroup::WeakPtr & weak_group : this->callback_groups_) {
-    rclcpp::CallbackGroup::SharedPtr group = weak_group.lock();
-    if (group) {
-      func(group);
-    }
-  }
+  return callback_groups_;
 }
 
 std::atomic_bool &
@@ -264,34 +256,20 @@ NodeBase::get_associated_with_executor_atomic()
   return associated_with_executor_;
 }
 
-rclcpp::GuardCondition &
+rcl_guard_condition_t *
 NodeBase::get_notify_guard_condition()
-{
-  std::lock_guard<std::recursive_mutex> notify_condition_lock(notify_guard_condition_mutex_);
-  if (!notify_guard_condition_is_valid_) {
-    throw std::runtime_error("failed to get notify guard condition because it is invalid");
-  }
-  return *notify_guard_condition_;
-}
-
-rclcpp::GuardCondition::SharedPtr
-NodeBase::get_shared_notify_guard_condition()
 {
   std::lock_guard<std::recursive_mutex> notify_condition_lock(notify_guard_condition_mutex_);
   if (!notify_guard_condition_is_valid_) {
     return nullptr;
   }
-  return notify_guard_condition_;
+  return &notify_guard_condition_;
 }
 
-void
-NodeBase::trigger_notify_guard_condition()
+std::unique_lock<std::recursive_mutex>
+NodeBase::acquire_notify_guard_condition_lock() const
 {
-  std::lock_guard<std::recursive_mutex> notify_condition_lock(notify_guard_condition_mutex_);
-  if (!notify_guard_condition_is_valid_) {
-    throw std::runtime_error("failed to trigger notify guard condition because it is invalid");
-  }
-  notify_guard_condition_->trigger();
+  return std::unique_lock<std::recursive_mutex>(notify_guard_condition_mutex_);
 }
 
 bool
@@ -304,25 +282,4 @@ bool
 NodeBase::get_enable_topic_statistics_default() const
 {
   return enable_topic_statistics_default_;
-}
-
-std::string
-NodeBase::resolve_topic_or_service_name(
-  const std::string & name, bool is_service, bool only_expand) const
-{
-  char * output_cstr = NULL;
-  auto allocator = rcl_get_default_allocator();
-  rcl_ret_t ret = rcl_node_resolve_name(
-    node_handle_.get(),
-    name.c_str(),
-    allocator,
-    is_service,
-    only_expand,
-    &output_cstr);
-  if (RCL_RET_OK != ret) {
-    throw_from_rcl_error(ret, "failed to resolve name", rcl_get_error_state());
-  }
-  std::string output{output_cstr};
-  allocator.deallocate(output_cstr, allocator.state);
-  return output;
 }

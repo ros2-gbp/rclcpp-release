@@ -15,15 +15,14 @@
 #ifndef RCLCPP_ACTION__TYPES_HPP_
 #define RCLCPP_ACTION__TYPES_HPP_
 
-#include <array>
+#include <rcl_action/types.h>
+
+#include <action_msgs/msg/goal_status.hpp>
+#include <action_msgs/msg/goal_info.hpp>
+
 #include <climits>
 #include <functional>
 #include <string>
-
-#include "rcl_action/types.h"
-
-#include "action_msgs/msg/goal_status.hpp"
-#include "action_msgs/msg/goal_info.hpp"
 
 #include "rclcpp_action/visibility_control.hpp"
 
@@ -34,7 +33,7 @@ using GoalUUID = std::array<uint8_t, UUID_SIZE>;
 using GoalStatus = action_msgs::msg::GoalStatus;
 using GoalInfo = action_msgs::msg::GoalInfo;
 
-/// Convert a goal id to a human readable RFC-4122 compliant string.
+/// Convert a goal id to a human readable string.
 RCLCPP_ACTION_PUBLIC
 std::string
 to_string(const GoalUUID & goal_id);

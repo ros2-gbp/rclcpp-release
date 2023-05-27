@@ -18,7 +18,6 @@
 #include <chrono>
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <vector>
 
 #include "rclcpp/callback_group.hpp"
@@ -26,9 +25,7 @@
 #include "rclcpp/intra_process_buffer_type.hpp"
 #include "rclcpp/intra_process_setting.hpp"
 #include "rclcpp/qos.hpp"
-#include "rclcpp/event_handler.hpp"
-#include "rclcpp/qos_overriding_options.hpp"
-#include "rclcpp/subscription_content_filter_options.hpp"
+#include "rclcpp/qos_event.hpp"
 #include "rclcpp/topic_statistics_state.hpp"
 #include "rclcpp/visibility_control.hpp"
 
@@ -46,11 +43,6 @@ struct SubscriptionOptionsBase
 
   /// True to ignore local publications.
   bool ignore_local_publications = false;
-
-  /// Require middleware to generate unique network flow endpoints
-  /// Disabled by default
-  rmw_unique_network_flow_endpoints_requirement_t require_unique_network_flow_endpoints =
-    RMW_UNIQUE_NETWORK_FLOW_ENDPOINTS_NOT_REQUIRED;
 
   /// The callback group for this subscription. NULL to use the default callback group.
   rclcpp::CallbackGroup::SharedPtr callback_group = nullptr;
@@ -80,24 +72,16 @@ struct SubscriptionOptionsBase
   };
 
   TopicStatisticsOptions topic_stats_options;
-
-  QosOverridingOptions qos_overriding_options;
-
-  ContentFilterOptions content_filter_options;
 };
 
 /// Structure containing optional configuration for Subscriptions.
 template<typename Allocator>
 struct SubscriptionOptionsWithAllocator : public SubscriptionOptionsBase
 {
-  static_assert(
-    std::is_void_v<typename std::allocator_traits<Allocator>::value_type>,
-    "Subscription allocator value type must be void");
-
   /// Optional custom allocator.
   std::shared_ptr<Allocator> allocator = nullptr;
 
-  SubscriptionOptionsWithAllocator() {}
+  SubscriptionOptionsWithAllocator<Allocator>() {}
 
   /// Constructor using base class as input.
   explicit SubscriptionOptionsWithAllocator(
@@ -110,6 +94,7 @@ struct SubscriptionOptionsWithAllocator : public SubscriptionOptionsBase
    * \param qos QoS profile for subcription.
    * \return rcl_subscription_options_t structure based on the rclcpp::QoS
    */
+  template<typename MessageT>
   rcl_subscription_options_t
   to_rcl_subscription_options(const rclcpp::QoS & qos) const
   {
@@ -117,40 +102,21 @@ struct SubscriptionOptionsWithAllocator : public SubscriptionOptionsBase
     result.allocator = this->get_rcl_allocator();
     result.qos = qos.get_rmw_qos_profile();
     result.rmw_subscription_options.ignore_local_publications = this->ignore_local_publications;
-    result.rmw_subscription_options.require_unique_network_flow_endpoints =
-      this->require_unique_network_flow_endpoints;
 
     // Apply payload to rcl_subscription_options if necessary.
     if (rmw_implementation_payload && rmw_implementation_payload->has_been_customized()) {
       rmw_implementation_payload->modify_rmw_subscription_options(result.rmw_subscription_options);
     }
 
-    // Copy content_filter_options into rcl_subscription_options.
-    if (!content_filter_options.filter_expression.empty()) {
-      std::vector<const char *> cstrings =
-        get_c_vector_string(content_filter_options.expression_parameters);
-      rcl_ret_t ret = rcl_subscription_options_set_content_filter_options(
-        get_c_string(content_filter_options.filter_expression),
-        cstrings.size(),
-        cstrings.data(),
-        &result);
-      if (RCL_RET_OK != ret) {
-        rclcpp::exceptions::throw_from_rcl_error(
-          ret, "failed to set content_filter_options");
-      }
-    }
-
     return result;
   }
 
+  /// Get the allocator, creating one if needed.
   std::shared_ptr<Allocator>
   get_allocator() const
   {
     if (!this->allocator) {
-      if (!allocator_storage_) {
-        allocator_storage_ = std::make_shared<Allocator>();
-      }
-      return allocator_storage_;
+      return std::make_shared<Allocator>();
     }
     return this->allocator;
   }

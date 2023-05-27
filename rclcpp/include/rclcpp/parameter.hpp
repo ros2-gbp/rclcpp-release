@@ -264,7 +264,6 @@ get_value_helper<rclcpp::Parameter>(const rclcpp::Parameter * parameter)
 
 }  // namespace detail
 
-/// \cond
 template<typename T>
 decltype(auto)
 Parameter::get_value() const
@@ -276,7 +275,6 @@ Parameter::get_value() const
     throw exceptions::InvalidParameterTypeException(this->name_, ex.what());
   }
 }
-/// \endcond
 
 }  // namespace rclcpp
 

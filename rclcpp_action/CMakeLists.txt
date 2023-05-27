@@ -6,19 +6,14 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rcl_action REQUIRED)
-find_package(rcpputils REQUIRED)
 find_package(rosidl_runtime_c REQUIRED)
 
-# Default to C++17
+# Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_STANDARD 14)
 endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(
-    -Wall -Wextra -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual
-    -Wformat=2 -Wconversion -Wshadow -Wsign-conversion -Wcast-qual
-  )
+  add_compile_options(-Wall -Wextra -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual)
 endif()
 
 set(${PROJECT_NAME}_SRCS
@@ -35,13 +30,12 @@ add_library(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME}
   PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-  "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
+  "$<INSTALL_INTERFACE:include>")
 
 ament_target_dependencies(${PROJECT_NAME}
   "action_msgs"
   "rcl_action"
   "rclcpp"
-  "rcpputils"
   "rosidl_runtime_c"
 )
 
@@ -52,7 +46,7 @@ target_compile_definitions(${PROJECT_NAME}
 
 install(
   DIRECTORY include/
-  DESTINATION include/${PROJECT_NAME})
+  DESTINATION include)
 
 install(
   TARGETS ${PROJECT_NAME}
@@ -62,14 +56,11 @@ install(
   RUNTIME DESTINATION bin
 )
 
-# Export old-style CMake variables
-ament_export_include_directories("include/${PROJECT_NAME}")
+# specific order: dependents before dependencies
+ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
-
-# Export modern CMake targets
 ament_export_targets(${PROJECT_NAME})
 
-# specific order: dependents before dependencies
 ament_export_dependencies(ament_cmake)
 ament_export_dependencies(action_msgs)
 ament_export_dependencies(rclcpp)
@@ -97,10 +88,9 @@ if(BUILD_TESTING)
     )
   endif()
 
-  ament_add_gtest(test_server test/test_server.cpp TIMEOUT 180)
+  ament_add_gtest(test_server test/test_server.cpp)
   if(TARGET test_server)
     ament_target_dependencies(test_server
-      "rcpputils"
       "rcutils"
       "test_msgs"
     )

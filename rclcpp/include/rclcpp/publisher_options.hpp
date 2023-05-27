@@ -17,7 +17,6 @@
 
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <vector>
 
 #include "rcl/publisher.h"
@@ -26,8 +25,7 @@
 #include "rclcpp/detail/rmw_implementation_specific_publisher_payload.hpp"
 #include "rclcpp/intra_process_setting.hpp"
 #include "rclcpp/qos.hpp"
-#include "rclcpp/event_handler.hpp"
-#include "rclcpp/qos_overriding_options.hpp"
+#include "rclcpp/qos_event.hpp"
 
 namespace rclcpp
 {
@@ -46,33 +44,22 @@ struct PublisherOptionsBase
   /// Whether or not to use default callbacks when user doesn't supply any in event_callbacks
   bool use_default_callbacks = true;
 
-  /// Require middleware to generate unique network flow endpoints
-  /// Disabled by default
-  rmw_unique_network_flow_endpoints_requirement_t require_unique_network_flow_endpoints =
-    RMW_UNIQUE_NETWORK_FLOW_ENDPOINTS_NOT_REQUIRED;
-
   /// Callback group in which the waitable items from the publisher should be placed.
   std::shared_ptr<rclcpp::CallbackGroup> callback_group;
 
   /// Optional RMW implementation specific payload to be used during creation of the publisher.
   std::shared_ptr<rclcpp::detail::RMWImplementationSpecificPublisherPayload>
   rmw_implementation_payload = nullptr;
-
-  QosOverridingOptions qos_overriding_options;
 };
 
 /// Structure containing optional configuration for Publishers.
 template<typename Allocator>
 struct PublisherOptionsWithAllocator : public PublisherOptionsBase
 {
-  static_assert(
-    std::is_void_v<typename std::allocator_traits<Allocator>::value_type>,
-    "Publisher allocator value type must be void");
-
   /// Optional custom allocator.
   std::shared_ptr<Allocator> allocator = nullptr;
 
-  PublisherOptionsWithAllocator() {}
+  PublisherOptionsWithAllocator<Allocator>() {}
 
   /// Constructor using base class as input.
   explicit PublisherOptionsWithAllocator(const PublisherOptionsBase & publisher_options_base)
@@ -87,8 +74,6 @@ struct PublisherOptionsWithAllocator : public PublisherOptionsBase
     rcl_publisher_options_t result = rcl_publisher_get_default_options();
     result.allocator = this->get_rcl_allocator();
     result.qos = qos.get_rmw_qos_profile();
-    result.rmw_publisher_options.require_unique_network_flow_endpoints =
-      this->require_unique_network_flow_endpoints;
 
     // Apply payload to rcl_publisher_options if necessary.
     if (rmw_implementation_payload && rmw_implementation_payload->has_been_customized()) {
@@ -104,10 +89,7 @@ struct PublisherOptionsWithAllocator : public PublisherOptionsBase
   get_allocator() const
   {
     if (!this->allocator) {
-      if (!allocator_storage_) {
-        allocator_storage_ = std::make_shared<Allocator>();
-      }
-      return allocator_storage_;
+      return std::make_shared<Allocator>();
     }
     return this->allocator;
   }

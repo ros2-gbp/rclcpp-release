@@ -16,7 +16,6 @@
 #define RCLCPP_ACTION__EXCEPTIONS_HPP_
 
 #include <stdexcept>
-#include <string>
 
 namespace rclcpp_action
 {
@@ -34,9 +33,8 @@ public:
 class UnawareGoalHandleError : public std::runtime_error
 {
 public:
-  UnawareGoalHandleError(
-    const std::string & message = "Goal handle is not tracking the goal result.")
-  : std::runtime_error(message)
+  UnawareGoalHandleError()
+  : std::runtime_error("Goal handle is not tracking the goal result.")
   {
   }
 };

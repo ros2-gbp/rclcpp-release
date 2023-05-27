@@ -15,10 +15,9 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_PARAMETERS_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_PARAMETERS_HPP_
 
-#include <list>
 #include <map>
 #include <memory>
-#include <mutex>
+#include <list>
 #include <string>
 #include <vector>
 
@@ -85,16 +84,6 @@ class NodeParameters : public NodeParametersInterface
 public:
   RCLCPP_SMART_PTR_ALIASES_ONLY(NodeParameters)
 
-  /// Constructor.
-  /**
-   * If using automatically_declare_parameters_from_overrides, overrides of
-   * get_parameter_overrides(), has_parameter(), declare_parameter() will not
-   * be respected.
-   * If this is an issue, pass false for
-   * automatically_declare_parameters_from_overrides and invoke
-   * perform_automatically_declare_parameters_from_overrides() manually after
-   * construction.
-   */
   RCLCPP_PUBLIC
   NodeParameters(
     const node_interfaces::NodeBaseInterface::SharedPtr node_base,
@@ -119,18 +108,8 @@ public:
   declare_parameter(
     const std::string & name,
     const rclcpp::ParameterValue & default_value,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor{},
-    bool ignore_override = false) override;
-
-  RCLCPP_PUBLIC
-  const rclcpp::ParameterValue &
-  declare_parameter(
-    const std::string & name,
-    rclcpp::ParameterType type,
-    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor =
-    rcl_interfaces::msg::ParameterDescriptor(),
-    bool ignore_override = false) override;
+    const rcl_interfaces::msg::ParameterDescriptor & parameter_descriptor,
+    bool ignore_override) override;
 
   RCLCPP_PUBLIC
   void
@@ -184,46 +163,23 @@ public:
 
   RCLCPP_PUBLIC
   RCUTILS_WARN_UNUSED
-  PreSetParametersCallbackHandle::SharedPtr
-  add_pre_set_parameters_callback(PreSetParametersCallbackType callback) override;
-
-  RCLCPP_PUBLIC
-  RCUTILS_WARN_UNUSED
   OnSetParametersCallbackHandle::SharedPtr
-  add_on_set_parameters_callback(OnSetParametersCallbackType callback) override;
-
-  RCLCPP_PUBLIC
-  RCUTILS_WARN_UNUSED
-  PostSetParametersCallbackHandle::SharedPtr
-  add_post_set_parameters_callback(PostSetParametersCallbackType callback) override;
+  add_on_set_parameters_callback(OnParametersSetCallbackType callback) override;
 
   RCLCPP_PUBLIC
   void
   remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const handler) override;
 
+  [[deprecated("use add_on_set_parameters_callback(OnParametersSetCallbackType callback) instead")]]
   RCLCPP_PUBLIC
-  void
-  remove_post_set_parameters_callback(const PostSetParametersCallbackHandle * const handler)
-  override;
-
-  RCLCPP_PUBLIC
-  void
-  remove_pre_set_parameters_callback(const PreSetParametersCallbackHandle * const handler) override;
+  OnParametersSetCallbackType
+  set_on_parameters_set_callback(OnParametersSetCallbackType callback) override;
 
   RCLCPP_PUBLIC
   const std::map<std::string, rclcpp::ParameterValue> &
   get_parameter_overrides() const override;
 
-  using PreSetCallbacksHandleContainer = std::list<PreSetParametersCallbackHandle::WeakPtr>;
-  using OnSetCallbacksHandleContainer = std::list<OnSetParametersCallbackHandle::WeakPtr>;
-  using PostSetCallbacksHandleContainer = std::list<PostSetParametersCallbackHandle::WeakPtr>;
-  using CallbacksContainerType [[deprecated("use OnSetCallbacksHandleContainer instead")]] =
-    OnSetCallbacksHandleContainer;
-
-protected:
-  RCLCPP_PUBLIC
-  void
-  perform_automatically_declare_parameters_from_overrides();
+  using CallbacksContainerType = std::list<OnSetParametersCallbackHandle::WeakPtr>;
 
 private:
   RCLCPP_DISABLE_COPY(NodeParameters)
@@ -235,11 +191,9 @@ private:
   // declare_parameter, etc).  In those cases, this will be set to false.
   bool parameter_modification_enabled_{true};
 
-  PreSetCallbacksHandleContainer pre_set_parameters_callback_container_;
+  OnParametersSetCallbackType on_parameters_set_callback_ = nullptr;
 
-  OnSetCallbacksHandleContainer on_set_parameters_callback_container_;
-
-  PostSetCallbacksHandleContainer post_set_parameters_callback_container_;
+  CallbacksContainerType on_parameters_set_callback_container_;
 
   std::map<std::string, ParameterInfo> parameters_;
 

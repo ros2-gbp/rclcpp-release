@@ -16,8 +16,6 @@
 
 #include <string>
 
-#include "tracetools/tracetools.h"
-
 using rclcpp::node_interfaces::NodeTimers;
 
 NodeTimers::NodeTimers(rclcpp::node_interfaces::NodeBaseInterface * node_base)
@@ -37,21 +35,13 @@ NodeTimers::add_timer(
       // TODO(jacquelinekay): use custom exception
       throw std::runtime_error("Cannot create timer, group not in node.");
     }
+    callback_group->add_timer(timer);
   } else {
-    callback_group = node_base_->get_default_callback_group();
+    node_base_->get_default_callback_group()->add_timer(timer);
   }
-  callback_group->add_timer(timer);
-
-  try {
-    node_base_->trigger_notify_guard_condition();
-    callback_group->trigger_notify_guard_condition();
-  } catch (const rclcpp::exceptions::RCLError & ex) {
+  if (rcl_trigger_guard_condition(node_base_->get_notify_guard_condition()) != RCL_RET_OK) {
     throw std::runtime_error(
-            std::string("failed to notify wait set on timer creation: ") + ex.what());
+            std::string("Failed to notify wait set on timer creation: ") +
+            rmw_get_error_string().str);
   }
-
-  TRACEPOINT(
-    rclcpp_timer_link_node,
-    static_cast<const void *>(timer->get_timer_handle().get()),
-    static_cast<const void *>(node_base_->get_rcl_node_handle()));
 }

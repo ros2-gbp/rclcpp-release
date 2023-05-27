@@ -35,19 +35,20 @@ NodeWaitables::add_waitable(
       // TODO(jacobperron): use custom exception
       throw std::runtime_error("Cannot create waitable, group not in node.");
     }
+    group->add_waitable(waitable_ptr);
   } else {
-    group = node_base_->get_default_callback_group();
+    node_base_->get_default_callback_group()->add_waitable(waitable_ptr);
   }
 
-  group->add_waitable(waitable_ptr);
-
   // Notify the executor that a new waitable was created using the parent Node.
-  try {
-    node_base_->trigger_notify_guard_condition();
-    group->trigger_notify_guard_condition();
-  } catch (const rclcpp::exceptions::RCLError & ex) {
-    throw std::runtime_error(
-            std::string("failed to notify wait set on waitable creation: ") + ex.what());
+  {
+    auto notify_guard_condition_lock = node_base_->acquire_notify_guard_condition_lock();
+    if (rcl_trigger_guard_condition(node_base_->get_notify_guard_condition()) != RCL_RET_OK) {
+      throw std::runtime_error(
+              std::string("Failed to notify wait set on waitable creation: ") +
+              rmw_get_error_string().str
+      );
+    }
   }
 }
 

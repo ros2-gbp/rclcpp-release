@@ -15,14 +15,11 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_GRAPH_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_GRAPH_HPP_
 
-#include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -74,32 +71,8 @@ public:
     const std::string & namespace_) const override;
 
   RCLCPP_PUBLIC
-  std::map<std::string, std::vector<std::string>>
-  get_client_names_and_types_by_node(
-    const std::string & node_name,
-    const std::string & namespace_) const override;
-
-  RCLCPP_PUBLIC
-  std::map<std::string, std::vector<std::string>>
-  get_publisher_names_and_types_by_node(
-    const std::string & node_name,
-    const std::string & namespace_,
-    bool no_demangle = false) const override;
-
-  RCLCPP_PUBLIC
-  std::map<std::string, std::vector<std::string>>
-  get_subscriber_names_and_types_by_node(
-    const std::string & node_name,
-    const std::string & namespace_,
-    bool no_demangle = false) const override;
-
-  RCLCPP_PUBLIC
   std::vector<std::string>
   get_node_names() const override;
-
-  RCLCPP_PUBLIC
-  std::vector<std::tuple<std::string, std::string, std::string>>
-  get_node_names_with_enclaves() const override;
 
   RCLCPP_PUBLIC
   std::vector<std::pair<std::string, std::string>>
@@ -137,7 +110,7 @@ public:
 
   RCLCPP_PUBLIC
   size_t
-  count_graph_users() const override;
+  count_graph_users() override;
 
   RCLCPP_PUBLIC
   std::vector<rclcpp::TopicEndpointInfo>
