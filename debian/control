@@ -1,0 +1,12 @@
+Source: ros-foxy-rclcpp
+Section: misc
+Priority: optional
+Maintainer: Dirk Thomas <dthomas@osrfoundation.org>
+Build-Depends: debhelper (>= 9.0.0), ros-foxy-ament-cmake-gmock <!nocheck>, ros-foxy-ament-cmake-google-benchmark <!nocheck>, ros-foxy-ament-cmake-gtest <!nocheck>, ros-foxy-ament-cmake-ros, ros-foxy-ament-lint-auto <!nocheck>, ros-foxy-ament-lint-common <!nocheck>, ros-foxy-builtin-interfaces, ros-foxy-libstatistics-collector, ros-foxy-mimick-vendor <!nocheck>, ros-foxy-performance-test-fixture <!nocheck>, ros-foxy-rcl, ros-foxy-rcl-interfaces, ros-foxy-rcl-yaml-param-parser, ros-foxy-rcpputils, ros-foxy-rcutils, ros-foxy-rmw, ros-foxy-rmw <!nocheck>, ros-foxy-rmw-implementation-cmake <!nocheck>, ros-foxy-rosgraph-msgs, ros-foxy-rosidl-default-generators <!nocheck>, ros-foxy-rosidl-runtime-cpp, ros-foxy-rosidl-typesupport-c, ros-foxy-rosidl-typesupport-cpp, ros-foxy-statistics-msgs, ros-foxy-test-msgs <!nocheck>, ros-foxy-tracetools, ros-foxy-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-foxy-rclcpp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-foxy-builtin-interfaces, ros-foxy-libstatistics-collector, ros-foxy-rcl, ros-foxy-rcl-interfaces, ros-foxy-rcl-yaml-param-parser, ros-foxy-rcpputils, ros-foxy-rcutils, ros-foxy-rmw, ros-foxy-rosgraph-msgs, ros-foxy-rosidl-runtime-cpp, ros-foxy-rosidl-typesupport-c, ros-foxy-rosidl-typesupport-cpp, ros-foxy-statistics-msgs, ros-foxy-tracetools, ros-foxy-ros-workspace
+Description: The ROS client library in C++.
