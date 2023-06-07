@@ -15,17 +15,18 @@
 #ifndef RCLCPP_ACTION__CLIENT_GOAL_HANDLE_HPP_
 #define RCLCPP_ACTION__CLIENT_GOAL_HANDLE_HPP_
 
-#include <rcl_action/action_client.h>
-
-#include <action_msgs/msg/goal_status.hpp>
-#include <rclcpp/macros.hpp>
-#include <rclcpp/time.hpp>
-
 #include <functional>
 #include <future>
 #include <memory>
 #include <mutex>
 
+#include "rcl_action/action_client.h"
+
+#include "action_msgs/msg/goal_status.hpp"
+#include "rclcpp/macros.hpp"
+#include "rclcpp/time.hpp"
+
+#include "rclcpp_action/exceptions.hpp"
 #include "rclcpp_action/types.hpp"
 #include "rclcpp_action/visibility_control.hpp"
 
@@ -61,7 +62,7 @@ public:
   RCLCPP_SMART_PTR_DEFINITIONS_NOT_COPYABLE(ClientGoalHandle)
 
   // A wrapper that defines the result of an action
-  typedef struct WrappedResult
+  struct WrappedResult
   {
     /// The unique identifier of the goal
     GoalUUID goal_id;
@@ -69,7 +70,7 @@ public:
     ResultCode code;
     /// User defined fields sent back with an action
     typename ActionT::Result::SharedPtr result;
-  } WrappedResult;
+  };
 
   using Feedback = typename ActionT::Feedback;
   using Result = typename ActionT::Result;
@@ -89,22 +90,6 @@ public:
   rclcpp::Time
   get_goal_stamp() const;
 
-  /// Get a future to the goal result.
-  /**
-   * \deprecated Use rclcpp_action::Client::async_get_result() instead.
-   *
-   * This method should not be called if the `ignore_result` flag was set when
-   * sending the original goal request (see Client::async_send_goal).
-   *
-   * `is_result_aware()` can be used to check if it is safe to call this method.
-   *
-   * \throws exceptions::UnawareGoalHandleError If the the goal handle is unaware of the result.
-   * \return A future to the result.
-   */
-  [[deprecated("use rclcpp_action::Client::async_get_result() instead")]]
-  std::shared_future<WrappedResult>
-  async_result();
-
   /// Get the goal status code.
   int8_t
   get_status();
@@ -119,7 +104,7 @@ public:
 
 private:
   // The templated Client creates goal handles
-  friend Client<ActionT>;
+  friend class Client<ActionT>;
 
   ClientGoalHandle(
     const GoalInfo & info,
@@ -161,9 +146,14 @@ private:
   set_result(const WrappedResult & wrapped_result);
 
   void
-  invalidate();
+  invalidate(const exceptions::UnawareGoalHandleError & ex);
+
+  bool
+  is_invalidated() const;
 
   GoalInfo info_;
+
+  std::exception_ptr invalidate_exception_{nullptr};
 
   bool is_result_aware_{false};
   std::promise<WrappedResult> result_promise_;

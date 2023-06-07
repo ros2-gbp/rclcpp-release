@@ -14,8 +14,9 @@
 
 #include <gtest/gtest.h>
 
-#include <string>
+#include <chrono>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -24,14 +25,13 @@
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include "rcutils/env.h"
+
 #include "../mocking_utils/patch.hpp"
 #include "../utils/rclcpp_gtest_macros.hpp"
 
 #include "test_msgs/msg/empty.hpp"
-
-// Note: This is a long running test with rmw_connext_cpp, if you change this file, please check
-// that this test can complete fully, or adjust the timeout as necessary.
-// See https://github.com/ros2/rmw_connext/issues/325 for resolution
+#include "test_msgs/msg/strings.hpp"
 
 class TestPublisher : public ::testing::Test
 {
@@ -151,6 +151,31 @@ TEST_F(TestPublisher, various_creation_signatures) {
       rclcpp::create_publisher<Empty>(node, "topic", 42, rclcpp::PublisherOptions());
     (void)publisher;
   }
+  {
+    rclcpp::PublisherOptions options;
+    options.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
+    auto publisher =
+      rclcpp::create_publisher<Empty>(node, "topic", 42, options);
+    (void)publisher;
+  }
+  {
+    auto publisher = rclcpp::create_publisher<Empty>(
+      node->get_node_topics_interface(), "topic", 42, rclcpp::PublisherOptions());
+    (void)publisher;
+  }
+  {
+    auto node_topics_interface = node->get_node_topics_interface();
+    auto publisher = rclcpp::create_publisher<Empty>(
+      node_topics_interface, "topic", 42, rclcpp::PublisherOptions());
+    (void)publisher;
+  }
+  {
+    auto node_parameters = node->get_node_parameters_interface();
+    auto node_topics = node->get_node_topics_interface();
+    auto publisher = rclcpp::create_publisher<Empty>(
+      node_parameters, node_topics, "topic", 42, rclcpp::PublisherOptions());
+    (void)publisher;
+  }
 }
 
 /*
@@ -184,7 +209,7 @@ static std::vector<TestParameters> invalid_qos_profiles()
   return parameters;
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
   TestPublisherThrows, TestPublisherInvalidIntraprocessQos,
   ::testing::ValuesIn(invalid_qos_profiles()),
   ::testing::PrintToStringParamName());
@@ -220,10 +245,9 @@ const rosidl_message_type_support_t EmptyTypeSupport()
   return *rosidl_typesupport_cpp::get_message_type_support_handle<test_msgs::msg::Empty>();
 }
 
-const rcl_publisher_options_t PublisherOptions()
+const rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> PublisherOptions()
 {
-  return rclcpp::PublisherOptionsWithAllocator<std::allocator<void>>().template
-         to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10));
+  return rclcpp::PublisherOptionsWithAllocator<std::allocator<void>>();
 }
 
 class TestPublisherBase : public rclcpp::PublisherBase
@@ -231,7 +255,9 @@ class TestPublisherBase : public rclcpp::PublisherBase
 public:
   explicit TestPublisherBase(rclcpp::Node * node)
   : rclcpp::PublisherBase(
-      node->get_node_base_interface().get(), "topic", EmptyTypeSupport(), PublisherOptions()) {}
+      node->get_node_base_interface().get(), "topic", EmptyTypeSupport(),
+      PublisherOptions().to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10)),
+      PublisherOptions().event_callbacks, PublisherOptions().use_default_callbacks) {}
 };
 
 /*
@@ -383,17 +409,23 @@ TEST_F(TestPublisher, intra_process_publish_failures) {
   std::allocator<void> allocator;
   {
     rclcpp::LoanedMessage<test_msgs::msg::Empty> loaned_msg(*publisher, allocator);
-    RCLCPP_EXPECT_THROW_EQ(
-      publisher->publish(std::move(loaned_msg)),
-      std::runtime_error("storing loaned messages in intra process is not supported yet"));
+    EXPECT_NO_THROW(publisher->publish(std::move(loaned_msg)));
   }
 
   {
     rclcpp::LoanedMessage<test_msgs::msg::Empty> loaned_msg(*publisher, allocator);
-    loaned_msg.release();
+    auto msg = loaned_msg.release();  // this will unmanage the ownership of the message
     RCLCPP_EXPECT_THROW_EQ(
       publisher->publish(std::move(loaned_msg)),
       std::runtime_error("loaned message is not valid"));
+    // if the message is actually loaned from the middleware but not be published,
+    // it is user responsibility to return the message to the middleware manually
+    if (publisher->can_loan_messages()) {
+      ASSERT_EQ(
+        RCL_RET_OK,
+        rcl_return_loaned_message_from_publisher(
+          publisher->get_publisher_handle().get(), msg.get()));
+    }
   }
   RCLCPP_EXPECT_THROW_EQ(
     node->create_publisher<test_msgs::msg::Empty>(
@@ -448,9 +480,9 @@ class TestPublisherProtectedMethods : public rclcpp::Publisher<MessageT, Allocat
 public:
   using rclcpp::Publisher<MessageT, AllocatorT>::Publisher;
 
-  void publish_loaned_message(MessageT * msg)
+  void publish_loaned_message(rclcpp::LoanedMessage<MessageT, AllocatorT> && loaned_msg)
   {
-    this->do_loaned_message_publish(msg);
+    this->do_loaned_message_publish(std::move(loaned_msg.release()));
   }
 
   void call_default_incompatible_qos_callback(rclcpp::QOSOfferedIncompatibleQoSInfo & event) const
@@ -462,16 +494,22 @@ public:
 TEST_F(TestPublisher, do_loaned_message_publish_error) {
   initialize();
   using PublisherT = TestPublisherProtectedMethods<test_msgs::msg::Empty, std::allocator<void>>;
+  // This test only passes when message is allocated on heap, not middleware.
+  // Since `do_loaned_message_publish()` will fail, there is no way to return the message
+  // to the middleware.
+  // This eventually fails to destroy publisher handle in the implementation.
+  ASSERT_TRUE(rcutils_set_env("ROS_DISABLE_LOANED_MESSAGES", "1"));
   auto publisher =
     node->create_publisher<test_msgs::msg::Empty, std::allocator<void>, PublisherT>("topic", 10);
 
-  auto msg = std::make_shared<test_msgs::msg::Empty>();
+  auto msg = publisher->borrow_loaned_message();
+
   {
     // Using 'self' instead of 'lib:rclcpp' because `rcl_publish_loaned_message` is entirely
     // defined in a header
     auto mock = mocking_utils::patch_and_return(
       "self", rcl_publish_loaned_message, RCL_RET_PUBLISHER_INVALID);
-    EXPECT_THROW(publisher->publish_loaned_message(msg.get()), rclcpp::exceptions::RCLError);
+    EXPECT_THROW(publisher->publish_loaned_message(std::move(msg)), rclcpp::exceptions::RCLError);
   }
 }
 
@@ -489,7 +527,150 @@ TEST_F(TestPublisher, default_incompatible_qos_callback) {
 TEST_F(TestPublisher, run_event_handlers) {
   initialize();
   auto publisher = node->create_publisher<test_msgs::msg::Empty>("topic", 10);
-  for (const auto & handler : publisher->get_event_handlers()) {
-    EXPECT_NO_THROW(handler->execute());
+
+  for (const auto & key_event_pair : publisher->get_event_handlers()) {
+    auto handler = key_event_pair.second;
+    std::shared_ptr<void> data = handler->take_data();
+    handler->execute(data);
   }
 }
+
+TEST_F(TestPublisher, get_network_flow_endpoints_errors) {
+  initialize();
+  const rclcpp::QoS publisher_qos(1);
+  auto publisher = node->create_publisher<test_msgs::msg::Empty>("topic", publisher_qos);
+
+  {
+    auto mock = mocking_utils::patch_and_return(
+      "lib:rclcpp", rcl_publisher_get_network_flow_endpoints, RCL_RET_ERROR);
+    auto mock_network_flow_endpoint_array_fini = mocking_utils::patch_and_return(
+      "lib:rclcpp", rcl_network_flow_endpoint_array_fini, RCL_RET_ERROR);
+    EXPECT_THROW(
+      publisher->get_network_flow_endpoints(),
+      rclcpp::exceptions::RCLError);
+  }
+  {
+    auto mock_network_flow_endpoint_array_fini = mocking_utils::patch_and_return(
+      "lib:rclcpp", rcl_network_flow_endpoint_array_fini, RCL_RET_ERROR);
+    EXPECT_THROW(
+      publisher->get_network_flow_endpoints(),
+      rclcpp::exceptions::RCLError);
+  }
+  {
+    auto mock = mocking_utils::patch_and_return(
+      "lib:rclcpp", rcl_publisher_get_network_flow_endpoints, RCL_RET_OK);
+    auto mock_network_flow_endpoint_array_fini = mocking_utils::patch_and_return(
+      "lib:rclcpp", rcl_network_flow_endpoint_array_fini, RCL_RET_OK);
+    EXPECT_NO_THROW(publisher->get_network_flow_endpoints());
+  }
+}
+
+TEST_F(TestPublisher, check_wait_for_all_acked_return) {
+  initialize();
+  const rclcpp::QoS publisher_qos(1);
+  auto publisher = node->create_publisher<test_msgs::msg::Empty>("topic", publisher_qos);
+
+  {
+    // Using 'self' instead of 'lib:rclcpp' because `rcl_publisher_wait_for_all_acked` is entirely
+    // defined in a header
+    auto mock = mocking_utils::patch_and_return(
+      "self", rcl_publisher_wait_for_all_acked, RCL_RET_OK);
+    EXPECT_TRUE(publisher->wait_for_all_acked(std::chrono::milliseconds(-1)));
+  }
+
+  {
+    // Using 'self' instead of 'lib:rclcpp' because `rcl_publisher_wait_for_all_acked` is entirely
+    // defined in a header
+    auto mock = mocking_utils::patch_and_return(
+      "self", rcl_publisher_wait_for_all_acked, RCL_RET_TIMEOUT);
+    EXPECT_FALSE(publisher->wait_for_all_acked(std::chrono::milliseconds(-1)));
+  }
+
+  {
+    // Using 'self' instead of 'lib:rclcpp' because `rcl_publisher_wait_for_all_acked` is entirely
+    // defined in a header
+    auto mock = mocking_utils::patch_and_return(
+      "self", rcl_publisher_wait_for_all_acked, RCL_RET_UNSUPPORTED);
+    EXPECT_THROW(
+      publisher->wait_for_all_acked(std::chrono::milliseconds(-1)),
+      rclcpp::exceptions::RCLError);
+  }
+
+  {
+    // Using 'self' instead of 'lib:rclcpp' because `rcl_publisher_wait_for_all_acked` is entirely
+    // defined in a header
+    auto mock = mocking_utils::patch_and_return(
+      "self", rcl_publisher_wait_for_all_acked, RCL_RET_ERROR);
+    EXPECT_THROW(
+      publisher->wait_for_all_acked(std::chrono::milliseconds(-1)),
+      rclcpp::exceptions::RCLError);
+  }
+}
+
+class TestPublisherWaitForAllAcked
+  : public TestPublisher, public ::testing::WithParamInterface<std::pair<rclcpp::QoS, rclcpp::QoS>>
+{
+};
+
+TEST_P(TestPublisherWaitForAllAcked, check_wait_for_all_acked_with_QosPolicy) {
+  initialize();
+
+  auto do_nothing = [](std::shared_ptr<const test_msgs::msg::Strings>) {};
+  auto pub = node->create_publisher<test_msgs::msg::Strings>("topic", std::get<0>(GetParam()));
+  auto sub = node->create_subscription<test_msgs::msg::Strings>(
+    "topic",
+    std::get<1>(GetParam()),
+    do_nothing);
+
+  auto msg = std::make_shared<test_msgs::msg::Strings>();
+  for (int i = 0; i < 20; i++) {
+    ASSERT_NO_THROW(pub->publish(*msg));
+  }
+  EXPECT_TRUE(pub->wait_for_all_acked(std::chrono::milliseconds(6000)));
+}
+
+TEST_F(TestPublisher, lowest_available_ipm_capacity) {
+  constexpr auto history_depth = 10u;
+
+  initialize(rclcpp::NodeOptions().use_intra_process_comms(true));
+
+  rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> options_ipm_disabled;
+  options_ipm_disabled.use_intra_process_comm = rclcpp::IntraProcessSetting::Disable;
+
+  rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> options_ipm_enabled;
+  options_ipm_enabled.use_intra_process_comm = rclcpp::IntraProcessSetting::Enable;
+
+  auto do_nothing = [](std::shared_ptr<const test_msgs::msg::Strings>) {};
+  auto pub_ipm_disabled = node->create_publisher<test_msgs::msg::Strings>(
+    "topic", history_depth,
+    options_ipm_disabled);
+  auto pub_ipm_enabled = node->create_publisher<test_msgs::msg::Strings>(
+    "topic", history_depth,
+    options_ipm_enabled);
+  auto sub = node->create_subscription<test_msgs::msg::Strings>(
+    "topic",
+    history_depth,
+    do_nothing);
+
+  ASSERT_EQ(1, pub_ipm_enabled->get_intra_process_subscription_count());
+  ASSERT_EQ(0, pub_ipm_disabled->lowest_available_ipm_capacity());
+  ASSERT_EQ(history_depth, pub_ipm_enabled->lowest_available_ipm_capacity());
+
+  auto msg = std::make_shared<test_msgs::msg::Strings>();
+  ASSERT_NO_THROW(pub_ipm_disabled->publish(*msg));
+  ASSERT_NO_THROW(pub_ipm_enabled->publish(*msg));
+
+  ASSERT_EQ(0, pub_ipm_disabled->lowest_available_ipm_capacity());
+  ASSERT_EQ(history_depth - 1u, pub_ipm_enabled->lowest_available_ipm_capacity());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+  TestWaitForAllAckedWithParm,
+  TestPublisherWaitForAllAcked,
+  ::testing::Values(
+    std::pair<rclcpp::QoS, rclcpp::QoS>(
+      rclcpp::QoS(1).reliable(), rclcpp::QoS(1).reliable()),
+    std::pair<rclcpp::QoS, rclcpp::QoS>(
+      rclcpp::QoS(1).best_effort(), rclcpp::QoS(1).best_effort()),
+    std::pair<rclcpp::QoS, rclcpp::QoS>(
+      rclcpp::QoS(1).reliable(), rclcpp::QoS(1).best_effort())));

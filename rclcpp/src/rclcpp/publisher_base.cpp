@@ -22,6 +22,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "rcutils/logging_macros.h"
@@ -34,8 +35,9 @@
 #include "rclcpp/experimental/intra_process_manager.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/macros.hpp"
+#include "rclcpp/network_flow_endpoint.hpp"
 #include "rclcpp/node.hpp"
-#include "rclcpp/qos_event.hpp"
+#include "rclcpp/event_handler.hpp"
 
 using rclcpp::PublisherBase;
 
@@ -43,9 +45,14 @@ PublisherBase::PublisherBase(
   rclcpp::node_interfaces::NodeBaseInterface * node_base,
   const std::string & topic,
   const rosidl_message_type_support_t & type_support,
-  const rcl_publisher_options_t & publisher_options)
+  const rcl_publisher_options_t & publisher_options,
+  const PublisherEventCallbacks & event_callbacks,
+  bool use_default_callbacks)
 : rcl_node_handle_(node_base->get_shared_rcl_node_handle()),
-  intra_process_is_enabled_(false), intra_process_publisher_id_(0)
+  intra_process_is_enabled_(false),
+  intra_process_publisher_id_(0),
+  type_support_(type_support),
+  event_callbacks_(event_callbacks)
 {
   auto custom_deleter = [node_handle = this->rcl_node_handle_](rcl_publisher_t * rcl_pub)
     {
@@ -94,6 +101,8 @@ PublisherBase::PublisherBase(
     rmw_reset_error();
     throw std::runtime_error(msg);
   }
+
+  bind_event_callbacks(event_callbacks_, use_default_callbacks);
 }
 
 PublisherBase::~PublisherBase()
@@ -120,6 +129,65 @@ const char *
 PublisherBase::get_topic_name() const
 {
   return rcl_publisher_get_topic_name(publisher_handle_.get());
+}
+
+void
+PublisherBase::bind_event_callbacks(
+  const PublisherEventCallbacks & event_callbacks, bool use_default_callbacks)
+{
+  if (event_callbacks.deadline_callback) {
+    this->add_event_handler(
+      event_callbacks.deadline_callback,
+      RCL_PUBLISHER_OFFERED_DEADLINE_MISSED);
+  }
+  if (event_callbacks.liveliness_callback) {
+    this->add_event_handler(
+      event_callbacks.liveliness_callback,
+      RCL_PUBLISHER_LIVELINESS_LOST);
+  }
+
+  QOSOfferedIncompatibleQoSCallbackType incompatible_qos_cb;
+  if (event_callbacks.incompatible_qos_callback) {
+    incompatible_qos_cb = event_callbacks.incompatible_qos_callback;
+  } else if (use_default_callbacks) {
+    // Register default callback when not specified
+    incompatible_qos_cb = [this](QOSOfferedIncompatibleQoSInfo & info) {
+        this->default_incompatible_qos_callback(info);
+      };
+  }
+  try {
+    if (incompatible_qos_cb) {
+      this->add_event_handler(incompatible_qos_cb, RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS);
+    }
+  } catch (const UnsupportedEventTypeException & /*exc*/) {
+    RCLCPP_DEBUG(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for incompatible qos; wrong callback type");
+  }
+
+  IncompatibleTypeCallbackType incompatible_type_cb;
+  if (event_callbacks.incompatible_type_callback) {
+    incompatible_type_cb = event_callbacks.incompatible_type_callback;
+  } else if (use_default_callbacks) {
+    // Register default callback when not specified
+    incompatible_type_cb = [this](IncompatibleTypeInfo & info) {
+        this->default_incompatible_type_callback(info);
+      };
+  }
+  try {
+    if (incompatible_type_cb) {
+      this->add_event_handler(incompatible_type_cb, RCL_PUBLISHER_INCOMPATIBLE_TYPE);
+    }
+  } catch (UnsupportedEventTypeException & /*exc*/) {
+    RCLCPP_DEBUG(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for incompatible type; wrong callback type");
+  }
+  if (event_callbacks.matched_callback) {
+    this->add_event_handler(
+      event_callbacks.matched_callback,
+      RCL_PUBLISHER_MATCHED);
+  }
 }
 
 size_t
@@ -153,7 +221,8 @@ PublisherBase::get_publisher_handle() const
   return publisher_handle_;
 }
 
-const std::vector<std::shared_ptr<rclcpp::QOSEventHandlerBase>> &
+const
+std::unordered_map<rcl_publisher_event_type_t, std::shared_ptr<rclcpp::EventHandlerBase>> &
 PublisherBase::get_event_handlers() const
 {
   return event_handlers_;
@@ -223,7 +292,7 @@ PublisherBase::assert_liveliness() const
 bool
 PublisherBase::can_loan_messages() const
 {
-  return rcl_publisher_can_loan_messages(publisher_handle_.get());
+  return !intra_process_is_enabled_ && rcl_publisher_can_loan_messages(publisher_handle_.get());
 }
 
 bool
@@ -262,7 +331,75 @@ PublisherBase::default_incompatible_qos_callback(
   std::string policy_name = qos_policy_name_from_kind(event.last_policy_kind);
   RCLCPP_WARN(
     rclcpp::get_logger(rcl_node_get_logger_name(rcl_node_handle_.get())),
-    "New subscription discovered on this topic, requesting incompatible QoS. "
+    "New subscription discovered on topic '%s', requesting incompatible QoS. "
     "No messages will be sent to it. "
-    "Last incompatible policy: %s", policy_name.c_str());
+    "Last incompatible policy: %s",
+    get_topic_name(),
+    policy_name.c_str());
+}
+
+void
+PublisherBase::default_incompatible_type_callback(
+  rclcpp::IncompatibleTypeInfo & event) const
+{
+  (void)event;
+
+  RCLCPP_WARN(
+    rclcpp::get_logger(rcl_node_get_logger_name(rcl_node_handle_.get())),
+    "Incompatible type on topic '%s', no messages will be sent to it.", get_topic_name());
+}
+
+std::vector<rclcpp::NetworkFlowEndpoint> PublisherBase::get_network_flow_endpoints() const
+{
+  rcutils_allocator_t allocator = rcutils_get_default_allocator();
+  rcl_network_flow_endpoint_array_t network_flow_endpoint_array =
+    rcl_get_zero_initialized_network_flow_endpoint_array();
+  rcl_ret_t ret = rcl_publisher_get_network_flow_endpoints(
+    publisher_handle_.get(), &allocator, &network_flow_endpoint_array);
+  if (RCL_RET_OK != ret) {
+    auto error_msg = std::string("error obtaining network flows of publisher: ") +
+      rcl_get_error_string().str;
+    rcl_reset_error();
+    if (RCL_RET_OK !=
+      rcl_network_flow_endpoint_array_fini(&network_flow_endpoint_array))
+    {
+      error_msg += std::string(", also error cleaning up network flow array: ") +
+        rcl_get_error_string().str;
+      rcl_reset_error();
+    }
+    rclcpp::exceptions::throw_from_rcl_error(ret, error_msg);
+  }
+
+  std::vector<rclcpp::NetworkFlowEndpoint> network_flow_endpoint_vector;
+  for (size_t i = 0; i < network_flow_endpoint_array.size; ++i) {
+    network_flow_endpoint_vector.push_back(
+      rclcpp::NetworkFlowEndpoint(
+        network_flow_endpoint_array.network_flow_endpoint[i]));
+  }
+
+  ret = rcl_network_flow_endpoint_array_fini(&network_flow_endpoint_array);
+  if (RCL_RET_OK != ret) {
+    rclcpp::exceptions::throw_from_rcl_error(ret, "error cleaning up network flow array");
+  }
+
+  return network_flow_endpoint_vector;
+}
+
+size_t PublisherBase::lowest_available_ipm_capacity() const
+{
+  if (!intra_process_is_enabled_) {
+    return 0u;
+  }
+
+  auto ipm = weak_ipm_.lock();
+
+  if (!ipm) {
+    // TODO(ivanpauno): should this raise an error?
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Intra process manager died for a publisher.");
+    return 0u;
+  }
+
+  return ipm->lowest_available_capacity(intra_process_publisher_id_);
 }

@@ -44,9 +44,12 @@ BENCHMARK_F(NodePerformanceTest, create_node)(benchmark::State & state)
 
   reset_heap_counters();
   for (auto _ : state) {
+    (void)_;
     // Using pointer to separate construction and destruction in timing
     auto node = std::make_shared<rclcpp::Node>("node");
+#ifndef __clang_analyzer__
     benchmark::DoNotOptimize(node);
+#endif
     benchmark::ClobberMemory();
 
     // Ensure destruction of node is not counted toward timing
@@ -64,12 +67,15 @@ BENCHMARK_F(NodePerformanceTest, destroy_node)(benchmark::State & state)
 
   reset_heap_counters();
   for (auto _ : state) {
+    (void)_;
     // Using pointer to separate construction and destruction in timing
     state.PauseTiming();
     auto node = std::make_shared<rclcpp::Node>("node");
     state.ResumeTiming();
 
+#ifndef __clang_analyzer__
     benchmark::DoNotOptimize(node);
+#endif
     benchmark::ClobberMemory();
 
     node.reset();

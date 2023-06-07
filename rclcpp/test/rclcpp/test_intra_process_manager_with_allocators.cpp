@@ -18,6 +18,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include "test_msgs/msg/empty.hpp"
@@ -121,48 +122,6 @@ constexpr bool operator!=(
 }
 
 template<
-  typename ExpectedExceptionT,
-  typename PublisherT,
-  typename FutureT,
-  typename MessageT,
-  typename ExpectedMessagePtr,
-  typename std::enable_if<std::is_same<ExpectedExceptionT, void>::value, int>::type = 0>
-void check_exception(
-  PublisherT & publisher, rclcpp::Executor & executor, FutureT received_message_future,
-  uint32_t & counter, MessageT msg, ExpectedMessagePtr expected_ptr)
-{
-  // no exception expected
-  EXPECT_NO_THROW(
-  {
-    publisher->publish(std::move(msg));
-    executor.spin_until_future_complete(received_message_future, std::chrono::seconds(10));
-  });
-  EXPECT_EQ(expected_ptr, received_message_future.get().get());
-  EXPECT_EQ(1u, counter);
-}
-
-template<
-  typename ExpectedExceptionT,
-  typename PublisherT,
-  typename FutureT,
-  typename MessageT,
-  typename ExpectedMessagePtr,
-  typename std::enable_if<!std::is_same<ExpectedExceptionT, void>::value, int>::type = 0>
-void check_exception(
-  PublisherT & publisher, rclcpp::Executor & executor, FutureT received_message_future,
-  uint32_t counter, MessageT msg, ExpectedMessagePtr expected_ptr)
-{
-  (void)counter;
-  (void)expected_ptr;
-  // exception expected
-  EXPECT_THROW(
-  {
-    publisher->publish(std::move(msg));
-    executor.spin_until_future_complete(received_message_future, std::chrono::seconds(10));
-  }, ExpectedExceptionT);
-}
-
-template<
   typename PublishedMessageAllocatorT,
   typename PublisherAllocatorT,
   typename SubscribedMessageAllocatorT,
@@ -209,7 +168,7 @@ do_custom_allocator_test(
   // callback for subscription
   uint32_t counter = 0;
   std::promise<std::unique_ptr<test_msgs::msg::Empty, SubscribedMessageDeleter>> received_message;
-  auto received_message_future = received_message.get_future().share();
+  auto received_message_future = received_message.get_future();
   auto callback =
     [&counter, &received_message](
     std::unique_ptr<test_msgs::msg::Empty, SubscribedMessageDeleter> msg)
@@ -237,7 +196,6 @@ do_custom_allocator_test(
     test_msgs::msg::Empty,
     decltype(callback),
     SubscriptionAllocatorT,
-    CallbackMessageT,
     rclcpp::Subscription<CallbackMessageT, SubscriptionAllocatorT>,
     rclcpp::message_memory_strategy::MessageMemoryStrategy<
       CallbackMessageT,
@@ -277,8 +235,23 @@ do_custom_allocator_test(
   std::unique_ptr<test_msgs::msg::Empty, PublishedMessageDeleter> msg(ptr, message_deleter);
 
   // publisher and receive
-  check_exception<ExpectedExceptionT>(
-    publisher, executor, received_message_future, counter, std::move(msg), ptr);
+  if constexpr (std::is_same_v<ExpectedExceptionT, void>) {
+    // no exception expected
+    EXPECT_NO_THROW(
+    {
+      publisher->publish(std::move(msg));
+      executor.spin_until_future_complete(received_message_future, std::chrono::seconds(10));
+    });
+    EXPECT_EQ(ptr, received_message_future.get().get());
+    EXPECT_EQ(1u, counter);
+  } else {
+    // exception expected
+    EXPECT_THROW(
+    {
+      publisher->publish(std::move(msg));
+      executor.spin_until_future_complete(received_message_future, std::chrono::seconds(10));
+    }, ExpectedExceptionT);
+  }
 }
 
 /*

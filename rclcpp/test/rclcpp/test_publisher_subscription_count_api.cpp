@@ -122,7 +122,7 @@ public:
   }
 
 protected:
-  static void OnMessage(const test_msgs::msg::Empty::SharedPtr msg)
+  static void OnMessage(test_msgs::msg::Empty::ConstSharedPtr msg)
   {
     (void)msg;
   }
@@ -192,7 +192,7 @@ using AllTestDescriptions = ::testing::Types<
   TwoSubscriptionsInTwoContextsWithIntraprocessComm,
   TwoSubscriptionsInTwoContextsWithoutIntraprocessComm
 >;
-TYPED_TEST_CASE(TestPublisherSubscriptionCount, AllTestDescriptions, PrintTestDescription);
+TYPED_TEST_SUITE(TestPublisherSubscriptionCount, AllTestDescriptions, PrintTestDescription);
 
 
 using test_msgs::msg::Empty;

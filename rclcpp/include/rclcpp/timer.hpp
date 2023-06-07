@@ -91,6 +91,17 @@ public:
   void
   reset();
 
+  /// Indicate that we're about to execute the callback.
+  /**
+   * The multithreaded executor takes advantage of this to avoid scheduling
+   * the callback multiple times.
+   *
+   * \return `true` if the callback should be executed, `false` if the timer was canceled.
+   */
+  RCLCPP_PUBLIC
+  virtual bool
+  call() = 0;
+
   /// Call the callback function when the timer signal is emitted.
   RCLCPP_PUBLIC
   virtual void
@@ -102,7 +113,8 @@ public:
 
   /// Check how long the timer has until its next scheduled callback.
   /**
-   * \return A std::chrono::duration representing the relative time until the next callback.
+   * \return A std::chrono::duration representing the relative time until the next callback
+   * or std::chrono::nanoseconds::max() if the timer is canceled.
    * \throws std::runtime_error if the rcl_timer_get_time_until_next_call returns a failure
    */
   RCLCPP_PUBLIC
@@ -137,11 +149,48 @@ public:
   bool
   exchange_in_use_by_wait_set_state(bool in_use_state);
 
+  /// Set a callback to be called when the timer is reset
+  /**
+   * You should aim to make this callback fast and not blocking.
+   * If you need to do a lot of work or wait for some other event, you should
+   * spin it off to another thread.
+   *
+   * Calling it again will override any previously set callback.
+   * An exception will be thrown if the callback is not callable.
+   *
+   * This function is thread-safe.
+   *
+   * If you want more information available in the callback,
+   * you may use a lambda with captures or std::bind.
+   *
+   * \param[in] callback functor to be called whenever timer is reset
+   */
+  RCLCPP_PUBLIC
+  void
+  set_on_reset_callback(std::function<void(size_t)> callback);
+
+  /// Unset the callback registered for reset timer
+  RCLCPP_PUBLIC
+  void
+  clear_on_reset_callback();
+
 protected:
+  std::recursive_mutex callback_mutex_;
+  // Declare callback before timer_handle_, so on destruction
+  // the callback is destroyed last. Otherwise, the rcl timer
+  // callback would point briefly to a destroyed function.
+  // Clearing the callback on timer destructor also makes sure
+  // the rcl callback is cleared before on_reset_callback_.
+  std::function<void(size_t)> on_reset_callback_{nullptr};
+
   Clock::SharedPtr clock_;
   std::shared_ptr<rcl_timer_t> timer_handle_;
 
   std::atomic<bool> in_use_by_wait_set_{false};
+
+  RCLCPP_PUBLIC
+  void
+  set_on_reset_callback(rcl_event_callback_t callback, const void * user_data);
 };
 
 
@@ -176,12 +225,18 @@ public:
   {
     TRACEPOINT(
       rclcpp_timer_callback_added,
-      (const void *)get_timer_handle().get(),
-      (const void *)&callback_);
-    TRACEPOINT(
-      rclcpp_callback_register,
-      (const void *)&callback_,
-      get_symbol(callback_));
+      static_cast<const void *>(get_timer_handle().get()),
+      reinterpret_cast<const void *>(&callback_));
+#ifndef TRACETOOLS_DISABLED
+    if (TRACEPOINT_ENABLED(rclcpp_callback_register)) {
+      char * symbol = tracetools::get_symbol(callback_);
+      DO_TRACEPOINT(
+        rclcpp_callback_register,
+        reinterpret_cast<const void *>(&callback_),
+        symbol);
+      std::free(symbol);
+    }
+#endif
   }
 
   /// Default destructor.
@@ -192,22 +247,31 @@ public:
   }
 
   /**
-   * \sa rclcpp::TimerBase::execute_callback
-   * \throws std::runtime_error if it failed to notify timer that callback occurred
+   * \sa rclcpp::TimerBase::call
+   * \throws std::runtime_error if it failed to notify timer that callback will occurr
    */
-  void
-  execute_callback() override
+  bool
+  call() override
   {
     rcl_ret_t ret = rcl_timer_call(timer_handle_.get());
     if (ret == RCL_RET_TIMER_CANCELED) {
-      return;
+      return false;
     }
     if (ret != RCL_RET_OK) {
       throw std::runtime_error("Failed to notify timer that callback occurred");
     }
-    TRACEPOINT(callback_start, (const void *)&callback_, false);
+    return true;
+  }
+
+  /**
+   * \sa rclcpp::TimerBase::execute_callback
+   */
+  void
+  execute_callback() override
+  {
+    TRACEPOINT(callback_start, reinterpret_cast<const void *>(&callback_), false);
     execute_callback_delegate<>();
-    TRACEPOINT(callback_end, (const void *)&callback_);
+    TRACEPOINT(callback_end, reinterpret_cast<const void *>(&callback_));
   }
 
   // void specialization

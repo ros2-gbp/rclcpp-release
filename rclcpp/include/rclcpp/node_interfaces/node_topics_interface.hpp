@@ -15,8 +15,6 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_TOPICS_INTERFACE_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_TOPICS_INTERFACE_HPP_
 
-#include <functional>
-#include <memory>
 #include <string>
 
 #include "rcl/publisher.h"
@@ -24,6 +22,7 @@
 
 #include "rclcpp/callback_group.hpp"
 #include "rclcpp/macros.hpp"
+#include "rclcpp/node_interfaces/detail/node_interfaces_helpers.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/node_interfaces/node_timers_interface.hpp"
 #include "rclcpp/publisher.hpp"
@@ -86,9 +85,17 @@ public:
   virtual
   rclcpp::node_interfaces::NodeTimersInterface *
   get_node_timers_interface() const = 0;
+
+  /// Get a remapped and expanded topic name given an input name.
+  RCLCPP_PUBLIC
+  virtual
+  std::string
+  resolve_topic_name(const std::string & name, bool only_expand = false) const = 0;
 };
 
 }  // namespace node_interfaces
 }  // namespace rclcpp
+
+RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(rclcpp::node_interfaces::NodeTopicsInterface, topics)
 
 #endif  // RCLCPP__NODE_INTERFACES__NODE_TOPICS_INTERFACE_HPP_

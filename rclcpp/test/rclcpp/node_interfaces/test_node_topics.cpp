@@ -17,6 +17,7 @@
 #include <memory>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 #include "rcl/node_options.h"
 #include "rclcpp/node.hpp"
@@ -27,6 +28,11 @@
 #include "../../mocking_utils/patch.hpp"
 #include "../../utils/rclcpp_gtest_macros.hpp"
 
+using rclcpp::dynamic_typesupport::DynamicMessage;
+using rclcpp::dynamic_typesupport::DynamicMessageType;
+using rclcpp::dynamic_typesupport::DynamicSerializationSupport;
+
+
 namespace
 {
 
@@ -35,16 +41,14 @@ const rosidl_message_type_support_t EmptyTypeSupport()
   return *rosidl_typesupport_cpp::get_message_type_support_handle<test_msgs::msg::Empty>();
 }
 
-const rcl_publisher_options_t PublisherOptions()
+const rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> PublisherOptions()
 {
-  return rclcpp::PublisherOptionsWithAllocator<std::allocator<void>>().template
-         to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10));
+  return rclcpp::PublisherOptionsWithAllocator<std::allocator<void>>();
 }
 
-const rcl_subscription_options_t SubscriptionOptions()
+const rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>> SubscriptionOptions()
 {
-  return rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>>().template
-         to_rcl_subscription_options<test_msgs::msg::Empty>(rclcpp::QoS(10));
+  return rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>>();
 }
 
 }  // namespace
@@ -54,7 +58,9 @@ class TestPublisher : public rclcpp::PublisherBase
 public:
   explicit TestPublisher(rclcpp::Node * node)
   : rclcpp::PublisherBase(
-      node->get_node_base_interface().get(), "topic", EmptyTypeSupport(), PublisherOptions()) {}
+      node->get_node_base_interface().get(), "topic", EmptyTypeSupport(),
+      PublisherOptions().to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10)),
+      PublisherOptions().event_callbacks, PublisherOptions().use_default_callbacks) {}
 };
 
 class TestSubscription : public rclcpp::SubscriptionBase
@@ -62,7 +68,9 @@ class TestSubscription : public rclcpp::SubscriptionBase
 public:
   explicit TestSubscription(rclcpp::Node * node)
   : rclcpp::SubscriptionBase(
-      node->get_node_base_interface().get(), EmptyTypeSupport(), "topic", SubscriptionOptions()) {}
+      node->get_node_base_interface().get(), EmptyTypeSupport(), "topic",
+      SubscriptionOptions().to_rcl_subscription_options(rclcpp::QoS(10)),
+      SubscriptionOptions().event_callbacks, SubscriptionOptions().use_default_callbacks) {}
   std::shared_ptr<void> create_message() override {return nullptr;}
 
   std::shared_ptr<rclcpp::SerializedMessage>
@@ -70,8 +78,22 @@ public:
 
   void handle_message(std::shared_ptr<void> &, const rclcpp::MessageInfo &) override {}
   void handle_loaned_message(void *, const rclcpp::MessageInfo &) override {}
+  void handle_serialized_message(
+    const std::shared_ptr<rclcpp::SerializedMessage> &, const rclcpp::MessageInfo &) override {}
   void return_message(std::shared_ptr<void> &) override {}
   void return_serialized_message(std::shared_ptr<rclcpp::SerializedMessage> &) override {}
+
+  DynamicMessageType::SharedPtr get_shared_dynamic_message_type() override {return nullptr;}
+  DynamicMessage::SharedPtr get_shared_dynamic_message() override {return nullptr;}
+  DynamicSerializationSupport::SharedPtr get_shared_dynamic_serialization_support() override
+  {
+    return nullptr;
+  }
+  DynamicMessage::SharedPtr create_dynamic_message() override {return nullptr;}
+  void return_dynamic_message(DynamicMessage::SharedPtr &) override {}
+  void handle_dynamic_message(
+    const DynamicMessage::SharedPtr &,
+    const rclcpp::MessageInfo &) override {}
 };
 
 class TestNodeTopics : public ::testing::Test
@@ -80,7 +102,9 @@ public:
   void SetUp()
   {
     rclcpp::init(0, nullptr);
-    node = std::make_shared<rclcpp::Node>("node", "ns");
+    rclcpp::NodeOptions options{};
+    options.arguments(std::vector<std::string>{"-r", "foo:=bar"});
+    node = std::make_shared<rclcpp::Node>("node", "ns", options);
 
     // This dynamic cast is not necessary for the unittest itself, but instead is used to ensure
     // the proper type is being tested and covered.
@@ -124,7 +148,7 @@ TEST_F(TestNodeTopics, add_publisher_rcl_trigger_guard_condition_error)
     "lib:rclcpp", rcl_trigger_guard_condition, RCL_RET_ERROR);
   RCLCPP_EXPECT_THROW_EQ(
     node_topics->add_publisher(publisher, callback_group),
-    std::runtime_error("Failed to notify wait set on publisher creation: error not set"));
+    std::runtime_error("failed to notify wait set on publisher creation: error not set"));
 }
 
 TEST_F(TestNodeTopics, add_subscription)
@@ -153,4 +177,14 @@ TEST_F(TestNodeTopics, add_subscription_rcl_trigger_guard_condition_error)
   RCLCPP_EXPECT_THROW_EQ(
     node_topics->add_subscription(subscription, callback_group),
     std::runtime_error("failed to notify wait set on subscription creation: error not set"));
+}
+
+TEST_F(TestNodeTopics, resolve_topic_name)
+{
+  EXPECT_EQ("/ns/bar", node_topics->resolve_topic_name("foo", false));
+  EXPECT_EQ("/ns/foo", node_topics->resolve_topic_name("foo", true));
+  EXPECT_EQ("/foo", node_topics->resolve_topic_name("/foo", true));
+  EXPECT_THROW(
+    node_topics->resolve_topic_name("this is not a valid name!~>", true),
+    rclcpp::exceptions::RCLError);
 }

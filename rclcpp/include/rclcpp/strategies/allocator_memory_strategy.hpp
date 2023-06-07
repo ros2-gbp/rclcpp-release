@@ -17,10 +17,12 @@
 
 #include <memory>
 #include <vector>
+#include <utility>
 
 #include "rcl/allocator.h"
 
 #include "rclcpp/allocator/allocator_common.hpp"
+#include "rclcpp/detail/add_guard_condition_to_rcl_wait_set.hpp"
 #include "rclcpp/memory_strategy.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/visibility_control.hpp"
@@ -61,17 +63,17 @@ public:
     allocator_ = std::make_shared<VoidAlloc>();
   }
 
-  void add_guard_condition(const rcl_guard_condition_t * guard_condition) override
+  void add_guard_condition(const rclcpp::GuardCondition & guard_condition) override
   {
     for (const auto & existing_guard_condition : guard_conditions_) {
-      if (existing_guard_condition == guard_condition) {
+      if (existing_guard_condition == &guard_condition) {
         return;
       }
     }
-    guard_conditions_.push_back(guard_condition);
+    guard_conditions_.push_back(&guard_condition);
   }
 
-  void remove_guard_condition(const rcl_guard_condition_t * guard_condition) override
+  void remove_guard_condition(const rclcpp::GuardCondition * guard_condition) override
   {
     for (auto it = guard_conditions_.begin(); it != guard_conditions_.end(); ++it) {
       if (*it == guard_condition) {
@@ -119,8 +121,8 @@ public:
       }
     }
     for (size_t i = 0; i < waitable_handles_.size(); ++i) {
-      if (!waitable_handles_[i]->is_ready(wait_set)) {
-        waitable_handles_[i].reset();
+      if (waitable_handles_[i]->is_ready(wait_set)) {
+        waitable_triggered_handles_.emplace_back(std::move(waitable_handles_[i]));
       }
     }
 
@@ -144,54 +146,42 @@ public:
       timer_handles_.end()
     );
 
-    waitable_handles_.erase(
-      std::remove(waitable_handles_.begin(), waitable_handles_.end(), nullptr),
-      waitable_handles_.end()
-    );
+    waitable_handles_.clear();
   }
 
-  bool collect_entities(const WeakNodeList & weak_nodes) override
+  bool collect_entities(const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
   {
-    bool has_invalid_weak_nodes = false;
-    for (auto & weak_node : weak_nodes) {
-      auto node = weak_node.lock();
-      if (!node) {
-        has_invalid_weak_nodes = true;
+    bool has_invalid_weak_groups_or_nodes = false;
+    for (const auto & pair : weak_groups_to_nodes) {
+      auto group = pair.first.lock();
+      auto node = pair.second.lock();
+      if (group == nullptr || node == nullptr) {
+        has_invalid_weak_groups_or_nodes = true;
         continue;
       }
-      for (auto & weak_group : node->get_callback_groups()) {
-        auto group = weak_group.lock();
-        if (!group || !group->can_be_taken_from().load()) {
-          continue;
-        }
-        group->find_subscription_ptrs_if(
-          [this](const rclcpp::SubscriptionBase::SharedPtr & subscription) {
-            subscription_handles_.push_back(subscription->get_subscription_handle());
-            return false;
-          });
-        group->find_service_ptrs_if(
-          [this](const rclcpp::ServiceBase::SharedPtr & service) {
-            service_handles_.push_back(service->get_service_handle());
-            return false;
-          });
-        group->find_client_ptrs_if(
-          [this](const rclcpp::ClientBase::SharedPtr & client) {
-            client_handles_.push_back(client->get_client_handle());
-            return false;
-          });
-        group->find_timer_ptrs_if(
-          [this](const rclcpp::TimerBase::SharedPtr & timer) {
-            timer_handles_.push_back(timer->get_timer_handle());
-            return false;
-          });
-        group->find_waitable_ptrs_if(
-          [this](const rclcpp::Waitable::SharedPtr & waitable) {
-            waitable_handles_.push_back(waitable);
-            return false;
-          });
+      if (!group || !group->can_be_taken_from().load()) {
+        continue;
       }
+
+      group->collect_all_ptrs(
+        [this](const rclcpp::SubscriptionBase::SharedPtr & subscription) {
+          subscription_handles_.push_back(subscription->get_subscription_handle());
+        },
+        [this](const rclcpp::ServiceBase::SharedPtr & service) {
+          service_handles_.push_back(service->get_service_handle());
+        },
+        [this](const rclcpp::ClientBase::SharedPtr & client) {
+          client_handles_.push_back(client->get_client_handle());
+        },
+        [this](const rclcpp::TimerBase::SharedPtr & timer) {
+          timer_handles_.push_back(timer->get_timer_handle());
+        },
+        [this](const rclcpp::Waitable::SharedPtr & waitable) {
+          waitable_handles_.push_back(waitable);
+        });
     }
-    return has_invalid_weak_nodes;
+
+    return has_invalid_weak_groups_or_nodes;
   }
 
   void add_waitable_handle(const rclcpp::Waitable::SharedPtr & waitable) override
@@ -204,7 +194,7 @@ public:
 
   bool add_handles_to_wait_set(rcl_wait_set_t * wait_set) override
   {
-    for (auto subscription : subscription_handles_) {
+    for (const std::shared_ptr<const rcl_subscription_t> & subscription : subscription_handles_) {
       if (rcl_wait_set_add_subscription(wait_set, subscription.get(), NULL) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
@@ -213,7 +203,7 @@ public:
       }
     }
 
-    for (auto client : client_handles_) {
+    for (const std::shared_ptr<const rcl_client_t> & client : client_handles_) {
       if (rcl_wait_set_add_client(wait_set, client.get(), NULL) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
@@ -222,7 +212,7 @@ public:
       }
     }
 
-    for (auto service : service_handles_) {
+    for (const std::shared_ptr<const rcl_service_t> & service : service_handles_) {
       if (rcl_wait_set_add_service(wait_set, service.get(), NULL) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
@@ -231,7 +221,7 @@ public:
       }
     }
 
-    for (auto timer : timer_handles_) {
+    for (const std::shared_ptr<const rcl_timer_t> & timer : timer_handles_) {
       if (rcl_wait_set_add_timer(wait_set, timer.get(), NULL) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
@@ -241,22 +231,11 @@ public:
     }
 
     for (auto guard_condition : guard_conditions_) {
-      if (rcl_wait_set_add_guard_condition(wait_set, guard_condition, NULL) != RCL_RET_OK) {
-        RCUTILS_LOG_ERROR_NAMED(
-          "rclcpp",
-          "Couldn't add guard_condition to wait set: %s",
-          rcl_get_error_string().str);
-        return false;
-      }
+      detail::add_guard_condition_to_rcl_wait_set(*wait_set, *guard_condition);
     }
 
-    for (auto waitable : waitable_handles_) {
-      if (!waitable->add_to_wait_set(wait_set)) {
-        RCUTILS_LOG_ERROR_NAMED(
-          "rclcpp",
-          "Couldn't add waitable to wait set: %s", rcl_get_error_string().str);
-        return false;
-      }
+    for (const std::shared_ptr<Waitable> & waitable : waitable_handles_) {
+      waitable->add_to_wait_set(wait_set);
     }
     return true;
   }
@@ -264,14 +243,14 @@ public:
   void
   get_next_subscription(
     rclcpp::AnyExecutable & any_exec,
-    const WeakNodeList & weak_nodes) override
+    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
   {
     auto it = subscription_handles_.begin();
     while (it != subscription_handles_.end()) {
-      auto subscription = get_subscription_by_handle(*it, weak_nodes);
+      auto subscription = get_subscription_by_handle(*it, weak_groups_to_nodes);
       if (subscription) {
         // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_subscription(subscription, weak_nodes);
+        auto group = get_group_by_subscription(subscription, weak_groups_to_nodes);
         if (!group) {
           // Group was not found, meaning the subscription is not valid...
           // Remove it from the ready list and continue looking
@@ -287,7 +266,7 @@ public:
         // Otherwise it is safe to set and return the any_exec
         any_exec.subscription = subscription;
         any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_nodes);
+        any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
         subscription_handles_.erase(it);
         return;
       }
@@ -299,14 +278,14 @@ public:
   void
   get_next_service(
     rclcpp::AnyExecutable & any_exec,
-    const WeakNodeList & weak_nodes) override
+    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
   {
     auto it = service_handles_.begin();
     while (it != service_handles_.end()) {
-      auto service = get_service_by_handle(*it, weak_nodes);
+      auto service = get_service_by_handle(*it, weak_groups_to_nodes);
       if (service) {
         // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_service(service, weak_nodes);
+        auto group = get_group_by_service(service, weak_groups_to_nodes);
         if (!group) {
           // Group was not found, meaning the service is not valid...
           // Remove it from the ready list and continue looking
@@ -322,7 +301,7 @@ public:
         // Otherwise it is safe to set and return the any_exec
         any_exec.service = service;
         any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_nodes);
+        any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
         service_handles_.erase(it);
         return;
       }
@@ -332,14 +311,16 @@ public:
   }
 
   void
-  get_next_client(rclcpp::AnyExecutable & any_exec, const WeakNodeList & weak_nodes) override
+  get_next_client(
+    rclcpp::AnyExecutable & any_exec,
+    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
   {
     auto it = client_handles_.begin();
     while (it != client_handles_.end()) {
-      auto client = get_client_by_handle(*it, weak_nodes);
+      auto client = get_client_by_handle(*it, weak_groups_to_nodes);
       if (client) {
         // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_client(client, weak_nodes);
+        auto group = get_group_by_client(client, weak_groups_to_nodes);
         if (!group) {
           // Group was not found, meaning the service is not valid...
           // Remove it from the ready list and continue looking
@@ -355,7 +336,7 @@ public:
         // Otherwise it is safe to set and return the any_exec
         any_exec.client = client;
         any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_nodes);
+        any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
         client_handles_.erase(it);
         return;
       }
@@ -367,14 +348,14 @@ public:
   void
   get_next_timer(
     rclcpp::AnyExecutable & any_exec,
-    const WeakNodeList & weak_nodes) override
+    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
   {
     auto it = timer_handles_.begin();
     while (it != timer_handles_.end()) {
-      auto timer = get_timer_by_handle(*it, weak_nodes);
+      auto timer = get_timer_by_handle(*it, weak_groups_to_nodes);
       if (timer) {
         // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_timer(timer, weak_nodes);
+        auto group = get_group_by_timer(timer, weak_groups_to_nodes);
         if (!group) {
           // Group was not found, meaning the timer is not valid...
           // Remove it from the ready list and continue looking
@@ -387,31 +368,39 @@ public:
           ++it;
           continue;
         }
+        if (!timer->call()) {
+          // timer was cancelled, skip it.
+          ++it;
+          continue;
+        }
         // Otherwise it is safe to set and return the any_exec
         any_exec.timer = timer;
         any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_nodes);
+        any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
         timer_handles_.erase(it);
         return;
       }
-      // Else, the service is no longer valid, remove it and continue
+      // Else, the timer is no longer valid, remove it and continue
       it = timer_handles_.erase(it);
     }
   }
 
   void
-  get_next_waitable(rclcpp::AnyExecutable & any_exec, const WeakNodeList & weak_nodes) override
+  get_next_waitable(
+    rclcpp::AnyExecutable & any_exec,
+    const WeakCallbackGroupsToNodesMap & weak_groups_to_nodes) override
   {
-    auto it = waitable_handles_.begin();
-    while (it != waitable_handles_.end()) {
-      auto waitable = *it;
+    auto & waitable_handles = waitable_triggered_handles_;
+    auto it = waitable_handles.begin();
+    while (it != waitable_handles.end()) {
+      std::shared_ptr<Waitable> & waitable = *it;
       if (waitable) {
         // Find the group for this handle and see if it can be serviced
-        auto group = get_group_by_waitable(waitable, weak_nodes);
+        auto group = get_group_by_waitable(waitable, weak_groups_to_nodes);
         if (!group) {
           // Group was not found, meaning the waitable is not valid...
           // Remove it from the ready list and continue looking
-          it = waitable_handles_.erase(it);
+          it = waitable_handles.erase(it);
           continue;
         }
         if (!group->can_be_taken_from().load()) {
@@ -423,12 +412,12 @@ public:
         // Otherwise it is safe to set and return the any_exec
         any_exec.waitable = waitable;
         any_exec.callback_group = group;
-        any_exec.node_base = get_node_by_group(group, weak_nodes);
-        waitable_handles_.erase(it);
+        any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
+        waitable_handles.erase(it);
         return;
       }
       // Else, the waitable is no longer valid, remove it and continue
-      it = waitable_handles_.erase(it);
+      it = waitable_handles.erase(it);
     }
   }
 
@@ -440,7 +429,7 @@ public:
   size_t number_of_ready_subscriptions() const override
   {
     size_t number_of_subscriptions = subscription_handles_.size();
-    for (auto waitable : waitable_handles_) {
+    for (const std::shared_ptr<Waitable> & waitable : waitable_handles_) {
       number_of_subscriptions += waitable->get_number_of_ready_subscriptions();
     }
     return number_of_subscriptions;
@@ -449,7 +438,7 @@ public:
   size_t number_of_ready_services() const override
   {
     size_t number_of_services = service_handles_.size();
-    for (auto waitable : waitable_handles_) {
+    for (const std::shared_ptr<Waitable> & waitable : waitable_handles_) {
       number_of_services += waitable->get_number_of_ready_services();
     }
     return number_of_services;
@@ -458,7 +447,7 @@ public:
   size_t number_of_ready_events() const override
   {
     size_t number_of_events = 0;
-    for (auto waitable : waitable_handles_) {
+    for (const std::shared_ptr<Waitable> & waitable : waitable_handles_) {
       number_of_events += waitable->get_number_of_ready_events();
     }
     return number_of_events;
@@ -467,7 +456,7 @@ public:
   size_t number_of_ready_clients() const override
   {
     size_t number_of_clients = client_handles_.size();
-    for (auto waitable : waitable_handles_) {
+    for (const std::shared_ptr<Waitable> & waitable : waitable_handles_) {
       number_of_clients += waitable->get_number_of_ready_clients();
     }
     return number_of_clients;
@@ -476,7 +465,7 @@ public:
   size_t number_of_guard_conditions() const override
   {
     size_t number_of_guard_conditions = guard_conditions_.size();
-    for (auto waitable : waitable_handles_) {
+    for (const std::shared_ptr<Waitable> & waitable : waitable_handles_) {
       number_of_guard_conditions += waitable->get_number_of_ready_guard_conditions();
     }
     return number_of_guard_conditions;
@@ -485,7 +474,7 @@ public:
   size_t number_of_ready_timers() const override
   {
     size_t number_of_timers = timer_handles_.size();
-    for (auto waitable : waitable_handles_) {
+    for (const std::shared_ptr<Waitable> & waitable : waitable_handles_) {
       number_of_timers += waitable->get_number_of_ready_timers();
     }
     return number_of_timers;
@@ -501,13 +490,15 @@ private:
   using VectorRebind =
     std::vector<T, typename std::allocator_traits<Alloc>::template rebind_alloc<T>>;
 
-  VectorRebind<const rcl_guard_condition_t *> guard_conditions_;
+  VectorRebind<const rclcpp::GuardCondition *> guard_conditions_;
 
   VectorRebind<std::shared_ptr<const rcl_subscription_t>> subscription_handles_;
   VectorRebind<std::shared_ptr<const rcl_service_t>> service_handles_;
   VectorRebind<std::shared_ptr<const rcl_client_t>> client_handles_;
   VectorRebind<std::shared_ptr<const rcl_timer_t>> timer_handles_;
   VectorRebind<std::shared_ptr<Waitable>> waitable_handles_;
+
+  VectorRebind<std::shared_ptr<Waitable>> waitable_triggered_handles_;
 
   std::shared_ptr<VoidAlloc> allocator_;
 };

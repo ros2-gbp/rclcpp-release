@@ -15,10 +15,6 @@
 #ifndef RCLCPP__EXPERIMENTAL__BUFFERS__RING_BUFFER_IMPLEMENTATION_HPP_
 #define RCLCPP__EXPERIMENTAL__BUFFERS__RING_BUFFER_IMPLEMENTATION_HPP_
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <utility>
@@ -29,6 +25,7 @@
 #include "rclcpp/logging.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/visibility_control.hpp"
+#include "tracetools/tracetools.h"
 
 namespace rclcpp
 {
@@ -37,6 +34,10 @@ namespace experimental
 namespace buffers
 {
 
+/// Store elements in a fixed-size, FIFO buffer
+/**
+ * All public member functions are thread-safe.
+ */
 template<typename BufferT>
 class RingBufferImplementation : public BufferImplementationBase<BufferT>
 {
@@ -51,59 +52,166 @@ public:
     if (capacity == 0) {
       throw std::invalid_argument("capacity must be a positive, non-zero value");
     }
+    TRACEPOINT(rclcpp_construct_ring_buffer, static_cast<const void *>(this), capacity_);
   }
 
   virtual ~RingBufferImplementation() {}
 
+  /// Add a new element to store in the ring buffer
+  /**
+   * This member function is thread-safe.
+   *
+   * \param request the element to be stored in the ring buffer
+   */
   void enqueue(BufferT request)
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    write_index_ = next(write_index_);
+    write_index_ = next_(write_index_);
     ring_buffer_[write_index_] = std::move(request);
+    TRACEPOINT(
+      rclcpp_ring_buffer_enqueue,
+      static_cast<const void *>(this),
+      write_index_,
+      size_ + 1,
+      is_full_());
 
-    if (is_full()) {
-      read_index_ = next(read_index_);
+    if (is_full_()) {
+      read_index_ = next_(read_index_);
     } else {
       size_++;
     }
   }
 
+  /// Remove the oldest element from ring buffer
+  /**
+   * This member function is thread-safe.
+   *
+   * \return the element that is being removed from the ring buffer
+   */
   BufferT dequeue()
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (!has_data()) {
-      RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Calling dequeue on empty intra-process buffer");
-      throw std::runtime_error("Calling dequeue on empty intra-process buffer");
+    if (!has_data_()) {
+      return BufferT();
     }
 
     auto request = std::move(ring_buffer_[read_index_]);
-    read_index_ = next(read_index_);
+    TRACEPOINT(
+      rclcpp_ring_buffer_dequeue,
+      static_cast<const void *>(this),
+      read_index_,
+      size_ - 1);
+    read_index_ = next_(read_index_);
 
     size_--;
 
     return request;
   }
 
+  /// Get the next index value for the ring buffer
+  /**
+   * This member function is thread-safe.
+   *
+   * \param val the current index value
+   * \return the next index value
+   */
   inline size_t next(size_t val)
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return next_(val);
+  }
+
+  /// Get if the ring buffer has at least one element stored
+  /**
+   * This member function is thread-safe.
+   *
+   * \return `true` if there is data and `false` otherwise
+   */
+  inline bool has_data() const
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return has_data_();
+  }
+
+  /// Get if the size of the buffer is equal to its capacity
+  /**
+   * This member function is thread-safe.
+   *
+   * \return `true` if the size of the buffer is equal is capacity
+   * and `false` otherwise
+   */
+  inline bool is_full() const
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return is_full_();
+  }
+
+  /// Get the remaining capacity to store messages
+  /**
+   * This member function is thread-safe.
+   *
+   * \return the number of free capacity for new messages
+   */
+  size_t available_capacity() const
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return available_capacity_();
+  }
+
+  void clear()
+  {
+    TRACEPOINT(rclcpp_ring_buffer_clear, static_cast<const void *>(this));
+  }
+
+private:
+  /// Get the next index value for the ring buffer
+  /**
+   * This member function is not thread-safe.
+   *
+   * \param val the current index value
+   * \return the next index value
+   */
+  inline size_t next_(size_t val)
   {
     return (val + 1) % capacity_;
   }
 
-  inline bool has_data() const
+  /// Get if the ring buffer has at least one element stored
+  /**
+   * This member function is not thread-safe.
+   *
+   * \return `true` if there is data and `false` otherwise
+   */
+  inline bool has_data_() const
   {
     return size_ != 0;
   }
 
-  inline bool is_full()
+  /// Get if the size of the buffer is equal to its capacity
+  /**
+   * This member function is not thread-safe.
+   *
+   * \return `true` if the size of the buffer is equal is capacity
+   * and `false` otherwise
+   */
+  inline bool is_full_() const
   {
     return size_ == capacity_;
   }
 
-  void clear() {}
+  /// Get the remaining capacity to store messages
+  /**
+   * This member function is not thread-safe.
+   *
+   * \return the number of free capacity for new messages
+   */
+  inline size_t available_capacity_() const
+  {
+    return capacity_ - size_;
+  }
 
-private:
   size_t capacity_;
 
   std::vector<BufferT> ring_buffer_;
@@ -112,7 +220,7 @@ private:
   size_t read_index_;
   size_t size_;
 
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
 };
 
 }  // namespace buffers
