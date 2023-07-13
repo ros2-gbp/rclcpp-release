@@ -3,23 +3,10 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-22.0.0 (2023-07-11)
--------------------
-* Implement get_node_type_descriptions_interface for lifecyclenode and add smoke test for it (`#2237 <https://github.com/ros2/rclcpp/issues/2237>`_)
-* Switch lifecycle to use the RCLCPP macros. (`#2233 <https://github.com/ros2/rclcpp/issues/2233>`_)
-* Add new node interface TypeDescriptionsInterface to provide GetTypeDescription service (`#2224 <https://github.com/ros2/rclcpp/issues/2224>`_)
-* Contributors: Chris Lalancette, Emerson Knapp
-
-21.3.0 (2023-06-12)
+21.0.2 (2023-07-14)
 -------------------
 
-21.2.0 (2023-06-07)
--------------------
-
-21.1.1 (2023-05-11)
--------------------
-
-21.1.0 (2023-04-27)
+21.0.1 (2023-05-11)
 -------------------
 
 21.0.0 (2023-04-18)

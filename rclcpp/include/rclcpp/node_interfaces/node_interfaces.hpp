@@ -30,7 +30,6 @@
   rclcpp::node_interfaces::NodeTimeSourceInterface, \
   rclcpp::node_interfaces::NodeTimersInterface, \
   rclcpp::node_interfaces::NodeTopicsInterface, \
-  rclcpp::node_interfaces::NodeTypeDescriptionsInterface, \
   rclcpp::node_interfaces::NodeWaitablesInterface
 
 
@@ -119,7 +118,6 @@ public:
    *   - rclcpp::node_interfaces::NodeTimeSourceInterface
    *   - rclcpp::node_interfaces::NodeTimersInterface
    *   - rclcpp::node_interfaces::NodeTopicsInterface
-   *   - rclcpp::node_interfaces::NodeTypeDescriptionsInterface
    *   - rclcpp::node_interfaces::NodeWaitablesInterface
    *
    * Or you use custom interfaces as long as you make a template specialization
