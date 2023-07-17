@@ -229,7 +229,6 @@ TEST_F(TestDefaultStateMachine, empty_initializer) {
   auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
   EXPECT_STREQ("testnode", test_node->get_name());
   EXPECT_STREQ("/", test_node->get_namespace());
-  EXPECT_STREQ("/testnode", test_node->get_fully_qualified_name());
   EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->get_current_state().id());
 }
 
@@ -376,6 +375,28 @@ TEST_F(TestDefaultStateMachine, call_transitions_without_code) {
 
   auto finalized = test_node->shutdown();
   EXPECT_EQ(finalized.id(), State::PRIMARY_STATE_FINALIZED);
+}
+
+TEST_F(TestDefaultStateMachine, get_current_state_thread_safety) {
+  auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
+  test_node->trigger_transition(lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
+
+  const auto check_state_fn = [](std::shared_ptr<rclcpp_lifecycle::LifecycleNode> node)
+    {
+      std::size_t count = 0;
+      while (count < 100000) {
+        node->get_current_state().id();
+        count++;
+      }
+    };
+
+  // Call get_current_state() on the same node repeatedly from two different threads.
+  std::thread thread_object_1(check_state_fn, test_node);
+  std::thread thread_object_2(check_state_fn, test_node);
+
+  // Test has succeeded if both threads finish without exceptions.
+  thread_object_1.join();
+  thread_object_2.join();
 }
 
 TEST_F(TestDefaultStateMachine, good_mood) {

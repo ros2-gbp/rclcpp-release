@@ -114,6 +114,7 @@ def get_rclcpp_suffix_from_features(features):
 @[ end for]@
 @[ if 'stream' not in feature_combination]@
  * \param ... The format string, followed by the variable arguments for the format string.
+ * It also accepts a single argument of type std::string.
 @[ end if]@
  */
 @{params = rclcpp_feature_combinations[feature_combination].params.keys()}@
@@ -124,7 +125,7 @@ def get_rclcpp_suffix_from_features(features):
 ) \
   do { \
     static_assert( \
-      ::std::is_same<typename std::remove_cv_t<typename std::remove_reference_t<decltype(logger)>>, \
+      ::std::is_same<typename std::remove_cv<typename std::remove_reference<decltype(logger)>::type>::type, \
       typename ::rclcpp::Logger>::value, \
       "First argument to logging macros must be an rclcpp::Logger"); \
 @[ if 'throttle' in feature_combination]@ \
