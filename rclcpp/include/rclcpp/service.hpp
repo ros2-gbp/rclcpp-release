@@ -265,15 +265,19 @@ protected:
 
   std::shared_ptr<rcl_node_t> node_handle_;
 
+  std::recursive_mutex callback_mutex_;
+  // It is important to declare on_new_request_callback_ before
+  // service_handle_, so on destruction the service is
+  // destroyed first. Otherwise, the rmw service callback
+  // would point briefly to a destroyed function.
+  std::function<void(size_t)> on_new_request_callback_{nullptr};
+  // Declare service_handle_ after callback
   std::shared_ptr<rcl_service_t> service_handle_;
   bool owns_rcl_handle_ = true;
 
   rclcpp::Logger node_logger_;
 
   std::atomic<bool> in_use_by_wait_set_{false};
-
-  std::recursive_mutex callback_mutex_;
-  std::function<void(size_t)> on_new_request_callback_{nullptr};
 };
 
 template<typename ServiceT>
@@ -348,7 +352,7 @@ public:
 
       rclcpp::exceptions::throw_from_rcl_error(ret, "could not create service");
     }
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_service_callback_added,
       static_cast<const void *>(get_service_handle().get()),
       static_cast<const void *>(&any_callback_));
@@ -383,7 +387,7 @@ public:
     }
 
     service_handle_ = service_handle;
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_service_callback_added,
       static_cast<const void *>(get_service_handle().get()),
       static_cast<const void *>(&any_callback_));
@@ -420,7 +424,7 @@ public:
     // In this case, rcl owns the service handle memory
     service_handle_ = std::shared_ptr<rcl_service_t>(new rcl_service_t);
     service_handle_->impl = service_handle->impl;
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_service_callback_added,
       static_cast<const void *>(get_service_handle().get()),
       static_cast<const void *>(&any_callback_));

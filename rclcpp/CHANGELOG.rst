@@ -2,22 +2,73 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-21.0.3 (2023-09-08)
+23.0.0 (2023-09-08)
 -------------------
-* Do not crash Executor when send_response fails due to client failure. (`#2279 <https://github.com/ros2/rclcpp/issues/2279>`_)
-* Add new node interface TypeDescriptionsInterface to provide GetTypeDescription service (`#2236 <https://github.com/ros2/rclcpp/issues/2236>`_)
-* Contributors: Emerson Knapp, Tomoya Fujita, Zang MingJie
+* Fix the return type of Rate::period. (`#2301 <https://github.com/ros2/rclcpp/issues/2301>`_)
+* Update API docs links in package READMEs (`#2302 <https://github.com/ros2/rclcpp/issues/2302>`_)
+* Cleanup flaky timers_manager tests. (`#2299 <https://github.com/ros2/rclcpp/issues/2299>`_)
+* Contributors: Chris Lalancette, Christophe Bedard
 
-21.0.2 (2023-07-14)
+22.2.0 (2023-09-07)
 -------------------
-* Fix warnings related to comparison of integer expressions of different signedness (`#2222 <https://github.com/ros2/rclcpp/issues/2222>`_)
-* Fix race condition in events-executor (`#2191 <https://github.com/ros2/rclcpp/issues/2191>`_)
-* Contributors: Alberto Soragna, Tomoya Fujita
+* Topic correct typeadapter deduction (`#2294 <https://github.com/ros2/rclcpp/issues/2294>`_)
+* Fix C++20 allocator construct deprecation (`#2292 <https://github.com/ros2/rclcpp/issues/2292>`_)
+* Make Rate to select the clock to work with (`#2123 <https://github.com/ros2/rclcpp/issues/2123>`_)
+* Correct the position of a comment. (`#2290 <https://github.com/ros2/rclcpp/issues/2290>`_)
+* Remove unnecessary lambda captures in the tests. (`#2289 <https://github.com/ros2/rclcpp/issues/2289>`_)
+* Add rcl_logging_interface as an explicit dependency. (`#2284 <https://github.com/ros2/rclcpp/issues/2284>`_)
+* Revamp list_parameters to be more efficient and easier to read. (`#2282 <https://github.com/ros2/rclcpp/issues/2282>`_)
+* Contributors: AiVerisimilitude, Alexey Merzlyakov, Chen Lihui, Chris Lalancette, Jiaqi Li
 
-21.0.1 (2023-05-11)
+22.1.0 (2023-08-21)
 -------------------
-* Fix delivered message kind (`#2175 <https://github.com/ros2/rclcpp/issues/2175>`_) (`#2178 <https://github.com/ros2/rclcpp/issues/2178>`_)
-* Contributors: mergify[bot]
+* Do not crash Executor when send_response fails due to client failure. (`#2276 <https://github.com/ros2/rclcpp/issues/2276>`_)
+* Adding Custom Unknown Type Error (`#2272 <https://github.com/ros2/rclcpp/issues/2272>`_)
+* Add a pimpl inside rclcpp::Node for future distro backports (`#2228 <https://github.com/ros2/rclcpp/issues/2228>`_)
+* Remove an unused variable from the events executor tests. (`#2270 <https://github.com/ros2/rclcpp/issues/2270>`_)
+* Add spin_all shortcut (`#2246 <https://github.com/ros2/rclcpp/issues/2246>`_)
+* Adding Missing Group Exceptions (`#2256 <https://github.com/ros2/rclcpp/issues/2256>`_)
+* Change associated clocks storage to unordered_set (`#2257 <https://github.com/ros2/rclcpp/issues/2257>`_)
+* associated clocks should be protected by mutex. (`#2255 <https://github.com/ros2/rclcpp/issues/2255>`_)
+* Instrument loaned message publication code path (`#2240 <https://github.com/ros2/rclcpp/issues/2240>`_)
+* Contributors: Chris Lalancette, Christophe Bedard, Emerson Knapp, Luca Della Vedova, Lucas Wendland, Tomoya Fujita, Tony Najjar
+
+22.0.0 (2023-07-11)
+-------------------
+* Implement get_node_type_descriptions_interface for lifecyclenode and add smoke test for it (`#2237 <https://github.com/ros2/rclcpp/issues/2237>`_)
+* Add new node interface TypeDescriptionsInterface to provide GetTypeDescription service (`#2224 <https://github.com/ros2/rclcpp/issues/2224>`_)
+* Move always_false_v to detail namespace (`#2232 <https://github.com/ros2/rclcpp/issues/2232>`_)
+* Revamp the test_subscription.cpp tests. (`#2227 <https://github.com/ros2/rclcpp/issues/2227>`_)
+* warning: comparison of integer expressions of different signedness (`#2219 <https://github.com/ros2/rclcpp/issues/2219>`_)
+* Modifies timers API to select autostart state (`#2005 <https://github.com/ros2/rclcpp/issues/2005>`_)
+* Enable callback group tests for connextdds (`#2182 <https://github.com/ros2/rclcpp/issues/2182>`_)
+* Contributors: Chris Lalancette, Christopher Wecht, Eloy Briceno, Emerson Knapp, Nathan Wiebe Neufeldt, Tomoya Fujita
+
+21.3.0 (2023-06-12)
+-------------------
+* Fix up misspellings of "receive". (`#2208 <https://github.com/ros2/rclcpp/issues/2208>`_)
+* Remove flaky stressAddRemoveNode test (`#2206 <https://github.com/ros2/rclcpp/issues/2206>`_)
+* Use TRACETOOLS\_ prefix for tracepoint-related macros (`#2162 <https://github.com/ros2/rclcpp/issues/2162>`_)
+* Contributors: Chris Lalancette, Christophe Bedard, Michael Carroll
+
+21.2.0 (2023-06-07)
+-------------------
+* remove nolint since ament_cpplint updated for the c++17 header (`#2198 <https://github.com/ros2/rclcpp/issues/2198>`_)
+* Feature/available capacity of ipm (`#2173 <https://github.com/ros2/rclcpp/issues/2173>`_)
+* add mutex to protect events_executor current entity collection (`#2187 <https://github.com/ros2/rclcpp/issues/2187>`_)
+* Declare rclcpp callbacks before the rcl entities (`#2024 <https://github.com/ros2/rclcpp/issues/2024>`_)
+* Contributors: Alberto Soragna, Chen Lihui, DensoADAS, mauropasse
+
+21.1.1 (2023-05-11)
+-------------------
+* Fix race condition in events-executor (`#2177 <https://github.com/ros2/rclcpp/issues/2177>`_)
+* Add missing stdexcept include (`#2186 <https://github.com/ros2/rclcpp/issues/2186>`_)
+* Fix a format-security warning when building with clang (`#2171 <https://github.com/ros2/rclcpp/issues/2171>`_)
+* Fix delivered message kind (`#2175 <https://github.com/ros2/rclcpp/issues/2175>`_)
+* Contributors: Alberto Soragna, Chris Lalancette, methylDragon, Øystein Sture
+
+21.1.0 (2023-04-27)
+-------------------
 
 21.0.0 (2023-04-18)
 -------------------
