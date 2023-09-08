@@ -99,6 +99,13 @@ TYPED_TEST_SUITE(TestAddCallbackGroupsToExecutorStable, StandardExecutors, Execu
 TYPED_TEST(TestAddCallbackGroupsToExecutor, add_callback_groups)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
 
   auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
   auto timer_callback = []() {};
@@ -148,6 +155,13 @@ TYPED_TEST(TestAddCallbackGroupsToExecutor, add_callback_groups)
 TYPED_TEST(TestAddCallbackGroupsToExecutor, remove_callback_groups)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
 
   auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
   auto timer_callback = []() {};
@@ -179,6 +193,13 @@ TYPED_TEST(TestAddCallbackGroupsToExecutor, remove_callback_groups)
 TYPED_TEST(TestAddCallbackGroupsToExecutor, add_duplicate_callback_groups)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
 
   ExecutorType executor;
   auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
@@ -199,6 +220,13 @@ TYPED_TEST(TestAddCallbackGroupsToExecutor, add_duplicate_callback_groups)
 TYPED_TEST(TestAddCallbackGroupsToExecutor, add_callback_groups_after_add_node_to_executor)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
 
   ExecutorType executor;
   auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
@@ -235,6 +263,13 @@ TYPED_TEST(TestAddCallbackGroupsToExecutor, add_callback_groups_after_add_node_t
 TYPED_TEST(TestAddCallbackGroupsToExecutor, add_unallowable_callback_groups)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
 
   ExecutorType executor;
   auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
@@ -272,6 +307,13 @@ TYPED_TEST(TestAddCallbackGroupsToExecutor, add_unallowable_callback_groups)
 TYPED_TEST(TestAddCallbackGroupsToExecutor, one_node_many_callback_groups_many_executors)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
 
   ExecutorType timer_executor;
   ExecutorType sub_executor;
@@ -313,6 +355,13 @@ TYPED_TEST(TestAddCallbackGroupsToExecutor, one_node_many_callback_groups_many_e
 TYPED_TEST(TestAddCallbackGroupsToExecutorStable, subscriber_triggered_to_receive_message)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
 
   auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
 
@@ -379,6 +428,13 @@ TYPED_TEST(TestAddCallbackGroupsToExecutorStable, subscriber_triggered_to_receiv
 TYPED_TEST(TestAddCallbackGroupsToExecutorStable, callback_group_create_after_spin)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
 
   auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");
 
@@ -425,6 +481,13 @@ TYPED_TEST(TestAddCallbackGroupsToExecutorStable, callback_group_create_after_sp
 TYPED_TEST(TestAddCallbackGroupsToExecutor, remove_callback_group)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
 
   ExecutorType executor;
   auto node = std::make_shared<rclcpp::Node>("my_node", "/ns");

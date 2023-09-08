@@ -228,8 +228,7 @@ protected:
 BENCHMARK_F(BenchmarkLifecycleClient, get_state)(benchmark::State & state) {
   for (auto _ : state) {
     (void)_;
-
-    lifecycle_msgs::msg::State lifecycle_state = lifecycle_client->get_state();
+    const auto lifecycle_state = lifecycle_client->get_state();
     if (lifecycle_state.id != lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED) {
       const std::string msg =
         std::string("Expected state did not match actual: ") +
@@ -269,7 +268,7 @@ BENCHMARK_F(BenchmarkLifecycleClient, get_available_states)(benchmark::State & s
   for (auto _ : state) {
     (void)_;
     constexpr size_t expected_states = 11u;
-    std::vector<lifecycle_msgs::msg::State> states = lifecycle_client->get_available_states();
+    const auto states = lifecycle_client->get_available_states();
     if (states.size() != expected_states) {
       const std::string msg =
         std::string("Expected number of states did not match actual: ") +
@@ -285,8 +284,7 @@ BENCHMARK_F(BenchmarkLifecycleClient, get_available_transitions)(benchmark::Stat
   for (auto _ : state) {
     (void)_;
     constexpr size_t expected_transitions = 2u;
-    std::vector<lifecycle_msgs::msg::TransitionDescription> transitions =
-      lifecycle_client->get_available_transitions();
+    const auto transitions = lifecycle_client->get_available_transitions();
     if (transitions.size() != expected_transitions) {
       const std::string msg =
         std::string("Expected number of transitions did not match actual: ") +
@@ -302,8 +300,7 @@ BENCHMARK_F(BenchmarkLifecycleClient, get_transition_graph)(benchmark::State & s
   for (auto _ : state) {
     (void)_;
     constexpr size_t expected_transitions = 25u;
-    std::vector<lifecycle_msgs::msg::TransitionDescription> transitions =
-      lifecycle_client->get_transition_graph();
+    const auto transitions = lifecycle_client->get_transition_graph();
     if (transitions.size() != expected_transitions) {
       const std::string msg =
         std::string("Expected number of transitions did not match actual: ") +

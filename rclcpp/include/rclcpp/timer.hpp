@@ -53,17 +53,12 @@ public:
    * \param clock A clock to use for time and sleeping
    * \param period The interval at which the timer fires
    * \param context node context
-   * \param autostart timer state on initialization
-   *
-   * In order to activate a timer that is not started on initialization,
-   * user should call the reset() method.
    */
   RCLCPP_PUBLIC
   explicit TimerBase(
     Clock::SharedPtr clock,
     std::chrono::nanoseconds period,
-    rclcpp::Context::SharedPtr context,
-    bool autostart = true);
+    rclcpp::Context::SharedPtr context);
 
   /// TimerBase destructor
   RCLCPP_PUBLIC
@@ -221,22 +216,21 @@ public:
    * \param[in] period The interval at which the timer fires.
    * \param[in] callback User-specified callback function.
    * \param[in] context custom context to be used.
-   * \param autostart timer state on initialization
    */
   explicit GenericTimer(
     Clock::SharedPtr clock, std::chrono::nanoseconds period, FunctorT && callback,
-    rclcpp::Context::SharedPtr context, bool autostart = true
+    rclcpp::Context::SharedPtr context
   )
-  : TimerBase(clock, period, context, autostart), callback_(std::forward<FunctorT>(callback))
+  : TimerBase(clock, period, context), callback_(std::forward<FunctorT>(callback))
   {
-    TRACETOOLS_TRACEPOINT(
+    TRACEPOINT(
       rclcpp_timer_callback_added,
       static_cast<const void *>(get_timer_handle().get()),
       reinterpret_cast<const void *>(&callback_));
 #ifndef TRACETOOLS_DISABLED
-    if (TRACETOOLS_TRACEPOINT_ENABLED(rclcpp_callback_register)) {
+    if (TRACEPOINT_ENABLED(rclcpp_callback_register)) {
       char * symbol = tracetools::get_symbol(callback_);
-      TRACETOOLS_DO_TRACEPOINT(
+      DO_TRACEPOINT(
         rclcpp_callback_register,
         reinterpret_cast<const void *>(&callback_),
         symbol);
@@ -275,9 +269,9 @@ public:
   void
   execute_callback() override
   {
-    TRACETOOLS_TRACEPOINT(callback_start, reinterpret_cast<const void *>(&callback_), false);
+    TRACEPOINT(callback_start, reinterpret_cast<const void *>(&callback_), false);
     execute_callback_delegate<>();
-    TRACETOOLS_TRACEPOINT(callback_end, reinterpret_cast<const void *>(&callback_));
+    TRACEPOINT(callback_end, reinterpret_cast<const void *>(&callback_));
   }
 
   // void specialization
@@ -336,15 +330,13 @@ public:
    * \param period The interval at which the timer fires
    * \param callback The callback function to execute every interval
    * \param context node context
-   * \param autostart timer state on initialization
    */
   WallTimer(
     std::chrono::nanoseconds period,
     FunctorT && callback,
-    rclcpp::Context::SharedPtr context,
-    bool autostart = true)
+    rclcpp::Context::SharedPtr context)
   : GenericTimer<FunctorT>(
-      std::make_shared<Clock>(RCL_STEADY_TIME), period, std::move(callback), context, autostart)
+      std::make_shared<Clock>(RCL_STEADY_TIME), period, std::move(callback), context)
   {}
 
 protected:

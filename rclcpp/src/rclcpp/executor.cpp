@@ -431,22 +431,6 @@ void Executor::spin_some(std::chrono::nanoseconds max_duration)
   return this->spin_some_impl(max_duration, false);
 }
 
-void
-Executor::spin_node_all(
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node,
-  std::chrono::nanoseconds max_duration)
-{
-  this->add_node(node, false);
-  spin_all(max_duration);
-  this->remove_node(node, false);
-}
-
-void
-Executor::spin_node_all(std::shared_ptr<rclcpp::Node> node, std::chrono::nanoseconds max_duration)
-{
-  this->spin_node_all(node->get_node_base_interface(), max_duration);
-}
-
 void Executor::spin_all(std::chrono::nanoseconds max_duration)
 {
   if (max_duration < 0ns) {
@@ -541,13 +525,13 @@ Executor::execute_any_executable(AnyExecutable & any_exec)
     return;
   }
   if (any_exec.timer) {
-    TRACETOOLS_TRACEPOINT(
+    TRACEPOINT(
       rclcpp_executor_execute,
       static_cast<const void *>(any_exec.timer->get_timer_handle().get()));
     execute_timer(any_exec.timer);
   }
   if (any_exec.subscription) {
-    TRACETOOLS_TRACEPOINT(
+    TRACEPOINT(
       rclcpp_executor_execute,
       static_cast<const void *>(any_exec.subscription->get_subscription_handle().get()));
     execute_subscription(any_exec.subscription);
@@ -742,7 +726,7 @@ Executor::execute_client(
 void
 Executor::wait_for_work(std::chrono::nanoseconds timeout)
 {
-  TRACETOOLS_TRACEPOINT(rclcpp_executor_wait_for_work, timeout.count());
+  TRACEPOINT(rclcpp_executor_wait_for_work, timeout.count());
   {
     std::lock_guard<std::mutex> guard(mutex_);
 
@@ -898,7 +882,7 @@ Executor::get_next_ready_executable_from_map(
   const rclcpp::memory_strategy::MemoryStrategy::WeakCallbackGroupsToNodesMap &
   weak_groups_to_nodes)
 {
-  TRACETOOLS_TRACEPOINT(rclcpp_executor_get_next_ready);
+  TRACEPOINT(rclcpp_executor_get_next_ready);
   bool success = false;
   std::lock_guard<std::mutex> guard{mutex_};
   // Check the timers to see if there are any that are ready

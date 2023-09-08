@@ -1094,7 +1094,6 @@ private:
   rclcpp::node_interfaces::NodeClockInterface::SharedPtr node_clock_;
   rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters_;
   rclcpp::node_interfaces::NodeTimeSourceInterface::SharedPtr node_time_source_;
-  rclcpp::node_interfaces::NodeTypeDescriptionsInterface::SharedPtr node_type_descriptions_;
   rclcpp::node_interfaces::NodeWaitablesInterface::SharedPtr node_waitables_;
 
   const rclcpp::NodeOptions node_options_;

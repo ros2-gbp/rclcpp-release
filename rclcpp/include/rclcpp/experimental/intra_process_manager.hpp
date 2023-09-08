@@ -306,11 +306,6 @@ public:
   rclcpp::experimental::SubscriptionIntraProcessBase::SharedPtr
   get_subscription_intra_process(uint64_t intra_process_subscription_id);
 
-  /// Return the lowest available capacity for all subscription buffers for a publisher id.
-  RCLCPP_PUBLIC
-  size_t
-  lowest_available_capacity(const uint64_t intra_process_publisher_id) const;
-
 private:
   struct SplittedSubscriptions
   {
@@ -486,13 +481,13 @@ private:
                 "subscription use different allocator types, which is not supported");
       }
 
-      if constexpr (rclcpp::TypeAdapter<MessageT, ROSMessageType>::is_specialized::value) {
+      if constexpr (rclcpp::TypeAdapter<MessageT>::is_specialized::value) {
         ROSMessageTypeAllocator ros_message_alloc(allocator);
-        auto ptr = ROSMessageTypeAllocatorTraits::allocate(ros_message_alloc, 1);
-        ROSMessageTypeAllocatorTraits::construct(ros_message_alloc, ptr);
+        auto ptr = ros_message_alloc.allocate(1);
+        ros_message_alloc.construct(ptr);
         ROSMessageTypeDeleter deleter;
         allocator::set_allocator_for_deleter(&deleter, &allocator);
-        rclcpp::TypeAdapter<MessageT, ROSMessageType>::convert_to_ros_message(*message, *ptr);
+        rclcpp::TypeAdapter<MessageT>::convert_to_ros_message(*message, *ptr);
         auto ros_msg = std::unique_ptr<ROSMessageType, ROSMessageTypeDeleter>(ptr, deleter);
         ros_message_subscription->provide_intra_process_message(std::move(ros_msg));
       } else {

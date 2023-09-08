@@ -233,15 +233,13 @@ public:
    * \param[in] period Time interval between triggers of the callback.
    * \param[in] callback User-defined callback function.
    * \param[in] group Callback group to execute this timer's callback in.
-   * \param[in] autostart The state of the clock on initialization.
    */
   template<typename DurationRepT = int64_t, typename DurationT = std::milli, typename CallbackT>
   typename rclcpp::WallTimer<CallbackT>::SharedPtr
   create_wall_timer(
     std::chrono::duration<DurationRepT, DurationT> period,
     CallbackT callback,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr,
-    bool autostart = true);
+    rclcpp::CallbackGroup::SharedPtr group = nullptr);
 
   /// Create a timer that uses the node clock to drive the callback.
   /**
@@ -1594,18 +1592,16 @@ private:
   rclcpp::node_interfaces::NodeClockInterface::SharedPtr node_clock_;
   rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters_;
   rclcpp::node_interfaces::NodeTimeSourceInterface::SharedPtr node_time_source_;
-  rclcpp::node_interfaces::NodeTypeDescriptionsInterface::SharedPtr node_type_descriptions_;
   rclcpp::node_interfaces::NodeWaitablesInterface::SharedPtr node_waitables_;
 
   const rclcpp::NodeOptions node_options_;
   const std::string sub_namespace_;
   const std::string effective_namespace_;
 
-  class NodeImpl;
-  // This member is meant to be a place to backport features into stable distributions,
-  // and new features targeting Rolling should not use this.
-  // See the comment in node.cpp for more information.
-  std::shared_ptr<NodeImpl> hidden_impl_{nullptr};
+  /// Static map(s) containing extra member variables for Node without changing its ABI.
+  // See node.cpp for more details.
+  class BackportMembers;
+  static BackportMembers backport_members_;
 };
 
 }  // namespace rclcpp
