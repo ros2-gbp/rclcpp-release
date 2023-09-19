@@ -2,17 +2,13 @@
 <?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="2">
   <name>rclcpp</name>
-  <version>23.0.0</version>
+  <version>16.0.6</version>
   <description>The ROS client library in C++.</description>
-
   <maintainer email="ivanpauno@ekumenlabs.com">Ivan Paunovic</maintainer>
-  <maintainer email="michel@ekumenlabs.com">Michel Hidalgo</maintainer>
+  <maintainer email="jacob@openrobotics.org">Jacob Perron</maintainer>
   <maintainer email="william@openrobotics.org">William Woodall</maintainer>
-
   <license>Apache License 2.0</license>
-
   <author email="dthomas@openrobotics.org">Dirk Thomas</author>
-  <author email="jacob@openrobotics.org">Jacob Perron</author>
 
   <buildtool_depend>ament_cmake_ros</buildtool_depend>
   <buildtool_depend>ament_cmake_gen_version_h</buildtool_depend>
@@ -35,12 +31,10 @@
 
   <depend>libstatistics_collector</depend>
   <depend>rcl</depend>
-  <depend>rcl_logging_interface</depend>
   <depend>rcl_yaml_param_parser</depend>
   <depend>rcpputils</depend>
   <depend>rcutils</depend>
   <depend>rmw</depend>
-  <depend>rosidl_dynamic_typesupport</depend>
   <depend>statistics_msgs</depend>
   <depend>tracetools</depend>
 

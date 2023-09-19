@@ -14,7 +14,6 @@
 
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -38,8 +37,7 @@ class ClocksState final
 {
 public:
   ClocksState()
-  : logger_(rclcpp::get_logger("rclcpp")),
-    last_time_msg_(std::make_shared<builtin_interfaces::msg::Time>())
+  : logger_(rclcpp::get_logger("rclcpp"))
   {
   }
 
@@ -55,7 +53,14 @@ public:
     ros_time_active_ = true;
 
     // Update all attached clocks to zero or last recorded time
-    set_all_clocks(last_time_msg_, true);
+    std::lock_guard<std::mutex> guard(clock_list_lock_);
+    auto time_msg = std::make_shared<builtin_interfaces::msg::Time>();
+    if (last_msg_set_) {
+      time_msg = std::make_shared<builtin_interfaces::msg::Time>(last_msg_set_->clock);
+    }
+    for (auto it = associated_clocks_.begin(); it != associated_clocks_.end(); ++it) {
+      set_clock(time_msg, true, *it);
+    }
   }
 
   // An internal method to use in the clock callback that iterates and disables all clocks
@@ -70,8 +75,11 @@ public:
     ros_time_active_ = false;
 
     // Update all attached clocks
-    auto msg = std::make_shared<builtin_interfaces::msg::Time>();
-    set_all_clocks(msg, false);
+    std::lock_guard<std::mutex> guard(clock_list_lock_);
+    for (auto it = associated_clocks_.begin(); it != associated_clocks_.end(); ++it) {
+      auto msg = std::make_shared<builtin_interfaces::msg::Time>();
+      set_clock(msg, false, *it);
+    }
   }
 
   // Check if ROS time is active
@@ -83,25 +91,28 @@ public:
   // Attach a clock
   void attachClock(rclcpp::Clock::SharedPtr clock)
   {
-    {
-      std::lock_guard<std::mutex> clock_guard(clock->get_clock_mutex());
-      if (clock->get_clock_type() != RCL_ROS_TIME && ros_time_active_) {
-        throw std::invalid_argument(
-                "ros_time_active_ can't be true while clock is not of RCL_ROS_TIME type");
-      }
+    if (clock->get_clock_type() != RCL_ROS_TIME) {
+      throw std::invalid_argument("Cannot attach clock to a time source that's not a ROS clock");
     }
+
     std::lock_guard<std::mutex> guard(clock_list_lock_);
-    associated_clocks_.insert(clock);
+    associated_clocks_.push_back(clock);
     // Set the clock to zero unless there's a recently received message
-    set_clock(last_time_msg_, ros_time_active_, clock);
+    auto time_msg = std::make_shared<builtin_interfaces::msg::Time>();
+    if (last_msg_set_) {
+      time_msg = std::make_shared<builtin_interfaces::msg::Time>(last_msg_set_->clock);
+    }
+    set_clock(time_msg, ros_time_active_, clock);
   }
 
   // Detach a clock
   void detachClock(rclcpp::Clock::SharedPtr clock)
   {
     std::lock_guard<std::mutex> guard(clock_list_lock_);
-    auto removed = associated_clocks_.erase(clock);
-    if (removed == 0) {
+    auto result = std::find(associated_clocks_.begin(), associated_clocks_.end(), clock);
+    if (result != associated_clocks_.end()) {
+      associated_clocks_.erase(result);
+    } else {
       RCLCPP_ERROR(logger_, "failed to remove clock");
     }
   }
@@ -114,32 +125,27 @@ public:
   {
     std::lock_guard<std::mutex> clock_guard(clock->get_clock_mutex());
 
-    if (clock->get_clock_type() == RCL_ROS_TIME) {
-      // Do change
-      if (!set_ros_time_enabled && clock->ros_time_is_active()) {
-        auto ret = rcl_disable_ros_time_override(clock->get_clock_handle());
-        if (ret != RCL_RET_OK) {
-          rclcpp::exceptions::throw_from_rcl_error(
-            ret, "Failed to disable ros_time_override_status");
-        }
-      } else if (set_ros_time_enabled && !clock->ros_time_is_active()) {
-        auto ret = rcl_enable_ros_time_override(clock->get_clock_handle());
-        if (ret != RCL_RET_OK) {
-          rclcpp::exceptions::throw_from_rcl_error(
-            ret, "Failed to enable ros_time_override_status");
-        }
-      }
-
-      auto ret = rcl_set_ros_time_override(
-        clock->get_clock_handle(),
-        rclcpp::Time(*msg).nanoseconds());
+    // Do change
+    if (!set_ros_time_enabled && clock->ros_time_is_active()) {
+      auto ret = rcl_disable_ros_time_override(clock->get_clock_handle());
       if (ret != RCL_RET_OK) {
         rclcpp::exceptions::throw_from_rcl_error(
-          ret, "Failed to set ros_time_override_status");
+          ret, "Failed to disable ros_time_override_status");
       }
-    } else if (set_ros_time_enabled) {
-      throw std::invalid_argument(
-              "set_ros_time_enabled can't be true while clock is not of RCL_ROS_TIME type");
+    } else if (set_ros_time_enabled && !clock->ros_time_is_active()) {
+      auto ret = rcl_enable_ros_time_override(clock->get_clock_handle());
+      if (ret != RCL_RET_OK) {
+        rclcpp::exceptions::throw_from_rcl_error(
+          ret, "Failed to enable ros_time_override_status");
+      }
+    }
+
+    auto ret = rcl_set_ros_time_override(
+      clock->get_clock_handle(),
+      rclcpp::Time(*msg).nanoseconds());
+    if (ret != RCL_RET_OK) {
+      rclcpp::exceptions::throw_from_rcl_error(
+        ret, "Failed to set ros_time_override_status");
     }
   }
 
@@ -157,19 +163,7 @@ public:
   // Cache the last clock message received
   void cache_last_msg(std::shared_ptr<const rosgraph_msgs::msg::Clock> msg)
   {
-    last_time_msg_ = std::make_shared<builtin_interfaces::msg::Time>(msg->clock);
-  }
-
-  bool are_all_clocks_rcl_ros_time()
-  {
-    std::lock_guard<std::mutex> guard(clock_list_lock_);
-    for (auto & clock : associated_clocks_) {
-      std::lock_guard<std::mutex> clock_guard(clock->get_clock_mutex());
-      if (clock->get_clock_type() != RCL_ROS_TIME) {
-        return false;
-      }
-    }
-    return true;
+    last_msg_set_ = msg;
   }
 
 private:
@@ -178,14 +172,14 @@ private:
 
   // A lock to protect iterating the associated_clocks_ field.
   std::mutex clock_list_lock_;
-  // An unordered_set to store references to associated clocks.
-  std::unordered_set<rclcpp::Clock::SharedPtr> associated_clocks_;
+  // A vector to store references to associated clocks.
+  std::vector<rclcpp::Clock::SharedPtr> associated_clocks_;
 
   // Local storage of validity of ROS time
   // This is needed when new clocks are added.
   bool ros_time_active_{false};
   // Last set message to be passed to newly registered clocks
-  std::shared_ptr<builtin_interfaces::msg::Time> last_time_msg_{nullptr};
+  std::shared_ptr<const rosgraph_msgs::msg::Clock> last_msg_set_;
 };
 
 class TimeSource::NodeState final
@@ -272,10 +266,6 @@ public:
       throw std::invalid_argument("Invalid type for parameter 'use_sim_time', should be 'bool'");
     }
 
-    on_set_parameters_callback_ = node_parameters_->add_on_set_parameters_callback(
-      std::bind(&TimeSource::NodeState::on_set_parameters, this, std::placeholders::_1));
-
-
     // TODO(tfoote) use parameters interface not subscribe to events via topic ticketed #609
     parameter_subscription_ = rclcpp::AsyncParametersClient::on_parameter_event(
       node_topics_,
@@ -295,10 +285,6 @@ public:
     // can't possibly call any of the callbacks as we are cleaning up.
     destroy_clock_sub();
     clocks_state_.disable_ros_time();
-    if (on_set_parameters_callback_) {
-      node_parameters_->remove_on_set_parameters_callback(on_set_parameters_callback_.get());
-    }
-    on_set_parameters_callback_.reset();
     parameter_subscription_.reset();
     node_base_.reset();
     node_topics_.reset();
@@ -433,33 +419,9 @@ private:
     clock_subscription_.reset();
   }
 
-  // On set Parameters callback handle
-  node_interfaces::OnSetParametersCallbackHandle::SharedPtr on_set_parameters_callback_{nullptr};
-
   // Parameter Event subscription
   using ParamSubscriptionT = rclcpp::Subscription<rcl_interfaces::msg::ParameterEvent>;
   std::shared_ptr<ParamSubscriptionT> parameter_subscription_;
-
-  // Callback for parameter settings
-  rcl_interfaces::msg::SetParametersResult on_set_parameters(
-    const std::vector<rclcpp::Parameter> & parameters)
-  {
-    rcl_interfaces::msg::SetParametersResult result;
-    result.successful = true;
-    for (const auto & param : parameters) {
-      if (param.get_name() == "use_sim_time" && param.get_type() == rclcpp::PARAMETER_BOOL) {
-        if (param.as_bool() && !(clocks_state_.are_all_clocks_rcl_ros_time())) {
-          result.successful = false;
-          result.reason =
-            "use_sim_time parameter can't be true while clocks are not all of RCL_ROS_TIME type";
-          RCLCPP_ERROR(
-            logger_,
-            "use_sim_time parameter can't be true while clocks are not all of RCL_ROS_TIME type");
-        }
-      }
-    }
-    return result;
-  }
 
   // Callback for parameter updates
   void on_parameter_event(std::shared_ptr<const rcl_interfaces::msg::ParameterEvent> event)

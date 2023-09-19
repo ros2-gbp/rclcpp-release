@@ -52,7 +52,7 @@ public:
   {}
 
   RCLCPP_PUBLIC
-  virtual ~SubscriptionIntraProcessBase() = default;
+  virtual ~SubscriptionIntraProcessBase();
 
   RCLCPP_PUBLIC
   size_t
@@ -61,11 +61,6 @@ public:
   RCLCPP_PUBLIC
   void
   add_to_wait_set(rcl_wait_set_t * wait_set) override;
-
-  RCLCPP_PUBLIC
-  virtual
-  size_t
-  available_capacity() const = 0;
 
   bool
   is_ready(rcl_wait_set_t * wait_set) override = 0;

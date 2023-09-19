@@ -246,8 +246,8 @@ TEST_F(TestService, on_new_request_callback) {
   auto server_callback =
     [](const test_msgs::srv::Empty::Request::SharedPtr,
       test_msgs::srv::Empty::Response::SharedPtr) {FAIL();};
-  rclcpp::ServicesQoS service_qos;
-  service_qos.keep_last(3);
+  rmw_qos_profile_t service_qos = rmw_qos_profile_services_default;
+  service_qos.depth = 3;
   auto server = node->create_service<test_msgs::srv::Empty>(
     "~/test_service", server_callback, service_qos);
 
@@ -338,25 +338,28 @@ TEST_F(TestService, rcl_service_request_subscription_get_actual_qos_error) {
 
 
 TEST_F(TestService, server_qos) {
-  rclcpp::ServicesQoS qos_profile;
-  qos_profile.liveliness(rclcpp::LivelinessPolicy::Automatic);
-  rclcpp::Duration duration(std::chrono::nanoseconds(1));
-  qos_profile.deadline(duration);
-  qos_profile.lifespan(duration);
-  qos_profile.liveliness_lease_duration(duration);
+  rmw_qos_profile_t qos_profile = rmw_qos_profile_services_default;
+  qos_profile.liveliness = RMW_QOS_POLICY_LIVELINESS_AUTOMATIC;
+  uint64_t duration = 1;
+  qos_profile.deadline = {duration, duration};
+  qos_profile.lifespan = {duration, duration};
+  qos_profile.liveliness_lease_duration = {duration, duration};
 
   auto callback = [](const test_msgs::srv::Empty::Request::SharedPtr,
       test_msgs::srv::Empty::Response::SharedPtr) {};
 
   auto server = node->create_service<test_msgs::srv::Empty>(
-    "service", callback, qos_profile);
+    "service", callback,
+    qos_profile);
+  auto init_qos =
+    rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(qos_profile), qos_profile);
   auto rs_qos = server->get_request_subscription_actual_qos();
   auto rp_qos = server->get_response_publisher_actual_qos();
 
-  EXPECT_EQ(qos_profile, rp_qos);
+  EXPECT_EQ(init_qos, rp_qos);
   // Lifespan has no meaning for subscription/readers
-  rs_qos.lifespan(qos_profile.lifespan());
-  EXPECT_EQ(qos_profile, rs_qos);
+  rs_qos.lifespan(qos_profile.lifespan);
+  EXPECT_EQ(init_qos, rs_qos);
 }
 
 TEST_F(TestService, server_qos_depth) {
@@ -369,12 +372,13 @@ TEST_F(TestService, server_qos_depth) {
 
   auto server_node = std::make_shared<rclcpp::Node>("server_node", "/ns");
 
-  rclcpp::QoS server_qos_profile(2);
+  rmw_qos_profile_t server_qos_profile = rmw_qos_profile_default;
+  server_qos_profile.depth = 2;
 
   auto server = server_node->create_service<test_msgs::srv::Empty>(
     "test_qos_depth", std::move(server_callback), server_qos_profile);
 
-  rclcpp::QoS client_qos_profile(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
+  rmw_qos_profile_t client_qos_profile = rmw_qos_profile_default;
   auto client = node->create_client<test_msgs::srv::Empty>("test_qos_depth", client_qos_profile);
 
   ::testing::AssertionResult request_result = ::testing::AssertionSuccess();
@@ -394,7 +398,7 @@ TEST_F(TestService, server_qos_depth) {
   }
 
   auto start = std::chrono::steady_clock::now();
-  while ((server_cb_count_ < server_qos_profile.depth()) &&
+  while ((server_cb_count_ < server_qos_profile.depth) &&
     (std::chrono::steady_clock::now() - start) < 1s)
   {
     rclcpp::spin_some(server_node);
@@ -405,5 +409,5 @@ TEST_F(TestService, server_qos_depth) {
   // so more server responses might be processed than expected.
   rclcpp::spin_some(server_node);
 
-  EXPECT_EQ(server_cb_count_, server_qos_profile.depth());
+  EXPECT_EQ(server_cb_count_, server_qos_profile.depth);
 }

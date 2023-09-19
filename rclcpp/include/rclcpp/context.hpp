@@ -26,7 +26,6 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include <stdexcept>
 
 #include "rcl/context.h"
 #include "rcl/guard_condition.h"
@@ -66,11 +65,8 @@ using PreShutdownCallbackHandle = ShutdownCallbackHandle;
 /// Context which encapsulates shared state between nodes and other similar entities.
 /**
  * A context also represents the lifecycle between init and shutdown of rclcpp.
- * Nodes may be attached to a particular context by passing to the rclcpp::Node
- * constructor a rclcpp::NodeOptions instance in which the Context is set via
- * rclcpp::NodeOptions::context.
- * Nodes will be automatically removed from the context when destructed.
- * Contexts may be shutdown by calling rclcpp::shutdown.
+ * It is often used in conjunction with rclcpp::init, or rclcpp::init_local,
+ * and rclcpp::shutdown.
  */
 class Context : public std::enable_shared_from_this<Context>
 {
@@ -186,11 +182,6 @@ public:
    * The underlying rcl context is not finalized by this function.
    *
    * This function is thread-safe.
-   *
-   * Note that if you override this method, but leave shutdown to be called in
-   * the destruction of this base class, it will not call the overridden
-   * version from your base class.
-   * So you need to ensure you call your class's shutdown() in its destructor.
    *
    * \param[in] reason the description of why shutdown happened
    * \return true if shutdown was successful, false if context was already shutdown
@@ -327,6 +318,7 @@ public:
 
   /// Interrupt any blocking sleep_for calls, causing them to return immediately and return true.
   RCLCPP_PUBLIC
+  virtual
   void
   interrupt_all_sleep_for();
 
@@ -359,6 +351,7 @@ protected:
   // Called by constructor and destructor to clean up by finalizing the
   // shutdown rcl context and preparing for a new init cycle.
   RCLCPP_PUBLIC
+  virtual
   void
   clean_up();
 
@@ -380,10 +373,10 @@ private:
   // attempt to acquire another sub context.
   std::recursive_mutex sub_contexts_mutex_;
 
-  std::vector<std::shared_ptr<OnShutdownCallback>> on_shutdown_callbacks_;
+  std::unordered_set<std::shared_ptr<OnShutdownCallback>> on_shutdown_callbacks_;
   mutable std::mutex on_shutdown_callbacks_mutex_;
 
-  std::vector<std::shared_ptr<PreShutdownCallback>> pre_shutdown_callbacks_;
+  std::unordered_set<std::shared_ptr<PreShutdownCallback>> pre_shutdown_callbacks_;
   mutable std::mutex pre_shutdown_callbacks_mutex_;
 
   /// Condition variable for timed sleep (see sleep_for).
@@ -402,22 +395,20 @@ private:
 
   using ShutdownCallback = ShutdownCallbackHandle::ShutdownCallbackType;
 
-  template<ShutdownType shutdown_type>
   RCLCPP_LOCAL
   ShutdownCallbackHandle
   add_shutdown_callback(
+    ShutdownType shutdown_type,
     ShutdownCallback callback);
 
-  template<ShutdownType shutdown_type>
   RCLCPP_LOCAL
   bool
   remove_shutdown_callback(
+    ShutdownType shutdown_type,
     const ShutdownCallbackHandle & callback_handle);
 
-  template<ShutdownType shutdown_type>
-  RCLCPP_LOCAL
   std::vector<rclcpp::Context::ShutdownCallback>
-  get_shutdown_callback() const;
+  get_shutdown_callback(ShutdownType shutdown_type) const;
 };
 
 /// Return a copy of the list of context shared pointers.
