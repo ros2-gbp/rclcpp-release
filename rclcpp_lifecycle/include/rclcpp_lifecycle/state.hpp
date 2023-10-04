@@ -15,17 +15,17 @@
 #ifndef RCLCPP_LIFECYCLE__STATE_HPP_
 #define RCLCPP_LIFECYCLE__STATE_HPP_
 
+#include <mutex>
 #include <string>
 
 #include "rcl_lifecycle/data_types.h"
+
 #include "rclcpp_lifecycle/visibility_control.h"
 
 #include "rcutils/allocator.h"
 
 namespace rclcpp_lifecycle
 {
-/// Forward declaration of mutex helper class
-class MutexMap;
 
 /// Abstract class for the Lifecycle's states.
 /**
@@ -93,22 +93,8 @@ protected:
 
   bool owns_rcl_state_handle_;
 
+  mutable std::recursive_mutex state_handle_mutex_;
   rcl_lifecycle_state_t * state_handle_;
-
-private:
-  /// Maps state handle mutexes to each instance of State.
-  /**
-   * \details A mutex is added to this map when each new instance of State is constructed.
-   *
-   * The mutex is removed when the instance of State is destroyed.
-   *
-   * The mutex is locked while state_handle_ is being accessed.
-   *
-   * This static member exists to allow implementing the fix described in ros2/rclcpp#1756
-   * in Humble without breaking ABI compatibility, since adding a new static data
-   * member is permitted under REP-0009.
-   */
-  static MutexMap state_handle_mutex_map_;
 };
 
 }  // namespace rclcpp_lifecycle
