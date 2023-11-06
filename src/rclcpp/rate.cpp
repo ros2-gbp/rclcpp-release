@@ -67,7 +67,8 @@ Rate::sleep()
   // Calculate the time to sleep
   auto time_to_sleep = next_interval - now;
   // Sleep (will get interrupted by ctrl-c, may not sleep full time)
-  return clock_->sleep_for(time_to_sleep);
+  clock_->sleep_for(time_to_sleep);
+  return true;
 }
 
 bool
@@ -100,14 +101,6 @@ WallRate::WallRate(const double rate)
 
 WallRate::WallRate(const Duration & period)
 : Rate(period, std::make_shared<Clock>(RCL_STEADY_TIME))
-{}
-
-ROSRate::ROSRate(const double rate)
-: Rate(rate, std::make_shared<Clock>(RCL_ROS_TIME))
-{}
-
-ROSRate::ROSRate(const Duration & period)
-: Rate(period, std::make_shared<Clock>(RCL_ROS_TIME))
 {}
 
 }  // namespace rclcpp
