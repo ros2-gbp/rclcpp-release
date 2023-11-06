@@ -21,12 +21,24 @@
 
 #include "../utils/rclcpp_gtest_macros.hpp"
 
-/*
-   Basic tests for the Rate, WallRate and ROSRate classes.
- */
-TEST(TestRate, rate_basics) {
-  rclcpp::init(0, nullptr);
+class TestRate : public ::testing::Test
+{
+public:
+  void SetUp()
+  {
+    rclcpp::init(0, nullptr);
+  }
 
+  void TearDown()
+  {
+    rclcpp::shutdown();
+  }
+};
+
+/*
+   Basic tests for the Rate and WallRate classes.
+ */
+TEST_F(TestRate, rate_basics) {
   auto period = std::chrono::milliseconds(1000);
   auto offset = std::chrono::milliseconds(500);
   auto epsilon = std::chrono::milliseconds(100);
@@ -79,13 +91,9 @@ TEST(TestRate, rate_basics) {
   auto five = std::chrono::system_clock::now();
   delta = five - four;
   ASSERT_TRUE(epsilon > delta);
-
-  rclcpp::shutdown();
 }
 
-TEST(TestRate, wall_rate_basics) {
-  rclcpp::init(0, nullptr);
-
+TEST_F(TestRate, wall_rate_basics) {
   auto period = std::chrono::milliseconds(100);
   auto offset = std::chrono::milliseconds(50);
   auto epsilon = std::chrono::milliseconds(1);
@@ -140,77 +148,12 @@ TEST(TestRate, wall_rate_basics) {
   auto five = std::chrono::steady_clock::now();
   delta = five - four;
   EXPECT_GT(epsilon, delta);
-
-  rclcpp::shutdown();
-}
-
-TEST(TestRate, ros_rate_basics) {
-  rclcpp::init(0, nullptr);
-
-  auto period = std::chrono::milliseconds(100);
-  auto offset = std::chrono::milliseconds(50);
-  auto epsilon = std::chrono::milliseconds(1);
-  double overrun_ratio = 1.5;
-
-  rclcpp::Clock clock(RCL_ROS_TIME);
-
-  auto start = clock.now();
-  rclcpp::ROSRate r(period);
-  EXPECT_EQ(rclcpp::Duration(period), r.period());
-// suppress deprecated warnings
-#if !defined(_WIN32)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else  // !defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-  ASSERT_FALSE(r.is_steady());
-// suppress deprecated warnings
-#if !defined(_WIN32)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else  // !defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-  ASSERT_EQ(RCL_ROS_TIME, r.get_type());
-  ASSERT_TRUE(r.sleep());
-  auto one = clock.now();
-  auto delta = one - start;
-  EXPECT_LT(rclcpp::Duration(period), delta);
-  EXPECT_GT(rclcpp::Duration(period * overrun_ratio), delta);
-
-  clock.sleep_for(offset);
-  ASSERT_TRUE(r.sleep());
-  auto two = clock.now();
-  delta = two - start;
-  EXPECT_LT(rclcpp::Duration(2 * period), delta + epsilon);
-  EXPECT_GT(rclcpp::Duration(2 * period * overrun_ratio), delta);
-
-  clock.sleep_for(offset);
-  auto two_offset = clock.now();
-  r.reset();
-  ASSERT_TRUE(r.sleep());
-  auto three = clock.now();
-  delta = three - two_offset;
-  EXPECT_LT(rclcpp::Duration(period), delta);
-  EXPECT_GT(rclcpp::Duration(period * overrun_ratio), delta);
-
-  clock.sleep_for(offset + period);
-  auto four = clock.now();
-  ASSERT_FALSE(r.sleep());
-  auto five = clock.now();
-  delta = five - four;
-  EXPECT_GT(rclcpp::Duration(epsilon), delta);
-
-  rclcpp::shutdown();
 }
 
 /*
    Basic test for the deprecated GenericRate class.
  */
-TEST(TestRate, generic_rate) {
+TEST_F(TestRate, generic_rate) {
   auto period = std::chrono::milliseconds(100);
   auto offset = std::chrono::milliseconds(50);
   auto epsilon = std::chrono::milliseconds(1);
@@ -325,13 +268,13 @@ TEST(TestRate, generic_rate) {
   }
 }
 
-TEST(TestRate, from_double) {
+TEST_F(TestRate, from_double) {
   {
     rclcpp::Rate rate(1.0);
     EXPECT_EQ(rclcpp::Duration(std::chrono::seconds(1)), rate.period());
   }
   {
-    rclcpp::WallRate rate(2.0);
+    rclcpp::Rate rate(2.0);
     EXPECT_EQ(rclcpp::Duration(std::chrono::milliseconds(500)), rate.period());
   }
   {
@@ -339,12 +282,12 @@ TEST(TestRate, from_double) {
     EXPECT_EQ(rclcpp::Duration(std::chrono::seconds(2)), rate.period());
   }
   {
-    rclcpp::ROSRate rate(4.0);
+    rclcpp::WallRate rate(4.0);
     EXPECT_EQ(rclcpp::Duration(std::chrono::milliseconds(250)), rate.period());
   }
 }
 
-TEST(TestRate, clock_types) {
+TEST_F(TestRate, clock_types) {
   {
     rclcpp::Rate rate(1.0, std::make_shared<rclcpp::Clock>(RCL_SYSTEM_TIME));
 // suppress deprecated warnings
@@ -404,7 +347,7 @@ TEST(TestRate, clock_types) {
   }
 }
 
-TEST(TestRate, incorrect_constuctor) {
+TEST_F(TestRate, incorrect_constuctor) {
   // Constructor with 0-frequency
   RCLCPP_EXPECT_THROW_EQ(
     rclcpp::Rate rate(0.0),
