@@ -67,6 +67,8 @@ TEST(TestSerializedMessage, various_constructors) {
   rclcpp::SerializedMessage yet_another_serialized_message(std::move(other_serialized_message));
   auto & yet_another_rcl_handle = yet_another_serialized_message.get_rcl_serialized_message();
   EXPECT_TRUE(nullptr == other_rcl_handle.buffer);
+  EXPECT_EQ(0u, other_serialized_message.capacity());
+  EXPECT_EQ(0u, other_serialized_message.size());
   EXPECT_TRUE(nullptr != yet_another_rcl_handle.buffer);
   EXPECT_EQ(content_size, yet_another_serialized_message.size());
   EXPECT_EQ(content_size, yet_another_serialized_message.capacity());
@@ -145,6 +147,11 @@ TEST(TestSerializedMessage, reserve) {
   // Resize using reserve method
   serialized_msg.reserve(15);
   EXPECT_EQ(15u, serialized_msg.capacity());
+
+  // Use invalid value throws exception
+  EXPECT_THROW(
+    {serialized_msg.reserve(-1);},
+    rclcpp::exceptions::RCLBadAlloc);
 }
 
 TEST(TestSerializedMessage, serialization) {

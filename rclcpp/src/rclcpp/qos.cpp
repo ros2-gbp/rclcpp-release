@@ -16,8 +16,6 @@
 
 #include <string>
 
-#include "rclcpp/logging.hpp"
-
 #include "rmw/error_handling.h"
 #include "rmw/types.h"
 #include "rmw/qos_profiles.h"
@@ -45,19 +43,9 @@ std::string qos_policy_name_from_kind(rmw_qos_policy_kind_t policy_kind)
   }
 }
 
-QoSInitialization::QoSInitialization(
-  rmw_qos_history_policy_t history_policy_arg, size_t depth_arg,
-  bool print_depth_warning)
+QoSInitialization::QoSInitialization(rmw_qos_history_policy_t history_policy_arg, size_t depth_arg)
 : history_policy(history_policy_arg), depth(depth_arg)
-{
-  if (history_policy == RMW_QOS_POLICY_HISTORY_KEEP_LAST && depth == 0 && print_depth_warning) {
-    RCLCPP_WARN_ONCE(
-      rclcpp::get_logger(
-        "rclcpp"),
-      "A zero depth with KEEP_LAST doesn't make sense; no data could be stored. "
-      "This will be interpreted as SYSTEM_DEFAULT");
-  }
-}
+{}
 
 QoSInitialization
 QoSInitialization::from_rmw(const rmw_qos_profile_t & rmw_qos)
@@ -65,9 +53,8 @@ QoSInitialization::from_rmw(const rmw_qos_profile_t & rmw_qos)
   switch (rmw_qos.history) {
     case RMW_QOS_POLICY_HISTORY_KEEP_ALL:
       return KeepAll();
-    case RMW_QOS_POLICY_HISTORY_SYSTEM_DEFAULT:
-      return KeepLast(rmw_qos.depth, false);
     case RMW_QOS_POLICY_HISTORY_KEEP_LAST:
+    case RMW_QOS_POLICY_HISTORY_SYSTEM_DEFAULT:
     case RMW_QOS_POLICY_HISTORY_UNKNOWN:
     default:
       return KeepLast(rmw_qos.depth);
@@ -78,10 +65,9 @@ KeepAll::KeepAll()
 : QoSInitialization(RMW_QOS_POLICY_HISTORY_KEEP_ALL, 0)
 {}
 
-KeepLast::KeepLast(size_t depth, bool print_depth_warning)
-: QoSInitialization(RMW_QOS_POLICY_HISTORY_KEEP_LAST, depth, print_depth_warning)
-{
-}
+KeepLast::KeepLast(size_t depth)
+: QoSInitialization(RMW_QOS_POLICY_HISTORY_KEEP_LAST, depth)
+{}
 
 QoS::QoS(
   const QoSInitialization & qos_initialization,
@@ -125,14 +111,6 @@ QoS::history(HistoryPolicy history)
 QoS &
 QoS::keep_last(size_t depth)
 {
-  if (depth == 0) {
-    RCLCPP_WARN_ONCE(
-      rclcpp::get_logger(
-        "rclcpp"),
-      "A zero depth with KEEP_LAST doesn't make sense; no data could be stored."
-      "This will be interpreted as SYSTEM_DEFAULT");
-  }
-
   rmw_qos_profile_.history = RMW_QOS_POLICY_HISTORY_KEEP_LAST;
   rmw_qos_profile_.depth = depth;
   return *this;
@@ -173,12 +151,6 @@ QoS::best_effort()
 }
 
 QoS &
-QoS::reliability_best_available()
-{
-  return this->reliability(RMW_QOS_POLICY_RELIABILITY_BEST_AVAILABLE);
-}
-
-QoS &
 QoS::durability(rmw_qos_durability_policy_t durability)
 {
   rmw_qos_profile_.durability = durability;
@@ -202,12 +174,6 @@ QoS &
 QoS::transient_local()
 {
   return this->durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL);
-}
-
-QoS &
-QoS::durability_best_available()
-{
-  return this->durability(RMW_QOS_POLICY_DURABILITY_BEST_AVAILABLE);
 }
 
 QoS &
@@ -412,10 +378,6 @@ RosoutQoS::RosoutQoS(const QoSInitialization & rosout_initialization)
 
 SystemDefaultsQoS::SystemDefaultsQoS(const QoSInitialization & qos_initialization)
 : QoS(qos_initialization, rmw_qos_profile_system_default)
-{}
-
-BestAvailableQoS::BestAvailableQoS(const QoSInitialization & qos_initialization)
-: QoS(qos_initialization, rmw_qos_profile_best_available)
 {}
 
 }  // namespace rclcpp

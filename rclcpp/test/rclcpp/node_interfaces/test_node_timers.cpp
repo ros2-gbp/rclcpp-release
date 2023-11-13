@@ -75,7 +75,7 @@ TEST_F(TestNodeTimers, add_timer)
     different_node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   RCLCPP_EXPECT_THROW_EQ(
     node_timers->add_timer(timer, callback_group_in_different_node),
-    rclcpp::exceptions::MissingGroupNodeException("timer"));
+    std::runtime_error("Cannot create timer, group not in node."));
 }
 
 TEST_F(TestNodeTimers, add_timer_rcl_trigger_guard_condition_error)
