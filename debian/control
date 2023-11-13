@@ -1,0 +1,12 @@
+Source: ros-humble-rclcpp-components
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-humble-ament-cmake-google-benchmark <!nocheck>, ros-humble-ament-cmake-gtest <!nocheck>, ros-humble-ament-cmake-ros, ros-humble-ament-index-cpp, ros-humble-ament-lint-auto <!nocheck>, ros-humble-ament-lint-common <!nocheck>, ros-humble-class-loader, ros-humble-composition-interfaces, ros-humble-launch-testing <!nocheck>, ros-humble-rclcpp, ros-humble-rcpputils, ros-humble-std-msgs <!nocheck>, ros-humble-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-humble-rclcpp-components
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-humble-ament-index-cpp, ros-humble-class-loader, ros-humble-composition-interfaces, ros-humble-rclcpp, ros-humble-ros-workspace
+Description: Package containing tools for dynamically loadable components
