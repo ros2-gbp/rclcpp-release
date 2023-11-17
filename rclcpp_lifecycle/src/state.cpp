@@ -14,6 +14,7 @@
 
 #include "rclcpp_lifecycle/state.hpp"
 
+#include <stdexcept>
 #include <string>
 
 #include "lifecycle_msgs/msg/state.hpp"
@@ -25,17 +26,12 @@
 
 #include "rcutils/allocator.h"
 
-#include "mutex_map.hpp"
-
 namespace rclcpp_lifecycle
 {
-MutexMap State::state_handle_mutex_map_;
 
 State::State(rcutils_allocator_t allocator)
 : State(lifecycle_msgs::msg::State::PRIMARY_STATE_UNKNOWN, "unknown", allocator)
-{
-  state_handle_mutex_map_.add(this);
-}
+{}
 
 State::State(
   uint8_t id,
@@ -45,8 +41,6 @@ State::State(
   owns_rcl_state_handle_(true),
   state_handle_(nullptr)
 {
-  state_handle_mutex_map_.add(this);
-
   if (label.empty()) {
     throw std::runtime_error("Lifecycle State cannot have an empty label.");
   }
@@ -74,11 +68,10 @@ State::State(
   owns_rcl_state_handle_(false),
   state_handle_(nullptr)
 {
-  state_handle_mutex_map_.add(this);
-
   if (!rcl_lifecycle_state_handle) {
     throw std::runtime_error("rcl_lifecycle_state_handle is null");
   }
+
   state_handle_ = const_cast<rcl_lifecycle_state_t *>(rcl_lifecycle_state_handle);
 }
 
@@ -87,15 +80,12 @@ State::State(const State & rhs)
   owns_rcl_state_handle_(false),
   state_handle_(nullptr)
 {
-  state_handle_mutex_map_.add(this);
-
   *this = rhs;
 }
 
 State::~State()
 {
   reset();
-  state_handle_mutex_map_.remove(this);
 }
 
 State &
@@ -105,8 +95,8 @@ State::operator=(const State & rhs)
     return *this;
   }
 
-  const auto lock = std::lock_guard<std::recursive_mutex>(state_handle_mutex_map_.getMutex(this));
-
+  // hold the lock until state_handle_ is reconstructed
+  std::lock_guard<std::recursive_mutex> lock(state_handle_mutex_);
   // reset all currently used resources
   reset();
 
@@ -142,7 +132,7 @@ State::operator=(const State & rhs)
 uint8_t
 State::id() const
 {
-  const auto lock = std::lock_guard<std::recursive_mutex>(state_handle_mutex_map_.getMutex(this));
+  std::lock_guard<std::recursive_mutex> lock(state_handle_mutex_);
   if (!state_handle_) {
     throw std::runtime_error("Error in state! Internal state_handle is NULL.");
   }
@@ -152,7 +142,7 @@ State::id() const
 std::string
 State::label() const
 {
-  const auto lock = std::lock_guard<std::recursive_mutex>(state_handle_mutex_map_.getMutex(this));
+  std::lock_guard<std::recursive_mutex> lock(state_handle_mutex_);
   if (!state_handle_) {
     throw std::runtime_error("Error in state! Internal state_handle is NULL.");
   }
@@ -162,8 +152,7 @@ State::label() const
 void
 State::reset() noexcept
 {
-  const auto lock = std::lock_guard<std::recursive_mutex>(state_handle_mutex_map_.getMutex(this));
-
+  std::lock_guard<std::recursive_mutex> lock(state_handle_mutex_);
   if (!owns_rcl_state_handle_) {
     state_handle_ = nullptr;
   }
