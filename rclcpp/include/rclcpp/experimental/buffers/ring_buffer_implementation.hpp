@@ -52,7 +52,10 @@ public:
     if (capacity == 0) {
       throw std::invalid_argument("capacity must be a positive, non-zero value");
     }
-    TRACEPOINT(rclcpp_construct_ring_buffer, static_cast<const void *>(this), capacity_);
+    TRACETOOLS_TRACEPOINT(
+      rclcpp_construct_ring_buffer,
+      static_cast<const void *>(this),
+      capacity_);
   }
 
   virtual ~RingBufferImplementation() {}
@@ -69,7 +72,7 @@ public:
 
     write_index_ = next_(write_index_);
     ring_buffer_[write_index_] = std::move(request);
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_ring_buffer_enqueue,
       static_cast<const void *>(this),
       write_index_,
@@ -98,7 +101,7 @@ public:
     }
 
     auto request = std::move(ring_buffer_[read_index_]);
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_ring_buffer_dequeue,
       static_cast<const void *>(this),
       read_index_,
@@ -148,9 +151,21 @@ public:
     return is_full_();
   }
 
+  /// Get the remaining capacity to store messages
+  /**
+   * This member function is thread-safe.
+   *
+   * \return the number of free capacity for new messages
+   */
+  size_t available_capacity() const
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return available_capacity_();
+  }
+
   void clear()
   {
-    TRACEPOINT(rclcpp_ring_buffer_clear, static_cast<const void *>(this));
+    TRACETOOLS_TRACEPOINT(rclcpp_ring_buffer_clear, static_cast<const void *>(this));
   }
 
 private:
@@ -187,6 +202,17 @@ private:
   inline bool is_full_() const
   {
     return size_ == capacity_;
+  }
+
+  /// Get the remaining capacity to store messages
+  /**
+   * This member function is not thread-safe.
+   *
+   * \return the number of free capacity for new messages
+   */
+  inline size_t available_capacity_() const
+  {
+    return capacity_ - size_;
   }
 
   size_t capacity_;

@@ -390,7 +390,7 @@ public:
     if (this->can_loan_messages()) {
       // we release the ownership from the rclpp::LoanedMessage instance
       // and let the middleware clean up the memory.
-      this->do_loaned_message_publish(std::move(loaned_msg.release()));
+      this->do_loaned_message_publish(loaned_msg.release());
     } else {
       // we don't release the ownership, let the middleware copy the ros message
       // and thus the destructor of rclcpp::LoanedMessage cleans up the memory.
@@ -421,7 +421,7 @@ protected:
   void
   do_inter_process_publish(const ROSMessageType & msg)
   {
-    TRACEPOINT(rclcpp_publish, nullptr, static_cast<const void *>(&msg));
+    TRACETOOLS_TRACEPOINT(rclcpp_publish, nullptr, static_cast<const void *>(&msg));
     auto status = rcl_publish(publisher_handle_.get(), &msg, nullptr);
 
     if (RCL_RET_PUBLISHER_INVALID == status) {
@@ -456,6 +456,7 @@ protected:
   do_loaned_message_publish(
     std::unique_ptr<ROSMessageType, std::function<void(ROSMessageType *)>> msg)
   {
+    TRACETOOLS_TRACEPOINT(rclcpp_publish, nullptr, static_cast<const void *>(msg.get()));
     auto status = rcl_publish_loaned_message(publisher_handle_.get(), msg.get(), nullptr);
 
     if (RCL_RET_PUBLISHER_INVALID == status) {
@@ -484,7 +485,7 @@ protected:
     if (!msg) {
       throw std::runtime_error("cannot publish msg which is a null pointer");
     }
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_intra_publish,
       static_cast<const void *>(publisher_handle_.get()),
       msg.get());
@@ -506,7 +507,7 @@ protected:
     if (!msg) {
       throw std::runtime_error("cannot publish msg which is a null pointer");
     }
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_intra_publish,
       static_cast<const void *>(publisher_handle_.get()),
       msg.get());
@@ -529,7 +530,7 @@ protected:
     if (!msg) {
       throw std::runtime_error("cannot publish msg which is a null pointer");
     }
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_intra_publish,
       static_cast<const void *>(publisher_handle_.get()),
       msg.get());

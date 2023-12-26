@@ -93,7 +93,7 @@ public:
       buffer_type,
       qos_profile,
       std::make_shared<Alloc>(subscribed_type_allocator_));
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_ipb_to_subscription,
       static_cast<const void *>(buffer_.get()),
       static_cast<const void *>(this));
@@ -167,6 +167,11 @@ public:
   use_take_shared_method() const override
   {
     return buffer_->use_take_shared_method();
+  }
+
+  size_t available_capacity() const override
+  {
+    return buffer_->available_capacity();
   }
 
 protected:

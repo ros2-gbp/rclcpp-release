@@ -306,6 +306,11 @@ public:
   rclcpp::experimental::SubscriptionIntraProcessBase::SharedPtr
   get_subscription_intra_process(uint64_t intra_process_subscription_id);
 
+  /// Return the lowest available capacity for all subscription buffers for a publisher id.
+  RCLCPP_PUBLIC
+  size_t
+  lowest_available_capacity(const uint64_t intra_process_publisher_id) const;
+
 private:
   struct SplittedSubscriptions
   {
@@ -462,7 +467,7 @@ private:
           auto ptr = MessageAllocTraits::allocate(allocator, 1);
           MessageAllocTraits::construct(allocator, ptr, *message);
 
-          subscription->provide_intra_process_data(std::move(MessageUniquePtr(ptr, deleter)));
+          subscription->provide_intra_process_data(MessageUniquePtr(ptr, deleter));
         }
 
         continue;
@@ -505,7 +510,7 @@ private:
             MessageAllocTraits::construct(allocator, ptr, *message);
 
             ros_message_subscription->provide_intra_process_message(
-              std::move(MessageUniquePtr(ptr, deleter)));
+              MessageUniquePtr(ptr, deleter));
           }
         }
       }
