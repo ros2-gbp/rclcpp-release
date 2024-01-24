@@ -2,28 +2,95 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-16.0.8 (2024-01-24)
--------------------
-* Add missing header required by the rclcpp::NodeOptions type (`#2324 <https://github.com/ros2/rclcpp/issues/2324>`_) (`#2407 <https://github.com/ros2/rclcpp/issues/2407>`_)
-* fix(rclcpp_components): increase the service queue sizes in component_container (backport `#2363 <https://github.com/ros2/rclcpp/issues/2363>`_) (`#2380 <https://github.com/ros2/rclcpp/issues/2380>`_)
-* Contributors: mergify[bot]
-
-16.0.7 (2023-11-13)
+26.0.0 (2024-01-24)
 -------------------
 
-16.0.6 (2023-09-19)
+25.0.0 (2023-12-26)
+-------------------
+* Switch to target_link_libraries. (`#2374 <https://github.com/ros2/rclcpp/issues/2374>`_)
+* feat(rclcpp_components): support events executor in node main template (`#2366 <https://github.com/ros2/rclcpp/issues/2366>`_)
+* fix(rclcpp_components): increase the service queue sizes in component_container (`#2363 <https://github.com/ros2/rclcpp/issues/2363>`_)
+* Contributors: Chris Lalancette, Daisuke Nishimatsu, M. Fatih Cırıt
+
+24.0.0 (2023-11-06)
 -------------------
 
-16.0.5 (2023-07-17)
+23.2.0 (2023-10-09)
 -------------------
 
-16.0.4 (2023-04-25)
+23.1.0 (2023-10-04)
+-------------------
+* Add missing header required by the rclcpp::NodeOptions type (`#2324 <https://github.com/ros2/rclcpp/issues/2324>`_)
+* Contributors: Ignacio Vizzo
+
+23.0.0 (2023-09-08)
+-------------------
+* Update API docs links in package READMEs (`#2302 <https://github.com/ros2/rclcpp/issues/2302>`_)
+* Contributors: Christophe Bedard
+
+22.2.0 (2023-09-07)
 -------------------
 
-16.0.3 (2023-01-10)
+22.1.0 (2023-08-21)
 -------------------
 
-16.0.2 (2022-11-07)
+22.0.0 (2023-07-11)
+-------------------
+
+21.3.0 (2023-06-12)
+-------------------
+
+21.2.0 (2023-06-07)
+-------------------
+
+21.1.1 (2023-05-11)
+-------------------
+
+21.1.0 (2023-04-27)
+-------------------
+
+21.0.0 (2023-04-18)
+-------------------
+
+20.0.0 (2023-04-13)
+-------------------
+* Update all rclcpp packages to C++17. (`#2121 <https://github.com/ros2/rclcpp/issues/2121>`_)
+* Contributors: Chris Lalancette
+
+19.3.0 (2023-03-01)
+-------------------
+
+19.2.0 (2023-02-24)
+-------------------
+
+19.1.0 (2023-02-14)
+-------------------
+
+19.0.0 (2023-01-30)
+-------------------
+* Improve component_manager_isolated shutdown (`#2085 <https://github.com/ros2/rclcpp/issues/2085>`_)
+* Contributors: Michael Carroll
+
+18.0.0 (2022-12-29)
+-------------------
+* Update maintainers (`#2043 <https://github.com/ros2/rclcpp/issues/2043>`_)
+* Contributors: Audrow Nash
+
+17.1.0 (2022-11-02)
+-------------------
+* use unique ptr and remove unuseful container (`#2013 <https://github.com/ros2/rclcpp/issues/2013>`_)
+* Contributors: Chen Lihui
+
+17.0.0 (2022-09-13)
+-------------------
+* Revert "Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)" (`#1956 <https://github.com/ros2/rclcpp/issues/1956>`_)
+* Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)
+* Contributors: Hubert Liberacki, William Woodall
+
+16.2.0 (2022-05-03)
+-------------------
+
+16.1.0 (2022-04-29)
 -------------------
 
 16.0.1 (2022-04-13)

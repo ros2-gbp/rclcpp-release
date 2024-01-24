@@ -3,29 +3,97 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-16.0.8 (2024-01-24)
+26.0.0 (2024-01-24)
 -------------------
 
-16.0.7 (2023-11-13)
+25.0.0 (2023-12-26)
+-------------------
+* Switch to target_link_libraries. (`#2374 <https://github.com/ros2/rclcpp/issues/2374>`_)
+* Contributors: Chris Lalancette
+
+24.0.0 (2023-11-06)
 -------------------
 
-16.0.6 (2023-09-19)
+23.2.0 (2023-10-09)
 -------------------
 
-16.0.5 (2023-07-17)
+23.1.0 (2023-10-04)
 -------------------
 
-16.0.4 (2023-04-25)
+23.0.0 (2023-09-08)
 -------------------
-* Revert "Revert "extract the result response before the callback is issued. (`#2133 <https://github.com/ros2/rclcpp/issues/2133>`_)" (`#2148 <https://github.com/ros2/rclcpp/issues/2148>`_)" (`#2152 <https://github.com/ros2/rclcpp/issues/2152>`_)
-* Revert "extract the result response before the callback is issued. (`#2133 <https://github.com/ros2/rclcpp/issues/2133>`_)" (`#2148 <https://github.com/ros2/rclcpp/issues/2148>`_)
-* extract the result response before the callback is issued. (`#2133 <https://github.com/ros2/rclcpp/issues/2133>`_)
-* Contributors: Tomoya Fujita
+* Update API docs links in package READMEs (`#2302 <https://github.com/ros2/rclcpp/issues/2302>`_)
+* fix(ClientGoalHandle): Made mutex recursive to prevent deadlocks (`#2267 <https://github.com/ros2/rclcpp/issues/2267>`_)
+* Contributors: Christophe Bedard, jmachowinski
 
-16.0.3 (2023-01-10)
+22.2.0 (2023-09-07)
+-------------------
+* Correct the position of a comment. (`#2290 <https://github.com/ros2/rclcpp/issues/2290>`_)
+* Fix a typo in a comment. (`#2283 <https://github.com/ros2/rclcpp/issues/2283>`_)
+* doc fix: call `canceled` only after goal state is in canceling. (`#2266 <https://github.com/ros2/rclcpp/issues/2266>`_)
+* Contributors: Chris Lalancette, Jiaqi Li, Tomoya Fujita
+
+22.1.0 (2023-08-21)
 -------------------
 
-16.0.2 (2022-11-07)
+22.0.0 (2023-07-11)
+-------------------
+
+21.3.0 (2023-06-12)
+-------------------
+
+21.2.0 (2023-06-07)
+-------------------
+
+21.1.1 (2023-05-11)
+-------------------
+
+21.1.0 (2023-04-27)
+-------------------
+
+21.0.0 (2023-04-18)
+-------------------
+
+20.0.0 (2023-04-13)
+-------------------
+* extract the result response before the callback is issued. (`#2132 <https://github.com/ros2/rclcpp/issues/2132>`_)
+* Update all rclcpp packages to C++17. (`#2121 <https://github.com/ros2/rclcpp/issues/2121>`_)
+* Fix the GoalUUID to_string representation (`#1999 <https://github.com/ros2/rclcpp/issues/1999>`_)
+* Contributors: Chris Lalancette, Nathan Wiebe Neufeldt, Tomoya Fujita
+
+19.3.0 (2023-03-01)
+-------------------
+
+19.2.0 (2023-02-24)
+-------------------
+
+19.1.0 (2023-02-14)
+-------------------
+
+19.0.0 (2023-01-30)
+-------------------
+
+18.0.0 (2022-12-29)
+-------------------
+* Explicitly set callback type (`#2059 <https://github.com/ros2/rclcpp/issues/2059>`_)
+* Update maintainers (`#2043 <https://github.com/ros2/rclcpp/issues/2043>`_)
+* Contributors: Audrow Nash, mauropasse
+
+17.1.0 (2022-11-02)
+-------------------
+* Do not clear entities callbacks on destruction (`#2002 <https://github.com/ros2/rclcpp/issues/2002>`_)
+* Contributors: mauropasse
+
+17.0.0 (2022-09-13)
+-------------------
+* Revert "Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)" (`#1956 <https://github.com/ros2/rclcpp/issues/1956>`_)
+* Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)
+* Contributors: Hubert Liberacki, William Woodall
+
+16.2.0 (2022-05-03)
+-------------------
+
+16.1.0 (2022-04-29)
 -------------------
 
 16.0.1 (2022-04-13)
