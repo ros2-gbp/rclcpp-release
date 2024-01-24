@@ -306,11 +306,6 @@ public:
   rclcpp::experimental::SubscriptionIntraProcessBase::SharedPtr
   get_subscription_intra_process(uint64_t intra_process_subscription_id);
 
-  /// Return the lowest available capacity for all subscription buffers for a publisher id.
-  RCLCPP_PUBLIC
-  size_t
-  lowest_available_capacity(const uint64_t intra_process_publisher_id) const;
-
 private:
   struct SplittedSubscriptions
   {
@@ -459,15 +454,13 @@ private:
         if (std::next(it) == subscription_ids.end()) {
           // If this is the last subscription, give up ownership
           subscription->provide_intra_process_data(std::move(message));
-          // Last message delivered, break from for loop
-          break;
         } else {
           // Copy the message since we have additional subscriptions to serve
           Deleter deleter = message.get_deleter();
           auto ptr = MessageAllocTraits::allocate(allocator, 1);
           MessageAllocTraits::construct(allocator, ptr, *message);
 
-          subscription->provide_intra_process_data(MessageUniquePtr(ptr, deleter));
+          subscription->provide_intra_process_data(std::move(MessageUniquePtr(ptr, deleter)));
         }
 
         continue;
@@ -500,8 +493,6 @@ private:
           if (std::next(it) == subscription_ids.end()) {
             // If this is the last subscription, give up ownership
             ros_message_subscription->provide_intra_process_message(std::move(message));
-            // Last message delivered, break from for loop
-            break;
           } else {
             // Copy the message since we have additional subscriptions to serve
             Deleter deleter = message.get_deleter();
@@ -510,7 +501,7 @@ private:
             MessageAllocTraits::construct(allocator, ptr, *message);
 
             ros_message_subscription->provide_intra_process_message(
-              MessageUniquePtr(ptr, deleter));
+              std::move(MessageUniquePtr(ptr, deleter)));
           }
         }
       }

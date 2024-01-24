@@ -17,7 +17,6 @@
 
 #include "rclcpp/callback_group.hpp"
 #include "rclcpp/macros.hpp"
-#include "rclcpp/node_interfaces/detail/node_interfaces_helpers.hpp"
 #include "rclcpp/visibility_control.hpp"
 #include "rclcpp/waitable.hpp"
 
@@ -54,7 +53,5 @@ public:
 
 }  // namespace node_interfaces
 }  // namespace rclcpp
-
-RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(rclcpp::node_interfaces::NodeWaitablesInterface, waitables)
 
 #endif  // RCLCPP__NODE_INTERFACES__NODE_WAITABLES_INTERFACE_HPP_
