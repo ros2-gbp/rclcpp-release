@@ -104,7 +104,7 @@ public:
 
 private:
   using SubscriptionTopicStatisticsSharedPtr =
-    std::shared_ptr<rclcpp::topic_statistics::SubscriptionTopicStatistics>;
+    std::shared_ptr<rclcpp::topic_statistics::SubscriptionTopicStatistics<ROSMessageType>>;
 
 public:
   RCLCPP_SMART_PTR_DEFINITIONS(Subscription)
@@ -163,6 +163,10 @@ public:
         throw std::invalid_argument(
                 "intraprocess communication is not allowed with 0 depth qos policy");
       }
+      if (qos_profile.durability() != rclcpp::DurabilityPolicy::Volatile) {
+        throw std::invalid_argument(
+                "intraprocess communication allowed only with volatile durability");
+      }
 
       using SubscriptionIntraProcessT = rclcpp::experimental::SubscriptionIntraProcess<
         MessageT,
@@ -181,7 +185,7 @@ public:
         this->get_topic_name(),  // important to get like this, as it has the fully-qualified name
         qos_profile,
         resolve_intra_process_buffer_type(options_.intra_process_buffer_type, callback));
-      TRACETOOLS_TRACEPOINT(
+      TRACEPOINT(
         rclcpp_subscription_init,
         static_cast<const void *>(get_subscription_handle().get()),
         static_cast<const void *>(subscription_intra_process_.get()));
@@ -189,8 +193,7 @@ public:
       // Add it to the intra process manager.
       using rclcpp::experimental::IntraProcessManager;
       auto ipm = context->get_sub_context<IntraProcessManager>();
-      uint64_t intra_process_subscription_id = ipm->template add_subscription<
-        ROSMessageType, ROSMessageTypeAllocator>(subscription_intra_process_);
+      uint64_t intra_process_subscription_id = ipm->add_subscription(subscription_intra_process_);
       this->setup_intra_process(intra_process_subscription_id, ipm);
     }
 
@@ -198,11 +201,11 @@ public:
       this->subscription_topic_statistics_ = std::move(subscription_topic_statistics);
     }
 
-    TRACETOOLS_TRACEPOINT(
+    TRACEPOINT(
       rclcpp_subscription_init,
       static_cast<const void *>(get_subscription_handle().get()),
       static_cast<const void *>(this));
-    TRACETOOLS_TRACEPOINT(
+    TRACEPOINT(
       rclcpp_subscription_callback_added,
       static_cast<const void *>(this),
       static_cast<const void *>(&any_callback_));
@@ -313,7 +316,7 @@ public:
     if (subscription_topic_statistics_) {
       const auto nanos = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
       const auto time = rclcpp::Time(nanos.time_since_epoch().count());
-      subscription_topic_statistics_->handle_message(message_info.get_rmw_message_info(), time);
+      subscription_topic_statistics_->handle_message(*typed_message, time);
     }
   }
 
@@ -322,20 +325,8 @@ public:
     const std::shared_ptr<rclcpp::SerializedMessage> & serialized_message,
     const rclcpp::MessageInfo & message_info) override
   {
-    std::chrono::time_point<std::chrono::system_clock> now;
-    if (subscription_topic_statistics_) {
-      // get current time before executing callback to
-      // exclude callback duration from topic statistics result.
-      now = std::chrono::system_clock::now();
-    }
-
+    // TODO(wjwwood): enable topic statistics for serialized messages
     any_callback_.dispatch(serialized_message, message_info);
-
-    if (subscription_topic_statistics_) {
-      const auto nanos = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
-      const auto time = rclcpp::Time(nanos.time_since_epoch().count());
-      subscription_topic_statistics_->handle_message(message_info.get_rmw_message_info(), time);
-    }
   }
 
   void
@@ -366,7 +357,7 @@ public:
     if (subscription_topic_statistics_) {
       const auto nanos = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
       const auto time = rclcpp::Time(nanos.time_since_epoch().count());
-      subscription_topic_statistics_->handle_message(message_info.get_rmw_message_info(), time);
+      subscription_topic_statistics_->handle_message(*typed_message, time);
     }
   }
 

@@ -10,14 +10,11 @@ find_package(builtin_interfaces REQUIRED)
 find_package(libstatistics_collector REQUIRED)
 find_package(rcl REQUIRED)
 find_package(rcl_interfaces REQUIRED)
-find_package(rcl_logging_interface REQUIRED)
 find_package(rcl_yaml_param_parser REQUIRED)
 find_package(rcpputils REQUIRED)
 find_package(rcutils REQUIRED)
 find_package(rmw REQUIRED)
 find_package(rosgraph_msgs REQUIRED)
-find_package(rosidl_dynamic_typesupport REQUIRED)
-find_package(rosidl_runtime_c REQUIRED)
 find_package(rosidl_runtime_cpp REQUIRED)
 find_package(rosidl_typesupport_c REQUIRED)
 find_package(rosidl_typesupport_cpp REQUIRED)
@@ -46,7 +43,6 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/context.cpp
   src/rclcpp/contexts/default_context.cpp
   src/rclcpp/detail/add_guard_condition_to_rcl_wait_set.cpp
-  src/rclcpp/detail/resolve_intra_process_buffer_type.cpp
   src/rclcpp/detail/resolve_parameter_overrides.cpp
   src/rclcpp/detail/rmw_implementation_specific_payload.cpp
   src/rclcpp/detail/rmw_implementation_specific_publisher_payload.cpp
@@ -110,7 +106,6 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/qos.cpp
   src/rclcpp/event_handler.cpp
   src/rclcpp/qos_overriding_options.cpp
-  src/rclcpp/rate.cpp
   src/rclcpp/serialization.cpp
   src/rclcpp/serialized_message.cpp
   src/rclcpp/service.cpp
@@ -205,28 +200,22 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
-target_link_libraries(${PROJECT_NAME} PUBLIC
-  ${builtin_interfaces_TARGETS}
-  libstatistics_collector::libstatistics_collector
-  rcl::rcl
-  ${rcl_interfaces_TARGETS}
-  rcl_yaml_param_parser::rcl_yaml_param_parser
-  rcpputils::rcpputils
-  rcutils::rcutils
-  rmw::rmw
-  ${rosgraph_msgs_TARGETS}
-  rosidl_dynamic_typesupport::rosidl_dynamic_typesupport
-  rosidl_runtime_c::rosidl_runtime_c
-  rosidl_runtime_cpp::rosidl_runtime_cpp
-  rosidl_typesupport_cpp::rosidl_typesupport_cpp
-  ${statistics_msgs_TARGETS}
-  tracetools::tracetools
-  ${CMAKE_THREAD_LIBS_INIT}
-)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE
-  ament_index_cpp::ament_index_cpp
-  rcl_logging_interface::rcl_logging_interface
+target_link_libraries(${PROJECT_NAME} ${CMAKE_THREAD_LIBS_INIT})
+# specific order: dependents before dependencies
+ament_target_dependencies(${PROJECT_NAME}
+  "ament_index_cpp"
+  "libstatistics_collector"
+  "rcl"
+  "rcl_interfaces"
+  "rcl_yaml_param_parser"
+  "rcpputils"
+  "rcutils"
+  "builtin_interfaces"
+  "rosgraph_msgs"
+  "rosidl_typesupport_cpp"
+  "rosidl_runtime_cpp"
+  "statistics_msgs"
+  "tracetools"
 )
 
 # Causes the visibility macros to use dllexport rather than dllimport,
@@ -248,23 +237,20 @@ ament_export_libraries(${PROJECT_NAME})
 # Export modern CMake targets
 ament_export_targets(${PROJECT_NAME})
 
-ament_export_dependencies(
-  builtin_interfaces
-  libstatistics_collector
-  rcl
-  rcl_interfaces
-  rcl_yaml_param_parser
-  rcpputils
-  rcutils
-  rmw
-  rosgraph_msgs
-  rosidl_dynamic_typesupport
-  rosidl_runtime_c
-  rosidl_runtime_cpp
-  rosidl_typesupport_cpp
-  statistics_msgs
-  tracetools
-)
+# specific order: dependents before dependencies
+ament_export_dependencies(ament_index_cpp)
+ament_export_dependencies(libstatistics_collector)
+ament_export_dependencies(rcl)
+ament_export_dependencies(rcpputils)
+ament_export_dependencies(rcutils)
+ament_export_dependencies(builtin_interfaces)
+ament_export_dependencies(rosgraph_msgs)
+ament_export_dependencies(rosidl_typesupport_cpp)
+ament_export_dependencies(rosidl_typesupport_c)
+ament_export_dependencies(rosidl_runtime_cpp)
+ament_export_dependencies(rcl_yaml_param_parser)
+ament_export_dependencies(statistics_msgs)
+ament_export_dependencies(tracetools)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -282,7 +268,7 @@ install(
 
 if(TEST cppcheck)
   # must set the property after ament_package()
-  set_tests_properties(cppcheck PROPERTIES TIMEOUT 600)
+  set_tests_properties(cppcheck PROPERTIES TIMEOUT 500)
 endif()
 
 if(TEST cpplint)

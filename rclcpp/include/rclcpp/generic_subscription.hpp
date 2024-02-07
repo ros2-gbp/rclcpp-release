@@ -74,21 +74,18 @@ public:
     const std::string & topic_name,
     const std::string & topic_type,
     const rclcpp::QoS & qos,
-    AnySubscriptionCallback<rclcpp::SerializedMessage, AllocatorT> callback,
+    // TODO(nnmm): Add variant for callback with message info. See issue #1604.
+    std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
     const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
   : SubscriptionBase(
       node_base,
-      *rclcpp::get_message_typesupport_handle(topic_type, "rosidl_typesupport_cpp", *ts_lib),
+      *rclcpp::get_typesupport_handle(topic_type, "rosidl_typesupport_cpp", *ts_lib),
       topic_name,
       options.to_rcl_subscription_options(qos),
       options.event_callbacks,
       options.use_default_callbacks,
       DeliveredMessageKind::SERIALIZED_MESSAGE),
-    callback_([callback](
-        std::shared_ptr<const rclcpp::SerializedMessage> serialized_message,
-        const rclcpp::MessageInfo & message_info) mutable {
-        callback.dispatch(serialized_message, message_info);
-      }),
+    callback_(callback),
     ts_lib_(ts_lib)
   {}
 
@@ -154,9 +151,7 @@ public:
 private:
   RCLCPP_DISABLE_COPY(GenericSubscription)
 
-  std::function<void(
-      std::shared_ptr<const rclcpp::SerializedMessage>,
-      const rclcpp::MessageInfo)> callback_;
+  std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback_;
   // The type support library should stay loaded, so it is stored in the GenericSubscription
   std::shared_ptr<rcpputils::SharedLibrary> ts_lib_;
 };

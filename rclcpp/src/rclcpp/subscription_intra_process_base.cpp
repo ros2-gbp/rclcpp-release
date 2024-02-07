@@ -34,9 +34,3 @@ SubscriptionIntraProcessBase::get_actual_qos() const
 {
   return qos_profile_;
 }
-
-bool
-SubscriptionIntraProcessBase::is_durability_transient_local() const
-{
-  return qos_profile_.durability() == rclcpp::DurabilityPolicy::TransientLocal;
-}
