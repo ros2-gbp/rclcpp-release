@@ -1,0 +1,12 @@
+Source: ros-rolling-rclcpp
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ament-cmake, ament-cmake-copyright <!nocheck>, ament-cmake-cppcheck <!nocheck>, ament-cmake-cpplint <!nocheck>, ament-cmake-flake8 <!nocheck>, ament-cmake-googletest <!nocheck>, ament-cmake-lint-cmake <!nocheck>, ament-cmake-pep257 <!nocheck>, ament-cmake-ros, ament-cmake-uncrustify <!nocheck>, ament-cmake-xmllint <!nocheck>, ament-lint <!nocheck>, libament-index-cpp-dev, libperformance-test-fixture-dev <!nocheck>, librcpputils-dev, librcutils-dev, libros-rosgraph-msgs-dev, librosidl-runtime-c-cpp-dev, python3-ament-cmake-google-benchmark <!nocheck>, python3-dev, python3-rcutils, python3-rosgraph-msgs, ros-rolling-builtin-interfaces, ros-rolling-libstatistics-collector, ros-rolling-mimick-vendor <!nocheck>, ros-rolling-rcl, ros-rolling-rcl-interfaces, ros-rolling-rcl-logging-interface, ros-rolling-rcl-yaml-param-parser, ros-rolling-rmw, ros-rolling-rmw <!nocheck>, ros-rolling-rmw-implementation-cmake <!nocheck>, ros-rolling-rosidl-default-generators <!nocheck>, ros-rolling-rosidl-dynamic-typesupport, ros-rolling-rosidl-typesupport-c, ros-rolling-rosidl-typesupport-cpp, ros-rolling-statistics-msgs, ros-rolling-test-msgs <!nocheck>, ros-rolling-tracetools, ros-rosgraph-msgs, ros-rolling-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-rolling-rclcpp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libament-index-cpp-dev, librcpputils-dev, librcutils-dev, libros-rosgraph-msgs-dev, librosidl-runtime-c-cpp-dev, python3-rcutils, python3-rosgraph-msgs, ros-rolling-builtin-interfaces, ros-rolling-libstatistics-collector, ros-rolling-rcl, ros-rolling-rcl-interfaces, ros-rolling-rcl-logging-interface, ros-rolling-rcl-yaml-param-parser, ros-rolling-rmw, ros-rolling-rosidl-dynamic-typesupport, ros-rolling-rosidl-typesupport-c, ros-rolling-rosidl-typesupport-cpp, ros-rolling-statistics-msgs, ros-rolling-tracetools, ros-rosgraph-msgs, ros-rolling-ros-workspace
+Description: The ROS client library in C++.
