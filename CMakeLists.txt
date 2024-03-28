@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.20)
 
 project(rclcpp)
 
@@ -45,6 +45,7 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/clock.cpp
   src/rclcpp/context.cpp
   src/rclcpp/contexts/default_context.cpp
+  src/rclcpp/create_generic_client.cpp
   src/rclcpp/detail/add_guard_condition_to_rcl_wait_set.cpp
   src/rclcpp/detail/resolve_intra_process_buffer_type.cpp
   src/rclcpp/detail/resolve_parameter_overrides.cpp
@@ -74,6 +75,7 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/experimental/executors/events_executor/events_executor.cpp
   src/rclcpp/experimental/timers_manager.cpp
   src/rclcpp/future_return_code.cpp
+  src/rclcpp/generic_client.cpp
   src/rclcpp/generic_publisher.cpp
   src/rclcpp/generic_subscription.cpp
   src/rclcpp/graph_listener.cpp
@@ -126,6 +128,21 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/wait_set_policies/detail/write_preferring_read_write_lock.cpp
   src/rclcpp/waitable.cpp
 )
+
+# By default, without the settings below, find_package(Python3) will attempt
+# to find the newest python version it can, and additionally will find the
+# most specific version.  For instance, on a system that has
+# /usr/bin/python3.10, /usr/bin/python3.11, and /usr/bin/python3, it will find
+# /usr/bin/python3.11, even if /usr/bin/python3 points to /usr/bin/python3.10.
+# The behavior we want is to prefer the "system" installed version unless the
+# user specifically tells us othewise through the Python3_EXECUTABLE hint.
+# Setting CMP0094 to NEW means that the search will stop after the first
+# python version is found.  Setting Python3_FIND_UNVERSIONED_NAMES means that
+# the search will prefer /usr/bin/python3 over /usr/bin/python3.11.  And that
+# latter functionality is only available in CMake 3.20 or later, so we need
+# at least that version.
+cmake_policy(SET CMP0094 NEW)
+set(Python3_FIND_UNVERSIONED_NAMES FIRST)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
