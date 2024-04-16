@@ -1,18 +1,10 @@
-# rclcpp
+# `rclcpp_action`
 
-This repository contains the source code for the ROS Client Library for C++ package, included with a standard install of any ROS 2 distro.
+Adds action APIs for C++.
 
-rclcpp provides the standard C++ API for interacting with ROS 2.
+The link to the latest rclcpp_action API documentation, which includes a complete list of its main components and features, can be found on the [rclcpp_action package info page](https://docs.ros.org/en/rolling/p/rclcpp_action).
+For more information about Actions in ROS 2, see the [design document](http://design.ros2.org/articles/actions.html).
 
-## Usage
+## Quality Declaration
 
-`#include "rclcpp/rclcpp.hpp"` allows use of the most common elements of the ROS 2 system.
-
-The link to the latest API documentation can be found on the [rclcpp package info page](https://docs.ros.org/en/rolling/p/rclcpp).
-
-
-### Examples
-
-The ROS 2 tutorials [Writing a simple publisher and subscriber](https://docs.ros.org/en/rolling/Tutorials/Writing-A-Simple-Cpp-Publisher-And-Subscriber.html).
-and [Writing a simple service and client](https://docs.ros.org/en/rolling/Tutorials/Writing-A-Simple-Cpp-Service-And-Client.html)
-contain some examples of rclcpp APIs in use.
+This package claims to be in the **Quality Level 1** category, see the [Quality Declaration](QUALITY_DECLARATION.md) for more details.
