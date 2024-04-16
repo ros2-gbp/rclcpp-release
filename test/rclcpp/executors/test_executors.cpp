@@ -82,8 +82,6 @@ public:
   int callback_count;
 };
 
-// spin_all and spin_some are not implemented correctly in StaticSingleThreadedExecutor, see:
-// https://github.com/ros2/rclcpp/issues/1219 for tracking
 template<typename T>
 class TestExecutorsStable : public TestExecutors<T> {};
 
@@ -106,10 +104,7 @@ TYPED_TEST(TestExecutors, detachOnDestruction)
 }
 
 // Make sure that the executor can automatically remove expired nodes correctly
-// Currently fails for StaticSingleThreadedExecutor so it is being skipped, see:
-// https://github.com/ros2/rclcpp/issues/1231
-TYPED_TEST(TestExecutorsStable, addTemporaryNode)
-{
+TYPED_TEST(TestExecutors, addTemporaryNode) {
   using ExecutorType = TypeParam;
   ExecutorType executor;
 
@@ -177,16 +172,19 @@ TYPED_TEST(TestExecutors, spinWhileAlreadySpinning)
 {
   using ExecutorType = TypeParam;
   ExecutorType executor;
+
+  std::atomic_bool timer_completed = false;
+  auto timer = this->node->create_wall_timer(
+    1ms, [&]() {
+      timer_completed.store(true);
+    });
+
   executor.add_node(this->node);
-
-  bool timer_completed = false;
-  auto timer = this->node->create_wall_timer(1ms, [&]() {timer_completed = true;});
-
   std::thread spinner([&]() {executor.spin();});
-  // Sleep for a short time to verify executor.spin() is going, and didn't throw.
 
+  // Sleep for a short time to verify executor.spin() is going, and didn't throw.
   auto start = std::chrono::steady_clock::now();
-  while (!timer_completed && (std::chrono::steady_clock::now() - start) < 10s) {
+  while (!timer_completed.load() && (std::chrono::steady_clock::now() - start) < 10s) {
     std::this_thread::sleep_for(1ms);
   }
 
@@ -339,21 +337,28 @@ public:
   TestWaitable() = default;
 
   void
-  add_to_wait_set(rcl_wait_set_t * wait_set) override
+  add_to_wait_set(rcl_wait_set_t & wait_set) override
   {
-    rclcpp::detail::add_guard_condition_to_rcl_wait_set(*wait_set, gc_);
+    if (trigger_count_ > 0) {
+      // Keep the gc triggered until the trigger count is reduced back to zero.
+      // This is necessary if trigger() results in the wait set waking, but not
+      // executing this waitable, in which case it needs to be re-triggered.
+      gc_.trigger();
+    }
+    rclcpp::detail::add_guard_condition_to_rcl_wait_set(wait_set, gc_);
   }
 
   void trigger()
   {
+    trigger_count_++;
     gc_.trigger();
   }
 
   bool
-  is_ready(rcl_wait_set_t * wait_set) override
+  is_ready(const rcl_wait_set_t & wait_set) override
   {
-    for (size_t i = 0; i < wait_set->size_of_guard_conditions; ++i) {
-      auto rcl_guard_condition = wait_set->guard_conditions[i];
+    for (size_t i = 0; i < wait_set.size_of_guard_conditions; ++i) {
+      auto rcl_guard_condition = wait_set.guard_conditions[i];
       if (&gc_.get_rcl_guard_condition() == rcl_guard_condition) {
         return true;
       }
@@ -375,9 +380,9 @@ public:
   }
 
   void
-  execute(std::shared_ptr<void> & data) override
+  execute(const std::shared_ptr<void> &) override
   {
-    (void) data;
+    trigger_count_--;
     count_++;
     if (nullptr != on_execute_callback_) {
       on_execute_callback_();
@@ -414,13 +419,14 @@ public:
   get_number_of_ready_guard_conditions() override {return 1;}
 
   size_t
-  get_count()
+  get_count() const
   {
     return count_;
   }
 
 private:
-  size_t count_ = 0;
+  std::atomic<size_t> trigger_count_ = 0;
+  std::atomic<size_t> count_ = 0;
   rclcpp::GuardCondition gc_;
   std::function<void()> on_execute_callback_ = nullptr;
 };
@@ -832,4 +838,34 @@ TEST(TestExecutors, testSpinUntilFutureCompleteNodePtr)
   }
 
   rclcpp::shutdown();
+}
+
+// Check spin functions with non default context
+TEST(TestExecutors, testSpinWithNonDefaultContext)
+{
+  auto non_default_context = std::make_shared<rclcpp::Context>();
+  non_default_context->init(0, nullptr);
+
+  {
+    auto node =
+      std::make_unique<rclcpp::Node>("node", rclcpp::NodeOptions().context(non_default_context));
+
+    EXPECT_NO_THROW(rclcpp::spin_some(node->get_node_base_interface()));
+
+    EXPECT_NO_THROW(rclcpp::spin_all(node->get_node_base_interface(), 1s));
+
+    auto check_spin_until_future_complete = [&]() {
+        std::promise<bool> promise;
+        std::future<bool> future = promise.get_future();
+        promise.set_value(true);
+
+        auto shared_future = future.share();
+        auto ret = rclcpp::spin_until_future_complete(
+          node->get_node_base_interface(), shared_future, 1s);
+        EXPECT_EQ(rclcpp::FutureReturnCode::SUCCESS, ret);
+      };
+    EXPECT_NO_THROW(check_spin_until_future_complete());
+  }
+
+  rclcpp::shutdown(non_default_context);
 }
