@@ -1,0 +1,12 @@
+Source: ros-iron-rclcpp-lifecycle
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-iron-ament-cmake-gtest <!nocheck>, ros-iron-ament-cmake-ros, ros-iron-ament-lint-auto <!nocheck>, ros-iron-ament-lint-common <!nocheck>, ros-iron-lifecycle-msgs, ros-iron-mimick-vendor <!nocheck>, ros-iron-performance-test-fixture <!nocheck>, ros-iron-rcl, ros-iron-rcl-interfaces, ros-iron-rcl-lifecycle, ros-iron-rclcpp, ros-iron-rcpputils <!nocheck>, ros-iron-rcutils, ros-iron-rmw, ros-iron-rosidl-typesupport-cpp, ros-iron-test-msgs <!nocheck>, ros-iron-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-iron-rclcpp-lifecycle
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-iron-lifecycle-msgs, ros-iron-rcl, ros-iron-rcl-interfaces, ros-iron-rcl-lifecycle, ros-iron-rclcpp, ros-iron-rcutils, ros-iron-rmw, ros-iron-rosidl-typesupport-cpp, ros-iron-ros-workspace
+Description: Package containing a prototype for lifecycle implementation
