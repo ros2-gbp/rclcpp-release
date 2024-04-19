@@ -43,9 +43,10 @@ TEST_F(TestNodeTypeDescriptions, disabled_no_service)
   node_options.append_parameter_override("start_type_description_service", false);
   rclcpp::Node node{"node", "ns", node_options};
 
-  auto services = node.get_node_graph_interface()->get_service_names_and_types_by_node(
-    "node", "/ns");
-  EXPECT_TRUE(services.find("/ns/node/get_type_description") == services.end());
+  rcl_node_t * rcl_node = node.get_node_base_interface()->get_rcl_node_handle();
+  rcl_service_t * srv = nullptr;
+  rcl_ret_t ret = rcl_node_get_type_description_service(rcl_node, &srv);
+  ASSERT_EQ(RCL_RET_NOT_INIT, ret);
 }
 
 TEST_F(TestNodeTypeDescriptions, enabled_creates_service)
@@ -54,8 +55,9 @@ TEST_F(TestNodeTypeDescriptions, enabled_creates_service)
   node_options.append_parameter_override("start_type_description_service", true);
   rclcpp::Node node{"node", "ns", node_options};
 
-  auto services = node.get_node_graph_interface()->get_service_names_and_types_by_node(
-    "node", "/ns");
-
-  EXPECT_TRUE(services.find("/ns/node/get_type_description") != services.end());
+  rcl_node_t * rcl_node = node.get_node_base_interface()->get_rcl_node_handle();
+  rcl_service_t * srv = nullptr;
+  rcl_ret_t ret = rcl_node_get_type_description_service(rcl_node, &srv);
+  ASSERT_EQ(RCL_RET_OK, ret);
+  ASSERT_NE(nullptr, srv);
 }

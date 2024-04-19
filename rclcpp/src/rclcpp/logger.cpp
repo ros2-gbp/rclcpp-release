@@ -17,7 +17,6 @@
 #include <utility>
 
 #include "rcl_logging_interface/rcl_logging_interface.h"
-#include "rcl/error_handling.h"
 #include "rcl/logging_rosout.h"
 
 #include "rclcpp/exceptions.hpp"
@@ -81,12 +80,10 @@ Logger::get_child(const std::string & suffix)
   {
     std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
     rcl_ret = rcl_logging_rosout_add_sublogger((*name_).c_str(), suffix.c_str());
-    if (RCL_RET_NOT_FOUND == rcl_ret) {
-      rcl_reset_error();
-    } else if (RCL_RET_OK != rcl_ret) {
+    if (RCL_RET_OK != rcl_ret) {
       exceptions::throw_from_rcl_error(
         rcl_ret, "failed to call rcl_logging_rosout_add_sublogger",
-        rcl_get_error_state(), rcl_reset_error);
+        rcutils_get_error_state(), rcutils_reset_error);
     }
   }
 
@@ -101,7 +98,9 @@ Logger::get_child(const std::string & suffix)
           logger_sublogger_pairname_ptr->second.c_str());
         delete logger_sublogger_pairname_ptr;
         if (RCL_RET_OK != rcl_ret) {
-          rcl_reset_error();
+          exceptions::throw_from_rcl_error(
+            rcl_ret, "failed to call rcl_logging_rosout_remove_sublogger",
+            rcutils_get_error_state(), rcutils_reset_error);
         }
       });
   }

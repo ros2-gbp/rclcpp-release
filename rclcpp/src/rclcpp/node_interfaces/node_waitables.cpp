@@ -32,7 +32,8 @@ NodeWaitables::add_waitable(
 {
   if (group) {
     if (!node_base_->callback_group_in_node(group)) {
-      throw rclcpp::exceptions::MissingGroupNodeException("waitable");
+      // TODO(jacobperron): use custom exception
+      throw std::runtime_error("Cannot create waitable, group not in node.");
     }
   } else {
     group = node_base_->get_default_callback_group();
