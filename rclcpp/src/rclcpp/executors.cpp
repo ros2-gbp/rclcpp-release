@@ -15,9 +15,28 @@
 #include "rclcpp/executors.hpp"
 
 void
+rclcpp::spin_all(
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+  std::chrono::nanoseconds max_duration)
+{
+  rclcpp::ExecutorOptions options;
+  options.context = node_ptr->get_context();
+  rclcpp::executors::SingleThreadedExecutor exec(options);
+  exec.spin_node_all(node_ptr, max_duration);
+}
+
+void
+rclcpp::spin_all(rclcpp::Node::SharedPtr node_ptr, std::chrono::nanoseconds max_duration)
+{
+  rclcpp::spin_all(node_ptr->get_node_base_interface(), max_duration);
+}
+
+void
 rclcpp::spin_some(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr)
 {
-  rclcpp::executors::SingleThreadedExecutor exec;
+  rclcpp::ExecutorOptions options;
+  options.context = node_ptr->get_context();
+  rclcpp::executors::SingleThreadedExecutor exec(options);
   exec.spin_node_some(node_ptr);
 }
 
@@ -30,7 +49,9 @@ rclcpp::spin_some(rclcpp::Node::SharedPtr node_ptr)
 void
 rclcpp::spin(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr)
 {
-  rclcpp::executors::SingleThreadedExecutor exec;
+  rclcpp::ExecutorOptions options;
+  options.context = node_ptr->get_context();
+  rclcpp::executors::SingleThreadedExecutor exec(options);
   exec.add_node(node_ptr);
   exec.spin();
   exec.remove_node(node_ptr);

@@ -40,10 +40,12 @@ EventsExecutor::EventsExecutor(
   // The timers manager can be used either to only track timers (in this case an expired
   // timer will generate an executor event and then it will be executed by the executor thread)
   // or it can also take care of executing expired timers in its dedicated thread.
-  std::function<void(const rclcpp::TimerBase *)> timer_on_ready_cb = nullptr;
+  std::function<void(const rclcpp::TimerBase *,
+    const std::shared_ptr<void> &)> timer_on_ready_cb = nullptr;
   if (!execute_timers_separate_thread) {
-    timer_on_ready_cb = [this](const rclcpp::TimerBase * timer_id) {
-        ExecutorEvent event = {timer_id, -1, ExecutorEventType::TIMER_EVENT, 1};
+    timer_on_ready_cb =
+      [this](const rclcpp::TimerBase * timer_id, const std::shared_ptr<void> & data) {
+        ExecutorEvent event = {timer_id, data, -1, ExecutorEventType::TIMER_EVENT, 1};
         this->events_queue_->enqueue(event);
       };
   }
@@ -88,7 +90,7 @@ EventsExecutor::EventsExecutor(
       }
 
       ExecutorEvent event =
-      {notify_waitable_entity_id, waitable_data, ExecutorEventType::WAITABLE_EVENT, 1};
+      {notify_waitable_entity_id, nullptr, waitable_data, ExecutorEventType::WAITABLE_EVENT, 1};
       this->events_queue_->enqueue(event);
     });
 
@@ -206,11 +208,12 @@ EventsExecutor::spin_once_impl(std::chrono::nanoseconds timeout)
     timeout = std::chrono::nanoseconds::max();
   }
 
-  // Select the smallest between input timeout and timer timeout
+  // Select the smallest between input timeout and timer timeout.
+  // Cancelled timers are not considered.
   bool is_timer_timeout = false;
   auto next_timer_timeout = timers_manager_->get_head_timeout();
-  if (next_timer_timeout < timeout) {
-    timeout = next_timer_timeout;
+  if (next_timer_timeout.has_value() && next_timer_timeout.value() < timeout) {
+    timeout = next_timer_timeout.value();
     is_timer_timeout = true;
   }
 
@@ -273,10 +276,13 @@ EventsExecutor::execute_event(const ExecutorEvent & event)
   switch (event.type) {
     case ExecutorEventType::CLIENT_EVENT:
       {
-        auto client = this->retrieve_entity(
-          static_cast<const rcl_client_t *>(event.entity_key),
-          current_entities_collection_->clients);
-
+        rclcpp::ClientBase::SharedPtr client;
+        {
+          std::lock_guard<std::recursive_mutex> lock(collection_mutex_);
+          client = this->retrieve_entity(
+            static_cast<const rcl_client_t *>(event.entity_key),
+            current_entities_collection_->clients);
+        }
         if (client) {
           for (size_t i = 0; i < event.num_events; i++) {
             execute_client(client);
@@ -287,9 +293,13 @@ EventsExecutor::execute_event(const ExecutorEvent & event)
       }
     case ExecutorEventType::SUBSCRIPTION_EVENT:
       {
-        auto subscription = this->retrieve_entity(
-          static_cast<const rcl_subscription_t *>(event.entity_key),
-          current_entities_collection_->subscriptions);
+        rclcpp::SubscriptionBase::SharedPtr subscription;
+        {
+          std::lock_guard<std::recursive_mutex> lock(collection_mutex_);
+          subscription = this->retrieve_entity(
+            static_cast<const rcl_subscription_t *>(event.entity_key),
+            current_entities_collection_->subscriptions);
+        }
         if (subscription) {
           for (size_t i = 0; i < event.num_events; i++) {
             execute_subscription(subscription);
@@ -299,10 +309,13 @@ EventsExecutor::execute_event(const ExecutorEvent & event)
       }
     case ExecutorEventType::SERVICE_EVENT:
       {
-        auto service = this->retrieve_entity(
-          static_cast<const rcl_service_t *>(event.entity_key),
-          current_entities_collection_->services);
-
+        rclcpp::ServiceBase::SharedPtr service;
+        {
+          std::lock_guard<std::recursive_mutex> lock(collection_mutex_);
+          service = this->retrieve_entity(
+            static_cast<const rcl_service_t *>(event.entity_key),
+            current_entities_collection_->services);
+        }
         if (service) {
           for (size_t i = 0; i < event.num_events; i++) {
             execute_service(service);
@@ -314,17 +327,21 @@ EventsExecutor::execute_event(const ExecutorEvent & event)
     case ExecutorEventType::TIMER_EVENT:
       {
         timers_manager_->execute_ready_timer(
-          static_cast<const rclcpp::TimerBase *>(event.entity_key));
+          static_cast<const rclcpp::TimerBase *>(event.entity_key), event.data);
         break;
       }
     case ExecutorEventType::WAITABLE_EVENT:
       {
-        auto waitable = this->retrieve_entity(
-          static_cast<const rclcpp::Waitable *>(event.entity_key),
-          current_entities_collection_->waitables);
+        rclcpp::Waitable::SharedPtr waitable;
+        {
+          std::lock_guard<std::recursive_mutex> lock(collection_mutex_);
+          waitable = this->retrieve_entity(
+            static_cast<const rclcpp::Waitable *>(event.entity_key),
+            current_entities_collection_->waitables);
+        }
         if (waitable) {
           for (size_t i = 0; i < event.num_events; i++) {
-            auto data = waitable->take_data_by_entity_id(event.waitable_data);
+            const auto data = waitable->take_data_by_entity_id(event.waitable_data);
             waitable->execute(data);
           }
         }
@@ -386,6 +403,7 @@ EventsExecutor::get_automatically_added_callback_groups_from_nodes()
 void
 EventsExecutor::refresh_current_collection_from_callback_groups()
 {
+  // Build the new collection
   this->entities_collector_->update_collections();
   auto callback_groups = this->entities_collector_->get_all_callback_groups();
   rclcpp::executors::ExecutorEntitiesCollection new_collection;
@@ -400,6 +418,9 @@ EventsExecutor::refresh_current_collection_from_callback_groups()
   // To do it, we need to add the notify waitable as an entry in both the new and
   // current collections such that it's neither added or removed.
   this->add_notify_waitable_to_collection(new_collection.waitables);
+
+  // Acquire lock before modifying the current collection
+  std::lock_guard<std::recursive_mutex> lock(collection_mutex_);
   this->add_notify_waitable_to_collection(current_entities_collection_->waitables);
 
   this->refresh_current_collection(new_collection);
@@ -409,6 +430,9 @@ void
 EventsExecutor::refresh_current_collection(
   const rclcpp::executors::ExecutorEntitiesCollection & new_collection)
 {
+  // Acquire lock before modifying the current collection
+  std::lock_guard<std::recursive_mutex> lock(collection_mutex_);
+
   current_entities_collection_->timers.update(
     new_collection.timers,
     [this](rclcpp::TimerBase::SharedPtr timer) {timers_manager_->add_timer(timer);},
@@ -463,7 +487,7 @@ EventsExecutor::create_entity_callback(
 {
   std::function<void(size_t)>
   callback = [this, entity_key, event_type](size_t num_events) {
-      ExecutorEvent event = {entity_key, -1, event_type, num_events};
+      ExecutorEvent event = {entity_key, nullptr, -1, event_type, num_events};
       this->events_queue_->enqueue(event);
     };
   return callback;
@@ -475,7 +499,7 @@ EventsExecutor::create_waitable_callback(const rclcpp::Waitable * entity_key)
   std::function<void(size_t, int)>
   callback = [this, entity_key](size_t num_events, int waitable_data) {
       ExecutorEvent event =
-      {entity_key, waitable_data, ExecutorEventType::WAITABLE_EVENT, num_events};
+      {entity_key, nullptr, waitable_data, ExecutorEventType::WAITABLE_EVENT, num_events};
       this->events_queue_->enqueue(event);
     };
   return callback;

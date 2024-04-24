@@ -22,10 +22,10 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <utility>
 #include <vector>
-
 #include "rclcpp/context.hpp"
 #include "rclcpp/timer.hpp"
 
@@ -86,7 +86,8 @@ public:
   RCLCPP_PUBLIC
   TimersManager(
     std::shared_ptr<rclcpp::Context> context,
-    std::function<void(const rclcpp::TimerBase *)> on_ready_callback = nullptr);
+    std::function<void(const rclcpp::TimerBase *,
+    const std::shared_ptr<void> &)> on_ready_callback = nullptr);
 
   /**
    * @brief Destruct the TimersManager object making sure to stop thread and release memory.
@@ -164,21 +165,23 @@ public:
    * the TimersManager on_ready_callback was passed during construction.
    *
    * @param timer_id the timer ID of the timer to execute
+   * @param data internal data of the timer
    */
   RCLCPP_PUBLIC
-  void execute_ready_timer(const rclcpp::TimerBase * timer_id);
+  void execute_ready_timer(const rclcpp::TimerBase * timer_id, const std::shared_ptr<void> & data);
 
   /**
    * @brief Get the amount of time before the next timer triggers.
    * This function is thread safe.
    *
-   * @return std::chrono::nanoseconds to wait,
+   * @return std::optional<std::chrono::nanoseconds> to wait,
    * the returned value could be negative if the timer is already expired
    * or std::chrono::nanoseconds::max() if there are no timers stored in the object.
+   * If the head timer was cancelled, then this will return a nullopt.
    * @throws std::runtime_error if the timers thread was already running.
    */
   RCLCPP_PUBLIC
-  std::chrono::nanoseconds get_head_timeout();
+  std::optional<std::chrono::nanoseconds> get_head_timeout();
 
 private:
   RCLCPP_DISABLE_COPY(TimersManager)
@@ -512,12 +515,13 @@ private:
    * @brief Get the amount of time before the next timer triggers.
    * This function is not thread safe, acquire a mutex before calling it.
    *
-   * @return std::chrono::nanoseconds to wait,
+   * @return std::optional<std::chrono::nanoseconds> to wait,
    * the returned value could be negative if the timer is already expired
    * or std::chrono::nanoseconds::max() if the heap is empty.
+   * If the head timer was cancelled, then this will return a nullopt.
    * This function is not thread safe, acquire the timers_mutex_ before calling it.
    */
-  std::chrono::nanoseconds get_head_timeout_unsafe();
+  std::optional<std::chrono::nanoseconds> get_head_timeout_unsafe();
 
   /**
    * @brief Executes all the timers currently ready when the function is invoked
@@ -527,7 +531,8 @@ private:
   void execute_ready_timers_unsafe();
 
   // Callback to be called when timer is ready
-  std::function<void(const rclcpp::TimerBase *)> on_ready_callback_ = nullptr;
+  std::function<void(const rclcpp::TimerBase *,
+    const std::shared_ptr<void> &)> on_ready_callback_ = nullptr;
 
   // Thread used to run the timers execution task
   std::thread timers_thread_;
