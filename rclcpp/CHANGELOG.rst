@@ -2,10 +2,11 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-28.1.1 (2024-04-24)
+28.2.0 (2024-04-26)
 -------------------
-* Revise the description of service configure_introspection() (`#2511 <https://github.com/ros2/rclcpp/issues/2511>`_) (`#2513 <https://github.com/ros2/rclcpp/issues/2513>`_)
-* Contributors: mergify[bot]
+* Check for negative time in rclcpp::Time(int64_t nanoseconds, ...) constructor (`#2510 <https://github.com/ros2/rclcpp/issues/2510>`_)
+* Revise the description of service configure_introspection() (`#2511 <https://github.com/ros2/rclcpp/issues/2511>`_)
+* Contributors: Barry Xu, Sharmin Ramli
 
 28.1.0 (2024-04-16)
 -------------------
