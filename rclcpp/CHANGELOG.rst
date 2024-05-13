@@ -2,11 +2,41 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-28.2.0 (2024-04-26)
+28.1.2 (2024-05-13)
 -------------------
-* Check for negative time in rclcpp::Time(int64_t nanoseconds, ...) constructor (`#2510 <https://github.com/ros2/rclcpp/issues/2510>`_)
-* Revise the description of service configure_introspection() (`#2511 <https://github.com/ros2/rclcpp/issues/2511>`_)
-* Contributors: Barry Xu, Sharmin Ramli
+* add impl pointer for ExecutorOptions (`#2523 <https://github.com/ros2/rclcpp/issues/2523>`_) (`#2525 <https://github.com/ros2/rclcpp/issues/2525>`_)
+  * add impl pointer for ExecutorOptions
+  (cherry picked from commit 343b29b617b163ad72b9fe3f6441dd4ed3d3af09)
+  Co-authored-by: William Woodall <william@osrfoundation.org>
+* Fixup Executor::spin_all() regression fix (`#2517 <https://github.com/ros2/rclcpp/issues/2517>`_) (`#2521 <https://github.com/ros2/rclcpp/issues/2521>`_)
+  * test(Executors): Added tests for busy waiting
+  Checks if executors are busy waiting while they should block
+  in spin_some or spin_all.
+  * fix: Reworked spinAll test
+  This test was strange. It looked like, it assumed that spin_all did
+  not return instantly. Also it was racy, as the thread could terminate
+  instantly.
+  * fix(Executor): Fixed spin_all not returning instantly is no work was available
+  * Update rclcpp/test/rclcpp/executors/test_executors.cpp
+  * test(executors): Added test for busy waiting while calling spin
+  * fix(executor): Reset wait_result on every call to spin_some_impl
+  Before, the method would not recollect available work in case of
+  spin_some, spin_all. This would lead to the method behaving differently
+  than to what the documentation states.
+  * restore previous test logic for now
+  * refactor spin_some_impl's logic and improve busy wait tests
+  * added some more comments about the implementation
+  ---------
+  Co-authored-by: Janosch Machowinski <J.Machowinski@cellumation.com>
+  Co-authored-by: jmachowinski <jmachowinski@users.noreply.github.com>
+  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
+  Co-authored-by: William Woodall <william@osrfoundation.org>
+* Contributors: mergify[bot]
+
+28.1.1 (2024-04-24)
+-------------------
+* Revise the description of service configure_introspection() (`#2511 <https://github.com/ros2/rclcpp/issues/2511>`_) (`#2513 <https://github.com/ros2/rclcpp/issues/2513>`_)
+* Contributors: mergify[bot]
 
 28.1.0 (2024-04-16)
 -------------------
