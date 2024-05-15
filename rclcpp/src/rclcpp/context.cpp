@@ -154,9 +154,7 @@ Context::~Context()
   // this will not prevent errors, but will maybe make them easier to reproduce
   std::lock_guard<std::recursive_mutex> lock(init_mutex_);
   try {
-    // Cannot rely on virtual dispatch in a destructor, so explicitly use the
-    // shutdown() provided by this base class.
-    Context::shutdown("context destructor was called while still not shutdown");
+    this->shutdown("context destructor was called while still not shutdown");
     // at this point it is shutdown and cannot reinit
     // clean_up will finalize the rcl context
     this->clean_up();
@@ -365,45 +363,49 @@ Context::on_shutdown(OnShutdownCallback callback)
 rclcpp::OnShutdownCallbackHandle
 Context::add_on_shutdown_callback(OnShutdownCallback callback)
 {
-  return add_shutdown_callback<ShutdownType::on_shutdown>(callback);
+  return add_shutdown_callback(ShutdownType::on_shutdown, callback);
 }
 
 bool
 Context::remove_on_shutdown_callback(const OnShutdownCallbackHandle & callback_handle)
 {
-  return remove_shutdown_callback<ShutdownType::on_shutdown>(callback_handle);
+  return remove_shutdown_callback(ShutdownType::on_shutdown, callback_handle);
 }
 
 rclcpp::PreShutdownCallbackHandle
 Context::add_pre_shutdown_callback(PreShutdownCallback callback)
 {
-  return add_shutdown_callback<ShutdownType::pre_shutdown>(callback);
+  return add_shutdown_callback(ShutdownType::pre_shutdown, callback);
 }
 
 bool
 Context::remove_pre_shutdown_callback(
   const PreShutdownCallbackHandle & callback_handle)
 {
-  return remove_shutdown_callback<ShutdownType::pre_shutdown>(callback_handle);
+  return remove_shutdown_callback(ShutdownType::pre_shutdown, callback_handle);
 }
 
-template<Context::ShutdownType shutdown_type>
 rclcpp::ShutdownCallbackHandle
 Context::add_shutdown_callback(
+  ShutdownType shutdown_type,
   ShutdownCallback callback)
 {
   auto callback_shared_ptr =
     std::make_shared<ShutdownCallbackHandle::ShutdownCallbackType>(callback);
 
-  static_assert(
-    shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
-
-  if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
-    std::lock_guard<std::mutex> lock(pre_shutdown_callbacks_mutex_);
-    pre_shutdown_callbacks_.emplace_back(callback_shared_ptr);
-  } else {
-    std::lock_guard<std::mutex> lock(on_shutdown_callbacks_mutex_);
-    on_shutdown_callbacks_.emplace_back(callback_shared_ptr);
+  switch (shutdown_type) {
+    case ShutdownType::pre_shutdown:
+      {
+        std::lock_guard<std::mutex> lock(pre_shutdown_callbacks_mutex_);
+        pre_shutdown_callbacks_.emplace(callback_shared_ptr);
+      }
+      break;
+    case ShutdownType::on_shutdown:
+      {
+        std::lock_guard<std::mutex> lock(on_shutdown_callbacks_mutex_);
+        on_shutdown_callbacks_.emplace(callback_shared_ptr);
+      }
+      break;
   }
 
   ShutdownCallbackHandle callback_handle;
@@ -411,74 +413,73 @@ Context::add_shutdown_callback(
   return callback_handle;
 }
 
-template<Context::ShutdownType shutdown_type>
 bool
 Context::remove_shutdown_callback(
+  ShutdownType shutdown_type,
   const ShutdownCallbackHandle & callback_handle)
 {
-  const auto callback_shared_ptr = callback_handle.callback.lock();
+  std::mutex * mutex_ptr = nullptr;
+  std::unordered_set<
+    std::shared_ptr<ShutdownCallbackHandle::ShutdownCallbackType>> * callback_list_ptr;
+
+  switch (shutdown_type) {
+    case ShutdownType::pre_shutdown:
+      mutex_ptr = &pre_shutdown_callbacks_mutex_;
+      callback_list_ptr = &pre_shutdown_callbacks_;
+      break;
+    case ShutdownType::on_shutdown:
+      mutex_ptr = &on_shutdown_callbacks_mutex_;
+      callback_list_ptr = &on_shutdown_callbacks_;
+      break;
+  }
+
+  std::lock_guard<std::mutex> lock(*mutex_ptr);
+  auto callback_shared_ptr = callback_handle.callback.lock();
   if (callback_shared_ptr == nullptr) {
     return false;
   }
-
-  const auto remove_callback = [&callback_shared_ptr](auto & mutex, auto & callback_vector) {
-      const std::lock_guard<std::mutex> lock(mutex);
-      auto iter = callback_vector.begin();
-      for (; iter != callback_vector.end(); iter++) {
-        if ((*iter).get() == callback_shared_ptr.get()) {
-          break;
-        }
-      }
-      if (iter == callback_vector.end()) {
-        return false;
-      }
-      callback_vector.erase(iter);
-      return true;
-    };
-
-  static_assert(
-    shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
-
-  if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
-    return remove_callback(pre_shutdown_callbacks_mutex_, pre_shutdown_callbacks_);
-  } else {
-    return remove_callback(on_shutdown_callbacks_mutex_, on_shutdown_callbacks_);
-  }
+  return callback_list_ptr->erase(callback_shared_ptr) == 1;
 }
 
 std::vector<rclcpp::Context::OnShutdownCallback>
 Context::get_on_shutdown_callbacks() const
 {
-  return get_shutdown_callback<ShutdownType::on_shutdown>();
+  return get_shutdown_callback(ShutdownType::on_shutdown);
 }
 
 std::vector<rclcpp::Context::PreShutdownCallback>
 Context::get_pre_shutdown_callbacks() const
 {
-  return get_shutdown_callback<ShutdownType::pre_shutdown>();
+  return get_shutdown_callback(ShutdownType::pre_shutdown);
 }
 
-template<Context::ShutdownType shutdown_type>
 std::vector<rclcpp::Context::ShutdownCallback>
-Context::get_shutdown_callback() const
+Context::get_shutdown_callback(ShutdownType shutdown_type) const
 {
-  const auto get_callback_vector = [](auto & mutex, auto & callback_set) {
-      const std::lock_guard<std::mutex> lock(mutex);
-      std::vector<rclcpp::Context::ShutdownCallback> callbacks;
-      for (auto & callback : callback_set) {
-        callbacks.push_back(*callback);
-      }
-      return callbacks;
-    };
+  std::mutex * mutex_ptr = nullptr;
+  const std::unordered_set<
+    std::shared_ptr<ShutdownCallbackHandle::ShutdownCallbackType>> * callback_list_ptr;
 
-  static_assert(
-    shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
-
-  if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
-    return get_callback_vector(pre_shutdown_callbacks_mutex_, pre_shutdown_callbacks_);
-  } else {
-    return get_callback_vector(on_shutdown_callbacks_mutex_, on_shutdown_callbacks_);
+  switch (shutdown_type) {
+    case ShutdownType::pre_shutdown:
+      mutex_ptr = &pre_shutdown_callbacks_mutex_;
+      callback_list_ptr = &pre_shutdown_callbacks_;
+      break;
+    case ShutdownType::on_shutdown:
+      mutex_ptr = &on_shutdown_callbacks_mutex_;
+      callback_list_ptr = &on_shutdown_callbacks_;
+      break;
   }
+
+  std::vector<rclcpp::Context::ShutdownCallback> callbacks;
+  {
+    std::lock_guard<std::mutex> lock(*mutex_ptr);
+    for (auto & iter : *callback_list_ptr) {
+      callbacks.emplace_back(*iter);
+    }
+  }
+
+  return callbacks;
 }
 
 std::shared_ptr<rcl_context_t>

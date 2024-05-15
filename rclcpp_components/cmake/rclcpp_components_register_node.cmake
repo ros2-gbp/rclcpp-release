@@ -24,8 +24,6 @@
 # :type PLUGIN: string
 # :param EXECUTABLE: the node's executable name
 # :type EXECUTABLE: string
-# :param EXECUTOR: the C++ class name of the executor to use (blank uses SingleThreadedExecutor)
-# :type EXECUTOR: string
 # :param RESOURCE_INDEX: the ament resource index to register the components
 # :type RESOURCE_INDEX: string
 #
@@ -72,11 +70,10 @@ macro(rclcpp_components_register_node target)
   file(GENERATE OUTPUT ${PROJECT_BINARY_DIR}/rclcpp_components/node_main_${node}.cpp
     INPUT ${PROJECT_BINARY_DIR}/rclcpp_components/node_main_configured_${node}.cpp.in)
   add_executable(${node} ${PROJECT_BINARY_DIR}/rclcpp_components/node_main_${node}.cpp)
-  target_link_libraries(${node}
-    class_loader::class_loader
-    rclcpp::rclcpp
-    rclcpp_components::component
-  )
+  ament_target_dependencies(${node}
+    "rclcpp"
+    "class_loader"
+    "rclcpp_components")
   install(TARGETS
     ${node}
     DESTINATION lib/${PROJECT_NAME})

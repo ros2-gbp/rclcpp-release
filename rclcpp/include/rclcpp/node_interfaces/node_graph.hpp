@@ -15,9 +15,7 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_GRAPH_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_GRAPH_HPP_
 
-#include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -112,14 +110,6 @@ public:
   RCLCPP_PUBLIC
   size_t
   count_subscribers(const std::string & topic_name) const override;
-
-  RCLCPP_PUBLIC
-  size_t
-  count_clients(const std::string & service_name) const override;
-
-  RCLCPP_PUBLIC
-  size_t
-  count_services(const std::string & service_name) const override;
 
   RCLCPP_PUBLIC
   const rcl_guard_condition_t *

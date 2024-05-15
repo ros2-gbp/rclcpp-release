@@ -32,9 +32,6 @@
 #include "rclcpp/allocator/allocator_common.hpp"
 #include "rclcpp/allocator/allocator_deleter.hpp"
 #include "rclcpp/detail/resolve_use_intra_process.hpp"
-#include "rclcpp/detail/resolve_intra_process_buffer_type.hpp"
-#include "rclcpp/experimental/buffers/intra_process_buffer.hpp"
-#include "rclcpp/experimental/create_intra_process_buffer.hpp"
 #include "rclcpp/experimental/intra_process_manager.hpp"
 #include "rclcpp/get_message_type_support_handle.hpp"
 #include "rclcpp/is_ros_compatible_type.hpp"
@@ -112,12 +109,6 @@ public:
   [[deprecated("use std::shared_ptr<const PublishedType>")]] =
     std::shared_ptr<const PublishedType>;
 
-  using BufferSharedPtr = typename rclcpp::experimental::buffers::IntraProcessBuffer<
-    ROSMessageType,
-    ROSMessageTypeAllocator,
-    ROSMessageTypeDeleter
-    >::SharedPtr;
-
   RCLCPP_SMART_PTR_DEFINITIONS(Publisher<MessageT, AllocatorT>)
 
   /// Default constructor.
@@ -140,16 +131,40 @@ public:
       node_base,
       topic,
       rclcpp::get_message_type_support_handle<MessageT>(),
-      options.template to_rcl_publisher_options<MessageT>(qos),
-      // NOTE(methylDragon): Passing these args separately is necessary for event binding
-      options.event_callbacks,
-      options.use_default_callbacks),
+      options.template to_rcl_publisher_options<MessageT>(qos)),
     options_(options),
     published_type_allocator_(*options.get_allocator()),
     ros_message_type_allocator_(*options.get_allocator())
   {
     allocator::set_allocator_for_deleter(&published_type_deleter_, &published_type_allocator_);
     allocator::set_allocator_for_deleter(&ros_message_type_deleter_, &ros_message_type_allocator_);
+
+    if (options_.event_callbacks.deadline_callback) {
+      this->add_event_handler(
+        options_.event_callbacks.deadline_callback,
+        RCL_PUBLISHER_OFFERED_DEADLINE_MISSED);
+    }
+    if (options_.event_callbacks.liveliness_callback) {
+      this->add_event_handler(
+        options_.event_callbacks.liveliness_callback,
+        RCL_PUBLISHER_LIVELINESS_LOST);
+    }
+    if (options_.event_callbacks.incompatible_qos_callback) {
+      this->add_event_handler(
+        options_.event_callbacks.incompatible_qos_callback,
+        RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS);
+    } else if (options_.use_default_callbacks) {
+      // Register default callback when not specified
+      try {
+        this->add_event_handler(
+          [this](QOSOfferedIncompatibleQoSInfo & info) {
+            this->default_incompatible_qos_callback(info);
+          },
+          RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS);
+      } catch (UnsupportedEventTypeException & /*exc*/) {
+        // pass
+      }
+    }
     // Setup continues in the post construction method, post_init_setup().
   }
 
@@ -180,14 +195,11 @@ public:
         throw std::invalid_argument(
                 "intraprocess communication is not allowed with a zero qos history depth value");
       }
-      if (qos.durability() == rclcpp::DurabilityPolicy::TransientLocal) {
-        buffer_ = rclcpp::experimental::create_intra_process_buffer<
-          ROSMessageType, ROSMessageTypeAllocator, ROSMessageTypeDeleter>(
-          rclcpp::detail::resolve_intra_process_buffer_type(options_.intra_process_buffer_type),
-          qos,
-          std::make_shared<ROSMessageTypeAllocator>(ros_message_type_allocator_));
+      if (qos.durability() != rclcpp::DurabilityPolicy::Volatile) {
+        throw std::invalid_argument(
+                "intraprocess communication allowed only with volatile durability");
       }
-      uint64_t intra_process_publisher_id = ipm->add_publisher(this->shared_from_this(), buffer_);
+      uint64_t intra_process_publisher_id = ipm->add_publisher(this->shared_from_this());
       this->setup_intra_process(
         intra_process_publisher_id,
         ipm);
@@ -254,18 +266,9 @@ public:
     if (inter_process_publish_needed) {
       auto shared_msg =
         this->do_intra_process_ros_message_publish_and_return_shared(std::move(msg));
-      if (buffer_) {
-        buffer_->add_shared(shared_msg);
-      }
       this->do_inter_process_publish(*shared_msg);
     } else {
-      if (buffer_) {
-        auto shared_msg =
-          this->do_intra_process_ros_message_publish_and_return_shared(std::move(msg));
-        buffer_->add_shared(shared_msg);
-      } else {
-        this->do_intra_process_ros_message_publish(std::move(msg));
-      }
+      this->do_intra_process_ros_message_publish(std::move(msg));
     }
   }
 
@@ -290,8 +293,8 @@ public:
   {
     // Avoid allocating when not using intra process.
     if (!intra_process_is_enabled_) {
-      this->do_inter_process_publish(msg);
-      return;
+      // In this case we're not using intra process.
+      return this->do_inter_process_publish(msg);
     }
     // Otherwise we have to allocate memory in a unique_ptr and pass it along.
     // As the message is not const, a copy should be made.
@@ -318,31 +321,26 @@ public:
   >
   publish(std::unique_ptr<T, PublishedTypeDeleter> msg)
   {
+    // Avoid allocating when not using intra process.
     if (!intra_process_is_enabled_) {
       // In this case we're not using intra process.
-      auto ros_msg_ptr = std::make_unique<ROSMessageType>();
-      rclcpp::TypeAdapter<MessageT>::convert_to_ros_message(*msg, *ros_msg_ptr);
-      this->do_inter_process_publish(*ros_msg_ptr);
-      return;
+      ROSMessageType ros_msg;
+      rclcpp::TypeAdapter<MessageT>::convert_to_ros_message(*msg, ros_msg);
+      return this->do_inter_process_publish(ros_msg);
     }
 
     bool inter_process_publish_needed =
       get_subscription_count() > get_intra_process_subscription_count();
 
     if (inter_process_publish_needed) {
-      auto ros_msg_ptr = std::make_shared<ROSMessageType>();
-      rclcpp::TypeAdapter<MessageT>::convert_to_ros_message(*msg, *ros_msg_ptr);
+      ROSMessageType ros_msg;
+      // TODO(clalancette): This is unnecessarily doing an additional conversion
+      // that may have already been done in do_intra_process_publish_and_return_shared().
+      // We should just reuse that effort.
+      rclcpp::TypeAdapter<MessageT>::convert_to_ros_message(*msg, ros_msg);
       this->do_intra_process_publish(std::move(msg));
-      this->do_inter_process_publish(*ros_msg_ptr);
-      if (buffer_) {
-        buffer_->add_shared(ros_msg_ptr);
-      }
+      this->do_inter_process_publish(ros_msg);
     } else {
-      if (buffer_) {
-        auto ros_msg_ptr = std::make_shared<ROSMessageType>();
-        rclcpp::TypeAdapter<MessageT>::convert_to_ros_message(*msg, *ros_msg_ptr);
-        buffer_->add_shared(ros_msg_ptr);
-      }
       this->do_intra_process_publish(std::move(msg));
     }
   }
@@ -365,12 +363,13 @@ public:
   >
   publish(const T & msg)
   {
+    // Avoid double allocating when not using intra process.
     if (!intra_process_is_enabled_) {
       // Convert to the ROS message equivalent and publish it.
-      auto ros_msg_ptr = std::make_unique<ROSMessageType>();
-      rclcpp::TypeAdapter<MessageT>::convert_to_ros_message(msg, *ros_msg_ptr);
-      this->do_inter_process_publish(*ros_msg_ptr);
-      return;
+      ROSMessageType ros_msg;
+      rclcpp::TypeAdapter<MessageT>::convert_to_ros_message(msg, ros_msg);
+      // In this case we're not using intra process.
+      return this->do_inter_process_publish(ros_msg);
     }
 
     // Otherwise we have to allocate memory in a unique_ptr and pass it along.
@@ -406,6 +405,10 @@ public:
     if (!loaned_msg.is_valid()) {
       throw std::runtime_error("loaned message is not valid");
     }
+    if (intra_process_is_enabled_) {
+      // TODO(Karsten1987): support loaned message passed by intraprocess
+      throw std::runtime_error("storing loaned messages in intra process is not supported yet");
+    }
 
     // verify that publisher supports loaned messages
     // TODO(Karsten1987): This case separation has to be done in rclcpp
@@ -415,11 +418,11 @@ public:
     if (this->can_loan_messages()) {
       // we release the ownership from the rclpp::LoanedMessage instance
       // and let the middleware clean up the memory.
-      this->do_loaned_message_publish(loaned_msg.release());
+      this->do_loaned_message_publish(std::move(loaned_msg.release()));
     } else {
       // we don't release the ownership, let the middleware copy the ros message
       // and thus the destructor of rclcpp::LoanedMessage cleans up the memory.
-      this->publish(loaned_msg.get());
+      this->do_inter_process_publish(loaned_msg.get());
     }
   }
 
@@ -446,7 +449,7 @@ protected:
   void
   do_inter_process_publish(const ROSMessageType & msg)
   {
-    TRACETOOLS_TRACEPOINT(rclcpp_publish, nullptr, static_cast<const void *>(&msg));
+    TRACEPOINT(rclcpp_publish, nullptr, static_cast<const void *>(&msg));
     auto status = rcl_publish(publisher_handle_.get(), &msg, nullptr);
 
     if (RCL_RET_PUBLISHER_INVALID == status) {
@@ -481,7 +484,6 @@ protected:
   do_loaned_message_publish(
     std::unique_ptr<ROSMessageType, std::function<void(ROSMessageType *)>> msg)
   {
-    TRACETOOLS_TRACEPOINT(rclcpp_publish, nullptr, static_cast<const void *>(msg.get()));
     auto status = rcl_publish_loaned_message(publisher_handle_.get(), msg.get(), nullptr);
 
     if (RCL_RET_PUBLISHER_INVALID == status) {
@@ -510,10 +512,6 @@ protected:
     if (!msg) {
       throw std::runtime_error("cannot publish msg which is a null pointer");
     }
-    TRACETOOLS_TRACEPOINT(
-      rclcpp_intra_publish,
-      static_cast<const void *>(publisher_handle_.get()),
-      msg.get());
 
     ipm->template do_intra_process_publish<PublishedType, ROSMessageType, AllocatorT>(
       intra_process_publisher_id_,
@@ -532,10 +530,6 @@ protected:
     if (!msg) {
       throw std::runtime_error("cannot publish msg which is a null pointer");
     }
-    TRACETOOLS_TRACEPOINT(
-      rclcpp_intra_publish,
-      static_cast<const void *>(publisher_handle_.get()),
-      msg.get());
 
     ipm->template do_intra_process_publish<ROSMessageType, ROSMessageType, AllocatorT>(
       intra_process_publisher_id_,
@@ -555,10 +549,6 @@ protected:
     if (!msg) {
       throw std::runtime_error("cannot publish msg which is a null pointer");
     }
-    TRACETOOLS_TRACEPOINT(
-      rclcpp_intra_publish,
-      static_cast<const void *>(publisher_handle_.get()),
-      msg.get());
 
     return ipm->template do_intra_process_publish_and_return_shared<ROSMessageType, ROSMessageType,
              AllocatorT>(
@@ -606,8 +596,6 @@ protected:
   PublishedTypeDeleter published_type_deleter_;
   ROSMessageTypeAllocator ros_message_type_allocator_;
   ROSMessageTypeDeleter ros_message_type_deleter_;
-
-  BufferSharedPtr buffer_{nullptr};
 };
 
 }  // namespace rclcpp
