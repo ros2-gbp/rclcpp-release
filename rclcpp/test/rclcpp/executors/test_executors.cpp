@@ -15,8 +15,8 @@
 /**
  * This test checks all implementations of rclcpp::executor to check they pass they basic API
  * tests. Anything specific to any executor in particular should go in a separate test file.
+ *
  */
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -36,11 +36,8 @@
 #include "rclcpp/duration.hpp"
 #include "rclcpp/guard_condition.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "rclcpp/time_source.hpp"
 
 #include "test_msgs/msg/empty.hpp"
-
-#include "./executor_types.hpp"
 
 using namespace std::chrono_literals;
 
@@ -82,17 +79,70 @@ public:
   int callback_count;
 };
 
+// spin_all and spin_some are not implemented correctly in StaticSingleThreadedExecutor, see:
+// https://github.com/ros2/rclcpp/issues/1219 for tracking
 template<typename T>
 class TestExecutorsStable : public TestExecutors<T> {};
 
+using ExecutorTypes =
+  ::testing::Types<
+  rclcpp::executors::SingleThreadedExecutor,
+  rclcpp::executors::MultiThreadedExecutor,
+  rclcpp::executors::StaticSingleThreadedExecutor,
+  rclcpp::experimental::executors::EventsExecutor>;
+
+class ExecutorTypeNames
+{
+public:
+  template<typename T>
+  static std::string GetName(int idx)
+  {
+    (void)idx;
+    if (std::is_same<T, rclcpp::executors::SingleThreadedExecutor>()) {
+      return "SingleThreadedExecutor";
+    }
+
+    if (std::is_same<T, rclcpp::executors::MultiThreadedExecutor>()) {
+      return "MultiThreadedExecutor";
+    }
+
+    if (std::is_same<T, rclcpp::executors::StaticSingleThreadedExecutor>()) {
+      return "StaticSingleThreadedExecutor";
+    }
+
+    if (std::is_same<T, rclcpp::experimental::executors::EventsExecutor>()) {
+      return "EventsExecutor";
+    }
+
+    return "";
+  }
+};
+
+// TYPED_TEST_SUITE is deprecated as of gtest 1.9, use TYPED_TEST_SUITE when gtest dependency
+// is updated.
 TYPED_TEST_SUITE(TestExecutors, ExecutorTypes, ExecutorTypeNames);
 
+// StaticSingleThreadedExecutor is not included in these tests for now, due to:
+// https://github.com/ros2/rclcpp/issues/1219
+using StandardExecutors =
+  ::testing::Types<
+  rclcpp::executors::SingleThreadedExecutor,
+  rclcpp::executors::MultiThreadedExecutor,
+  rclcpp::experimental::executors::EventsExecutor>;
 TYPED_TEST_SUITE(TestExecutorsStable, StandardExecutors, ExecutorTypeNames);
 
 // Make sure that executors detach from nodes when destructing
 TYPED_TEST(TestExecutors, detachOnDestruction)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   {
     ExecutorType executor;
     executor.add_node(this->node);
@@ -104,8 +154,19 @@ TYPED_TEST(TestExecutors, detachOnDestruction)
 }
 
 // Make sure that the executor can automatically remove expired nodes correctly
-TYPED_TEST(TestExecutors, addTemporaryNode) {
+// Currently fails for StaticSingleThreadedExecutor so it is being skipped, see:
+// https://github.com/ros2/rclcpp/issues/1231
+TYPED_TEST(TestExecutorsStable, addTemporaryNode)
+{
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
 
   {
@@ -126,6 +187,14 @@ TYPED_TEST(TestExecutors, addTemporaryNode) {
 TYPED_TEST(TestExecutors, emptyExecutor)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
   std::thread spinner([&]() {EXPECT_NO_THROW(executor.spin());});
   std::this_thread::sleep_for(50ms);
@@ -137,6 +206,14 @@ TYPED_TEST(TestExecutors, emptyExecutor)
 TYPED_TEST(TestExecutors, addNodeTwoExecutors)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor1;
   ExecutorType executor2;
   EXPECT_NO_THROW(executor1.add_node(this->node));
@@ -148,6 +225,14 @@ TYPED_TEST(TestExecutors, addNodeTwoExecutors)
 TYPED_TEST(TestExecutors, spinWithTimer)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
 
   bool timer_completed = false;
@@ -171,20 +256,25 @@ TYPED_TEST(TestExecutors, spinWithTimer)
 TYPED_TEST(TestExecutors, spinWhileAlreadySpinning)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
-
-  std::atomic_bool timer_completed = false;
-  auto timer = this->node->create_wall_timer(
-    1ms, [&]() {
-      timer_completed.store(true);
-    });
-
   executor.add_node(this->node);
-  std::thread spinner([&]() {executor.spin();});
 
+  bool timer_completed = false;
+  auto timer = this->node->create_wall_timer(1ms, [&]() {timer_completed = true;});
+
+  std::thread spinner([&]() {executor.spin();});
   // Sleep for a short time to verify executor.spin() is going, and didn't throw.
+
   auto start = std::chrono::steady_clock::now();
-  while (!timer_completed.load() && (std::chrono::steady_clock::now() - start) < 10s) {
+  while (!timer_completed && (std::chrono::steady_clock::now() - start) < 10s) {
     std::this_thread::sleep_for(1ms);
   }
 
@@ -201,6 +291,14 @@ TYPED_TEST(TestExecutors, spinWhileAlreadySpinning)
 TYPED_TEST(TestExecutors, testSpinUntilFutureComplete)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
   executor.add_node(this->node);
 
@@ -224,6 +322,14 @@ TYPED_TEST(TestExecutors, testSpinUntilFutureComplete)
 TYPED_TEST(TestExecutors, testSpinUntilSharedFutureComplete)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
   executor.add_node(this->node);
 
@@ -248,6 +354,14 @@ TYPED_TEST(TestExecutors, testSpinUntilSharedFutureComplete)
 TYPED_TEST(TestExecutors, testSpinUntilFutureCompleteNoTimeout)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
   executor.add_node(this->node);
 
@@ -295,6 +409,14 @@ TYPED_TEST(TestExecutors, testSpinUntilFutureCompleteNoTimeout)
 TYPED_TEST(TestExecutors, testSpinUntilFutureCompleteWithTimeout)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
   executor.add_node(this->node);
 
@@ -337,34 +459,21 @@ public:
   TestWaitable() = default;
 
   void
-  add_to_wait_set(rcl_wait_set_t & wait_set) override
+  add_to_wait_set(rcl_wait_set_t * wait_set) override
   {
-    if (trigger_count_ > 0) {
-      // Keep the gc triggered until the trigger count is reduced back to zero.
-      // This is necessary if trigger() results in the wait set waking, but not
-      // executing this waitable, in which case it needs to be re-triggered.
-      gc_.trigger();
-    }
-    rclcpp::detail::add_guard_condition_to_rcl_wait_set(wait_set, gc_);
+    rclcpp::detail::add_guard_condition_to_rcl_wait_set(*wait_set, gc_);
   }
 
   void trigger()
   {
-    trigger_count_++;
     gc_.trigger();
   }
 
   bool
-  is_ready(const rcl_wait_set_t & wait_set) override
+  is_ready(rcl_wait_set_t * wait_set) override
   {
-    is_ready_count_++;
-    for (size_t i = 0; i < wait_set.size_of_guard_conditions; ++i) {
-      auto rcl_guard_condition = wait_set.guard_conditions[i];
-      if (&gc_.get_rcl_guard_condition() == rcl_guard_condition) {
-        return true;
-      }
-    }
-    return false;
+    (void)wait_set;
+    return true;
   }
 
   std::shared_ptr<void>
@@ -381,24 +490,11 @@ public:
   }
 
   void
-  execute(const std::shared_ptr<void> &) override
+  execute(std::shared_ptr<void> & data) override
   {
-    trigger_count_--;
+    (void) data;
     count_++;
-    if (nullptr != on_execute_callback_) {
-      on_execute_callback_();
-    } else {
-      // TODO(wjwwood): I don't know why this was here, but probably it should
-      //   not be there, or test cases where that is important should use the
-      //   on_execute_callback?
-      std::this_thread::sleep_for(3ms);
-    }
-  }
-
-  void
-  set_on_execute_callback(std::function<void()> on_execute_callback)
-  {
-    on_execute_callback_ = on_execute_callback;
+    std::this_thread::sleep_for(3ms);
   }
 
   void
@@ -420,28 +516,27 @@ public:
   get_number_of_ready_guard_conditions() override {return 1;}
 
   size_t
-  get_count() const
+  get_count()
   {
     return count_;
   }
 
-  size_t
-  get_is_ready_call_count() const
-  {
-    return is_ready_count_;
-  }
-
 private:
-  std::atomic<size_t> trigger_count_ = 0;
-  std::atomic<size_t> is_ready_count_ = 0;
-  std::atomic<size_t> count_ = 0;
+  size_t count_ = 0;
   rclcpp::GuardCondition gc_;
-  std::function<void()> on_execute_callback_ = nullptr;
 };
 
 TYPED_TEST(TestExecutors, spinAll)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
   auto waitable_interfaces = this->node->get_node_waitables_interface();
   auto my_waitable = std::make_shared<TestWaitable>();
@@ -481,188 +576,67 @@ TYPED_TEST(TestExecutors, spinAll)
   spinner.join();
 }
 
-// Helper function to convert chrono durations into a scalar that GoogleTest
-// can more easily compare and print.
-template<typename DurationT>
-auto
-to_nanoseconds_helper(DurationT duration)
-{
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
-}
-
-// The purpose of this test is to check that the ExecutorT.spin_some() method:
-//   - works nominally (it can execute entities)
-//   - it can execute multiple items at once
-//   - it does not wait for work to be available before returning
-TYPED_TEST(TestExecutors, spin_some)
+TYPED_TEST(TestExecutors, spinSome)
 {
   using ExecutorType = TypeParam;
-
-  // Use an isolated callback group to avoid interference from any housekeeping
-  // items that may be in the default callback group of the node.
-  constexpr bool automatically_add_to_executor_with_node = false;
-  auto isolated_callback_group = this->node->create_callback_group(
-    rclcpp::CallbackGroupType::MutuallyExclusive,
-    automatically_add_to_executor_with_node);
-
-  // Check that spin_some() returns quickly when there is no work to be done.
-  // This can be a false positive if there is somehow some work for the executor
-  // to do that has not been considered, but the isolated callback group should
-  // avoid that.
-  {
-    ExecutorType executor;
-    executor.add_callback_group(isolated_callback_group, this->node->get_node_base_interface());
-
-    auto start = std::chrono::steady_clock::now();
-    // spin_some with some non-trival "max_duration" and check that it does not
-    // take anywhere near that long to execute.
-    constexpr auto max_duration = 10s;
-    executor.spin_some(max_duration);
-    EXPECT_LT(
-      to_nanoseconds_helper(std::chrono::steady_clock::now() - start),
-      to_nanoseconds_helper(max_duration / 2))
-      << "spin_some() took a long time to execute when it should have done "
-      << "nothing and should not have blocked either, but this could be a "
-      << "false negative if the computer is really slow";
-  }
-
-  // Check that having one thing ready gets executed by spin_some().
-  auto waitable_interfaces = this->node->get_node_waitables_interface();
-  auto my_waitable1 = std::make_shared<TestWaitable>();
-  waitable_interfaces->add_waitable(my_waitable1, isolated_callback_group);
-  {
-    ExecutorType executor;
-    executor.add_callback_group(isolated_callback_group, this->node->get_node_base_interface());
-
-    my_waitable1->trigger();
-
-    // The long duration should not matter, as executing the waitable is
-    // non-blocking, and spin_some() should exit after completing the available
-    // work.
-    auto start = std::chrono::steady_clock::now();
-    constexpr auto max_duration = 10s;
-    executor.spin_some(max_duration);
-    EXPECT_LT(
-      to_nanoseconds_helper(std::chrono::steady_clock::now() - start),
-      to_nanoseconds_helper(max_duration / 2))
-      << "spin_some() took a long time to execute when it should have very "
-      << "little to do and should not have blocked either, but this could be a "
-      << "false negative if the computer is really slow";
-
-    EXPECT_EQ(my_waitable1->get_count(), 1u)
-      << "spin_some() failed to execute a waitable that was triggered";
-  }
-
-  // Check that multiple things being ready are executed by spin_some().
-  auto my_waitable2 = std::make_shared<TestWaitable>();
-  waitable_interfaces->add_waitable(my_waitable2, isolated_callback_group);
-  {
-    ExecutorType executor;
-    executor.add_callback_group(isolated_callback_group, this->node->get_node_base_interface());
-
-    const size_t original_my_waitable1_count = my_waitable1->get_count();
-    my_waitable1->trigger();
-    my_waitable2->trigger();
-
-    // The long duration should not matter, as executing the waitable is
-    // non-blocking, and spin_some() should exit after completing the available
-    // work.
-    auto start = std::chrono::steady_clock::now();
-    constexpr auto max_duration = 10s;
-    executor.spin_some(max_duration);
-    EXPECT_LT(
-      to_nanoseconds_helper(std::chrono::steady_clock::now() - start),
-      to_nanoseconds_helper(max_duration / 2))
-      << "spin_some() took a long time to execute when it should have very "
-      << "little to do and should not have blocked either, but this could be a "
-      << "false negative if the computer is really slow";
-
-    EXPECT_EQ(my_waitable1->get_count(), original_my_waitable1_count + 1)
-      << "spin_some() failed to execute a waitable that was triggered";
-    EXPECT_EQ(my_waitable2->get_count(), 1u)
-      << "spin_some() failed to execute a waitable that was triggered";
-  }
-}
-
-// The purpose of this test is to check that the ExecutorT.spin_some() method:
-//   - does not continue executing after max_duration has elapsed
-TYPED_TEST(TestExecutors, spin_some_max_duration)
-{
-  using ExecutorType = TypeParam;
-
-  // TODO(wjwwood): The `StaticSingleThreadedExecutor`
-  //   do not properly implement max_duration (it seems), so disable this test
-  //   for them in the meantime.
-  //   see: https://github.com/ros2/rclcpp/issues/2462
+  // rmw_connextdds doesn't support events-executor
   if (
-    std::is_same<ExecutorType, rclcpp::executors::StaticSingleThreadedExecutor>())
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
   {
     GTEST_SKIP();
   }
 
-  // Use an isolated callback group to avoid interference from any housekeeping
-  // items that may be in the default callback group of the node.
-  constexpr bool automatically_add_to_executor_with_node = false;
-  auto isolated_callback_group = this->node->create_callback_group(
-    rclcpp::CallbackGroupType::MutuallyExclusive,
-    automatically_add_to_executor_with_node);
-
-  // Set up a situation with two waitables that take time to execute, such that
-  // the time it takes to execute two waitables far exceeds the max_duration
-  // given to spin_some(), which should result in spin_some() starting to
-  // execute one of them, have the max duration elapse, finish executing one
-  // of them, then returning before starting on the second.
-  constexpr auto max_duration = 100ms;  // relatively short because we expect to exceed it
-  constexpr auto waitable_callback_duration = max_duration * 2;
-  auto long_running_callback = [&waitable_callback_duration]() {
-      std::this_thread::sleep_for(waitable_callback_duration);
-    };
-
-  auto waitable_interfaces = this->node->get_node_waitables_interface();
-
-  auto my_waitable1 = std::make_shared<TestWaitable>();
-  my_waitable1->set_on_execute_callback(long_running_callback);
-  waitable_interfaces->add_waitable(my_waitable1, isolated_callback_group);
-
-  auto my_waitable2 = std::make_shared<TestWaitable>();
-  my_waitable2->set_on_execute_callback(long_running_callback);
-  waitable_interfaces->add_waitable(my_waitable2, isolated_callback_group);
-
-  my_waitable1->trigger();
-  my_waitable2->trigger();
-
   ExecutorType executor;
-  executor.add_callback_group(isolated_callback_group, this->node->get_node_base_interface());
+  auto waitable_interfaces = this->node->get_node_waitables_interface();
+  auto my_waitable = std::make_shared<TestWaitable>();
+  waitable_interfaces->add_waitable(my_waitable, nullptr);
+  executor.add_node(this->node);
 
+  // Long timeout, doesn't block test from finishing because spin_some should exit after the
+  // first one completes.
+  bool spin_exited = false;
+  std::thread spinner([&spin_exited, &executor, this]() {
+      executor.spin_some(1s);
+      executor.remove_node(this->node, true);
+      spin_exited = true;
+    });
+
+  // Do some work until sufficient calls to the waitable occur, but keep going until either
+  // count becomes too large, spin exits, or the 1 second timeout completes.
   auto start = std::chrono::steady_clock::now();
-  // spin_some and check that it does not take longer than two of waitable_callback_duration,
-  // nor significantly less than a single waitable_callback_duration.
-  executor.spin_some(max_duration);
-  auto spin_some_run_time = std::chrono::steady_clock::now() - start;
-  EXPECT_GT(
-    to_nanoseconds_helper(spin_some_run_time),
-    to_nanoseconds_helper(waitable_callback_duration / 2))
-    << "spin_some() took less than half the expected time to execute a single "
-    << "waitable, which implies it did not actually execute one when it was "
-    << "expected to";
-  EXPECT_LT(
-    to_nanoseconds_helper(spin_some_run_time),
-    to_nanoseconds_helper(waitable_callback_duration * 2))
-    << "spin_some() took longer than expected to execute by a significant margin, but "
-    << "this could be a false positive on a very slow computer";
+  while (
+    my_waitable->get_count() <= 1 &&
+    !spin_exited &&
+    (std::chrono::steady_clock::now() - start < 1s))
+  {
+    my_waitable->trigger();
+    this->publisher->publish(test_msgs::msg::Empty());
+    std::this_thread::sleep_for(1ms);
+  }
+  // The count of "execute" depends on whether the executor starts spinning before (1) or after (0)
+  // the first iteration of the while loop
+  EXPECT_LE(1u, my_waitable->get_count());
+  waitable_interfaces->remove_waitable(my_waitable, nullptr);
+  EXPECT_TRUE(spin_exited);
+  // Cancel if it hasn't exited already.
+  executor.cancel();
 
-  // check that exactly one of the waitables were executed (do not depend on a specific order)
-  size_t number_of_waitables_executed = my_waitable1->get_count() + my_waitable2->get_count();
-  EXPECT_EQ(number_of_waitables_executed, 1u)
-    << "expected exactly one of the two waitables to be executed, but "
-    << "my_waitable1->get_count(): " << my_waitable1->get_count() << " and "
-    << "my_waitable2->get_count(): " << my_waitable2->get_count();
+  spinner.join();
 }
 
 // Check spin_node_until_future_complete with node base pointer
 TYPED_TEST(TestExecutors, testSpinNodeUntilFutureCompleteNodeBasePtr)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
 
   std::promise<bool> promise;
@@ -679,6 +653,14 @@ TYPED_TEST(TestExecutors, testSpinNodeUntilFutureCompleteNodeBasePtr)
 TYPED_TEST(TestExecutors, testSpinNodeUntilFutureCompleteNodePtr)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
 
   std::promise<bool> promise;
@@ -695,6 +677,14 @@ TYPED_TEST(TestExecutors, testSpinNodeUntilFutureCompleteNodePtr)
 TYPED_TEST(TestExecutors, testSpinUntilFutureCompleteInterrupted)
 {
   using ExecutorType = TypeParam;
+  // rmw_connextdds doesn't support events-executor
+  if (
+    std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>() &&
+    std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0)
+  {
+    GTEST_SKIP();
+  }
+
   ExecutorType executor;
   executor.add_node(this->node);
 
@@ -774,7 +764,6 @@ TYPED_TEST(TestExecutors, testRaceConditionAddNode)
             break;
           }
           total += k * (i + 42);
-          (void)total;
         }
       });
   }
@@ -848,184 +837,105 @@ TEST(TestExecutors, testSpinUntilFutureCompleteNodePtr)
   rclcpp::shutdown();
 }
 
-// Check spin functions with non default context
-TEST(TestExecutors, testSpinWithNonDefaultContext)
-{
-  auto non_default_context = std::make_shared<rclcpp::Context>();
-  non_default_context->init(0, nullptr);
-
-  {
-    auto node =
-      std::make_unique<rclcpp::Node>("node", rclcpp::NodeOptions().context(non_default_context));
-
-    EXPECT_NO_THROW(rclcpp::spin_some(node->get_node_base_interface()));
-
-    EXPECT_NO_THROW(rclcpp::spin_all(node->get_node_base_interface(), 1s));
-
-    auto check_spin_until_future_complete = [&]() {
-        std::promise<bool> promise;
-        std::future<bool> future = promise.get_future();
-        promise.set_value(true);
-
-        auto shared_future = future.share();
-        auto ret = rclcpp::spin_until_future_complete(
-          node->get_node_base_interface(), shared_future, 1s);
-        EXPECT_EQ(rclcpp::FutureReturnCode::SUCCESS, ret);
-      };
-    EXPECT_NO_THROW(check_spin_until_future_complete());
-  }
-
-  rclcpp::shutdown(non_default_context);
-}
-
 template<typename T>
-class TestBusyWaiting : public ::testing::Test
+class TestIntraprocessExecutors : public ::testing::Test
 {
 public:
-  void SetUp() override
+  static void SetUpTestCase()
   {
     rclcpp::init(0, nullptr);
-
-    const auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-    std::stringstream test_name;
-    test_name << test_info->test_case_name() << "_" << test_info->name();
-    node = std::make_shared<rclcpp::Node>("node", test_name.str());
-    callback_group = node->create_callback_group(
-      rclcpp::CallbackGroupType::MutuallyExclusive,
-      /* automatically_add_to_executor_with_node =*/ false);
-
-    auto waitable_interfaces = node->get_node_waitables_interface();
-    waitable = std::make_shared<TestWaitable>();
-    waitable_interfaces->add_waitable(waitable, callback_group);
-
-    executor = std::make_shared<T>();
-    executor->add_callback_group(callback_group, node->get_node_base_interface());
   }
 
-  void TearDown() override
+  static void TearDownTestCase()
   {
     rclcpp::shutdown();
   }
 
-  void
-  set_up_and_trigger_waitable(std::function<void()> extra_callback = nullptr)
+  void SetUp()
   {
-    this->has_executed = false;
-    this->waitable->set_on_execute_callback([this, extra_callback]() {
-        if (!this->has_executed) {
-        // trigger once to see if the second trigger is handled or not
-        // this follow up trigger simulates new entities becoming ready while
-        // the executor is executing something else, e.g. subscription got data
-        // or a timer expired, etc.
-        // spin_some would not handle this second trigger, since it collects
-        // work only once, whereas spin_all should handle it since it
-        // collects work multiple times
-          this->waitable->trigger();
-          this->has_executed = true;
-        }
-        if (nullptr != extra_callback) {
-          extra_callback();
-        }
-    });
-    this->waitable->trigger();
+    const auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+    std::stringstream test_name;
+    test_name << test_info->test_case_name() << "_" << test_info->name();
+    node = std::make_shared<rclcpp::Node>("node", test_name.str());
+
+    callback_count = 0u;
+
+    const std::string topic_name = std::string("topic_") + test_name.str();
+
+    rclcpp::PublisherOptions po;
+    po.use_intra_process_comm = rclcpp::IntraProcessSetting::Enable;
+    publisher = node->create_publisher<test_msgs::msg::Empty>(topic_name, rclcpp::QoS(1), po);
+
+    auto callback = [this](test_msgs::msg::Empty::ConstSharedPtr) {
+        this->callback_count.fetch_add(1u);
+      };
+
+    rclcpp::SubscriptionOptions so;
+    so.use_intra_process_comm = rclcpp::IntraProcessSetting::Enable;
+    subscription =
+      node->create_subscription<test_msgs::msg::Empty>(
+      topic_name, rclcpp::QoS(kNumMessages), std::move(callback), so);
   }
 
-  void
-  check_for_busy_waits(std::chrono::steady_clock::time_point start_time)
+  void TearDown()
   {
-    // rough time based check, since the work to be done was very small it
-    // should be safe to check that we didn't use more than half the
-    // max duration, which itself is much larger than necessary
-    // however, it could still produce a false-positive
-    EXPECT_LT(
-      std::chrono::steady_clock::now() - start_time,
-      max_duration / 2)
-      << "executor took a long time to execute when it should have done "
-      << "nothing and should not have blocked either, but this could be a "
-      << "false negative if the computer is really slow";
-
-    // this check is making some assumptions about the implementation of the
-    // executors, but it should be safe to say that a busy wait may result in
-    // hundreds or thousands of calls to is_ready(), but "normal" executor
-    // behavior should be within an order of magnitude of the number of
-    // times that the waitable was executed
-    ASSERT_LT(waitable->get_is_ready_call_count(), 10u * this->waitable->get_count());
+    publisher.reset();
+    subscription.reset();
+    node.reset();
   }
 
-  static constexpr auto max_duration = 10s;
+  const size_t kNumMessages = 100;
 
   rclcpp::Node::SharedPtr node;
-  rclcpp::CallbackGroup::SharedPtr callback_group;
-  std::shared_ptr<TestWaitable> waitable;
-  std::chrono::steady_clock::time_point start_time;
-  std::shared_ptr<T> executor;
-  bool has_executed;
+  rclcpp::Publisher<test_msgs::msg::Empty>::SharedPtr publisher;
+  rclcpp::Subscription<test_msgs::msg::Empty>::SharedPtr subscription;
+  std::atomic_size_t callback_count;
 };
 
-TYPED_TEST_SUITE(TestBusyWaiting, ExecutorTypes, ExecutorTypeNames);
+TYPED_TEST_SUITE(TestIntraprocessExecutors, ExecutorTypes, ExecutorTypeNames);
 
-TYPED_TEST(TestBusyWaiting, test_spin_all)
-{
-  this->set_up_and_trigger_waitable();
+TYPED_TEST(TestIntraprocessExecutors, testIntraprocessRetrigger) {
+  // This tests that executors will continue to service intraprocess subscriptions in the case
+  // that publishers aren't continuing to publish.
+  // This was previously broken in that intraprocess guard conditions were only triggered on
+  // publish and the test was added to prevent future regressions.
+  const size_t kNumMessages = 100;
 
-  auto start_time = std::chrono::steady_clock::now();
-  this->executor->spin_all(this->max_duration);
-  this->check_for_busy_waits(start_time);
-  // this should get the initial trigger, and the follow up from in the callback
-  ASSERT_EQ(this->waitable->get_count(), 2u);
-}
+  using ExecutorType = TypeParam;
+  ExecutorType executor;
+  executor.add_node(this->node);
 
-TYPED_TEST(TestBusyWaiting, test_spin_some)
-{
-  this->set_up_and_trigger_waitable();
+  EXPECT_EQ(0u, this->callback_count.load());
+  this->publisher->publish(test_msgs::msg::Empty());
 
-  auto start_time = std::chrono::steady_clock::now();
-  this->executor->spin_some(this->max_duration);
-  this->check_for_busy_waits(start_time);
-  // this should get the inital trigger, but not the follow up in the callback
-  ASSERT_EQ(this->waitable->get_count(), 1u);
-}
+  // Wait for up to 5 seconds for the first message to come available.
+  const std::chrono::milliseconds sleep_per_loop(10);
+  int loops = 0;
+  while (1u != this->callback_count.load() && loops < 500) {
+    rclcpp::sleep_for(sleep_per_loop);
+    executor.spin_some();
+    loops++;
+  }
+  EXPECT_EQ(1u, this->callback_count.load());
 
-TYPED_TEST(TestBusyWaiting, test_spin)
-{
-  std::condition_variable cv;
-  std::mutex cv_m;
-  bool first_check_passed = false;
+  // reset counter
+  this->callback_count.store(0u);
 
-  this->set_up_and_trigger_waitable([&cv, &cv_m, &first_check_passed]() {
-      cv.notify_one();
-      if (!first_check_passed) {
-        std::unique_lock<std::mutex> lk(cv_m);
-        cv.wait_for(lk, 1s, [&]() {return first_check_passed;});
+  for (size_t ii = 0; ii < kNumMessages; ++ii) {
+    this->publisher->publish(test_msgs::msg::Empty());
+  }
+
+  // Fire a timer every 10ms up to 5 seconds waiting for subscriptions to be read.
+  loops = 0;
+  auto timer = this->node->create_wall_timer(
+    std::chrono::milliseconds(10), [this, &executor, &loops, &kNumMessages]() {
+      loops++;
+      if (kNumMessages == this->callback_count.load() ||
+      loops == 500)
+      {
+        executor.cancel();
       }
-  });
-
-  auto start_time = std::chrono::steady_clock::now();
-  std::thread t([this]() {
-      this->executor->spin();
     });
-
-  // wait until thread has started (first execute of waitable)
-  {
-    std::unique_lock<std::mutex> lk(cv_m);
-    cv.wait_for(lk, 10s);
-  }
-  EXPECT_GT(this->waitable->get_count(), 0u);
-
-  first_check_passed = true;
-  cv.notify_one();
-
-  // wait until the executor has finished (second execute of waitable)
-  {
-    std::unique_lock<std::mutex> lk(cv_m);
-    cv.wait_for(lk, 10s);
-  }
-  EXPECT_EQ(this->waitable->get_count(), 2u);
-
-  this->executor->cancel();
-  t.join();
-
-  this->check_for_busy_waits(start_time);
-  // this should get the initial trigger, and the follow up from in the callback
-  ASSERT_EQ(this->waitable->get_count(), 2u);
+  executor.spin();
+  EXPECT_EQ(kNumMessages, this->callback_count.load());
 }

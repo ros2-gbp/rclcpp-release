@@ -3,100 +3,34 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-28.1.3 (2024-06-27)
+21.0.7 (2024-07-10)
 -------------------
-* Revert "call shutdown in LifecycleNode dtor to avoid leaving the device in unknown state (2nd) (backport `#2528 <https://github.com/ros2/rclcpp/issues/2528>`_) (`#2542 <https://github.com/ros2/rclcpp/issues/2542>`_)" (`#2558 <https://github.com/ros2/rclcpp/issues/2558>`_)
-* call shutdown in LifecycleNode dtor to avoid leaving the device in unknown state (2nd) (backport `#2528 <https://github.com/ros2/rclcpp/issues/2528>`_) (`#2542 <https://github.com/ros2/rclcpp/issues/2542>`_)
-  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
-* rclcpp::shutdown should not be called before LifecycleNode dtor. (`#2527 <https://github.com/ros2/rclcpp/issues/2527>`_) (`#2540 <https://github.com/ros2/rclcpp/issues/2540>`_)
-  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
-* Contributors: Tomoya Fujita, mergify[bot]
-
-28.1.2 (2024-05-13)
--------------------
-* Revert "call shutdown in LifecycleNode dtor to avoid leaving the device in un… (`#2450 <https://github.com/ros2/rclcpp/issues/2450>`_)" (`#2522 <https://github.com/ros2/rclcpp/issues/2522>`_) (`#2524 <https://github.com/ros2/rclcpp/issues/2524>`_)
-  This reverts commit 04ea0bb00293387791522590b7347a2282cda290.
-  (cherry picked from commit 42b0b5775b4e68718c5949308c9e1a059930ded7)
-  Co-authored-by: Chris Lalancette <clalancette@gmail.com>
-* Contributors: mergify[bot]
-
-28.1.1 (2024-04-24)
--------------------
-
-28.1.0 (2024-04-16)
--------------------
-* Remove references to index.ros.org. (`#2504 <https://github.com/ros2/rclcpp/issues/2504>`_)
-* Contributors: Chris Lalancette
-
-28.0.1 (2024-04-16)
--------------------
-* call shutdown in LifecycleNode dtor to avoid leaving the device in un… (`#2450 <https://github.com/ros2/rclcpp/issues/2450>`_)
-  * call shutdown in LifecycleNode dtor to avoid leaving the device in unknown state.
-  * add test to verify LifecycleNode::shutdown is called on destructor.
-  ---------
+* revert call shutdown in LifecycleNode destructor (Iron) (`#2559 <https://github.com/ros2/rclcpp/issues/2559>`_)
+* lifecycle node dtor shutdown should be called only in primary state. (`#2543 <https://github.com/ros2/rclcpp/issues/2543>`_)
+* rclcpp::shutdown should not be called before LifecycleNode dtor. (`#2539 <https://github.com/ros2/rclcpp/issues/2539>`_)
 * Contributors: Tomoya Fujita
 
-28.0.0 (2024-03-28)
+21.0.6 (2024-04-19)
 -------------------
-* Update quality declaration documents (`#2427 <https://github.com/ros2/rclcpp/issues/2427>`_)
-* Contributors: Christophe Bedard
-
-27.0.0 (2024-02-07)
--------------------
-
-26.0.0 (2024-01-24)
--------------------
-* Increase timeout for rclcpp_lifecycle to 360 (`#2395 <https://github.com/ros2/rclcpp/issues/2395>`_)
-* Contributors: Jorge Perez
-
-25.0.0 (2023-12-26)
--------------------
-
-24.0.0 (2023-11-06)
--------------------
-* Fix rclcpp_lifecycle inclusion on Windows. (`#2331 <https://github.com/ros2/rclcpp/issues/2331>`_)
-* Contributors: Chris Lalancette
-
-23.2.0 (2023-10-09)
--------------------
-* add clients & services count (`#2072 <https://github.com/ros2/rclcpp/issues/2072>`_)
-* Contributors: Minju, Lee
-
-23.1.0 (2023-10-04)
--------------------
-
-23.0.0 (2023-09-08)
--------------------
-* Update API docs links in package READMEs (`#2302 <https://github.com/ros2/rclcpp/issues/2302>`_)
-* Contributors: Christophe Bedard
-
-22.2.0 (2023-09-07)
--------------------
-* add logger level service to lifecycle node. (`#2277 <https://github.com/ros2/rclcpp/issues/2277>`_)
+* call shutdown in LifecycleNode dtor to avoid leaving the device in un… (`#2490 <https://github.com/ros2/rclcpp/issues/2490>`_)
 * Contributors: Tomoya Fujita
 
-22.1.0 (2023-08-21)
--------------------
-* Stop using constref signature of benchmark DoNotOptimize. (`#2238 <https://github.com/ros2/rclcpp/issues/2238>`_)
-* Contributors: Chris Lalancette
-
-22.0.0 (2023-07-11)
--------------------
-* Implement get_node_type_descriptions_interface for lifecyclenode and add smoke test for it (`#2237 <https://github.com/ros2/rclcpp/issues/2237>`_)
-* Switch lifecycle to use the RCLCPP macros. (`#2233 <https://github.com/ros2/rclcpp/issues/2233>`_)
-* Add new node interface TypeDescriptionsInterface to provide GetTypeDescription service (`#2224 <https://github.com/ros2/rclcpp/issues/2224>`_)
-* Contributors: Chris Lalancette, Emerson Knapp
-
-21.3.0 (2023-06-12)
+21.0.5 (2024-02-07)
 -------------------
 
-21.2.0 (2023-06-07)
+21.0.4 (2023-11-17)
 -------------------
 
-21.1.1 (2023-05-11)
+21.0.3 (2023-09-08)
+-------------------
+* Switch lifecycle to use the RCLCPP macros. (`#2244 <https://github.com/ros2/rclcpp/issues/2244>`_)
+* Add new node interface TypeDescriptionsInterface to provide GetTypeDescription service (`#2236 <https://github.com/ros2/rclcpp/issues/2236>`_)
+* Contributors: Emerson Knapp
+
+21.0.2 (2023-07-14)
 -------------------
 
-21.1.0 (2023-04-27)
+21.0.1 (2023-05-11)
 -------------------
 
 21.0.0 (2023-04-18)

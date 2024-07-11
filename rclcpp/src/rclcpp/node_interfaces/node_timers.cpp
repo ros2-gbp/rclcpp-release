@@ -34,7 +34,8 @@ NodeTimers::add_timer(
 {
   if (callback_group) {
     if (!node_base_->callback_group_in_node(callback_group)) {
-      throw rclcpp::exceptions::MissingGroupNodeException("timer");
+      // TODO(jacquelinekay): use custom exception
+      throw std::runtime_error("Cannot create timer, group not in node.");
     }
   } else {
     callback_group = node_base_->get_default_callback_group();
@@ -49,7 +50,7 @@ NodeTimers::add_timer(
             std::string("failed to notify wait set on timer creation: ") + ex.what());
   }
 
-  TRACETOOLS_TRACEPOINT(
+  TRACEPOINT(
     rclcpp_timer_link_node,
     static_cast<const void *>(timer->get_timer_handle().get()),
     static_cast<const void *>(node_base_->get_rcl_node_handle()));

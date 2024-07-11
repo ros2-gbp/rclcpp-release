@@ -110,16 +110,14 @@ typename rclcpp::WallTimer<CallbackT>::SharedPtr
 Node::create_wall_timer(
   std::chrono::duration<DurationRepT, DurationT> period,
   CallbackT callback,
-  rclcpp::CallbackGroup::SharedPtr group,
-  bool autostart)
+  rclcpp::CallbackGroup::SharedPtr group)
 {
   return rclcpp::create_wall_timer(
     period,
     std::move(callback),
     group,
     this->node_base_.get(),
-    this->node_timers_.get(),
-    autostart);
+    this->node_timers_.get());
 }
 
 template<typename DurationRepT, typename DurationT, typename CallbackT>
@@ -221,13 +219,13 @@ Node::create_generic_publisher(
   );
 }
 
-template<typename CallbackT, typename AllocatorT>
+template<typename AllocatorT>
 std::shared_ptr<rclcpp::GenericSubscription>
 Node::create_generic_subscription(
   const std::string & topic_name,
   const std::string & topic_type,
   const rclcpp::QoS & qos,
-  CallbackT && callback,
+  std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
   const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
 {
   return rclcpp::create_generic_subscription(
@@ -235,7 +233,7 @@ Node::create_generic_subscription(
     extend_name_with_sub_namespace(topic_name, this->get_sub_namespace()),
     topic_type,
     qos,
-    std::forward<CallbackT>(callback),
+    std::move(callback),
     options
   );
 }

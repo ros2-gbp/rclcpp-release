@@ -65,8 +65,6 @@ Time::Time(int64_t nanoseconds, rcl_clock_type_t clock_type)
 
 Time::Time(const Time & rhs) = default;
 
-Time::Time(Time && rhs) noexcept = default;
-
 Time::Time(
   const builtin_interfaces::msg::Time & time_msg,
   rcl_clock_type_t clock_type)
@@ -86,11 +84,23 @@ Time::Time(const rcl_time_point_t & time_point)
   // noop
 }
 
-Time::~Time() = default;
+Time::~Time()
+{
+}
 
 Time::operator builtin_interfaces::msg::Time() const
 {
-  return convert_rcl_time_to_sec_nanos(rcl_time_.nanoseconds);
+  builtin_interfaces::msg::Time msg_time;
+  constexpr rcl_time_point_value_t kRemainder = RCL_S_TO_NS(1);
+  const auto result = std::div(rcl_time_.nanoseconds, kRemainder);
+  if (result.rem >= 0) {
+    msg_time.sec = static_cast<std::int32_t>(result.quot);
+    msg_time.nanosec = static_cast<std::uint32_t>(result.rem);
+  } else {
+    msg_time.sec = static_cast<std::int32_t>(result.quot - 1);
+    msg_time.nanosec = static_cast<std::uint32_t>(kRemainder + result.rem);
+  }
+  return msg_time;
 }
 
 Time &
@@ -102,9 +112,6 @@ Time::operator=(const builtin_interfaces::msg::Time & time_msg)
   *this = Time(time_msg);
   return *this;
 }
-
-Time &
-Time::operator=(Time && rhs) noexcept = default;
 
 bool
 Time::operator==(const rclcpp::Time & rhs) const
@@ -269,25 +276,10 @@ Time::operator-=(const rclcpp::Duration & rhs)
 }
 
 Time
-Time::max(rcl_clock_type_t clock_type)
+Time::max()
 {
-  return Time(std::numeric_limits<int32_t>::max(), 999999999, clock_type);
+  return Time(std::numeric_limits<int32_t>::max(), 999999999);
 }
 
-builtin_interfaces::msg::Time
-convert_rcl_time_to_sec_nanos(const rcl_time_point_value_t & time_point)
-{
-  builtin_interfaces::msg::Time ret;
-  constexpr rcl_time_point_value_t kRemainder = RCL_S_TO_NS(1);
-  const auto result = std::div(time_point, kRemainder);
-  if (result.rem >= 0) {
-    ret.sec = static_cast<std::int32_t>(result.quot);
-    ret.nanosec = static_cast<std::uint32_t>(result.rem);
-  } else {
-    ret.sec = static_cast<std::int32_t>(result.quot - 1);
-    ret.nanosec = static_cast<std::uint32_t>(kRemainder + result.rem);
-  }
-  return ret;
-}
 
 }  // namespace rclcpp

@@ -3,110 +3,28 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-28.1.3 (2024-06-27)
+21.0.7 (2024-07-10)
+-------------------
+* fix: Fixed race condition in action server between is_ready and take"… (`#2531 <https://github.com/ros2/rclcpp/issues/2531>`_)
+* Do not generate the exception when action service response timeout. (`#2519 <https://github.com/ros2/rclcpp/issues/2519>`_)
+* Contributors: Janosch Machowinski, Tomoya Fujita, William Woodall
+
+21.0.6 (2024-04-19)
 -------------------
 
-28.1.2 (2024-05-13)
+21.0.5 (2024-02-07)
 -------------------
 
-28.1.1 (2024-04-24)
+21.0.4 (2023-11-17)
 -------------------
 
-28.1.0 (2024-04-16)
--------------------
-* Remove references to index.ros.org. (`#2504 <https://github.com/ros2/rclcpp/issues/2504>`_)
-* Contributors: Chris Lalancette
-
-28.0.1 (2024-04-16)
--------------------
-* Callback after cancel (`#2281 <https://github.com/ros2/rclcpp/issues/2281>`_)
-  * feat(Client): Added function to stop callbacks of a goal handle
-  This function allows us to drop the handle in a locked context.
-  If we do not do this within a lock, there will be a race condition between
-  the deletion of the shared_ptr of the handle and the result / feedback
-  callbacks.
-  * fix: make Client goal handle recursive
-  This fixes deadlocks due to release of goal handles in callbacks etc.
-  * fix(ActionGoalClient): Fixed memory leak for nominal case
-  This fixes a memory leak due to a self reference in the ClientGoalHandle.
-  Note, this fix will only work, if the ClientGoalHandle ever receives
-  a result callback.
-  * doc: Updated documentation of rclcpp_action::Client::async_send_goal
-  * docs: Made the async_send_goal documentation more explicit
-  Co-authored-by: Janosch Machowinski <J.Machowinski@cellumation.com>
-* Remake of "fix: Fixed race condition in action server between is_ready and take" (`#2495 <https://github.com/ros2/rclcpp/issues/2495>`_)
-  Some background information: is_ready, take_data and execute data
-  may be called from different threads in any order. The code in the old
-  state expected them to be called in series, without interruption.
-  This lead to multiple race conditions, as the state of the pimpl objects
-  was altered by the three functions in a non thread safe way.
-  Co-authored-by: Janosch Machowinski <j.machowinski@nospam.org>
-* update rclcpp::Waitable API to use references and const (`#2467 <https://github.com/ros2/rclcpp/issues/2467>`_)
-* Contributors: William Woodall, jmachowinski
-
-28.0.0 (2024-03-28)
--------------------
-* Do not generate the exception when action service response timeout. (`#2464 <https://github.com/ros2/rclcpp/issues/2464>`_)
-  * Do not generate the exception when action service response timeout.
-  * address review comment.
-  ---------
-* Modify rclcpp_action::GoalUUID hashing algorithm (`#2441 <https://github.com/ros2/rclcpp/issues/2441>`_)
-  * Add unit tests for hashing rclcpp_action::GoalUUID's
-  * Use the FNV-1a hash algorithm for Goal UUID
-* Various cleanups to deal with uncrustify 0.78. (`#2439 <https://github.com/ros2/rclcpp/issues/2439>`_)
-  These should also work with uncrustify 0.72.
-* Update quality declaration documents (`#2427 <https://github.com/ros2/rclcpp/issues/2427>`_)
-* Contributors: Chris Lalancette, Christophe Bedard, Tomoya Fujita, mauropasse
-
-27.0.0 (2024-02-07)
+21.0.3 (2023-09-08)
 -------------------
 
-26.0.0 (2024-01-24)
+21.0.2 (2023-07-14)
 -------------------
 
-25.0.0 (2023-12-26)
--------------------
-* Switch to target_link_libraries. (`#2374 <https://github.com/ros2/rclcpp/issues/2374>`_)
-* Contributors: Chris Lalancette
-
-24.0.0 (2023-11-06)
--------------------
-
-23.2.0 (2023-10-09)
--------------------
-
-23.1.0 (2023-10-04)
--------------------
-
-23.0.0 (2023-09-08)
--------------------
-* Update API docs links in package READMEs (`#2302 <https://github.com/ros2/rclcpp/issues/2302>`_)
-* fix(ClientGoalHandle): Made mutex recursive to prevent deadlocks (`#2267 <https://github.com/ros2/rclcpp/issues/2267>`_)
-* Contributors: Christophe Bedard, jmachowinski
-
-22.2.0 (2023-09-07)
--------------------
-* Correct the position of a comment. (`#2290 <https://github.com/ros2/rclcpp/issues/2290>`_)
-* Fix a typo in a comment. (`#2283 <https://github.com/ros2/rclcpp/issues/2283>`_)
-* doc fix: call `canceled` only after goal state is in canceling. (`#2266 <https://github.com/ros2/rclcpp/issues/2266>`_)
-* Contributors: Chris Lalancette, Jiaqi Li, Tomoya Fujita
-
-22.1.0 (2023-08-21)
--------------------
-
-22.0.0 (2023-07-11)
--------------------
-
-21.3.0 (2023-06-12)
--------------------
-
-21.2.0 (2023-06-07)
--------------------
-
-21.1.1 (2023-05-11)
--------------------
-
-21.1.0 (2023-04-27)
+21.0.1 (2023-05-11)
 -------------------
 
 21.0.0 (2023-04-18)

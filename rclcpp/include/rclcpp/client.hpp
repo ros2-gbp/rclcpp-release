@@ -20,13 +20,13 @@
 #include <future>
 #include <memory>
 #include <mutex>
-#include <optional>
+#include <optional>  // NOLINT, cpplint doesn't think this is a cpp std header
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
-#include <variant>
+#include <variant>  // NOLINT
 #include <vector>
 
 #include "rcl/client.h"
@@ -115,29 +115,6 @@ struct FutureAndRequestId
   /// Destructor.
   ~FutureAndRequestId() = default;
 };
-
-template<typename PendingRequestsT, typename AllocatorT = std::allocator<int64_t>>
-size_t
-prune_requests_older_than_impl(
-  PendingRequestsT & pending_requests,
-  std::mutex & pending_requests_mutex,
-  std::chrono::time_point<std::chrono::system_clock> time_point,
-  std::vector<int64_t, AllocatorT> * pruned_requests = nullptr)
-{
-  std::lock_guard guard(pending_requests_mutex);
-  auto old_size = pending_requests.size();
-  for (auto it = pending_requests.begin(), last = pending_requests.end(); it != last; ) {
-    if (it->second.first < time_point) {
-      if (pruned_requests) {
-        pruned_requests->push_back(it->first);
-      }
-      it = pending_requests.erase(it);
-    } else {
-      ++it;
-    }
-  }
-  return old_size - pending_requests.size();
-}
 }  // namespace detail
 
 namespace node_interfaces
@@ -386,16 +363,12 @@ protected:
   std::shared_ptr<rclcpp::Context> context_;
   rclcpp::Logger node_logger_;
 
-  std::recursive_mutex callback_mutex_;
-  // It is important to declare on_new_response_callback_ before
-  // client_handle_, so on destruction the client is
-  // destroyed first. Otherwise, the rmw client callback
-  // would point briefly to a destroyed function.
-  std::function<void(size_t)> on_new_response_callback_{nullptr};
-  // Declare client_handle_ after callback
   std::shared_ptr<rcl_client_t> client_handle_;
 
   std::atomic<bool> in_use_by_wait_set_{false};
+
+  std::recursive_mutex callback_mutex_;
+  std::function<void(size_t)> on_new_response_callback_{nullptr};
 };
 
 template<typename ServiceT>
@@ -794,11 +767,19 @@ public:
     std::chrono::time_point<std::chrono::system_clock> time_point,
     std::vector<int64_t, AllocatorT> * pruned_requests = nullptr)
   {
-    return detail::prune_requests_older_than_impl(
-      pending_requests_,
-      pending_requests_mutex_,
-      time_point,
-      pruned_requests);
+    std::lock_guard guard(pending_requests_mutex_);
+    auto old_size = pending_requests_.size();
+    for (auto it = pending_requests_.begin(), last = pending_requests_.end(); it != last; ) {
+      if (it->second.first < time_point) {
+        if (pruned_requests) {
+          pruned_requests->push_back(it->first);
+        }
+        it = pending_requests_.erase(it);
+      } else {
+        ++it;
+      }
+    }
+    return old_size - pending_requests_.size();
   }
 
   /// Configure client introspection.
