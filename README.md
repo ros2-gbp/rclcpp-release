@@ -1,3 +1,30 @@
+## rclcpp (iron) - 21.0.7-1
+
+The packages in the `rclcpp` repository were released into the `iron` distro by running `/usr/bin/bloom-release --rosdistro iron rclcpp` on `Thu, 11 Jul 2024 05:52:23 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_components`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `21.0.6-1`
+- old version: `21.0.6-1`
+- new version: `21.0.7-1`
+
+Versions of tools used:
+
+- bloom version: `0.12.0`
+- catkin_pkg version: `0.5.2`
+- rosdep version: `0.24.0`
+- rosdistro version: `0.9.1`
+- vcstools version: `0.1.42`
+
+
 ## rclcpp (jazzy) - 28.1.3-1
 
 The packages in the `rclcpp` repository were released into the `jazzy` distro by running `/usr/bin/bloom-release --rosdistro jazzy rclcpp` on `Thu, 27 Jun 2024 10:39:40 -0000`
