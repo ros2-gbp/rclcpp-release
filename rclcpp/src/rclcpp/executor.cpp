@@ -129,7 +129,7 @@ Executor::~Executor()
 }
 
 void
-Executor::trigger_entity_recollect(bool notify)
+Executor::handle_updated_entities(bool notify)
 {
   this->entities_need_rebuild_.store(true);
 
@@ -174,11 +174,11 @@ Executor::add_callback_group(
   this->collector_.add_callback_group(group_ptr);
 
   try {
-    this->trigger_entity_recollect(notify);
+    this->handle_updated_entities(notify);
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string(
-              "Failed to trigger guard condition on callback group add: ") + ex.what());
+              "Failed to handle entities update on callback group add: ") + ex.what());
   }
 }
 
@@ -188,11 +188,11 @@ Executor::add_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_pt
   this->collector_.add_node(node_ptr);
 
   try {
-    this->trigger_entity_recollect(notify);
+    this->handle_updated_entities(notify);
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string(
-              "Failed to trigger guard condition on node add: ") + ex.what());
+              "Failed to handle entities update on node add: ") + ex.what());
   }
 }
 
@@ -204,11 +204,11 @@ Executor::remove_callback_group(
   this->collector_.remove_callback_group(group_ptr);
 
   try {
-    this->trigger_entity_recollect(notify);
+    this->handle_updated_entities(notify);
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string(
-              "Failed to trigger guard condition on callback group remove: ") + ex.what());
+              "Failed to handle entities update on callback group remove: ") + ex.what());
   }
 }
 
@@ -224,11 +224,11 @@ Executor::remove_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node
   this->collector_.remove_node(node_ptr);
 
   try {
-    this->trigger_entity_recollect(notify);
+    this->handle_updated_entities(notify);
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string(
-              "Failed to trigger guard condition on node remove: ") + ex.what());
+              "Failed to handle entities update on node remove: ") + ex.what());
   }
 }
 
@@ -275,7 +275,7 @@ Executor::spin_until_future_complete_impl(
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin_until_future_complete() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
+  RCPPUTILS_SCOPE_EXIT(wait_result_.reset();this->spinning.store(false););
   while (rclcpp::ok(this->context_) && spinning.load()) {
     // Do one item of work.
     spin_once_impl(timeout_left);
@@ -364,7 +364,7 @@ Executor::spin_some_impl(std::chrono::nanoseconds max_duration, bool exhaustive)
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin_some() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
+  RCPPUTILS_SCOPE_EXIT(wait_result_.reset();this->spinning.store(false););
 
   // clear the wait result and wait for work without blocking to collect the work
   // for the first time
@@ -431,7 +431,7 @@ Executor::spin_once(std::chrono::nanoseconds timeout)
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin_once() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
+  RCPPUTILS_SCOPE_EXIT(wait_result_.reset();this->spinning.store(false););
   spin_once_impl(timeout);
 }
 
