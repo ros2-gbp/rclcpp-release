@@ -15,6 +15,7 @@
 #ifndef RCLCPP__EXPERIMENTAL__BUFFERS__RING_BUFFER_IMPLEMENTATION_HPP_
 #define RCLCPP__EXPERIMENTAL__BUFFERS__RING_BUFFER_IMPLEMENTATION_HPP_
 
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <utility>
@@ -52,7 +53,10 @@ public:
     if (capacity == 0) {
       throw std::invalid_argument("capacity must be a positive, non-zero value");
     }
-    TRACEPOINT(rclcpp_construct_ring_buffer, static_cast<const void *>(this), capacity_);
+    TRACETOOLS_TRACEPOINT(
+      rclcpp_construct_ring_buffer,
+      static_cast<const void *>(this),
+      capacity_);
   }
 
   virtual ~RingBufferImplementation() {}
@@ -63,13 +67,13 @@ public:
    *
    * \param request the element to be stored in the ring buffer
    */
-  void enqueue(BufferT request)
+  void enqueue(BufferT request) override
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
     write_index_ = next_(write_index_);
     ring_buffer_[write_index_] = std::move(request);
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_ring_buffer_enqueue,
       static_cast<const void *>(this),
       write_index_,
@@ -89,7 +93,7 @@ public:
    *
    * \return the element that is being removed from the ring buffer
    */
-  BufferT dequeue()
+  BufferT dequeue() override
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -98,7 +102,7 @@ public:
     }
 
     auto request = std::move(ring_buffer_[read_index_]);
-    TRACEPOINT(
+    TRACETOOLS_TRACEPOINT(
       rclcpp_ring_buffer_dequeue,
       static_cast<const void *>(this),
       read_index_,
@@ -108,6 +112,17 @@ public:
     size_--;
 
     return request;
+  }
+
+  /// Get all the elements from the ring buffer
+  /**
+   * This member function is thread-safe.
+   *
+   * \return a vector containing all the elements from the ring buffer
+   */
+  std::vector<BufferT> get_all_data() override
+  {
+    return get_all_data_impl();
   }
 
   /// Get the next index value for the ring buffer
@@ -129,7 +144,7 @@ public:
    *
    * \return `true` if there is data and `false` otherwise
    */
-  inline bool has_data() const
+  inline bool has_data() const override
   {
     std::lock_guard<std::mutex> lock(mutex_);
     return has_data_();
@@ -148,9 +163,21 @@ public:
     return is_full_();
   }
 
-  void clear()
+  /// Get the remaining capacity to store messages
+  /**
+   * This member function is thread-safe.
+   *
+   * \return the number of free capacity for new messages
+   */
+  size_t available_capacity() const override
   {
-    TRACEPOINT(rclcpp_ring_buffer_clear, static_cast<const void *>(this));
+    std::lock_guard<std::mutex> lock(mutex_);
+    return available_capacity_();
+  }
+
+  void clear() override
+  {
+    TRACETOOLS_TRACEPOINT(rclcpp_ring_buffer_clear, static_cast<const void *>(this));
   }
 
 private:
@@ -187,6 +214,82 @@ private:
   inline bool is_full_() const
   {
     return size_ == capacity_;
+  }
+
+  /// Get the remaining capacity to store messages
+  /**
+   * This member function is not thread-safe.
+   *
+   * \return the number of free capacity for new messages
+   */
+  inline size_t available_capacity_() const
+  {
+    return capacity_ - size_;
+  }
+
+  /// Traits for checking if a type is std::unique_ptr
+  template<typename ...>
+  struct is_std_unique_ptr final : std::false_type {};
+  template<class T, typename ... Args>
+  struct is_std_unique_ptr<std::unique_ptr<T, Args...>> final : std::true_type
+  {
+    typedef T Ptr_type;
+  };
+
+  /// Get all the elements from the ring buffer
+  /**
+   * This member function is thread-safe.
+   * Two versions for the implementation of the function.
+   * One for buffer containing unique_ptr and the other for other types
+   *
+   * \return a vector containing all the elements from the ring buffer
+   */
+  template<typename T = BufferT, std::enable_if_t<is_std_unique_ptr<T>::value &&
+    std::is_copy_constructible<
+      typename is_std_unique_ptr<T>::Ptr_type
+    >::value,
+    void> * = nullptr>
+  std::vector<BufferT> get_all_data_impl()
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<BufferT> result_vtr;
+    result_vtr.reserve(size_);
+    for (size_t id = 0; id < size_; ++id) {
+      result_vtr.emplace_back(
+        new typename is_std_unique_ptr<T>::Ptr_type(
+          *(ring_buffer_[(read_index_ + id) % capacity_])));
+    }
+    return result_vtr;
+  }
+
+  template<typename T = BufferT, std::enable_if_t<
+      std::is_copy_constructible<T>::value, void> * = nullptr>
+  std::vector<BufferT> get_all_data_impl()
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<BufferT> result_vtr;
+    result_vtr.reserve(size_);
+    for (size_t id = 0; id < size_; ++id) {
+      result_vtr.emplace_back(ring_buffer_[(read_index_ + id) % capacity_]);
+    }
+    return result_vtr;
+  }
+
+  template<typename T = BufferT, std::enable_if_t<!is_std_unique_ptr<T>::value &&
+    !std::is_copy_constructible<T>::value, void> * = nullptr>
+  std::vector<BufferT> get_all_data_impl()
+  {
+    throw std::logic_error("Underlined type results in invalid get_all_data_impl()");
+    return {};
+  }
+
+  template<typename T = BufferT, std::enable_if_t<is_std_unique_ptr<T>::value &&
+    !std::is_copy_constructible<typename is_std_unique_ptr<T>::Ptr_type>::value,
+    void> * = nullptr>
+  std::vector<BufferT> get_all_data_impl()
+  {
+    throw std::logic_error("Underlined type in unique_ptr results in invalid get_all_data_impl()");
+    return {};
   }
 
   size_t capacity_;

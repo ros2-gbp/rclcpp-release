@@ -74,20 +74,32 @@ public:
     const std::string & topic_name,
     const std::string & topic_type,
     const rclcpp::QoS & qos,
-    // TODO(nnmm): Add variant for callback with message info. See issue #1604.
-    std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
+    AnySubscriptionCallback<rclcpp::SerializedMessage, AllocatorT> callback,
     const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
   : SubscriptionBase(
       node_base,
-      *rclcpp::get_typesupport_handle(topic_type, "rosidl_typesupport_cpp", *ts_lib),
+      *rclcpp::get_message_typesupport_handle(topic_type, "rosidl_typesupport_cpp", *ts_lib),
       topic_name,
       options.to_rcl_subscription_options(qos),
       options.event_callbacks,
       options.use_default_callbacks,
       DeliveredMessageKind::SERIALIZED_MESSAGE),
-    callback_(callback),
+    any_callback_(callback),
     ts_lib_(ts_lib)
-  {}
+  {
+    TRACETOOLS_TRACEPOINT(
+      rclcpp_subscription_init,
+      static_cast<const void *>(get_subscription_handle().get()),
+      static_cast<const void *>(this));
+    TRACETOOLS_TRACEPOINT(
+      rclcpp_subscription_callback_added,
+      static_cast<const void *>(this),
+      static_cast<const void *>(&any_callback_));
+
+#ifndef TRACETOOLS_DISABLED
+    any_callback_.register_callback_for_tracing();
+#endif
+  }
 
   RCLCPP_PUBLIC
   virtual ~GenericSubscription() = default;
@@ -150,8 +162,7 @@ public:
 
 private:
   RCLCPP_DISABLE_COPY(GenericSubscription)
-
-  std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback_;
+  AnySubscriptionCallback<rclcpp::SerializedMessage, std::allocator<void>> any_callback_;
   // The type support library should stay loaded, so it is stored in the GenericSubscription
   std::shared_ptr<rcpputils::SharedLibrary> ts_lib_;
 };

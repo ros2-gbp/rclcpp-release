@@ -14,6 +14,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -54,9 +55,7 @@ public:
     ros_time_active_ = true;
 
     // Update all attached clocks to zero or last recorded time
-    for (auto it = associated_clocks_.begin(); it != associated_clocks_.end(); ++it) {
-      set_clock(last_time_msg_, true, *it);
-    }
+    set_all_clocks(last_time_msg_, true);
   }
 
   // An internal method to use in the clock callback that iterates and disables all clocks
@@ -71,11 +70,8 @@ public:
     ros_time_active_ = false;
 
     // Update all attached clocks
-    std::lock_guard<std::mutex> guard(clock_list_lock_);
-    for (auto it = associated_clocks_.begin(); it != associated_clocks_.end(); ++it) {
-      auto msg = std::make_shared<builtin_interfaces::msg::Time>();
-      set_clock(msg, false, *it);
-    }
+    auto msg = std::make_shared<builtin_interfaces::msg::Time>();
+    set_all_clocks(msg, false);
   }
 
   // Check if ROS time is active
@@ -95,7 +91,7 @@ public:
       }
     }
     std::lock_guard<std::mutex> guard(clock_list_lock_);
-    associated_clocks_.push_back(clock);
+    associated_clocks_.insert(clock);
     // Set the clock to zero unless there's a recently received message
     set_clock(last_time_msg_, ros_time_active_, clock);
   }
@@ -104,10 +100,8 @@ public:
   void detachClock(rclcpp::Clock::SharedPtr clock)
   {
     std::lock_guard<std::mutex> guard(clock_list_lock_);
-    auto result = std::find(associated_clocks_.begin(), associated_clocks_.end(), clock);
-    if (result != associated_clocks_.end()) {
-      associated_clocks_.erase(result);
-    } else {
+    auto removed = associated_clocks_.erase(clock);
+    if (removed == 0) {
       RCLCPP_ERROR(logger_, "failed to remove clock");
     }
   }
@@ -184,8 +178,8 @@ private:
 
   // A lock to protect iterating the associated_clocks_ field.
   std::mutex clock_list_lock_;
-  // A vector to store references to associated clocks.
-  std::vector<rclcpp::Clock::SharedPtr> associated_clocks_;
+  // An unordered_set to store references to associated clocks.
+  std::unordered_set<rclcpp::Clock::SharedPtr> associated_clocks_;
 
   // Local storage of validity of ROS time
   // This is needed when new clocks are added.
@@ -242,6 +236,7 @@ public:
     rclcpp::node_interfaces::NodeClockInterface::SharedPtr node_clock_interface,
     rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters_interface)
   {
+    std::lock_guard<std::mutex> guard(node_base_lock_);
     node_base_ = node_base_interface;
     node_topics_ = node_topics_interface;
     node_graph_ = node_graph_interface;
@@ -286,11 +281,7 @@ public:
     parameter_subscription_ = rclcpp::AsyncParametersClient::on_parameter_event(
       node_topics_,
       [this](std::shared_ptr<const rcl_interfaces::msg::ParameterEvent> event) {
-        if (node_base_ != nullptr) {
-          this->on_parameter_event(event);
-        }
-        // Do nothing if node_base_ is nullptr because it means the TimeSource is now
-        // without an attached node
+        this->on_parameter_event(event);
       });
   }
 
@@ -300,6 +291,7 @@ public:
     // destroy_clock_sub() *must* be first here, to ensure that the executor
     // can't possibly call any of the callbacks as we are cleaning up.
     destroy_clock_sub();
+    std::lock_guard<std::mutex> guard(node_base_lock_);
     clocks_state_.disable_ros_time();
     if (on_set_parameters_callback_) {
       node_parameters_->remove_on_set_parameters_callback(on_set_parameters_callback_.get());
@@ -333,6 +325,7 @@ private:
   std::thread clock_executor_thread_;
 
   // Preserve the node reference
+  std::mutex node_base_lock_;
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_{nullptr};
   rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_{nullptr};
   rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_{nullptr};
@@ -416,9 +409,14 @@ private:
       "/clock",
       qos_,
       [this](std::shared_ptr<const rosgraph_msgs::msg::Clock> msg) {
-        // We are using node_base_ as an indication if there is a node attached.
-        // Only call the clock_cb if that is the case.
-        if (node_base_ != nullptr) {
+        bool execute_cb = false;
+        {
+          std::lock_guard<std::mutex> guard(node_base_lock_);
+          // We are using node_base_ as an indication if there is a node attached.
+          // Only call the clock_cb if that is the case.
+          execute_cb = node_base_ != nullptr;
+        }
+        if (execute_cb) {
           clock_cb(msg);
         }
       },
@@ -470,6 +468,14 @@ private:
   // Callback for parameter updates
   void on_parameter_event(std::shared_ptr<const rcl_interfaces::msg::ParameterEvent> event)
   {
+    std::lock_guard<std::mutex> guard(node_base_lock_);
+
+    if (node_base_ == nullptr) {
+      // Do nothing if node_base_ is nullptr because it means the TimeSource is now
+      // without an attached node
+      return;
+    }
+
     // Filter out events on 'use_sim_time' parameter instances in other nodes.
     if (event->node != node_base_->get_fully_qualified_name()) {
       return;

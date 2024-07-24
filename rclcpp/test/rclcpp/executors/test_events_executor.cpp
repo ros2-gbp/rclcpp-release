@@ -43,11 +43,6 @@ public:
 
 TEST_F(TestEventsExecutor, run_pub_sub)
 {
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   auto node = std::make_shared<rclcpp::Node>("node");
 
   bool msg_received = false;
@@ -65,7 +60,7 @@ TEST_F(TestEventsExecutor, run_pub_sub)
   executor.add_node(node);
 
   bool spin_exited = false;
-  std::thread spinner([&spin_exited, &executor, this]() {
+  std::thread spinner([&spin_exited, &executor]() {
       executor.spin();
       spin_exited = true;
     });
@@ -80,8 +75,6 @@ TEST_F(TestEventsExecutor, run_pub_sub)
     !spin_exited &&
     (std::chrono::high_resolution_clock::now() - start < 1s))
   {
-    auto time = std::chrono::high_resolution_clock::now() - start;
-    auto time_msec = std::chrono::duration_cast<std::chrono::milliseconds>(time);
     std::this_thread::sleep_for(25ms);
   }
 
@@ -95,11 +88,6 @@ TEST_F(TestEventsExecutor, run_pub_sub)
 
 TEST_F(TestEventsExecutor, run_clients_servers)
 {
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   auto node = std::make_shared<rclcpp::Node>("node");
 
   bool request_received = false;
@@ -119,7 +107,7 @@ TEST_F(TestEventsExecutor, run_clients_servers)
   executor.add_node(node);
 
   bool spin_exited = false;
-  std::thread spinner([&spin_exited, &executor, this]() {
+  std::thread spinner([&spin_exited, &executor]() {
       executor.spin();
       spin_exited = true;
     });
@@ -153,11 +141,6 @@ TEST_F(TestEventsExecutor, run_clients_servers)
 
 TEST_F(TestEventsExecutor, spin_once_max_duration_timeout)
 {
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   auto node = std::make_shared<rclcpp::Node>("node");
 
   EventsExecutor executor;
@@ -190,11 +173,6 @@ TEST_F(TestEventsExecutor, spin_once_max_duration_timeout)
 
 TEST_F(TestEventsExecutor, spin_once_max_duration_timer)
 {
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   auto node = std::make_shared<rclcpp::Node>("node");
 
   EventsExecutor executor;
@@ -226,11 +204,6 @@ TEST_F(TestEventsExecutor, spin_once_max_duration_timer)
 
 TEST_F(TestEventsExecutor, spin_some_max_duration)
 {
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   {
     auto node = std::make_shared<rclcpp::Node>("node");
 
@@ -277,11 +250,6 @@ TEST_F(TestEventsExecutor, spin_some_max_duration)
 
 TEST_F(TestEventsExecutor, spin_some_zero_duration)
 {
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   auto node = std::make_shared<rclcpp::Node>("node");
 
   size_t t_runs = 0;
@@ -303,11 +271,6 @@ TEST_F(TestEventsExecutor, spin_some_zero_duration)
 
 TEST_F(TestEventsExecutor, spin_all_max_duration)
 {
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   {
     auto node = std::make_shared<rclcpp::Node>("node");
 
@@ -358,11 +321,6 @@ TEST_F(TestEventsExecutor, spin_all_max_duration)
 
 TEST_F(TestEventsExecutor, cancel_while_timers_running)
 {
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   auto node = std::make_shared<rclcpp::Node>("node");
 
   EventsExecutor executor;
@@ -388,7 +346,7 @@ TEST_F(TestEventsExecutor, cancel_while_timers_running)
     });
 
 
-  std::thread spinner([&executor, this]() {executor.spin();});
+  std::thread spinner([&executor]() {executor.spin();});
 
   std::this_thread::sleep_for(10ms);
   // Call cancel while t1 callback is still being executed
@@ -402,11 +360,6 @@ TEST_F(TestEventsExecutor, cancel_while_timers_running)
 
 TEST_F(TestEventsExecutor, cancel_while_timers_waiting)
 {
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   auto node = std::make_shared<rclcpp::Node>("node");
 
   size_t t1_runs = 0;
@@ -420,7 +373,7 @@ TEST_F(TestEventsExecutor, cancel_while_timers_waiting)
   executor.add_node(node);
 
   auto start = std::chrono::steady_clock::now();
-  std::thread spinner([&executor, this]() {executor.spin();});
+  std::thread spinner([&executor]() {executor.spin();});
 
   std::this_thread::sleep_for(10ms);
   executor.cancel();
@@ -435,11 +388,6 @@ TEST_F(TestEventsExecutor, destroy_entities)
   // This test fails on Windows! We skip it for now
   GTEST_SKIP();
 
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   // Create a publisher node and start publishing messages
   auto node_pub = std::make_shared<rclcpp::Node>("node_pub");
   auto publisher = node_pub->create_publisher<test_msgs::msg::Empty>("topic", rclcpp::QoS(10));
@@ -447,7 +395,7 @@ TEST_F(TestEventsExecutor, destroy_entities)
     2ms, [&]() {publisher->publish(std::make_unique<test_msgs::msg::Empty>());});
   EventsExecutor executor_pub;
   executor_pub.add_node(node_pub);
-  std::thread spinner([&executor_pub, this]() {executor_pub.spin();});
+  std::thread spinner([&executor_pub]() {executor_pub.spin();});
 
   // Create a node with two different subscriptions to the topic
   auto node_sub = std::make_shared<rclcpp::Node>("node_sub");
@@ -485,11 +433,6 @@ std::string * g_sub_log_msg;
 std::promise<void> * g_log_msgs_promise;
 TEST_F(TestEventsExecutor, test_default_incompatible_qos_callbacks)
 {
-  // rmw_connextdds doesn't support events-executor
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_connextdds") == 0) {
-    GTEST_SKIP();
-  }
-
   auto node = std::make_shared<rclcpp::Node>("node");
   rcutils_logging_output_handler_t original_output_handler = rcutils_logging_get_output_handler();
 

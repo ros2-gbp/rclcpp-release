@@ -25,6 +25,8 @@
 #include "lifecycle_msgs/msg/transition.hpp"
 
 #include "rcl_lifecycle/rcl_lifecycle.h"
+#include "rcl_interfaces/srv/get_logger_levels.hpp"
+#include "rcl_interfaces/srv/set_logger_levels.hpp"
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
@@ -33,6 +35,8 @@
 
 using lifecycle_msgs::msg::State;
 using lifecycle_msgs::msg::Transition;
+
+using namespace std::chrono_literals;
 
 static const std::chrono::nanoseconds DEFAULT_EVENT_TIMEOUT = std::chrono::seconds(3);
 static const std::chrono::nanoseconds DEFAULT_EVENT_SLEEP_PERIOD = std::chrono::milliseconds(100);
@@ -233,19 +237,32 @@ TEST_F(TestDefaultStateMachine, empty_initializer) {
   EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->get_current_state().id());
 }
 
-TEST_F(TestDefaultStateMachine, empty_initializer_rcl_errors) {
+TEST_F(TestDefaultStateMachine, check_logger_services_exist) {
+  // Logger level services are disabled
   {
-    auto patch = mocking_utils::inject_on_return(
-      "lib:rclcpp_lifecycle", rcl_lifecycle_state_machine_init, RCL_RET_ERROR);
-    EXPECT_THROW(
-      std::make_shared<EmptyLifecycleNode>("testnode").reset(),
-      std::runtime_error);
+    rclcpp::NodeOptions options = rclcpp::NodeOptions();
+    options.enable_logger_service(false);
+    auto node = std::make_shared<rclcpp_lifecycle::LifecycleNode>(
+      "test_logger_service", "/test", options);
+    auto get_client = node->create_client<rcl_interfaces::srv::GetLoggerLevels>(
+      "/test/test_logger_service/get_logger_levels");
+    ASSERT_FALSE(get_client->wait_for_service(2s));
+    auto set_client = node->create_client<rcl_interfaces::srv::SetLoggerLevels>(
+      "/test/test_logger_service/set_logger_levels");
+    ASSERT_FALSE(set_client->wait_for_service(2s));
   }
+  // Logger level services are enabled
   {
-    auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
-    auto patch = mocking_utils::inject_on_return(
-      "lib:rclcpp_lifecycle", rcl_lifecycle_state_machine_fini, RCL_RET_ERROR);
-    EXPECT_NO_THROW(test_node.reset());
+    rclcpp::NodeOptions options = rclcpp::NodeOptions();
+    options.enable_logger_service(true);
+    auto node = std::make_shared<rclcpp_lifecycle::LifecycleNode>(
+      "test_logger_service", "/test", options);
+    auto get_client = node->create_client<rcl_interfaces::srv::GetLoggerLevels>(
+      "/test/test_logger_service/get_logger_levels");
+    ASSERT_TRUE(get_client->wait_for_service(2s));
+    auto set_client = node->create_client<rcl_interfaces::srv::SetLoggerLevels>(
+      "/test/test_logger_service/set_logger_levels");
+    ASSERT_TRUE(set_client->wait_for_service(2s));
   }
 }
 
@@ -693,6 +710,17 @@ TEST_F(TestDefaultStateMachine, test_graph_services) {
   EXPECT_STREQ(
     service_names_and_types["/testnode/get_transition_graph"][0].c_str(),
     "lifecycle_msgs/srv/GetAvailableTransitions");
+
+  EXPECT_EQ(0u, test_node->count_clients("/testnode/change_state"));
+  EXPECT_EQ(0u, test_node->count_clients("/testnode/get_available_states"));
+  EXPECT_EQ(0u, test_node->count_clients("/testnode/get_available_transitions"));
+  EXPECT_EQ(0u, test_node->count_clients("/testnode/get_state"));
+  EXPECT_EQ(0u, test_node->count_clients("/testnode/get_transition_graph"));
+  EXPECT_EQ(1u, test_node->count_services("/testnode/change_state"));
+  EXPECT_EQ(1u, test_node->count_services("/testnode/get_available_states"));
+  EXPECT_EQ(1u, test_node->count_services("/testnode/get_available_transitions"));
+  EXPECT_EQ(1u, test_node->count_services("/testnode/get_state"));
+  EXPECT_EQ(1u, test_node->count_services("/testnode/get_transition_graph"));
 }
 
 TEST_F(TestDefaultStateMachine, test_graph_services_by_node) {

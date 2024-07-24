@@ -114,13 +114,15 @@ LifecycleNode::LifecycleNode(
       options.clock_qos(),
       options.use_clock_thread()
     )),
-  node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
-  node_options_(options),
-  impl_(new LifecycleNodeInterfaceImpl(
+  node_type_descriptions_(new rclcpp::node_interfaces::NodeTypeDescriptions(
       node_base_,
       node_logging_,
       node_parameters_,
-      node_services_))
+      node_services_
+    )),
+  node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
+  node_options_(options),
+  impl_(new LifecycleNodeInterfaceImpl(node_base_, node_services_, node_logging_))
 {
   impl_->init(enable_communication_interface);
 
@@ -142,6 +144,10 @@ LifecycleNode::LifecycleNode(
       &LifecycleNodeInterface::on_deactivate, this,
       std::placeholders::_1));
   register_on_error(std::bind(&LifecycleNodeInterface::on_error, this, std::placeholders::_1));
+
+  if (options.enable_logger_service()) {
+    node_logging_->create_logger_services(node_services_);
+  }
 }
 
 LifecycleNode::~LifecycleNode()
@@ -380,6 +386,18 @@ LifecycleNode::count_subscribers(const std::string & topic_name) const
   return node_graph_->count_subscribers(topic_name);
 }
 
+size_t
+LifecycleNode::count_clients(const std::string & service_name) const
+{
+  return node_graph_->count_clients(service_name);
+}
+
+size_t
+LifecycleNode::count_services(const std::string & service_name) const
+{
+  return node_graph_->count_services(service_name);
+}
+
 std::vector<rclcpp::TopicEndpointInfo>
 LifecycleNode::get_publishers_info_by_topic(const std::string & topic_name, bool no_mangle) const
 {
@@ -473,16 +491,16 @@ LifecycleNode::get_node_topics_interface()
   return node_topics_;
 }
 
+rclcpp::node_interfaces::NodeTypeDescriptionsInterface::SharedPtr
+LifecycleNode::get_node_type_descriptions_interface()
+{
+  return node_type_descriptions_;
+}
+
 rclcpp::node_interfaces::NodeServicesInterface::SharedPtr
 LifecycleNode::get_node_services_interface()
 {
   return node_services_;
-}
-
-rclcpp::node_interfaces::NodeTypeDescriptionsInterface::SharedPtr
-LifecycleNode::get_node_type_descriptions_interface()
-{
-  return impl_->get_node_type_descriptions_interface();
 }
 
 rclcpp::node_interfaces::NodeParametersInterface::SharedPtr
