@@ -21,25 +21,12 @@
 #include "rclcpp/executors/multi_threaded_executor.hpp"
 #include "rclcpp/executors/single_threaded_executor.hpp"
 #include "rclcpp/executors/static_single_threaded_executor.hpp"
-#include "rclcpp/experimental/executors/events_executor/events_executor.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
 {
-
-/// Create a default single-threaded executor and execute all available work exhaustively.
-/** \param[in] node_ptr Shared pointer to the node to spin. */
-RCLCPP_PUBLIC
-void
-spin_all(
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
-  std::chrono::nanoseconds max_duration);
-
-RCLCPP_PUBLIC
-void
-spin_all(rclcpp::Node::SharedPtr node_ptr, std::chrono::nanoseconds max_duration);
 
 /// Create a default single-threaded executor and execute any immediately available work.
 /** \param[in] node_ptr Shared pointer to the node to spin. */
@@ -120,9 +107,7 @@ spin_until_future_complete(
   const FutureT & future,
   std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
 {
-  rclcpp::ExecutorOptions options;
-  options.context = node_ptr->get_context();
-  rclcpp::executors::SingleThreadedExecutor executor(options);
+  rclcpp::executors::SingleThreadedExecutor executor;
   return executors::spin_node_until_future_complete<FutureT>(executor, node_ptr, future, timeout);
 }
 
