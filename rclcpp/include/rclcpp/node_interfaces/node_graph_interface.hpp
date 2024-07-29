@@ -29,6 +29,7 @@
 
 #include "rclcpp/event.hpp"
 #include "rclcpp/macros.hpp"
+#include "rclcpp/node_interfaces/detail/node_interfaces_helpers.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/visibility_control.hpp"
 
@@ -56,7 +57,8 @@ public:
     node_namespace_(info.node_namespace),
     topic_type_(info.topic_type),
     endpoint_type_(static_cast<rclcpp::EndpointType>(info.endpoint_type)),
-    qos_profile_({info.qos_profile.history, info.qos_profile.depth}, info.qos_profile)
+    qos_profile_({info.qos_profile.history, info.qos_profile.depth}, info.qos_profile),
+    topic_type_hash_(info.topic_type_hash)
   {
     std::copy(info.endpoint_gid, info.endpoint_gid + RMW_GID_STORAGE_SIZE, endpoint_gid_.begin());
   }
@@ -121,6 +123,16 @@ public:
   const rclcpp::QoS &
   qos_profile() const;
 
+  /// Get a mutable reference to the type hash of the topic endpoint.
+  RCLCPP_PUBLIC
+  rosidl_type_hash_t &
+  topic_type_hash();
+
+  /// Get a const reference to the type hash of the topic endpoint.
+  RCLCPP_PUBLIC
+  const rosidl_type_hash_t &
+  topic_type_hash() const;
+
 private:
   std::string node_name_;
   std::string node_namespace_;
@@ -128,6 +140,7 @@ private:
   rclcpp::EndpointType endpoint_type_;
   std::array<uint8_t, RMW_GID_STORAGE_SIZE> endpoint_gid_;
   rclcpp::QoS qos_profile_;
+  rosidl_type_hash_t topic_type_hash_;
 };
 
 namespace node_interfaces
@@ -292,6 +305,24 @@ public:
   size_t
   count_subscribers(const std::string & topic_name) const = 0;
 
+  /// Return the number of clients created for a given service.
+  /*
+   * \param[in] service_name the actual service name used; it will not be automatically remapped.
+   */
+  RCLCPP_PUBLIC
+  virtual
+  size_t
+  count_clients(const std::string & service_name) const = 0;
+
+  /// Return the number of services created for a given service.
+  /*
+   * \param[in] service_name the actual service name used; it will not be automatically remapped.
+   */
+  RCLCPP_PUBLIC
+  virtual
+  size_t
+  count_services(const std::string & service_name) const = 0;
+
   /// Return the rcl guard condition which is triggered when the ROS graph changes.
   RCLCPP_PUBLIC
   virtual
@@ -381,5 +412,7 @@ public:
 
 }  // namespace node_interfaces
 }  // namespace rclcpp
+
+RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(rclcpp::node_interfaces::NodeGraphInterface, graph)
 
 #endif  // RCLCPP__NODE_INTERFACES__NODE_GRAPH_INTERFACE_HPP_
