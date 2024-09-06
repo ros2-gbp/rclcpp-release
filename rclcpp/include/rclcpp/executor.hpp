@@ -541,9 +541,8 @@ protected:
    *
    * \param[in] notify if true will execute a trigger that will wake up a waiting executor
    */
-  RCLCPP_PUBLIC
-  virtual void
-  handle_updated_entities(bool notify);
+  void
+  trigger_entity_recollect(bool notify);
 
   /// Spinning state, used to prevent multi threaded calls to spin and to cancel blocking spins.
   std::atomic_bool spinning;

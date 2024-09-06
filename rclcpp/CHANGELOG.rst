@@ -2,49 +2,9 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-28.3.3 (2024-07-29)
+28.1.4 (2024-09-06)
 -------------------
-* Only compile the tests once. (`#2590 <https://github.com/ros2/rclcpp/issues/2590>`_)
-* Contributors: Chris Lalancette
-
-28.3.2 (2024-07-24)
--------------------
-* Updated rcpputils path API (`#2579 <https://github.com/ros2/rclcpp/issues/2579>`_)
-* Make the subscriber_triggered_to_receive_message test more reliable. (`#2584 <https://github.com/ros2/rclcpp/issues/2584>`_)
-  * Make the subscriber_triggered_to_receive_message test more reliable.
-  In the current code, inside of the timer we create the subscription
-  and the publisher, publish immediately, and expect the subscription
-  to get it immediately.  But it may be the case that discovery
-  hasn't even happened between the publisher and the subscription
-  by the time the publish call happens.
-  To make this more reliable, create the subscription and publish *before*
-  we ever create and spin on the timer.  This at least gives 100
-  milliseconds for discovery to happen.  That may not be quite enough
-  to make this reliable on all platforms, but in my local testing this
-  helps a lot.  Prior to this change I can make this fail one out of 10
-  times, and after the change I've run 100 times with no failures.
-* Have the EventsExecutor use more common code  (`#2570 <https://github.com/ros2/rclcpp/issues/2570>`_)
-  * move notify waitable setup to its own function
-  * move mutex lock to retrieve_entity utility
-  * use entities_need_rebuild\_ atomic bool in events-executors
-  * remove duplicated set_on_ready_callback for notify_waitable
-  * use mutex from base class rather than a new recursive mutex
-  * use current_collection\_ member in events-executor
-  * delay adding notify waitable to collection
-  * postpone clearing the current collection
-  * commonize notify waitable and collection
-  * commonize add/remove node/cbg methods
-  * fix linter errors
-  ---------
-* Removed deprecated methods and classes (`#2575 <https://github.com/ros2/rclcpp/issues/2575>`_)
-* Release ownership of entities after spinning cancelled (`#2556 <https://github.com/ros2/rclcpp/issues/2556>`_)
-  * Release ownership of entities after spinning cancelled
-  * Move release action to every exit point in different spin functions
-  * Move wait_result\_.reset() before setting spinning to false
-  * Update test code
-  * Move test code to test_executors.cpp
-  ---------
-* Split test_executors.cpp even further. (`#2572 <https://github.com/ros2/rclcpp/issues/2572>`_)
+* Split test_executors.cpp even further. (`#2572 <https://github.com/ros2/rclcpp/issues/2572>`_) (`#2619 <https://github.com/ros2/rclcpp/issues/2619>`_)
   That's because it is too large for Windows Debug to compile,
   so split into smaller bits.
   Even with this split, the file is too big; that's likely
@@ -52,32 +12,70 @@ Changelog for package rclcpp
   symbols per test case.  To deal with this, without further
   breaking up the file, also add in the /bigobj flag when
   compiling on Windows Debug.
-* avoid adding notify waitable twice to events-executor collection (`#2564 <https://github.com/ros2/rclcpp/issues/2564>`_)
-  * avoid adding notify waitable twice to events-executor entities collection
-  * remove redundant mutex lock
+  (cherry picked from commit c743c173e68d92af872cf163e10721a8dbe51dd0)
+  Co-authored-by: Chris Lalancette <clalancette@gmail.com>
+* Correct node name in service test code (`#2615 <https://github.com/ros2/rclcpp/issues/2615>`_) (`#2616 <https://github.com/ros2/rclcpp/issues/2616>`_)
+  (cherry picked from commit e846f56224a39b93f1c609e7ee03fff0662b7453)
+  Co-authored-by: Barry Xu <barry.xu@sony.com>
+* Release ownership of entities after spinning cancelled (backport `#2556 <https://github.com/ros2/rclcpp/issues/2556>`_) (`#2580 <https://github.com/ros2/rclcpp/issues/2580>`_)
+  * Release ownership of entities after spinning cancelled (`#2556 <https://github.com/ros2/rclcpp/issues/2556>`_)
+  * Release ownership of entities after spinning cancelled
+  * Move release action to every exit point in different spin functions
+  * Move wait_result\_.reset() before setting spinning to false
+  * Update test code
+  * Move test code to test_executors.cpp
   ---------
-* Contributors: Alberto Soragna, Alejandro Hernández Cordero, Barry Xu, Chris Lalancette
+  (cherry picked from commit 069a0018935b33a14632a1cdf4074984a1cf80fe)
+  # Conflicts:
+  #	rclcpp/test/rclcpp/executors/test_executors.cpp
+  * Fix backport issue (`#2581 <https://github.com/ros2/rclcpp/issues/2581>`_)
+  ---------
+  Co-authored-by: Barry Xu <barry.xu@sony.com>
+* Contributors: mergify[bot]
 
-28.3.1 (2024-06-25)
+28.1.3 (2024-06-27)
 -------------------
-* Remove unnecessary msg includes in tests (`#2566 <https://github.com/ros2/rclcpp/issues/2566>`_)
-* Fix copy-paste errors in function docs (`#2565 <https://github.com/ros2/rclcpp/issues/2565>`_)
-* Fix typo in function doc (`#2563 <https://github.com/ros2/rclcpp/issues/2563>`_)
-* Contributors: Christophe Bedard
+* Add test creating two content filter topics with the same topic name (`#2546 <https://github.com/ros2/rclcpp/issues/2546>`_) (`#2549 <https://github.com/ros2/rclcpp/issues/2549>`_) (`#2552 <https://github.com/ros2/rclcpp/issues/2552>`_)
+  Co-authored-by: Mario Domínguez López <116071334+Mario-DL@users.noreply.github.com>
+  (cherry picked from commit 7c096888caf92aa7557e1d3efc5448b56d8ce81c)
+  Co-authored-by: Alejandro Hernández Cordero <ahcorde@gmail.com>
+* Contributors: mergify[bot]
 
-28.3.0 (2024-06-17)
+28.1.2 (2024-05-13)
 -------------------
-* Add test creating two content filter topics with the same topic name (`#2546 <https://github.com/ros2/rclcpp/issues/2546>`_) (`#2549 <https://github.com/ros2/rclcpp/issues/2549>`_)
-* add impl pointer for ExecutorOptions (`#2523 <https://github.com/ros2/rclcpp/issues/2523>`_)
-* Fixup Executor::spin_all() regression fix (`#2517 <https://github.com/ros2/rclcpp/issues/2517>`_)
-* Add 'mimick' label to tests which use Mimick (`#2516 <https://github.com/ros2/rclcpp/issues/2516>`_)
-* Contributors: Alejandro Hernández Cordero, Scott K Logan, William Woodall
+* add impl pointer for ExecutorOptions (`#2523 <https://github.com/ros2/rclcpp/issues/2523>`_) (`#2525 <https://github.com/ros2/rclcpp/issues/2525>`_)
+  * add impl pointer for ExecutorOptions
+  (cherry picked from commit 343b29b617b163ad72b9fe3f6441dd4ed3d3af09)
+  Co-authored-by: William Woodall <william@osrfoundation.org>
+* Fixup Executor::spin_all() regression fix (`#2517 <https://github.com/ros2/rclcpp/issues/2517>`_) (`#2521 <https://github.com/ros2/rclcpp/issues/2521>`_)
+  * test(Executors): Added tests for busy waiting
+  Checks if executors are busy waiting while they should block
+  in spin_some or spin_all.
+  * fix: Reworked spinAll test
+  This test was strange. It looked like, it assumed that spin_all did
+  not return instantly. Also it was racy, as the thread could terminate
+  instantly.
+  * fix(Executor): Fixed spin_all not returning instantly is no work was available
+  * Update rclcpp/test/rclcpp/executors/test_executors.cpp
+  * test(executors): Added test for busy waiting while calling spin
+  * fix(executor): Reset wait_result on every call to spin_some_impl
+  Before, the method would not recollect available work in case of
+  spin_some, spin_all. This would lead to the method behaving differently
+  than to what the documentation states.
+  * restore previous test logic for now
+  * refactor spin_some_impl's logic and improve busy wait tests
+  * added some more comments about the implementation
+  ---------
+  Co-authored-by: Janosch Machowinski <J.Machowinski@cellumation.com>
+  Co-authored-by: jmachowinski <jmachowinski@users.noreply.github.com>
+  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
+  Co-authored-by: William Woodall <william@osrfoundation.org>
+* Contributors: mergify[bot]
 
-28.2.0 (2024-04-26)
+28.1.1 (2024-04-24)
 -------------------
-* Check for negative time in rclcpp::Time(int64_t nanoseconds, ...) constructor (`#2510 <https://github.com/ros2/rclcpp/issues/2510>`_)
-* Revise the description of service configure_introspection() (`#2511 <https://github.com/ros2/rclcpp/issues/2511>`_)
-* Contributors: Barry Xu, Sharmin Ramli
+* Revise the description of service configure_introspection() (`#2511 <https://github.com/ros2/rclcpp/issues/2511>`_) (`#2513 <https://github.com/ros2/rclcpp/issues/2513>`_)
+* Contributors: mergify[bot]
 
 28.1.0 (2024-04-16)
 -------------------

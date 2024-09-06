@@ -71,6 +71,12 @@ Rate::sleep()
   return true;
 }
 
+bool
+Rate::is_steady() const
+{
+  return clock_->get_clock_type() == RCL_STEADY_TIME;
+}
+
 rcl_clock_type_t
 Rate::get_type() const
 {

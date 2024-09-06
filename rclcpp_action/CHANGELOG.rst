@@ -3,23 +3,16 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-28.3.3 (2024-07-29)
+28.1.4 (2024-09-06)
 -------------------
 
-28.3.2 (2024-07-24)
+28.1.3 (2024-06-27)
 -------------------
 
-28.3.1 (2024-06-25)
+28.1.2 (2024-05-13)
 -------------------
-* Fix typo in function doc (`#2563 <https://github.com/ros2/rclcpp/issues/2563>`_)
-* Contributors: Christophe Bedard
 
-28.3.0 (2024-06-17)
--------------------
-* Add 'mimick' label to tests which use Mimick (`#2516 <https://github.com/ros2/rclcpp/issues/2516>`_)
-* Contributors: Scott K Logan
-
-28.2.0 (2024-04-26)
+28.1.1 (2024-04-24)
 -------------------
 
 28.1.0 (2024-04-16)

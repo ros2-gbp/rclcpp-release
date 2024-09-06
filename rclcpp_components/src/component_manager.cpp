@@ -14,7 +14,6 @@
 
 #include "rclcpp_components/component_manager.hpp"
 
-#include <filesystem>
 #include <functional>
 #include <memory>
 #include <string>
@@ -96,11 +95,11 @@ ComponentManager::get_component_resources(
       throw ComponentManagerException("Invalid resource entry");
     }
 
-    std::filesystem::path library_path = parts[1];
-    if (!library_path.is_absolute()) {
-      library_path = (base_path / library_path);
+    std::string library_path = parts[1];
+    if (!rcpputils::fs::path(library_path).is_absolute()) {
+      library_path = base_path + "/" + library_path;
     }
-    resources.push_back({parts[0], library_path.string()});
+    resources.push_back({parts[0], library_path});
   }
   return resources;
 }

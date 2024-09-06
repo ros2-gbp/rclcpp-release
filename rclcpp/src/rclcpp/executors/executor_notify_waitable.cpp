@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iostream>
+
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/executors/executor_notify_waitable.hpp"
 
@@ -89,9 +91,9 @@ ExecutorNotifyWaitable::is_ready(const rcl_wait_set_t & wait_set)
 }
 
 void
-ExecutorNotifyWaitable::execute(const std::shared_ptr<void> & /*data*/)
+ExecutorNotifyWaitable::execute(const std::shared_ptr<void> & data)
 {
-  std::lock_guard<std::mutex> lock(execute_mutex_);
+  (void) data;
   this->execute_callback_();
 }
 
@@ -145,14 +147,6 @@ ExecutorNotifyWaitable::clear_on_ready_callback()
     }
     gc->set_on_trigger_callback(nullptr);
   }
-}
-
-RCLCPP_PUBLIC
-void
-ExecutorNotifyWaitable::set_execute_callback(std::function<void(void)> on_execute_callback)
-{
-  std::lock_guard<std::mutex> lock(execute_mutex_);
-  execute_callback_ = on_execute_callback;
 }
 
 void

@@ -2,22 +2,16 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-28.3.3 (2024-07-29)
+28.1.4 (2024-09-06)
 -------------------
 
-28.3.2 (2024-07-24)
--------------------
-* Updated rcpputils path API (`#2579 <https://github.com/ros2/rclcpp/issues/2579>`_)
-* remove deprecated APIs from component_manager.hpp (`#2585 <https://github.com/ros2/rclcpp/issues/2585>`_)
-* Contributors: Alberto Soragna, Alejandro Hernández Cordero
-
-28.3.1 (2024-06-25)
+28.1.3 (2024-06-27)
 -------------------
 
-28.3.0 (2024-06-17)
+28.1.2 (2024-05-13)
 -------------------
 
-28.2.0 (2024-04-26)
+28.1.1 (2024-04-24)
 -------------------
 
 28.1.0 (2024-04-16)

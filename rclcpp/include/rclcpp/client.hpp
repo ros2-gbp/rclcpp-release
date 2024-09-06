@@ -70,6 +70,14 @@ struct FutureAndRequestId
   /// Allow implicit conversions to `std::future` by reference.
   operator FutureT &() {return this->future;}
 
+  /// Deprecated, use the `future` member variable instead.
+  /**
+   * Allow implicit conversions to `std::future` by value.
+   * \deprecated
+   */
+  [[deprecated("FutureAndRequestId: use .future instead of an implicit conversion")]]
+  operator FutureT() {return this->future;}
+
   // delegate future like methods in the std::future impl_
 
   /// See std::future::get().
@@ -428,6 +436,15 @@ public:
   {
     using detail::FutureAndRequestId<std::future<SharedResponse>>::FutureAndRequestId;
 
+    /// Deprecated, use `.future.share()` instead.
+    /**
+     * Allow implicit conversions to `std::shared_future` by value.
+     * \deprecated
+     */
+    [[deprecated(
+      "FutureAndRequestId: use .future.share() instead of an implicit conversion")]]
+    operator SharedFuture() {return this->future.share();}
+
     // delegate future like methods in the std::future impl_
 
     /// See std::future::share().
@@ -473,7 +490,7 @@ public:
    * \param[in] node_base NodeBaseInterface pointer that is used in part of the setup.
    * \param[in] node_graph The node graph interface of the corresponding node.
    * \param[in] service_name Name of the topic to publish to.
-   * \param[in] client_options options for the client.
+   * \param[in] client_options options for the subscription.
    */
   Client(
     rclcpp::node_interfaces::NodeBaseInterface * node_base,
