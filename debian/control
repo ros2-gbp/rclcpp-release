@@ -1,0 +1,12 @@
+Source: ros-iron-rclcpp-components
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-iron-ament-cmake-google-benchmark <!nocheck>, ros-iron-ament-cmake-gtest <!nocheck>, ros-iron-ament-cmake-ros, ros-iron-ament-index-cpp, ros-iron-ament-lint-auto <!nocheck>, ros-iron-ament-lint-common <!nocheck>, ros-iron-class-loader, ros-iron-composition-interfaces, ros-iron-launch-testing <!nocheck>, ros-iron-rclcpp, ros-iron-rcpputils, ros-iron-std-msgs <!nocheck>, ros-iron-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-iron-rclcpp-components
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-iron-ament-index-cpp, ros-iron-class-loader, ros-iron-composition-interfaces, ros-iron-rclcpp, ros-iron-ros-workspace
+Description: Package containing tools for dynamically loadable components
