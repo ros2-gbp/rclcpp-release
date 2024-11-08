@@ -38,7 +38,6 @@ protected:
   {
     node.reset();
     wrapped_node.reset();
-    rclcpp::shutdown();
   }
 
   static rclcpp::Node::SharedPtr node;

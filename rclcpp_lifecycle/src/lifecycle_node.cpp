@@ -114,15 +114,13 @@ LifecycleNode::LifecycleNode(
       options.clock_qos(),
       options.use_clock_thread()
     )),
-  node_type_descriptions_(new rclcpp::node_interfaces::NodeTypeDescriptions(
+  node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
+  node_options_(options),
+  impl_(new LifecycleNodeInterfaceImpl(
       node_base_,
       node_logging_,
       node_parameters_,
-      node_services_
-    )),
-  node_waitables_(new rclcpp::node_interfaces::NodeWaitables(node_base_.get())),
-  node_options_(options),
-  impl_(new LifecycleNodeInterfaceImpl(node_base_, node_services_, node_logging_))
+      node_services_))
 {
   impl_->init(enable_communication_interface);
 
@@ -152,19 +150,8 @@ LifecycleNode::LifecycleNode(
 
 LifecycleNode::~LifecycleNode()
 {
-  auto current_state = LifecycleNode::get_current_state().id();
-  if (current_state != lifecycle_msgs::msg::State::PRIMARY_STATE_FINALIZED) {
-    // This might be leaving sensors and devices without shutting down unintentionally.
-    // It is user's responsibility to call shutdown to avoid leaving them unknow states.
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp_lifecycle"),
-      "LifecycleNode is not shut down: Node still in state(%u) in destructor",
-      current_state);
-  }
-
   // release sub-interfaces in an order that allows them to consult with node_base during tear-down
   node_waitables_.reset();
-  node_type_descriptions_.reset();
   node_time_source_.reset();
   node_parameters_.reset();
   node_clock_.reset();
@@ -173,7 +160,6 @@ LifecycleNode::~LifecycleNode()
   node_timers_.reset();
   node_logging_.reset();
   node_graph_.reset();
-  node_base_.reset();
 }
 
 const char *
@@ -398,18 +384,6 @@ LifecycleNode::count_subscribers(const std::string & topic_name) const
   return node_graph_->count_subscribers(topic_name);
 }
 
-size_t
-LifecycleNode::count_clients(const std::string & service_name) const
-{
-  return node_graph_->count_clients(service_name);
-}
-
-size_t
-LifecycleNode::count_services(const std::string & service_name) const
-{
-  return node_graph_->count_services(service_name);
-}
-
 std::vector<rclcpp::TopicEndpointInfo>
 LifecycleNode::get_publishers_info_by_topic(const std::string & topic_name, bool no_mangle) const
 {
@@ -503,16 +477,16 @@ LifecycleNode::get_node_topics_interface()
   return node_topics_;
 }
 
-rclcpp::node_interfaces::NodeTypeDescriptionsInterface::SharedPtr
-LifecycleNode::get_node_type_descriptions_interface()
-{
-  return node_type_descriptions_;
-}
-
 rclcpp::node_interfaces::NodeServicesInterface::SharedPtr
 LifecycleNode::get_node_services_interface()
 {
   return node_services_;
+}
+
+rclcpp::node_interfaces::NodeTypeDescriptionsInterface::SharedPtr
+LifecycleNode::get_node_type_descriptions_interface()
+{
+  return impl_->get_node_type_descriptions_interface();
 }
 
 rclcpp::node_interfaces::NodeParametersInterface::SharedPtr

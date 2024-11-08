@@ -117,12 +117,12 @@ public:
   /// Add the Waitable to a wait set.
   RCLCPP_PUBLIC
   void
-  add_to_wait_set(rcl_wait_set_t & wait_set) override;
+  add_to_wait_set(rcl_wait_set_t * wait_set) override;
 
   /// Check if the Waitable is ready.
   RCLCPP_PUBLIC
   bool
-  is_ready(const rcl_wait_set_t & wait_set) override;
+  is_ready(rcl_wait_set_t * wait_set) override;
 
   /// Set a callback to be called when each new event instance occurs.
   /**
@@ -233,6 +233,8 @@ protected:
   size_t wait_set_event_index_;
 };
 
+using QOSEventHandlerBase [[deprecated("Use rclcpp::EventHandlerBase")]] = EventHandlerBase;
+
 template<typename EventCallbackT, typename ParentHandleT>
 class EventHandler : public EventHandlerBase
 {
@@ -292,7 +294,7 @@ public:
 
   /// Execute any entities of the Waitable that are ready.
   void
-  execute(const std::shared_ptr<void> & data) override
+  execute(std::shared_ptr<void> & data) override
   {
     if (!data) {
       throw std::runtime_error("'data' is empty");
@@ -309,6 +311,11 @@ private:
   ParentHandleT parent_handle_;
   EventCallbackT event_callback_;
 };
+
+template<typename EventCallbackT, typename ParentHandleT>
+using QOSEventHandler [[deprecated("Use rclcpp::EventHandler")]] = EventHandler<EventCallbackT,
+    ParentHandleT>;
+
 }  // namespace rclcpp
 
 #endif  // RCLCPP__EVENT_HANDLER_HPP_

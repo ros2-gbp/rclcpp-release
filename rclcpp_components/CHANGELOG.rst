@@ -2,96 +2,32 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-29.0.0 (2024-10-03)
--------------------
-* Shutdown the context before context's destructor is invoked in tests (`#2633 <https://github.com/ros2/rclcpp/issues/2633>`_)
-* Fix typo in rclcpp_components benchmark_components (`#2602 <https://github.com/ros2/rclcpp/issues/2602>`_)
-* Contributors: Alejandro Hernández Cordero, Christophe Bedard
-
-28.3.3 (2024-07-29)
+21.0.8 (2024-11-08)
 -------------------
 
-28.3.2 (2024-07-24)
--------------------
-* Updated rcpputils path API (`#2579 <https://github.com/ros2/rclcpp/issues/2579>`_)
-* remove deprecated APIs from component_manager.hpp (`#2585 <https://github.com/ros2/rclcpp/issues/2585>`_)
-* Contributors: Alberto Soragna, Alejandro Hernández Cordero
-
-28.3.1 (2024-06-25)
+21.0.7 (2024-07-10)
 -------------------
 
-28.3.0 (2024-06-17)
+21.0.6 (2024-04-19)
 -------------------
 
-28.2.0 (2024-04-26)
+21.0.5 (2024-02-07)
 -------------------
+* Increase the service queue sizes in component_container (`#2381 <https://github.com/ros2/rclcpp/issues/2381>`_)
+* Contributors: M. Fatih Cırıt
 
-28.1.0 (2024-04-16)
+21.0.4 (2023-11-17)
 -------------------
-* Remove references to index.ros.org. (`#2504 <https://github.com/ros2/rclcpp/issues/2504>`_)
-* Contributors: Chris Lalancette
-
-28.0.1 (2024-04-16)
--------------------
-
-28.0.0 (2024-03-28)
--------------------
-* Add EXECUTOR docs (`#2440 <https://github.com/ros2/rclcpp/issues/2440>`_)
-* Update quality declaration documents (`#2427 <https://github.com/ros2/rclcpp/issues/2427>`_)
-* crash on no class found (`#2415 <https://github.com/ros2/rclcpp/issues/2415>`_)
-  * crash on no class found
-  * error on no class found instead of no callback groups
-  Co-authored-by: Chris Lalancette <clalancette@gmail.com>
-* Contributors: Adam Aposhian, Christophe Bedard, Ruddick Lawrence
-
-27.0.0 (2024-02-07)
--------------------
-
-26.0.0 (2024-01-24)
--------------------
-
-25.0.0 (2023-12-26)
--------------------
-* Switch to target_link_libraries. (`#2374 <https://github.com/ros2/rclcpp/issues/2374>`_)
-* feat(rclcpp_components): support events executor in node main template (`#2366 <https://github.com/ros2/rclcpp/issues/2366>`_)
-* fix(rclcpp_components): increase the service queue sizes in component_container (`#2363 <https://github.com/ros2/rclcpp/issues/2363>`_)
-* Contributors: Chris Lalancette, Daisuke Nishimatsu, M. Fatih Cırıt
-
-24.0.0 (2023-11-06)
--------------------
-
-23.2.0 (2023-10-09)
--------------------
-
-23.1.0 (2023-10-04)
--------------------
-* Add missing header required by the rclcpp::NodeOptions type (`#2324 <https://github.com/ros2/rclcpp/issues/2324>`_)
+* Add missing header required by the rclcpp::NodeOptions type (`#2325 <https://github.com/ros2/rclcpp/issues/2325>`_)
 * Contributors: Ignacio Vizzo
 
-23.0.0 (2023-09-08)
--------------------
-* Update API docs links in package READMEs (`#2302 <https://github.com/ros2/rclcpp/issues/2302>`_)
-* Contributors: Christophe Bedard
-
-22.2.0 (2023-09-07)
+21.0.3 (2023-09-08)
 -------------------
 
-22.1.0 (2023-08-21)
+21.0.2 (2023-07-14)
 -------------------
 
-22.0.0 (2023-07-11)
--------------------
-
-21.3.0 (2023-06-12)
--------------------
-
-21.2.0 (2023-06-07)
--------------------
-
-21.1.1 (2023-05-11)
--------------------
-
-21.1.0 (2023-04-27)
+21.0.1 (2023-05-11)
 -------------------
 
 21.0.0 (2023-04-18)

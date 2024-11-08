@@ -282,6 +282,19 @@ public:
 
   /// Create and return a Client.
   /**
+   * \sa rclcpp::Node::create_client
+   * \deprecated use rclcpp::QoS instead of rmw_qos_profile_t
+   */
+  template<typename ServiceT>
+  [[deprecated("use rclcpp::QoS instead of rmw_qos_profile_t")]]
+  typename rclcpp::Client<ServiceT>::SharedPtr
+  create_client(
+    const std::string & service_name,
+    const rmw_qos_profile_t & qos_profile,
+    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+
+  /// Create and return a Client.
+  /**
    * \param[in] service_name The name on which the service is accessible.
    * \param[in] qos Quality of service profile for client.
    * \param[in] group Callback group to handle the reply to service calls.
@@ -292,6 +305,20 @@ public:
   create_client(
     const std::string & service_name,
     const rclcpp::QoS & qos = rclcpp::ServicesQoS(),
+    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+
+  /// Create and return a Service.
+  /**
+   * \sa rclcpp::Node::create_service
+   * \deprecated use rclcpp::QoS instead of rmw_qos_profile_t
+   */
+  template<typename ServiceT, typename CallbackT>
+  [[deprecated("use rclcpp::QoS instead of rmw_qos_profile_t")]]
+  typename rclcpp::Service<ServiceT>::SharedPtr
+  create_service(
+    const std::string & service_name,
+    CallbackT && callback,
+    const rmw_qos_profile_t & qos_profile,
     rclcpp::CallbackGroup::SharedPtr group = nullptr);
 
   /// Create and return a Service.
@@ -545,6 +572,8 @@ public:
     rclcpp::node_interfaces::OnSetParametersCallbackHandle;
   using OnSetParametersCallbackType =
     rclcpp::node_interfaces::NodeParametersInterface::OnSetParametersCallbackType;
+  using OnParametersSetCallbackType [[deprecated("use OnSetParametersCallbackType instead")]] =
+    OnSetParametersCallbackType;
 
   using PostSetParametersCallbackHandle =
     rclcpp::node_interfaces::PostSetParametersCallbackHandle;
@@ -660,22 +689,6 @@ public:
   RCLCPP_LIFECYCLE_PUBLIC
   size_t
   count_subscribers(const std::string & topic_name) const;
-
-  /// Return the number of clients created for a given service.
-  /**
-   * \sa rclcpp::Node::count_clients
-   */
-  RCLCPP_LIFECYCLE_PUBLIC
-  size_t
-  count_clients(const std::string & service_name) const;
-
-  /// Return the number of services created for a given service.
-  /**
-   * \sa rclcpp::Node::count_services
-   */
-  RCLCPP_LIFECYCLE_PUBLIC
-  size_t
-  count_services(const std::string & service_name) const;
 
   /// Return the topic endpoint information about publishers on a given topic.
   /**
@@ -1081,7 +1094,6 @@ private:
   rclcpp::node_interfaces::NodeClockInterface::SharedPtr node_clock_;
   rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters_;
   rclcpp::node_interfaces::NodeTimeSourceInterface::SharedPtr node_time_source_;
-  rclcpp::node_interfaces::NodeTypeDescriptionsInterface::SharedPtr node_type_descriptions_;
   rclcpp::node_interfaces::NodeWaitablesInterface::SharedPtr node_waitables_;
 
   const rclcpp::NodeOptions node_options_;

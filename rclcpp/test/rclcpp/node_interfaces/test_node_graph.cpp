@@ -47,13 +47,9 @@ constexpr char absolute_namespace[] = "/ns";
 class TestNodeGraph : public ::testing::Test
 {
 public:
-  static void SetUpTestCase()
-  {
-    rclcpp::init(0, nullptr);
-  }
-
   void SetUp()
   {
+    rclcpp::init(0, nullptr);
     node_ = std::make_shared<rclcpp::Node>(node_name, node_namespace);
 
     // This dynamic cast is not necessary for the unittests, but instead is used to ensure
@@ -63,7 +59,7 @@ public:
     ASSERT_NE(nullptr, node_graph_);
   }
 
-  static void TearDownTestCase()
+  void TearDown()
   {
     rclcpp::shutdown();
   }
@@ -133,9 +129,6 @@ TEST_F(TestNodeGraph, construct_from_node)
 
   EXPECT_EQ(0u, node_graph()->count_publishers("not_a_topic"));
   EXPECT_EQ(0u, node_graph()->count_subscribers("not_a_topic"));
-  EXPECT_EQ(0u, node_graph()->count_clients("not_a_service"));
-  EXPECT_EQ(0u, node_graph()->count_services("not_a_service"));
-
   EXPECT_NE(nullptr, node_graph()->get_graph_guard_condition());
 
   // get_graph_event is non-const
@@ -539,22 +532,6 @@ TEST_F(TestNodeGraph, count_subscribers_rcl_error)
   RCLCPP_EXPECT_THROW_EQ(
     node_graph()->count_subscribers("topic"),
     std::runtime_error("could not count subscribers: error not set"));
-}
-
-TEST_F(TestNodeGraph, count_clients_rcl_error)
-{
-  auto mock = mocking_utils::patch_and_return("lib:rclcpp", rcl_count_clients, RCL_RET_ERROR);
-  RCLCPP_EXPECT_THROW_EQ(
-    node_graph()->count_clients("service"),
-    std::runtime_error("could not count clients: error not set"));
-}
-
-TEST_F(TestNodeGraph, count_services_rcl_error)
-{
-  auto mock = mocking_utils::patch_and_return("lib:rclcpp", rcl_count_services, RCL_RET_ERROR);
-  RCLCPP_EXPECT_THROW_EQ(
-    node_graph()->count_services("service"),
-    std::runtime_error("could not count services: error not set"));
 }
 
 TEST_F(TestNodeGraph, notify_shutdown)

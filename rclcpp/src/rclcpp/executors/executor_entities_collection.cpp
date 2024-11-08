@@ -39,30 +39,6 @@ void ExecutorEntitiesCollection::clear()
   waitables.clear();
 }
 
-size_t ExecutorEntitiesCollection::remove_expired_entities()
-{
-  auto remove_entities = [](auto & collection) -> size_t {
-      size_t removed = 0;
-      for (auto it = collection.begin(); it != collection.end(); ) {
-        if (it->second.entity.expired()) {
-          ++removed;
-          it = collection.erase(it);
-        } else {
-          ++it;
-        }
-      }
-      return removed;
-    };
-
-  return
-    remove_entities(subscriptions) +
-    remove_entities(timers) +
-    remove_entities(guard_conditions) +
-    remove_entities(clients) +
-    remove_entities(services) +
-    remove_entities(waitables);
-}
-
 void
 build_entities_collection(
   const std::vector<rclcpp::CallbackGroup::WeakPtr> & callback_groups,
@@ -153,7 +129,7 @@ ready_executables(
         continue;
       }
       auto group_info = group_cache(entity_iter->second.callback_group);
-      if (!group_info || !group_info->can_be_taken_from().load()) {
+      if (group_info && !group_info->can_be_taken_from().load()) {
         continue;
       }
       if (!entity->call()) {
@@ -176,7 +152,7 @@ ready_executables(
         continue;
       }
       auto group_info = group_cache(entity_iter->second.callback_group);
-      if (!group_info || !group_info->can_be_taken_from().load()) {
+      if (group_info && !group_info->can_be_taken_from().load()) {
         continue;
       }
       rclcpp::AnyExecutable exec;
@@ -196,7 +172,7 @@ ready_executables(
         continue;
       }
       auto group_info = group_cache(entity_iter->second.callback_group);
-      if (!group_info || !group_info->can_be_taken_from().load()) {
+      if (group_info && !group_info->can_be_taken_from().load()) {
         continue;
       }
       rclcpp::AnyExecutable exec;
@@ -216,7 +192,7 @@ ready_executables(
         continue;
       }
       auto group_info = group_cache(entity_iter->second.callback_group);
-      if (!group_info || !group_info->can_be_taken_from().load()) {
+      if (group_info && !group_info->can_be_taken_from().load()) {
         continue;
       }
       rclcpp::AnyExecutable exec;
@@ -227,25 +203,28 @@ ready_executables(
     }
   }
 
-  for (const auto & [handle, entry] : collection.waitables) {
+  for (auto & [handle, entry] : collection.waitables) {
     auto waitable = entry.entity.lock();
     if (!waitable) {
       continue;
     }
-    if (!waitable->is_ready(rcl_wait_set)) {
+    if (!waitable->is_ready(&rcl_wait_set)) {
       continue;
     }
     auto group_info = group_cache(entry.callback_group);
-    if (!group_info || !group_info->can_be_taken_from().load()) {
+    if (group_info && !group_info->can_be_taken_from().load()) {
       continue;
     }
     rclcpp::AnyExecutable exec;
     exec.waitable = waitable;
     exec.callback_group = group_info;
+    exec.data = waitable->take_data();
     executables.push_back(exec);
     added++;
   }
+
   return added;
 }
+
 }  // namespace executors
 }  // namespace rclcpp

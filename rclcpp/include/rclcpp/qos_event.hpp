@@ -12,31 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RCLCPP__EXPERIMENTAL__BUFFERS__BUFFER_IMPLEMENTATION_BASE_HPP_
-#define RCLCPP__EXPERIMENTAL__BUFFERS__BUFFER_IMPLEMENTATION_BASE_HPP_
+#ifndef RCLCPP__QOS_EVENT_HPP_
+#define RCLCPP__QOS_EVENT_HPP_
 
-namespace rclcpp
-{
-namespace experimental
-{
-namespace buffers
-{
+#warning This header is obsolete, please include rclcpp/event_handler.hpp instead
 
-template<typename BufferT>
-class BufferImplementationBase
-{
-public:
-  virtual ~BufferImplementationBase() {}
+#include "rclcpp/event_handler.hpp"
 
-  virtual BufferT dequeue() = 0;
-  virtual void enqueue(BufferT request) = 0;
-
-  virtual void clear() = 0;
-  virtual bool has_data() const = 0;
-};
-
-}  // namespace buffers
-}  // namespace experimental
-}  // namespace rclcpp
-
-#endif  // RCLCPP__EXPERIMENTAL__BUFFERS__BUFFER_IMPLEMENTATION_BASE_HPP_
+#endif  // RCLCPP__QOS_EVENT_HPP_

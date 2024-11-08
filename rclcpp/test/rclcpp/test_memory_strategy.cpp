@@ -35,16 +35,10 @@ typedef std::map<rclcpp::CallbackGroup::WeakPtr,
 class TestWaitable : public rclcpp::Waitable
 {
 public:
-  void add_to_wait_set(rcl_wait_set_t &) override {}
-  bool is_ready(const rcl_wait_set_t &) override {return true;}
-
+  void add_to_wait_set(rcl_wait_set_t *) override {}
+  bool is_ready(rcl_wait_set_t *) override {return true;}
   std::shared_ptr<void> take_data() override {return nullptr;}
-  void execute(const std::shared_ptr<void> &) override {}
-
-  void set_on_ready_callback(std::function<void(size_t, int)>) override {}
-  void clear_on_ready_callback() override {}
-
-  std::shared_ptr<void> take_data_by_entity_id(size_t) override {return nullptr;}
+  void execute(std::shared_ptr<void> & data) override {(void)data;}
 };
 
 class TestMemoryStrategy : public ::testing::Test
@@ -149,9 +143,9 @@ TEST_F(TestMemoryStrategy, get_service_by_handle) {
     {
       auto callback_group =
         node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-      auto service_callback = [](
-        const test_msgs::srv::Empty::Request::SharedPtr,
-        test_msgs::srv::Empty::Response::SharedPtr) {};
+      auto service_callback =
+        [](const test_msgs::srv::Empty::Request::SharedPtr,
+          test_msgs::srv::Empty::Response::SharedPtr) {};
       const rclcpp::QoS qos(10);
       weak_groups_to_nodes.insert(
         std::pair<rclcpp::CallbackGroup::WeakPtr,
@@ -395,9 +389,9 @@ TEST_F(TestMemoryStrategy, get_group_by_service) {
     {
       auto callback_group =
         node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-      auto service_callback = [](
-        const test_msgs::srv::Empty::Request::SharedPtr,
-        test_msgs::srv::Empty::Response::SharedPtr) {};
+      auto service_callback =
+        [](const test_msgs::srv::Empty::Request::SharedPtr,
+          test_msgs::srv::Empty::Response::SharedPtr) {};
       const rclcpp::QoS qos(10);
 
       service = node->create_service<test_msgs::srv::Empty>(

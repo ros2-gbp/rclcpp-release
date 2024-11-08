@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iostream>
+
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/executors/executor_notify_waitable.hpp"
 
@@ -25,17 +27,15 @@ ExecutorNotifyWaitable::ExecutorNotifyWaitable(std::function<void(void)> on_exec
 {
 }
 
-ExecutorNotifyWaitable::ExecutorNotifyWaitable(ExecutorNotifyWaitable & other)
+ExecutorNotifyWaitable::ExecutorNotifyWaitable(const ExecutorNotifyWaitable & other)
+: ExecutorNotifyWaitable(other.execute_callback_)
 {
-  std::lock_guard<std::mutex> lock(other.guard_condition_mutex_);
-  this->execute_callback_ = other.execute_callback_;
   this->notify_guard_conditions_ = other.notify_guard_conditions_;
 }
 
-ExecutorNotifyWaitable & ExecutorNotifyWaitable::operator=(ExecutorNotifyWaitable & other)
+ExecutorNotifyWaitable & ExecutorNotifyWaitable::operator=(const ExecutorNotifyWaitable & other)
 {
   if (this != &other) {
-    std::lock_guard<std::mutex> lock(other.guard_condition_mutex_);
     this->execute_callback_ = other.execute_callback_;
     this->notify_guard_conditions_ = other.notify_guard_conditions_;
   }
@@ -43,45 +43,43 @@ ExecutorNotifyWaitable & ExecutorNotifyWaitable::operator=(ExecutorNotifyWaitabl
 }
 
 void
-ExecutorNotifyWaitable::add_to_wait_set(rcl_wait_set_t & wait_set)
+ExecutorNotifyWaitable::add_to_wait_set(rcl_wait_set_t * wait_set)
 {
   std::lock_guard<std::mutex> lock(guard_condition_mutex_);
 
-  // Note: no guard conditions need to be re-triggered, since the guard
-  // conditions in this class are not tracking a stateful condition, but instead
-  // only serve to interrupt the wait set when new information is available to
-  // consider.
   for (auto weak_guard_condition : this->notify_guard_conditions_) {
     auto guard_condition = weak_guard_condition.lock();
-    if (!guard_condition) {continue;}
+    if (guard_condition) {
+      auto rcl_guard_condition = &guard_condition->get_rcl_guard_condition();
 
-    rcl_guard_condition_t * cond = &guard_condition->get_rcl_guard_condition();
-    rcl_ret_t ret = rcl_wait_set_add_guard_condition(&wait_set, cond, NULL);
+      rcl_ret_t ret = rcl_wait_set_add_guard_condition(
+        wait_set,
+        rcl_guard_condition, NULL);
 
-    if (RCL_RET_OK != ret) {
-      rclcpp::exceptions::throw_from_rcl_error(
-        ret, "failed to add guard condition to wait set");
+      if (RCL_RET_OK != ret) {
+        rclcpp::exceptions::throw_from_rcl_error(
+          ret, "failed to add guard condition to wait set");
+      }
     }
   }
 }
 
 bool
-ExecutorNotifyWaitable::is_ready(const rcl_wait_set_t & wait_set)
+ExecutorNotifyWaitable::is_ready(rcl_wait_set_t * wait_set)
 {
   std::lock_guard<std::mutex> lock(guard_condition_mutex_);
 
   bool any_ready = false;
-  for (size_t ii = 0; ii < wait_set.size_of_guard_conditions; ++ii) {
-    const auto * rcl_guard_condition = wait_set.guard_conditions[ii];
+  for (size_t ii = 0; ii < wait_set->size_of_guard_conditions; ++ii) {
+    auto rcl_guard_condition = wait_set->guard_conditions[ii];
 
     if (nullptr == rcl_guard_condition) {
       continue;
     }
-    for (const auto & weak_guard_condition : this->notify_guard_conditions_) {
+    for (auto weak_guard_condition : this->notify_guard_conditions_) {
       auto guard_condition = weak_guard_condition.lock();
       if (guard_condition && &guard_condition->get_rcl_guard_condition() == rcl_guard_condition) {
         any_ready = true;
-        break;
       }
     }
   }
@@ -89,9 +87,9 @@ ExecutorNotifyWaitable::is_ready(const rcl_wait_set_t & wait_set)
 }
 
 void
-ExecutorNotifyWaitable::execute(const std::shared_ptr<void> & /*data*/)
+ExecutorNotifyWaitable::execute(std::shared_ptr<void> & data)
 {
-  std::lock_guard<std::mutex> lock(execute_mutex_);
+  (void) data;
   this->execute_callback_();
 }
 
@@ -145,14 +143,6 @@ ExecutorNotifyWaitable::clear_on_ready_callback()
     }
     gc->set_on_trigger_callback(nullptr);
   }
-}
-
-RCLCPP_PUBLIC
-void
-ExecutorNotifyWaitable::set_execute_callback(std::function<void(void)> on_execute_callback)
-{
-  std::lock_guard<std::mutex> lock(execute_mutex_);
-  execute_callback_ = on_execute_callback;
 }
 
 void

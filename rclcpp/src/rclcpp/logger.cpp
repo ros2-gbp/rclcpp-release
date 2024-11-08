@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <utility>
 
 #include "rcl_logging_interface/rcl_logging_interface.h"
-#include "rcl/error_handling.h"
 #include "rcl/logging_rosout.h"
 
 #include "rclcpp/exceptions.hpp"
@@ -55,36 +53,8 @@ get_node_logger(const rcl_node_t * node)
   return rclcpp::get_logger(logger_name);
 }
 
-// TODO(ahcorde): Remove deprecated class on the next release (in Rolling after Kilted).
-#if !defined(_WIN32)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else  // !defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
 rcpputils::fs::path
 get_logging_directory()
-{
-  char * log_dir = NULL;
-  auto allocator = rcutils_get_default_allocator();
-  rcl_logging_ret_t ret = rcl_logging_get_logging_directory(allocator, &log_dir);
-  if (RCL_LOGGING_RET_OK != ret) {
-    rclcpp::exceptions::throw_from_rcl_error(ret);
-  }
-  std::string path{log_dir};
-  allocator.deallocate(log_dir, allocator.state);
-  return path;
-}
-// remove warning suppression
-#if !defined(_WIN32)
-# pragma GCC diagnostic pop
-#else  // !defined(_WIN32)
-# pragma warning(pop)
-#endif
-
-std::filesystem::path
-get_log_directory()
 {
   char * log_dir = NULL;
   auto allocator = rcutils_get_default_allocator();
@@ -110,12 +80,10 @@ Logger::get_child(const std::string & suffix)
   {
     std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
     rcl_ret = rcl_logging_rosout_add_sublogger((*name_).c_str(), suffix.c_str());
-    if (RCL_RET_NOT_FOUND == rcl_ret) {
-      rcl_reset_error();
-    } else if (RCL_RET_OK != rcl_ret) {
+    if (RCL_RET_OK != rcl_ret) {
       exceptions::throw_from_rcl_error(
         rcl_ret, "failed to call rcl_logging_rosout_add_sublogger",
-        rcl_get_error_state(), rcl_reset_error);
+        rcutils_get_error_state(), rcutils_reset_error);
     }
   }
 
@@ -130,7 +98,9 @@ Logger::get_child(const std::string & suffix)
           logger_sublogger_pairname_ptr->second.c_str());
         delete logger_sublogger_pairname_ptr;
         if (RCL_RET_OK != rcl_ret) {
-          rcl_reset_error();
+          exceptions::throw_from_rcl_error(
+            rcl_ret, "failed to call rcl_logging_rosout_remove_sublogger",
+            rcutils_get_error_state(), rcutils_reset_error);
         }
       });
   }
