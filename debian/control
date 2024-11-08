@@ -1,0 +1,12 @@
+Source: ros-iron-rclcpp-action
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-iron-action-msgs, ros-iron-ament-cmake, ros-iron-ament-cmake-gtest <!nocheck>, ros-iron-ament-cmake-ros, ros-iron-ament-lint-auto <!nocheck>, ros-iron-ament-lint-common <!nocheck>, ros-iron-mimick-vendor <!nocheck>, ros-iron-performance-test-fixture <!nocheck>, ros-iron-rcl-action, ros-iron-rclcpp, ros-iron-rcpputils, ros-iron-rosidl-runtime-c, ros-iron-test-msgs <!nocheck>, ros-iron-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-iron-rclcpp-action
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-iron-action-msgs, ros-iron-ament-cmake, ros-iron-rcl-action, ros-iron-rclcpp, ros-iron-rcpputils, ros-iron-rosidl-runtime-c, ros-iron-ros-workspace
+Description: Adds action APIs for C++.
