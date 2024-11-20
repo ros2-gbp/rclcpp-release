@@ -48,11 +48,10 @@ public:
   ~ExecutorNotifyWaitable() override = default;
 
   RCLCPP_PUBLIC
-  ExecutorNotifyWaitable(const ExecutorNotifyWaitable & other);
-
+  ExecutorNotifyWaitable(ExecutorNotifyWaitable & other);
 
   RCLCPP_PUBLIC
-  ExecutorNotifyWaitable & operator=(const ExecutorNotifyWaitable & other);
+  ExecutorNotifyWaitable & operator=(ExecutorNotifyWaitable & other);
 
   /// Add conditions to the wait set
   /**
@@ -60,7 +59,7 @@ public:
    */
   RCLCPP_PUBLIC
   void
-  add_to_wait_set(rcl_wait_set_t * wait_set) override;
+  add_to_wait_set(rcl_wait_set_t & wait_set) override;
 
   /// Check conditions against the wait set
   /**
@@ -69,7 +68,7 @@ public:
    */
   RCLCPP_PUBLIC
   bool
-  is_ready(rcl_wait_set_t * wait_set) override;
+  is_ready(const rcl_wait_set_t & wait_set) override;
 
   /// Perform work associated with the waitable.
   /**
@@ -78,7 +77,7 @@ public:
    */
   RCLCPP_PUBLIC
   void
-  execute(std::shared_ptr<void> & data) override;
+  execute(const std::shared_ptr<void> & data) override;
 
   /// Retrieve data to be used in the next execute call.
   /**
@@ -123,6 +122,14 @@ public:
   void
   clear_on_ready_callback() override;
 
+  /// Set a new callback to be called whenever this waitable is executed.
+  /**
+   * \param[in] on_execute_callback The new callback
+   */
+  RCLCPP_PUBLIC
+  void
+  set_execute_callback(std::function<void(void)> on_execute_callback);
+
   /// Remove a guard condition from being waited on.
   /**
    * \param[in] weak_guard_condition The guard condition to remove.
@@ -143,7 +150,10 @@ private:
   /// Callback to run when waitable executes
   std::function<void(void)> execute_callback_;
 
+  /// Mutex to procetect the guard conditions
   std::mutex guard_condition_mutex_;
+  /// Mutex to protect the execute callback
+  std::mutex execute_mutex_;
 
   std::function<void(size_t)> on_ready_callback_;
 

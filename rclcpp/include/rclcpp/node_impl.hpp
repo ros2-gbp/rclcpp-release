@@ -40,6 +40,7 @@
 #include "rclcpp/create_generic_subscription.hpp"
 #include "rclcpp/create_publisher.hpp"
 #include "rclcpp/create_service.hpp"
+#include "rclcpp/create_generic_service.hpp"
 #include "rclcpp/create_subscription.hpp"
 #include "rclcpp/create_timer.hpp"
 #include "rclcpp/detail/resolve_enable_topic_statistics.hpp"
@@ -110,14 +111,16 @@ typename rclcpp::WallTimer<CallbackT>::SharedPtr
 Node::create_wall_timer(
   std::chrono::duration<DurationRepT, DurationT> period,
   CallbackT callback,
-  rclcpp::CallbackGroup::SharedPtr group)
+  rclcpp::CallbackGroup::SharedPtr group,
+  bool autostart)
 {
   return rclcpp::create_wall_timer(
     period,
     std::move(callback),
     group,
     this->node_base_.get(),
-    this->node_timers_.get());
+    this->node_timers_.get(),
+    autostart);
 }
 
 template<typename DurationRepT, typename DurationT, typename CallbackT>
@@ -152,22 +155,6 @@ Node::create_client(
     group);
 }
 
-template<typename ServiceT>
-typename Client<ServiceT>::SharedPtr
-Node::create_client(
-  const std::string & service_name,
-  const rmw_qos_profile_t & qos_profile,
-  rclcpp::CallbackGroup::SharedPtr group)
-{
-  return rclcpp::create_client<ServiceT>(
-    node_base_,
-    node_graph_,
-    node_services_,
-    extend_name_with_sub_namespace(service_name, this->get_sub_namespace()),
-    qos_profile,
-    group);
-}
-
 template<typename ServiceT, typename CallbackT>
 typename rclcpp::Service<ServiceT>::SharedPtr
 Node::create_service(
@@ -185,20 +172,22 @@ Node::create_service(
     group);
 }
 
-template<typename ServiceT, typename CallbackT>
-typename rclcpp::Service<ServiceT>::SharedPtr
-Node::create_service(
+template<typename CallbackT>
+typename rclcpp::GenericService::SharedPtr
+Node::create_generic_service(
   const std::string & service_name,
+  const std::string & service_type,
   CallbackT && callback,
-  const rmw_qos_profile_t & qos_profile,
+  const rclcpp::QoS & qos,
   rclcpp::CallbackGroup::SharedPtr group)
 {
-  return rclcpp::create_service<ServiceT, CallbackT>(
+  return rclcpp::create_generic_service<CallbackT>(
     node_base_,
     node_services_,
     extend_name_with_sub_namespace(service_name, this->get_sub_namespace()),
+    service_type,
     std::forward<CallbackT>(callback),
-    qos_profile,
+    qos,
     group);
 }
 
@@ -219,13 +208,13 @@ Node::create_generic_publisher(
   );
 }
 
-template<typename AllocatorT>
+template<typename CallbackT, typename AllocatorT>
 std::shared_ptr<rclcpp::GenericSubscription>
 Node::create_generic_subscription(
   const std::string & topic_name,
   const std::string & topic_type,
   const rclcpp::QoS & qos,
-  std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
+  CallbackT && callback,
   const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
 {
   return rclcpp::create_generic_subscription(
@@ -233,7 +222,7 @@ Node::create_generic_subscription(
     extend_name_with_sub_namespace(topic_name, this->get_sub_namespace()),
     topic_type,
     qos,
-    std::move(callback),
+    std::forward<CallbackT>(callback),
     options
   );
 }

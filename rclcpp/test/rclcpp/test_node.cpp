@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <filesystem>
 #include <functional>
 #include <limits>
 #include <map>
@@ -56,7 +57,7 @@ protected:
     test_resources_path /= "test_node";
   }
 
-  rcpputils::fs::path test_resources_path{TEST_RESOURCES_DIRECTORY};
+  std::filesystem::path test_resources_path{TEST_RESOURCES_DIRECTORY};
 };
 
 /*
@@ -3310,6 +3311,9 @@ TEST_F(TestNode, get_entity_names) {
 
   const auto service_names_and_types = node->get_service_names_and_types();
   EXPECT_EQ(service_names_and_types.end(), service_names_and_types.find("service"));
+
+  EXPECT_EQ(0u, node->count_clients("service"));
+  EXPECT_EQ(0u, node->count_services("service"));
 
   const auto service_names_and_types_by_node =
     node->get_service_names_and_types_by_node("node", "/ns");
