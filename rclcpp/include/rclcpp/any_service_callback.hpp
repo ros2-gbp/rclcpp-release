@@ -156,7 +156,7 @@ public:
     const std::shared_ptr<rmw_request_id_t> & request_header,
     std::shared_ptr<typename ServiceT::Request> request)
   {
-    TRACETOOLS_TRACEPOINT(callback_start, static_cast<const void *>(this), false);
+    TRACEPOINT(callback_start, static_cast<const void *>(this), false);
     if (std::holds_alternative<std::monostate>(callback_)) {
       // TODO(ivanpauno): Remove the set method, and force the users of this class
       // to pass a callback at construnciton.
@@ -165,13 +165,11 @@ public:
     if (std::holds_alternative<SharedPtrDeferResponseCallback>(callback_)) {
       const auto & cb = std::get<SharedPtrDeferResponseCallback>(callback_);
       cb(request_header, std::move(request));
-      TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
       return nullptr;
     }
     if (std::holds_alternative<SharedPtrDeferResponseCallbackWithServiceHandle>(callback_)) {
       const auto & cb = std::get<SharedPtrDeferResponseCallbackWithServiceHandle>(callback_);
       cb(service_handle, request_header, std::move(request));
-      TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
       return nullptr;
     }
     // auto response = allocate_shared<typename ServiceT::Response, Allocator>();
@@ -184,7 +182,7 @@ public:
       const auto & cb = std::get<SharedPtrWithRequestHeaderCallback>(callback_);
       cb(request_header, std::move(request), response);
     }
-    TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
+    TRACEPOINT(callback_end, static_cast<const void *>(this));
     return response;
   }
 
@@ -193,14 +191,10 @@ public:
 #ifndef TRACETOOLS_DISABLED
     std::visit(
       [this](auto && arg) {
-        if (TRACETOOLS_TRACEPOINT_ENABLED(rclcpp_callback_register)) {
-          char * symbol = tracetools::get_symbol(arg);
-          TRACETOOLS_DO_TRACEPOINT(
-            rclcpp_callback_register,
-            static_cast<const void *>(this),
-            symbol);
-          std::free(symbol);
-        }
+        TRACEPOINT(
+          rclcpp_callback_register,
+          static_cast<const void *>(this),
+          tracetools::get_symbol(arg));
       }, callback_);
 #endif  // TRACETOOLS_DISABLED
   }

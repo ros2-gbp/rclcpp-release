@@ -109,7 +109,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   void
-  add_to_wait_set(rcl_wait_set_t & wait_set) = 0;
+  add_to_wait_set(rcl_wait_set_t * wait_set) = 0;
 
   /// Check if the Waitable is ready.
   /**
@@ -124,7 +124,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   bool
-  is_ready(const rcl_wait_set_t & wait_set) = 0;
+  is_ready(rcl_wait_set_t * wait_set) = 0;
 
   /// Take the data so that it can be consumed with `execute`.
   /**
@@ -176,7 +176,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   std::shared_ptr<void>
-  take_data_by_entity_id(size_t id) = 0;
+  take_data_by_entity_id(size_t id);
 
   /// Execute data that is passed in.
   /**
@@ -203,7 +203,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   void
-  execute(const std::shared_ptr<void> & data) = 0;
+  execute(std::shared_ptr<void> & data) = 0;
 
   /// Exchange the "in use by wait set" state for this timer.
   /**
@@ -246,7 +246,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   void
-  set_on_ready_callback(std::function<void(size_t, int)> callback) = 0;
+  set_on_ready_callback(std::function<void(size_t, int)> callback);
 
   /// Unset any callback registered via set_on_ready_callback.
   /**
@@ -256,7 +256,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   void
-  clear_on_ready_callback() = 0;
+  clear_on_ready_callback();
 
 private:
   std::atomic<bool> in_use_by_wait_set_{false};

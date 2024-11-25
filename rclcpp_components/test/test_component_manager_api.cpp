@@ -33,11 +33,6 @@ protected:
   {
     rclcpp::init(0, nullptr);
   }
-
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
-  }
 };
 
 // TODO(hidmic): split up tests once Node bring up/tear down races

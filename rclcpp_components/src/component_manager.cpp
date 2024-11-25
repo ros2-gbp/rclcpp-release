@@ -14,7 +14,6 @@
 
 #include "rclcpp_components/component_manager.hpp"
 
-#include <filesystem>
 #include <functional>
 #include <memory>
 #include <string>
@@ -38,14 +37,16 @@ ComponentManager::ComponentManager(
 : Node(std::move(node_name), node_options),
   executor_(executor)
 {
+  rmw_qos_profile_t service_qos = rmw_qos_profile_services_default;
+  service_qos.depth = 200;
   loadNode_srv_ = create_service<LoadNode>(
     "~/_container/load_node",
     std::bind(&ComponentManager::on_load_node, this, _1, _2, _3),
-    rclcpp::ServicesQoS().keep_last(200));
+    service_qos);
   unloadNode_srv_ = create_service<UnloadNode>(
     "~/_container/unload_node",
     std::bind(&ComponentManager::on_unload_node, this, _1, _2, _3),
-    rclcpp::ServicesQoS().keep_last(200));
+    service_qos);
   listNodes_srv_ = create_service<ListNodes>(
     "~/_container/list_nodes",
     std::bind(&ComponentManager::on_list_nodes, this, _1, _2, _3));
@@ -96,11 +97,11 @@ ComponentManager::get_component_resources(
       throw ComponentManagerException("Invalid resource entry");
     }
 
-    std::filesystem::path library_path = parts[1];
-    if (!library_path.is_absolute()) {
-      library_path = (base_path / library_path);
+    std::string library_path = parts[1];
+    if (!rcpputils::fs::path(library_path).is_absolute()) {
+      library_path = base_path + "/" + library_path;
     }
-    resources.push_back({parts[0], library_path.string()});
+    resources.push_back({parts[0], library_path});
   }
   return resources;
 }
