@@ -1,3 +1,30 @@
+## rclcpp (rolling) - 29.3.0-1
+
+The packages in the `rclcpp` repository were released into the `rolling` distro by running `/usr/bin/bloom-release --track rolling --rosdistro rolling rclcpp` on `Fri, 20 Dec 2024 16:17:37 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_components`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `29.2.0-1`
+- old version: `29.2.0-1`
+- new version: `29.3.0-1`
+
+Versions of tools used:
+
+- bloom version: `0.12.0`
+- catkin_pkg version: `1.0.0`
+- rosdep version: `0.25.1`
+- rosdistro version: `1.0.1`
+- vcstools version: `0.1.42`
+
+
 ## rclcpp (jazzy) - 28.1.6-1
 
 The packages in the `rclcpp` repository were released into the `jazzy` distro by running `/usr/bin/bloom-release --track jazzy --rosdistro jazzy rclcpp` on `Wed, 18 Dec 2024 06:31:12 -0000`
