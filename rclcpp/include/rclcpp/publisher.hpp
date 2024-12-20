@@ -96,22 +96,6 @@ public:
   using ROSMessageTypeAllocator = typename ROSMessageTypeAllocatorTraits::allocator_type;
   using ROSMessageTypeDeleter = allocator::Deleter<ROSMessageTypeAllocator, ROSMessageType>;
 
-  using MessageAllocatorTraits
-  [[deprecated("use PublishedTypeAllocatorTraits")]] =
-    PublishedTypeAllocatorTraits;
-  using MessageAllocator
-  [[deprecated("use PublishedTypeAllocator")]] =
-    PublishedTypeAllocator;
-  using MessageDeleter
-  [[deprecated("use PublishedTypeDeleter")]] =
-    PublishedTypeDeleter;
-  using MessageUniquePtr
-  [[deprecated("use std::unique_ptr<PublishedType, PublishedTypeDeleter>")]] =
-    std::unique_ptr<PublishedType, PublishedTypeDeleter>;
-  using MessageSharedPtr
-  [[deprecated("use std::shared_ptr<const PublishedType>")]] =
-    std::shared_ptr<const PublishedType>;
-
   using BufferSharedPtr = typename rclcpp::experimental::buffers::IntraProcessBuffer<
     ROSMessageType,
     ROSMessageTypeAllocator,
@@ -128,8 +112,8 @@ public:
    *
    * \param[in] node_base NodeBaseInterface pointer that is used in part of the setup.
    * \param[in] topic Name of the topic to publish to.
-   * \param[in] qos QoS profile for Subcription.
-   * \param[in] options Options for the subscription.
+   * \param[in] qos QoS profile for the publisher.
+   * \param[in] options Options for the publisher.
    */
   Publisher(
     rclcpp::node_interfaces::NodeBaseInterface * node_base,
@@ -206,7 +190,7 @@ public:
    * the loaned message will be directly allocated in the middleware.
    * If not, the message allocator of this rclcpp::Publisher instance is being used.
    *
-   * With a call to \sa `publish` the LoanedMessage instance is being returned to the middleware
+   * With a call to `publish` the LoanedMessage instance is being returned to the middleware
    * or free'd accordingly to the allocator.
    * If the message is not being published but processed differently, the destructor of this
    * class will either return the message to the middleware or deallocate it via the internal
@@ -251,8 +235,12 @@ public:
     // interprocess publish, resulting in lower publish-to-subscribe latency.
     // It's not possible to do that with an unique_ptr,
     // as do_intra_process_publish takes the ownership of the message.
+
+    // When durability is set to TransientLocal (i.e. there is a buffer),
+    // inter process publish should always take place to ensure
+    // late joiners receive past data.
     bool inter_process_publish_needed =
-      get_subscription_count() > get_intra_process_subscription_count();
+      get_subscription_count() > get_intra_process_subscription_count() || buffer_;
 
     if (inter_process_publish_needed) {
       auto shared_msg =
@@ -329,8 +317,11 @@ public:
       return;
     }
 
+    // When durability is set to TransientLocal (i.e. there is a buffer),
+    // inter process publish should always take place to ensure
+    // late joiners receive past data.
     bool inter_process_publish_needed =
-      get_subscription_count() > get_intra_process_subscription_count();
+      get_subscription_count() > get_intra_process_subscription_count() || buffer_;
 
     if (inter_process_publish_needed) {
       auto ros_msg_ptr = std::make_shared<ROSMessageType>();
@@ -424,13 +415,6 @@ public:
       // and thus the destructor of rclcpp::LoanedMessage cleans up the memory.
       this->publish(loaned_msg.get());
     }
-  }
-
-  [[deprecated("use get_published_type_allocator() or get_ros_message_type_allocator() instead")]]
-  std::shared_ptr<PublishedTypeAllocator>
-  get_allocator() const
-  {
-    return std::make_shared<PublishedTypeAllocator>(published_type_allocator_);
   }
 
   PublishedTypeAllocator
