@@ -388,7 +388,7 @@ to_nanoseconds_helper(DurationT duration)
 //   - works nominally (it can execute entities)
 //   - it can execute multiple items at once
 //   - it does not wait for work to be available before returning
-TYPED_TEST(TestExecutors, spin_some)
+TYPED_TEST(TestExecutors, spinSome)
 {
   using ExecutorType = TypeParam;
 
@@ -484,7 +484,7 @@ TYPED_TEST(TestExecutors, spin_some)
 //   do not properly implement max_duration (it seems), so disable this test
 //   for them in the meantime.
 //   see: https://github.com/ros2/rclcpp/issues/2462
-TYPED_TEST(TestExecutorsStable, spin_some_max_duration)
+TYPED_TEST(TestExecutorsStable, spinSomeMaxDuration)
 {
   using ExecutorType = TypeParam;
 
@@ -714,6 +714,13 @@ TYPED_TEST(TestExecutors, notifyTwiceWhileSpinning)
       sub1_msg_count++;
     });
 
+  // Wait for the subscription to be matched
+  size_t tries = 10000;
+  while (this->publisher->get_subscription_count() < 2 && tries-- > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  ASSERT_EQ(this->publisher->get_subscription_count(), 2);
+
   // Publish a message and verify it's received
   this->publisher->publish(test_msgs::msg::Empty());
   auto start = std::chrono::steady_clock::now();
@@ -730,6 +737,13 @@ TYPED_TEST(TestExecutors, notifyTwiceWhileSpinning)
     [&sub2_msg_count](test_msgs::msg::Empty::ConstSharedPtr) {
       sub2_msg_count++;
     });
+
+  // Wait for the subscription to be matched
+  tries = 10000;
+  while (this->publisher->get_subscription_count() < 3 && tries-- > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  ASSERT_EQ(this->publisher->get_subscription_count(), 3);
 
   // Publish a message and verify it's received by both subscriptions
   this->publisher->publish(test_msgs::msg::Empty());
@@ -820,7 +834,7 @@ TEST(TestExecutors, testSpinWithNonDefaultContext)
   rclcpp::shutdown(non_default_context);
 }
 
-TYPED_TEST(TestExecutors, release_ownership_entity_after_spinning_cancel)
+TYPED_TEST(TestExecutors, releaseOwnershipEntityAfterSpinningCancel)
 {
   using ExecutorType = TypeParam;
   ExecutorType executor;
@@ -842,4 +856,37 @@ TYPED_TEST(TestExecutors, release_ownership_entity_after_spinning_cancel)
   EXPECT_EQ(future_status, std::future_status::ready);
 
   EXPECT_EQ(server.use_count(), 1);
+}
+
+TYPED_TEST(TestExecutors, testRaceDropCallbackGroupFromSecondThread)
+{
+  using ExecutorType = TypeParam;
+
+  // Create an executor
+  ExecutorType executor;
+  executor.add_node(this->node);
+
+  // Start spinning
+  auto executor_thread = std::thread(
+    [&executor]() {
+      executor.spin();
+    });
+
+  // As the problem is a race, we do this multiple times,
+  // to raise our chances of hitting the problem
+  for (size_t i = 0; i < 10; i++) {
+    auto cg = this->node->create_callback_group(
+      rclcpp::CallbackGroupType::MutuallyExclusive);
+    auto timer = this->node->create_timer(1s, [] {}, cg);
+    // sleep a bit, so that the spin thread can pick up the callback group
+    // and add it to the executor
+    std::this_thread::sleep_for(5ms);
+
+    // At this point the callbackgroup should be used within the waitset of the executor
+    // as we leave the scope, the reference to cg will be dropped.
+    // If the executor has a race, we will experience a segfault at this point.
+  }
+
+  executor.cancel();
+  executor_thread.join();
 }
