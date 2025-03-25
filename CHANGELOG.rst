@@ -2,6 +2,13 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+16.0.12 (2025-03-25)
+--------------------
+* doc: Added warning to not instantiate Clock directly with RCL_ROS_TIME (`#2768 <https://github.com/ros2/rclcpp/issues/2768>`_) (`#2770 <https://github.com/ros2/rclcpp/issues/2770>`_)
+* apply actual QoS from rmw to the IPC publisher. (backport `#2707 <https://github.com/ros2/rclcpp/issues/2707>`_) (`#2711 <https://github.com/ros2/rclcpp/issues/2711>`_)
+* Adding in topic name to logging on IPC issues (`#2706 <https://github.com/ros2/rclcpp/issues/2706>`_) (`#2709 <https://github.com/ros2/rclcpp/issues/2709>`_)
+* Contributors: mergify[bot]
+
 16.0.11 (2024-11-25)
 --------------------
 * Fix subscription.is_serialized() for callbacks with message info (`#1950 <https://github.com/ros2/rclcpp/issues/1950>`_) (`#2622 <https://github.com/ros2/rclcpp/issues/2622>`_)
