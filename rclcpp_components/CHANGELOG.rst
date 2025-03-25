@@ -2,6 +2,11 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+16.0.12 (2025-03-25)
+--------------------
+* Redundant .c_str() usage in rclcpp_components triggers ament_clang_tidy warning (`#2718 <https://github.com/ros2/rclcpp/issues/2718>`_)
+* Contributors: LihanChen2004
+
 16.0.11 (2024-11-25)
 --------------------
 
