@@ -60,6 +60,13 @@ public:
   /**
    * Initializes the clock instance with the given clock_type.
    *
+   * WARNING Don't instantiate a clock using RCL_ROS_TIME directly,
+   * unless you really know what you are doing. By default no TimeSource
+   * is attached to a new clock. This will lead to the unexpected behavior,
+   * that your RCL_ROS_TIME will run always on system time. If you want
+   * a RCL_ROS_TIME use Node::get_clock(), or make sure to attach a
+   * TimeSource yourself.
+   *
    * \param clock_type type of the clock.
    * \throws anything rclcpp::exceptions::throw_from_rcl_error can throw.
    */
@@ -77,7 +84,7 @@ public:
    */
   RCLCPP_PUBLIC
   Time
-  now() const;
+  now();
 
   /**
    * Sleep until a specified Time, according to clock type.
@@ -193,16 +200,6 @@ public:
   bool
   ros_time_is_active();
 
-  /**
-   * Cancels an ongoing or future sleep operation of one thread.
-   *
-   * This function can be used by one thread, to wakeup another thread that is
-   * blocked using any of the sleep_ or wait_ methods of this class.
-   */
-  RCLCPP_PUBLIC
-  void
-  cancel_sleep_or_wait();
-
   /// Return the rcl_clock_t clock handle
   RCLCPP_PUBLIC
   rcl_clock_t *
@@ -217,13 +214,13 @@ public:
   std::mutex &
   get_clock_mutex() noexcept;
 
-  /// Add a callback to invoke if the jump threshold is exceeded.
+  // Add a callback to invoke if the jump threshold is exceeded.
   /**
    * These callback functions must remain valid as long as the
    * returned shared pointer is valid.
    *
    * Function will register callbacks to the callback queue. On time jump all
-   * callbacks will be executed whose threshold is greater than the time jump;
+   * callbacks will be executed whose threshold is greater then the time jump;
    * The logic will first call selected pre_callbacks and then all selected
    * post_callbacks.
    *
@@ -232,7 +229,7 @@ public:
    * \param pre_callback Must be non-throwing
    * \param post_callback Must be non-throwing.
    * \param threshold Callbacks will be triggered if the time jump is greater
-   * than the threshold.
+   * then the threshold.
    * \throws anything rclcpp::exceptions::throw_from_rcl_error can throw.
    * \throws std::bad_alloc if the allocation of the JumpHandler fails.
    * \warning the instance of the clock must remain valid as long as any created
