@@ -2,6 +2,29 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+28.1.7 (2025-03-26)
+-------------------
+* fix(ClockConditionalVariable): Fixed potential crash on shutdown (`#2762 <https://github.com/ros2/rclcpp/issues/2762>`_)
+* doc: Added warning to not instantiate Clock directly with RCL_ROS_TIME (`#2769 <https://github.com/ros2/rclcpp/issues/2769>`_)
+  * Backports: `#2768 <https://github.com/ros2/rclcpp/issues/2768>`_
+* Use rmw_event_type_is_supported in test_qos_event (`#2766 <https://github.com/ros2/rclcpp/issues/2766>`_)
+  * Backports: `#2761 <https://github.com/ros2/rclcpp/issues/2761>`_
+* fix: Fixed expiring of goals if events executor is used (`#2674 <https://github.com/ros2/rclcpp/issues/2674>`_)
+* Executor strong reference fix (`#2754 <https://github.com/ros2/rclcpp/issues/2754>`_)
+  * Backports: `#2745 <https://github.com/ros2/rclcpp/issues/2745>`_
+* Double gc executor fix (`#2753 <https://github.com/ros2/rclcpp/issues/2753>`_)
+* Fix typo in doc section for get_service_typesupport_handle (`#2752 <https://github.com/ros2/rclcpp/issues/2752>`_)
+  * Backports: `#2751 <https://github.com/ros2/rclcpp/issues/2751>`_
+* Test case and fix for for https://github.com/ros2/rclcpp/issues/2652 (`#2740 <https://github.com/ros2/rclcpp/issues/2740>`_)
+  * Backports: `#2713 <https://github.com/ros2/rclcpp/issues/2713>`_
+* fix(timer): Delete node, after executor thread terminated (`#2738 <https://github.com/ros2/rclcpp/issues/2738>`_)
+  * Backports: `#2737 <https://github.com/ros2/rclcpp/issues/2737>`_
+* fix(Executor): Fixed entities not beeing executed after just beeing added (`#2729 <https://github.com/ros2/rclcpp/issues/2729>`_)
+  * Backports: `#2737 <https://github.com/ros2/rclcpp/issues/2724>`_
+* Fix transient local IPC publish  (`#2722 <https://github.com/ros2/rclcpp/issues/2722>`_)
+  * Backports: `#2708 <https://github.com/ros2/rclcpp/issues/2708>`_
+* Contributors: Janosch Machowinski, Jeffery Hsu, Tomoya Fujita, Francisco Martín Rico
+
 28.1.6 (2024-12-18)
 -------------------
 * apply actual QoS from rmw to the IPC publisher. (`#2707 <https://github.com/ros2/rclcpp/issues/2707>`_) (`#2712 <https://github.com/ros2/rclcpp/issues/2712>`_)
