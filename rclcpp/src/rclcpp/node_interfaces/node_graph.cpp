@@ -498,6 +498,50 @@ NodeGraph::count_subscribers(const std::string & topic_name) const
   return count;
 }
 
+size_t
+NodeGraph::count_clients(const std::string & service_name) const
+{
+  auto rcl_node_handle = node_base_->get_rcl_node_handle();
+
+  auto fqdn = rclcpp::expand_topic_or_service_name(
+    service_name,
+    rcl_node_get_name(rcl_node_handle),
+    rcl_node_get_namespace(rcl_node_handle),
+    true);
+
+  size_t count;
+  auto ret = rcl_count_clients(rcl_node_handle, fqdn.c_str(), &count);
+  if (ret != RMW_RET_OK) {
+    // *INDENT-OFF*
+    throw std::runtime_error(
+      std::string("could not count clients: ") + rmw_get_error_string().str);
+    // *INDENT-ON*
+  }
+  return count;
+}
+
+size_t
+NodeGraph::count_services(const std::string & service_name) const
+{
+  auto rcl_node_handle = node_base_->get_rcl_node_handle();
+
+  auto fqdn = rclcpp::expand_topic_or_service_name(
+    service_name,
+    rcl_node_get_name(rcl_node_handle),
+    rcl_node_get_namespace(rcl_node_handle),
+    true);
+
+  size_t count;
+  auto ret = rcl_count_services(rcl_node_handle, fqdn.c_str(), &count);
+  if (ret != RMW_RET_OK) {
+    // *INDENT-OFF*
+    throw std::runtime_error(
+      std::string("could not count services: ") + rmw_get_error_string().str);
+    // *INDENT-ON*
+  }
+  return count;
+}
+
 const rcl_guard_condition_t *
 NodeGraph::get_graph_guard_condition() const
 {
@@ -533,9 +577,8 @@ NodeGraph::notify_graph_change()
     }
   }
   graph_cv_.notify_all();
-  auto & node_gc = node_base_->get_notify_guard_condition();
   try {
-    node_gc.trigger();
+    node_base_->trigger_notify_guard_condition();
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string("failed to notify wait set on graph change: ") + ex.what());
@@ -788,4 +831,16 @@ const rclcpp::QoS &
 rclcpp::TopicEndpointInfo::qos_profile() const
 {
   return qos_profile_;
+}
+
+rosidl_type_hash_t &
+rclcpp::TopicEndpointInfo::topic_type_hash()
+{
+  return topic_type_hash_;
+}
+
+const rosidl_type_hash_t &
+rclcpp::TopicEndpointInfo::topic_type_hash() const
+{
+  return topic_type_hash_;
 }
