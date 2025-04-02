@@ -3,6 +3,13 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+28.1.8 (2025-04-02)
+-------------------
+* should pull valid transition before trying to change the state. (`#2774 <https://github.com/ros2/rclcpp/issues/2774>`_) (`#2784 <https://github.com/ros2/rclcpp/issues/2784>`_)
+  (cherry picked from commit 7b6ee8a2e7a13d73f9f69368970390a9e0930448)
+  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
+* Contributors: mergify[bot]
+
 28.1.7 (2025-03-26)
 -------------------
 
