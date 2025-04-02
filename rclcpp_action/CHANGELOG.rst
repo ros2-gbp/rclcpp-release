@@ -3,6 +3,16 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+28.1.8 (2025-04-02)
+-------------------
+* Harden rclcpp_action::convert(). (`#2786 <https://github.com/ros2/rclcpp/issues/2786>`_) (`#2789 <https://github.com/ros2/rclcpp/issues/2789>`_)
+  * Harden rclcpp_action::convert().
+  * update docstring.
+  ---------
+  (cherry picked from commit ce86ef7e621d96ce50d6ec1b49e9e1cd4f0a828b)
+  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
+* Contributors: mergify[bot]
+
 28.1.7 (2025-03-26)
 -------------------
 * fix: Fixed expiring of goals if events executor is used (`#2674 <https://github.com/ros2/rclcpp/issues/2674>`_)
