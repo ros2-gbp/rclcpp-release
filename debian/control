@@ -1,0 +1,12 @@
+Source: ros-rolling-rclcpp-components
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ament-cmake-copyright <!nocheck>, ament-cmake-cppcheck <!nocheck>, ament-cmake-cpplint <!nocheck>, ament-cmake-flake8 <!nocheck>, ament-cmake-googletest <!nocheck>, ament-cmake-lint-cmake <!nocheck>, ament-cmake-pep257 <!nocheck>, ament-cmake-ros, ament-cmake-uncrustify <!nocheck>, ament-cmake-xmllint <!nocheck>, ament-lint <!nocheck>, libament-index-cpp-dev, libclass-loader-dev, librcpputils-dev, libstd-msgs-dev <!nocheck>, python3-ament-cmake-google-benchmark <!nocheck>, python3-std-msgs <!nocheck>, ros-rolling-composition-interfaces, ros-rolling-launch-testing <!nocheck>, ros-rolling-rclcpp, ros-std-msgs <!nocheck>, ros-rolling-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-rolling-rclcpp-components
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libament-index-cpp-dev, libclass-loader-dev, ros-rolling-composition-interfaces, ros-rolling-rclcpp, ros-rolling-ros-workspace
+Description: Package containing tools for dynamically loadable components
