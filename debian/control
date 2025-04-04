@@ -1,0 +1,12 @@
+Source: ros-rolling-rclcpp-lifecycle
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ament-cmake-copyright <!nocheck>, ament-cmake-cppcheck <!nocheck>, ament-cmake-cpplint <!nocheck>, ament-cmake-flake8 <!nocheck>, ament-cmake-googletest <!nocheck>, ament-cmake-lint-cmake <!nocheck>, ament-cmake-pep257 <!nocheck>, ament-cmake-ros, ament-cmake-uncrustify <!nocheck>, ament-cmake-xmllint <!nocheck>, ament-lint <!nocheck>, libperformance-test-fixture-dev <!nocheck>, librcpputils-dev <!nocheck>, librcutils-dev, python3-rcutils, ros-rolling-lifecycle-msgs, ros-rolling-mimick-vendor <!nocheck>, ros-rolling-rcl, ros-rolling-rcl-interfaces, ros-rolling-rcl-lifecycle, ros-rolling-rclcpp, ros-rolling-rmw, ros-rolling-rosidl-typesupport-cpp, ros-rolling-test-msgs <!nocheck>, ros-rolling-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-rolling-rclcpp-lifecycle
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, librcutils-dev, python3-rcutils, ros-rolling-lifecycle-msgs, ros-rolling-rcl, ros-rolling-rcl-interfaces, ros-rolling-rcl-lifecycle, ros-rolling-rclcpp, ros-rolling-rmw, ros-rolling-rosidl-typesupport-cpp, ros-rolling-ros-workspace
+Description: Package containing a prototype for lifecycle implementation
