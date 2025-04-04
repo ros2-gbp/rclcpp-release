@@ -201,11 +201,16 @@ public:
   ros_time_is_active();
 
   /**
+   * Deprecated. This API is broken, as there is no way to get a deep
+   * copy of a clock. Therefore one can experience spurious wakeups triggered
+   * by some other instance of a clock.
+   *
    * Cancels an ongoing or future sleep operation of one thread.
    *
    * This function can be used by one thread, to wakeup another thread that is
    * blocked using any of the sleep_ or wait_ methods of this class.
    */
+  [[deprecated("Use ClockConditionalVariable")]]
   RCLCPP_PUBLIC
   void
   cancel_sleep_or_wait();
@@ -224,13 +229,13 @@ public:
   std::mutex &
   get_clock_mutex() noexcept;
 
-  // Add a callback to invoke if the jump threshold is exceeded.
+  /// Add a callback to invoke if the jump threshold is exceeded.
   /**
    * These callback functions must remain valid as long as the
    * returned shared pointer is valid.
    *
    * Function will register callbacks to the callback queue. On time jump all
-   * callbacks will be executed whose threshold is greater then the time jump;
+   * callbacks will be executed whose threshold is greater than the time jump;
    * The logic will first call selected pre_callbacks and then all selected
    * post_callbacks.
    *
@@ -239,7 +244,7 @@ public:
    * \param pre_callback Must be non-throwing
    * \param post_callback Must be non-throwing.
    * \param threshold Callbacks will be triggered if the time jump is greater
-   * then the threshold.
+   * than the threshold.
    * \throws anything rclcpp::exceptions::throw_from_rcl_error can throw.
    * \throws std::bad_alloc if the allocation of the JumpHandler fails.
    * \warning the instance of the clock must remain valid as long as any created

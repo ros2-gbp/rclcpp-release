@@ -480,19 +480,13 @@ TYPED_TEST(TestExecutors, spinSome)
 
 // The purpose of this test is to check that the ExecutorT.spin_some() method:
 //   - does not continue executing after max_duration has elapsed
-TYPED_TEST(TestExecutors, spinSomeMaxDuration)
+// TODO(wjwwood): The `StaticSingleThreadedExecutor`
+//   do not properly implement max_duration (it seems), so disable this test
+//   for them in the meantime.
+//   see: https://github.com/ros2/rclcpp/issues/2462
+TYPED_TEST(TestExecutorsStable, spinSomeMaxDuration)
 {
   using ExecutorType = TypeParam;
-
-  // TODO(wjwwood): The `StaticSingleThreadedExecutor`
-  //   do not properly implement max_duration (it seems), so disable this test
-  //   for them in the meantime.
-  //   see: https://github.com/ros2/rclcpp/issues/2462
-  if (
-    std::is_same<ExecutorType, rclcpp::executors::StaticSingleThreadedExecutor>())
-  {
-    GTEST_SKIP();
-  }
 
   // Use an isolated callback group to avoid interference from any housekeeping
   // items that may be in the default callback group of the node.
@@ -638,7 +632,7 @@ TYPED_TEST(TestExecutors, testSpinUntilFutureCompleteInterrupted)
 // and b) refreshing the executor collections.
 // The inconsistent state would happen if the event was processed before the collections were
 // finished to be refreshed: the executor would pick up the event but be unable to process it.
-// This would leave the `notify_waitable_event_pushed_` flag to true, preventing additional
+// This would leave the `entities_need_rebuild_` flag to true, preventing additional
 // notify waitable events to be pushed.
 // The behavior is observable only under heavy load, so this test spawns several worker
 // threads. Due to the nature of the bug, this test may still succeed even if the
@@ -667,20 +661,20 @@ TYPED_TEST(TestExecutors, testRaceConditionAddNode)
   }
 
   // Create an executor
-  auto executor = std::make_shared<ExecutorType>();
+  ExecutorType executor;
   // Start spinning
   auto executor_thread = std::thread(
-    [executor]() {
-      executor->spin();
+    [&executor]() {
+      executor.spin();
     });
   // Add a node to the executor
-  executor->add_node(this->node);
+  executor.add_node(this->node);
 
   // Cancel the executor (make sure that it's already spinning first)
-  while (!executor->is_spinning() && rclcpp::ok()) {
+  while (!executor.is_spinning() && rclcpp::ok()) {
     continue;
   }
-  executor->cancel();
+  executor.cancel();
 
   // Try to join the thread after cancelling the executor
   // This is the "test". We want to make sure that we can still cancel the executor
@@ -692,6 +686,80 @@ TYPED_TEST(TestExecutors, testRaceConditionAddNode)
   for (auto & t : stress_threads) {
     t.join();
   }
+}
+
+// Check that executors are correctly notified while they are spinning
+// we notify twice to ensure that the notify waitable is still working
+// after the first notification
+TYPED_TEST(TestExecutors, notifyTwiceWhileSpinning)
+{
+  using ExecutorType = TypeParam;
+
+  // Create executor, add the node and start spinning
+  ExecutorType executor;
+  executor.add_node(this->node);
+  std::thread spinner([&]() {executor.spin();});
+
+  // Wait for executor to be spinning
+  while (!executor.is_spinning()) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+
+  // Create the first subscription while the executor is already spinning
+  std::atomic<size_t> sub1_msg_count {0};
+  auto sub1 = this->node->template create_subscription<test_msgs::msg::Empty>(
+    this->publisher->get_topic_name(),
+    rclcpp::QoS(10),
+    [&sub1_msg_count](test_msgs::msg::Empty::ConstSharedPtr) {
+      sub1_msg_count++;
+    });
+
+  // Wait for the subscription to be matched
+  size_t tries = 10000;
+  while (this->publisher->get_subscription_count() < 2 && tries-- > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  ASSERT_EQ(this->publisher->get_subscription_count(), 2);
+
+  // Publish a message and verify it's received
+  this->publisher->publish(test_msgs::msg::Empty());
+  auto start = std::chrono::steady_clock::now();
+  while (sub1_msg_count == 0 && (std::chrono::steady_clock::now() - start) < 10s) {
+    std::this_thread::sleep_for(1ms);
+  }
+  EXPECT_EQ(sub1_msg_count, 1u);
+
+  // Create a second subscription while the executor is already spinning
+  std::atomic<size_t> sub2_msg_count {0};
+  auto sub2 = this->node->template create_subscription<test_msgs::msg::Empty>(
+    this->publisher->get_topic_name(),
+    rclcpp::QoS(10),
+    [&sub2_msg_count](test_msgs::msg::Empty::ConstSharedPtr) {
+      sub2_msg_count++;
+    });
+
+  // Wait for the subscription to be matched
+  tries = 10000;
+  while (this->publisher->get_subscription_count() < 3 && tries-- > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  ASSERT_EQ(this->publisher->get_subscription_count(), 3);
+
+  // Publish a message and verify it's received by both subscriptions
+  this->publisher->publish(test_msgs::msg::Empty());
+  start = std::chrono::steady_clock::now();
+  while (
+    (sub1_msg_count == 1 || sub2_msg_count == 0) &&
+    (std::chrono::steady_clock::now() - start) < 10s)
+  {
+    std::this_thread::sleep_for(1ms);
+  }
+  EXPECT_EQ(sub1_msg_count, 2u);
+  EXPECT_EQ(sub2_msg_count, 1u);
+
+  // Cancel needs to be called before join, so that executor.spin() returns.
+  executor.cancel();
+  spinner.join();
 }
 
 // Check spin_until_future_complete with node base pointer (instantiates its own executor)
