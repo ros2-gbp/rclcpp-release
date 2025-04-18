@@ -3,6 +3,11 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+29.5.0 (2025-04-18)
+-------------------
+* Use std::recursive_mutex for action requests. (`#2798 <https://github.com/ros2/rclcpp/issues/2798>`_)
+* Contributors: Tomoya Fujita
+
 29.4.0 (2025-04-04)
 -------------------
 * Remove warning (`#2790 <https://github.com/ros2/rclcpp/issues/2790>`_)

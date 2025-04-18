@@ -2,6 +2,16 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+29.5.0 (2025-04-18)
+-------------------
+* Fix a race condition (`#2819 <https://github.com/ros2/rclcpp/issues/2819>`_)
+* Remove redundant typesupport check in serialization module (`#2808 <https://github.com/ros2/rclcpp/issues/2808>`_)
+* Remove get_typesupport_handle implementation. (`#2806 <https://github.com/ros2/rclcpp/issues/2806>`_)
+* Use NodeParameterInterface instead of /parameter_event to update "use_sim_time" (`#2378 <https://github.com/ros2/rclcpp/issues/2378>`_)
+* Remove cancel_clock_executor_promise\_. (`#2797 <https://github.com/ros2/rclcpp/issues/2797>`_)
+* Enable parameter update recursively only when QoS override parameters. (`#2742 <https://github.com/ros2/rclcpp/issues/2742>`_)
+* Contributors: Pedro de Azeredo, Tanishq Chaudhary, Tomoya Fujita
+
 29.4.0 (2025-04-04)
 -------------------
 * Removed trailing whitespace from the codebase. (`#2791 <https://github.com/ros2/rclcpp/issues/2791>`_)
