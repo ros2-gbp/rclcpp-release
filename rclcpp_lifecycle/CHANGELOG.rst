@@ -3,6 +3,9 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+28.1.9 (2025-04-23)
+-------------------
+
 28.1.8 (2025-04-02)
 -------------------
 * should pull valid transition before trying to change the state. (`#2774 <https://github.com/ros2/rclcpp/issues/2774>`_) (`#2784 <https://github.com/ros2/rclcpp/issues/2784>`_)
