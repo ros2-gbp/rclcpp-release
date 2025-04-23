@@ -2,6 +2,13 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+28.1.9 (2025-04-23)
+-------------------
+* remove redundant typesupport check in serialization module (`#2808 <https://github.com/ros2/rclcpp/issues/2808>`_) (`#2815 <https://github.com/ros2/rclcpp/issues/2815>`_)
+  (cherry picked from commit f78ed952b27acc63ef8022d78cb816c309a9ca3d)
+  Co-authored-by: Tanishq Chaudhary <tanishqchaudhary101010@gmail.com>
+* Contributors: mergify[bot]
+
 28.1.8 (2025-04-02)
 -------------------
 
