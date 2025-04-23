@@ -237,6 +237,22 @@ TEST_F(TestDefaultStateMachine, empty_initializer) {
   EXPECT_EQ(State::PRIMARY_STATE_UNCONFIGURED, test_node->get_current_state().id());
 }
 
+TEST_F(TestDefaultStateMachine, empty_initializer_rcl_errors) {
+  {
+    auto patch = mocking_utils::inject_on_return(
+      "lib:rclcpp_lifecycle", rcl_lifecycle_state_machine_init, RCL_RET_ERROR);
+    EXPECT_THROW(
+      std::make_shared<EmptyLifecycleNode>("testnode").reset(),
+      std::runtime_error);
+  }
+  {
+    auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
+    auto patch = mocking_utils::inject_on_return(
+      "lib:rclcpp_lifecycle", rcl_lifecycle_state_machine_fini, RCL_RET_ERROR);
+    EXPECT_NO_THROW(test_node.reset());
+  }
+}
+
 TEST_F(TestDefaultStateMachine, check_logger_services_exist) {
   // Logger level services are disabled
   {
@@ -566,71 +582,6 @@ TEST_F(TestDefaultStateMachine, bad_mood) {
   EXPECT_EQ(1u, test_node->number_of_callbacks);
 }
 
-TEST_F(TestDefaultStateMachine, shutdown_from_each_primary_state) {
-  auto success = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::SUCCESS;
-  auto reset_key = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn::ERROR;
-
-  // PRIMARY_STATE_UNCONFIGURED to shutdown
-  {
-    auto ret = reset_key;
-    auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
-    auto finalized = test_node->shutdown(ret);
-    EXPECT_EQ(success, ret);
-    EXPECT_EQ(finalized.id(), State::PRIMARY_STATE_FINALIZED);
-  }
-
-  // PRIMARY_STATE_INACTIVE to shutdown
-  {
-    auto ret = reset_key;
-    auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
-    auto configured = test_node->configure(ret);
-    EXPECT_EQ(success, ret);
-    EXPECT_EQ(configured.id(), State::PRIMARY_STATE_INACTIVE);
-    ret = reset_key;
-    auto finalized = test_node->shutdown(ret);
-    EXPECT_EQ(success, ret);
-    EXPECT_EQ(finalized.id(), State::PRIMARY_STATE_FINALIZED);
-  }
-
-  // PRIMARY_STATE_ACTIVE to shutdown
-  {
-    auto ret = reset_key;
-    auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
-    auto configured = test_node->configure(ret);
-    EXPECT_EQ(success, ret);
-    EXPECT_EQ(configured.id(), State::PRIMARY_STATE_INACTIVE);
-    ret = reset_key;
-    auto activated = test_node->activate(ret);
-    EXPECT_EQ(success, ret);
-    EXPECT_EQ(activated.id(), State::PRIMARY_STATE_ACTIVE);
-    ret = reset_key;
-    auto finalized = test_node->shutdown(ret);
-    EXPECT_EQ(success, ret);
-    EXPECT_EQ(finalized.id(), State::PRIMARY_STATE_FINALIZED);
-  }
-
-  // PRIMARY_STATE_FINALIZED to shutdown
-  {
-    auto ret = reset_key;
-    auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
-    auto configured = test_node->configure(ret);
-    EXPECT_EQ(success, ret);
-    EXPECT_EQ(configured.id(), State::PRIMARY_STATE_INACTIVE);
-    ret = reset_key;
-    auto activated = test_node->activate(ret);
-    EXPECT_EQ(success, ret);
-    EXPECT_EQ(activated.id(), State::PRIMARY_STATE_ACTIVE);
-    ret = reset_key;
-    auto finalized = test_node->shutdown(ret);
-    EXPECT_EQ(success, ret);
-    EXPECT_EQ(finalized.id(), State::PRIMARY_STATE_FINALIZED);
-    ret = reset_key;
-    auto finalized_again = test_node->shutdown(ret);
-    EXPECT_EQ(reset_key, ret);
-    EXPECT_EQ(finalized_again.id(), State::PRIMARY_STATE_FINALIZED);
-  }
-}
-
 TEST_F(TestDefaultStateMachine, lifecycle_subscriber) {
   auto test_node = std::make_shared<MoodyLifecycleNode<GoodMood>>("testnode");
 
@@ -957,8 +908,9 @@ TEST_F(TestDefaultStateMachine, test_callback_groups) {
   auto test_node = std::make_shared<EmptyLifecycleNode>("testnode");
   size_t num_groups = 0;
   test_node->for_each_callback_group(
-    [&num_groups]([[maybe_unused]] rclcpp::CallbackGroup::SharedPtr group_ptr)
+    [&num_groups](rclcpp::CallbackGroup::SharedPtr group_ptr)
     {
+      (void)group_ptr;
       num_groups++;
     });
   EXPECT_EQ(num_groups, 1u);
@@ -969,8 +921,9 @@ TEST_F(TestDefaultStateMachine, test_callback_groups) {
 
   num_groups = 0;
   test_node->for_each_callback_group(
-    [&num_groups]([[maybe_unused]] rclcpp::CallbackGroup::SharedPtr group_ptr)
+    [&num_groups](rclcpp::CallbackGroup::SharedPtr group_ptr)
     {
+      (void)group_ptr;
       num_groups++;
     });
   EXPECT_EQ(num_groups, 2u);

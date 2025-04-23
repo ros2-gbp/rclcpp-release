@@ -15,7 +15,6 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
-#include <filesystem>
 #include <functional>
 #include <limits>
 #include <map>
@@ -57,7 +56,7 @@ protected:
     test_resources_path /= "test_node";
   }
 
-  std::filesystem::path test_resources_path{TEST_RESOURCES_DIRECTORY};
+  rcpputils::fs::path test_resources_path{TEST_RESOURCES_DIRECTORY};
 };
 
 /*

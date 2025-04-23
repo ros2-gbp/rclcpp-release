@@ -56,9 +56,10 @@ GenericSubscription::handle_serialized_message(
 
 void
 GenericSubscription::handle_loaned_message(
-  [[maybe_unused]] void * message,
-  [[maybe_unused]] const rclcpp::MessageInfo & message_info)
+  void * message, const rclcpp::MessageInfo & message_info)
 {
+  (void) message;
+  (void) message_info;
   throw rclcpp::exceptions::UnimplementedError(
           "handle_loaned_message is not implemented for GenericSubscription");
 }
@@ -110,17 +111,20 @@ GenericSubscription::create_dynamic_message()
 
 void
 GenericSubscription::return_dynamic_message(
-  [[maybe_unused]] rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message)
+  rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message)
 {
+  (void) message;
   throw rclcpp::exceptions::UnimplementedError(
           "return_dynamic_message is not implemented for GenericSubscription");
 }
 
 void
 GenericSubscription::handle_dynamic_message(
-  [[maybe_unused]] const rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message,
-  [[maybe_unused]] const rclcpp::MessageInfo & message_info)
+  const rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message,
+  const rclcpp::MessageInfo & message_info)
 {
+  (void) message;
+  (void) message_info;
   throw rclcpp::exceptions::UnimplementedError(
           "handle_dynamic_message is not implemented for GenericSubscription");
 }

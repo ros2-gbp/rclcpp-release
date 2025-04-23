@@ -70,9 +70,7 @@ LifecycleNode::LifecycleNodeInterfaceImpl::~LifecycleNodeInterfaceImpl()
   if (ret != RCL_RET_OK) {
     RCLCPP_FATAL(
       node_logging_interface_->get_logger(),
-      "failed to destroy rcl_state_machine: %s",
-      rcl_get_error_string().str);
-    rcl_reset_error();
+      "failed to destroy rcl_state_machine");
   }
 }
 
@@ -208,10 +206,11 @@ LifecycleNode::LifecycleNodeInterfaceImpl::register_callback(
 
 void
 LifecycleNode::LifecycleNodeInterfaceImpl::on_change_state(
-  [[maybe_unused]] const std::shared_ptr<rmw_request_id_t> header,
+  const std::shared_ptr<rmw_request_id_t> header,
   const std::shared_ptr<ChangeStateSrv::Request> req,
   std::shared_ptr<ChangeStateSrv::Response> resp)
 {
+  (void)header;
   std::uint8_t transition_id;
   {
     std::lock_guard<std::recursive_mutex> lock(state_machine_mutex_);
@@ -251,10 +250,12 @@ LifecycleNode::LifecycleNodeInterfaceImpl::on_change_state(
 
 void
 LifecycleNode::LifecycleNodeInterfaceImpl::on_get_state(
-  [[maybe_unused]] const std::shared_ptr<rmw_request_id_t> header,
-  [[maybe_unused]] const std::shared_ptr<GetStateSrv::Request> req,
+  const std::shared_ptr<rmw_request_id_t> header,
+  const std::shared_ptr<GetStateSrv::Request> req,
   std::shared_ptr<GetStateSrv::Response> resp) const
 {
+  (void)header;
+  (void)req;
   std::lock_guard<std::recursive_mutex> lock(state_machine_mutex_);
   if (rcl_lifecycle_state_machine_is_initialized(&state_machine_) != RCL_RET_OK) {
     throw std::runtime_error(
@@ -266,10 +267,12 @@ LifecycleNode::LifecycleNodeInterfaceImpl::on_get_state(
 
 void
 LifecycleNode::LifecycleNodeInterfaceImpl::on_get_available_states(
-  [[maybe_unused]] const std::shared_ptr<rmw_request_id_t> header,
-  [[maybe_unused]] const std::shared_ptr<GetAvailableStatesSrv::Request> req,
+  const std::shared_ptr<rmw_request_id_t> header,
+  const std::shared_ptr<GetAvailableStatesSrv::Request> req,
   std::shared_ptr<GetAvailableStatesSrv::Response> resp) const
 {
+  (void)header;
+  (void)req;
   std::lock_guard<std::recursive_mutex> lock(state_machine_mutex_);
   if (rcl_lifecycle_state_machine_is_initialized(&state_machine_) != RCL_RET_OK) {
     throw std::runtime_error(
@@ -287,10 +290,12 @@ LifecycleNode::LifecycleNodeInterfaceImpl::on_get_available_states(
 
 void
 LifecycleNode::LifecycleNodeInterfaceImpl::on_get_available_transitions(
-  [[maybe_unused]] const std::shared_ptr<rmw_request_id_t> header,
-  [[maybe_unused]] const std::shared_ptr<GetAvailableTransitionsSrv::Request> req,
+  const std::shared_ptr<rmw_request_id_t> header,
+  const std::shared_ptr<GetAvailableTransitionsSrv::Request> req,
   std::shared_ptr<GetAvailableTransitionsSrv::Response> resp) const
 {
+  (void)header;
+  (void)req;
   std::lock_guard<std::recursive_mutex> lock(state_machine_mutex_);
   if (rcl_lifecycle_state_machine_is_initialized(&state_machine_) != RCL_RET_OK) {
     throw std::runtime_error(
@@ -313,10 +318,12 @@ LifecycleNode::LifecycleNodeInterfaceImpl::on_get_available_transitions(
 
 void
 LifecycleNode::LifecycleNodeInterfaceImpl::on_get_transition_graph(
-  [[maybe_unused]] const std::shared_ptr<rmw_request_id_t> header,
-  [[maybe_unused]] const std::shared_ptr<GetAvailableTransitionsSrv::Request> req,
+  const std::shared_ptr<rmw_request_id_t> header,
+  const std::shared_ptr<GetAvailableTransitionsSrv::Request> req,
   std::shared_ptr<GetAvailableTransitionsSrv::Response> resp) const
 {
+  (void)header;
+  (void)req;
   std::lock_guard<std::recursive_mutex> lock(state_machine_mutex_);
   if (rcl_lifecycle_state_machine_is_initialized(&state_machine_) != RCL_RET_OK) {
     throw std::runtime_error(
@@ -398,7 +405,6 @@ LifecycleNode::LifecycleNodeInterfaceImpl::change_state(
         node_logging_interface_->get_logger(),
         "Unable to change state for state machine for %s: %s",
         node_base_interface_->get_name(), rcl_get_error_string().str);
-      rcl_reset_error();
       return RCL_RET_ERROR;
     }
 

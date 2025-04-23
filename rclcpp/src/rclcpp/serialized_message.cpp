@@ -122,7 +122,6 @@ SerializedMessage::~SerializedMessage()
       RCLCPP_ERROR(
         get_logger("rclcpp"),
         "Failed to destroy serialized message: %s", rcl_get_error_string().str);
-      rcl_reset_error();
     }
   }
 }

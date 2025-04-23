@@ -63,6 +63,7 @@ protected:
 
     auto callback = [this](const std::shared_ptr<const BasicTypes::Event> & msg) {
         events.push_back(msg);
+        (void)msg;
       };
 
     client = node->create_client<BasicTypes>("service");
@@ -130,20 +131,6 @@ TEST_F(TestServiceIntrospection, service_introspection_nominal)
   ASSERT_THAT(
     client_gid_arr,
     testing::Eq(event_map[ServiceEventInfo::REQUEST_SENT]->info.client_gid));
-  // TODO(@fujitatomoya): Remove this if statement once rmw implementations support test.
-  // rmw_cyclonedds_cpp does not pass this test requirement for now.
-  // See more details for https://github.com/ros2/rmw/issues/357
-  if (std::string(rmw_get_implementation_identifier()).find("rmw_cyclonedds_cpp") != 0) {
-    ASSERT_THAT(
-      client_gid_arr,
-      testing::Eq(event_map[ServiceEventInfo::REQUEST_RECEIVED]->info.client_gid));
-    ASSERT_THAT(
-      client_gid_arr,
-      testing::Eq(event_map[ServiceEventInfo::RESPONSE_SENT]->info.client_gid));
-  }
-  ASSERT_THAT(
-    client_gid_arr,
-    testing::Eq(event_map[ServiceEventInfo::RESPONSE_RECEIVED]->info.client_gid));
 
   ASSERT_EQ(
     event_map[ServiceEventInfo::REQUEST_SENT]->info.sequence_number,

@@ -3,65 +3,46 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-29.5.0 (2025-04-18)
+28.1.9 (2025-04-23)
 -------------------
 
-29.4.0 (2025-04-04)
+28.1.8 (2025-04-02)
 -------------------
-* should pull valid transition before trying to change the state. (`#2774 <https://github.com/ros2/rclcpp/issues/2774>`_)
-* use maybe_unused attribute for the portability. (`#2758 <https://github.com/ros2/rclcpp/issues/2758>`_)
-* Collect log messages from rcl, and reset. (`#2720 <https://github.com/ros2/rclcpp/issues/2720>`_)
-* Contributors: Tomoya Fujita
+* should pull valid transition before trying to change the state. (`#2774 <https://github.com/ros2/rclcpp/issues/2774>`_) (`#2784 <https://github.com/ros2/rclcpp/issues/2784>`_)
+  (cherry picked from commit 7b6ee8a2e7a13d73f9f69368970390a9e0930448)
+  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
+* Contributors: mergify[bot]
 
-29.3.0 (2024-12-20)
--------------------
-* Update docstring for `rclcpp::Node::now()` (`#2696 <https://github.com/ros2/rclcpp/issues/2696>`_)
-* Contributors: Patrick Roncagliolo
-
-29.2.0 (2024-11-25)
+28.1.7 (2025-03-26)
 -------------------
 
-29.1.0 (2024-11-20)
--------------------
-* Fix error message in rclcpp_lifecycle::State::reset() (`#2647 <https://github.com/ros2/rclcpp/issues/2647>`_)
-* Contributors: Christophe Bedard
-
-29.0.0 (2024-10-03)
--------------------
-* Shutdown the context before context's destructor is invoked in tests (`#2633 <https://github.com/ros2/rclcpp/issues/2633>`_)
-* LifecycleNode bugfix and add test cases (`#2562 <https://github.com/ros2/rclcpp/issues/2562>`_)
-* Properly test get_service_names_and_types_by_node in rclcpp_lifecycle (`#2599 <https://github.com/ros2/rclcpp/issues/2599>`_)
-* Contributors: Alejandro Hernández Cordero, Christophe Bedard, Tomoya Fujita
-
-28.3.3 (2024-07-29)
+28.1.6 (2024-12-18)
 -------------------
 
-28.3.2 (2024-07-24)
--------------------
-* Removed deprecated methods and classes (`#2575 <https://github.com/ros2/rclcpp/issues/2575>`_)
-* Fix the lifecycle tests on RHEL-9. (`#2583 <https://github.com/ros2/rclcpp/issues/2583>`_)
-  * Fix the lifecycle tests on RHEL-9.
-  The full explanation is in the comment, but basically since
-  RHEL doesn't support mocking_utils::inject_on_return, we have
-  to split out certain tests to make sure resources within a
-  process don't collide.
-  Co-authored-by: Alejandro Hernández Cordero <ahcorde@gmail.com>
-* Contributors: Alejandro Hernández Cordero, Chris Lalancette
-
-28.3.1 (2024-06-25)
+28.1.5 (2024-09-19)
 -------------------
 
-28.3.0 (2024-06-17)
+28.1.4 (2024-09-06)
 -------------------
-* revert call shutdown in LifecycleNode destructor (`#2557 <https://github.com/ros2/rclcpp/issues/2557>`_)
-* LifecycleNode shutdown on dtor only with valid context. (`#2545 <https://github.com/ros2/rclcpp/issues/2545>`_)
-* call shutdown in LifecycleNode dtor to avoid leaving the device in unknown state (2nd) (`#2528 <https://github.com/ros2/rclcpp/issues/2528>`_)
-* rclcpp::shutdown should not be called before LifecycleNode dtor. (`#2527 <https://github.com/ros2/rclcpp/issues/2527>`_)
-* Revert "call shutdown in LifecycleNode dtor to avoid leaving the device in un… (`#2450 <https://github.com/ros2/rclcpp/issues/2450>`_)" (`#2522 <https://github.com/ros2/rclcpp/issues/2522>`_)
-* Add 'mimick' label to tests which use Mimick (`#2516 <https://github.com/ros2/rclcpp/issues/2516>`_)
-* Contributors: Chris Lalancette, Scott K Logan, Tomoya Fujita
 
-28.2.0 (2024-04-26)
+28.1.3 (2024-06-27)
+-------------------
+* Revert "call shutdown in LifecycleNode dtor to avoid leaving the device in unknown state (2nd) (backport `#2528 <https://github.com/ros2/rclcpp/issues/2528>`_) (`#2542 <https://github.com/ros2/rclcpp/issues/2542>`_)" (`#2558 <https://github.com/ros2/rclcpp/issues/2558>`_)
+* call shutdown in LifecycleNode dtor to avoid leaving the device in unknown state (2nd) (backport `#2528 <https://github.com/ros2/rclcpp/issues/2528>`_) (`#2542 <https://github.com/ros2/rclcpp/issues/2542>`_)
+  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
+* rclcpp::shutdown should not be called before LifecycleNode dtor. (`#2527 <https://github.com/ros2/rclcpp/issues/2527>`_) (`#2540 <https://github.com/ros2/rclcpp/issues/2540>`_)
+  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
+* Contributors: Tomoya Fujita, mergify[bot]
+
+28.1.2 (2024-05-13)
+-------------------
+* Revert "call shutdown in LifecycleNode dtor to avoid leaving the device in un… (`#2450 <https://github.com/ros2/rclcpp/issues/2450>`_)" (`#2522 <https://github.com/ros2/rclcpp/issues/2522>`_) (`#2524 <https://github.com/ros2/rclcpp/issues/2524>`_)
+  This reverts commit 04ea0bb00293387791522590b7347a2282cda290.
+  (cherry picked from commit 42b0b5775b4e68718c5949308c9e1a059930ded7)
+  Co-authored-by: Chris Lalancette <clalancette@gmail.com>
+* Contributors: mergify[bot]
+
+28.1.1 (2024-04-24)
 -------------------
 
 28.1.0 (2024-04-16)
