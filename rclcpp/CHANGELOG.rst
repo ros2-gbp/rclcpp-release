@@ -2,6 +2,12 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+29.6.0 (2025-04-25)
+-------------------
+* throws std::invalid_argument if ParameterEvent is NULL. (`#2814 <https://github.com/ros2/rclcpp/issues/2814>`_)
+* Removed clang warnings (`#2823 <https://github.com/ros2/rclcpp/issues/2823>`_)
+* Contributors: Alejandro Hernández Cordero, Tomoya Fujita
+
 29.5.0 (2025-04-18)
 -------------------
 * Fix a race condition (`#2819 <https://github.com/ros2/rclcpp/issues/2819>`_)
