@@ -1,3 +1,30 @@
+## rclcpp (kilted) - 29.5.1-1
+
+The packages in the `rclcpp` repository were released into the `kilted` distro by running `/usr/bin/bloom-release --rosdistro kilted --track kilted rclcpp` on `Mon, 23 Jun 2025 14:47:18 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_components`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `29.5.0-2`
+- old version: `29.5.0-2`
+- new version: `29.5.1-1`
+
+Versions of tools used:
+
+- bloom version: `0.12.0`
+- catkin_pkg version: `1.0.0`
+- rosdep version: `0.25.1`
+- rosdistro version: `1.0.1`
+- vcstools version: `0.1.42`
+
+
 ## rclcpp (rolling) - 29.6.1-1
 
 The packages in the `rclcpp` repository were released into the `rolling` distro by running `/usr/bin/bloom-release --rosdistro rolling --track rolling rclcpp` on `Mon, 23 Jun 2025 14:02:14 -0000`
