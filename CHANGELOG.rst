@@ -2,6 +2,15 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+16.0.13 (2025-06-23)
+--------------------
+* Fix for memory leaks in rclcpp::SerializedMessage (`#2861 <https://github.com/ros2/rclcpp/issues/2861>`_) (`#2865 <https://github.com/ros2/rclcpp/issues/2865>`_)
+* Added missing chrono includes (backport `#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2857 <https://github.com/ros2/rclcpp/issues/2857>`_)
+* QoSInitialization::from_rmw does not validate invalid history policy … (backport `#2841 <https://github.com/ros2/rclcpp/issues/2841>`_) (`#2844 <https://github.com/ros2/rclcpp/issues/2844>`_)
+* throws std::invalid_argument if ParameterEvent is NULL. (`#2814 <https://github.com/ros2/rclcpp/issues/2814>`_) (`#2824 <https://github.com/ros2/rclcpp/issues/2824>`_)
+* remove redundant typesupport check in serialization module (`#2808 <https://github.com/ros2/rclcpp/issues/2808>`_) (`#2816 <https://github.com/ros2/rclcpp/issues/2816>`_)
+* Contributors: mergify[bot]
+
 16.0.12 (2025-03-25)
 --------------------
 * doc: Added warning to not instantiate Clock directly with RCL_ROS_TIME (`#2768 <https://github.com/ros2/rclcpp/issues/2768>`_) (`#2770 <https://github.com/ros2/rclcpp/issues/2770>`_)
