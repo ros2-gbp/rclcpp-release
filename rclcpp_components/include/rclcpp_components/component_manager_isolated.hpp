@@ -22,10 +22,9 @@
 #include <utility>
 #include <vector>
 #include <unordered_map>
-#include <system_error>
 
 #include "rclcpp_components/component_manager.hpp"
-#include "rcpputils/thread_name.hpp"
+
 
 namespace rclcpp_components
 {
@@ -78,16 +77,8 @@ protected:
     DedicatedExecutorWrapper & wrapper = result.first->second;
     wrapper.executor = exec;
     auto & thread_initialized = wrapper.thread_initialized;
-    auto name = node_wrappers_[node_id].get_node_base_interface()->get_name();
-    // Copy name so that it doesn't deallocate before the thread is started
     wrapper.thread = std::thread(
-      [exec, &thread_initialized, name]() {
-        try {
-          rcpputils::set_thread_name(name);
-        } catch (const std::system_error & e) {
-          RCLCPP_WARN(rclcpp::get_logger("rclcpp"), "Failed to set thread name: %s (%s)", e.what(),
-            e.code().message().c_str());
-        }
+      [exec, &thread_initialized]() {
         thread_initialized = true;
         exec->spin();
       });

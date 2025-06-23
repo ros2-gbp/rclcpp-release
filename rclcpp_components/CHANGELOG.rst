@@ -2,14 +2,10 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-29.6.1 (2025-06-23)
+29.5.1 (2025-06-23)
 -------------------
-* set thread names by node in component container isolated (`#2871 <https://github.com/ros2/rclcpp/issues/2871>`_)
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
-* Contributors: Adam Aposhian, Alejandro Hernández Cordero
-
-29.6.0 (2025-04-25)
--------------------
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2855 <https://github.com/ros2/rclcpp/issues/2855>`_)
+* Contributors: mergify[bot]
 
 29.5.0 (2025-04-18)
 -------------------
