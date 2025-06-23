@@ -2,6 +2,11 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+16.0.13 (2025-06-23)
+--------------------
+* Added missing chrono includes (backport `#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2857 <https://github.com/ros2/rclcpp/issues/2857>`_)
+* Contributors: mergify[bot]
+
 16.0.12 (2025-03-25)
 --------------------
 * Redundant .c_str() usage in rclcpp_components triggers ament_clang_tidy warning (`#2718 <https://github.com/ros2/rclcpp/issues/2718>`_)
