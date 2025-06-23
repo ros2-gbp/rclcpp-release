@@ -3,6 +3,13 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+16.0.13 (2025-06-23)
+--------------------
+* Replace std::default_random_engine with std::mt19937 (humble) (`#2847 <https://github.com/ros2/rclcpp/issues/2847>`_)
+* Added missing chrono includes (backport `#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2857 <https://github.com/ros2/rclcpp/issues/2857>`_)
+* Harden rclcpp_action::convert(). (backport `#2786 <https://github.com/ros2/rclcpp/issues/2786>`_) (`#2788 <https://github.com/ros2/rclcpp/issues/2788>`_)
+* Contributors: keeponoiro, mergify[bot]
+
 16.0.12 (2025-03-25)
 --------------------
 
