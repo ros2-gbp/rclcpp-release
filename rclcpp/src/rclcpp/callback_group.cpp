@@ -31,12 +31,10 @@ using rclcpp::CallbackGroupType;
 
 CallbackGroup::CallbackGroup(
   CallbackGroupType group_type,
-  rclcpp::Context::WeakPtr context,
   bool automatically_add_to_executor_with_node)
 : type_(group_type), associated_with_executor_(false),
   can_be_taken_from_(true),
-  automatically_add_to_executor_with_node_(automatically_add_to_executor_with_node),
-  context_(context)
+  automatically_add_to_executor_with_node_(automatically_add_to_executor_with_node)
 {}
 
 CallbackGroup::~CallbackGroup()
@@ -54,17 +52,6 @@ const CallbackGroupType &
 CallbackGroup::type() const
 {
   return type_;
-}
-
-size_t
-CallbackGroup::size() const
-{
-  return
-    subscription_ptrs_.size() +
-    service_ptrs_.size() +
-    client_ptrs_.size() +
-    timer_ptrs_.size() +
-    waitable_ptrs_.size();
 }
 
 void CallbackGroup::collect_all_ptrs(
@@ -125,17 +112,21 @@ CallbackGroup::automatically_add_to_executor_with_node() const
 }
 
 rclcpp::GuardCondition::SharedPtr
-CallbackGroup::get_notify_guard_condition()
+CallbackGroup::get_notify_guard_condition(const rclcpp::Context::SharedPtr context_ptr)
 {
   std::lock_guard<std::recursive_mutex> lock(notify_guard_condition_mutex_);
-  rclcpp::Context::SharedPtr context_ptr = context_.lock();
-  if (context_ptr && context_ptr->is_valid()) {
-    if (!notify_guard_condition_) {
-      notify_guard_condition_ = std::make_shared<rclcpp::GuardCondition>(context_ptr);
+  if (notify_guard_condition_ && context_ptr != notify_guard_condition_->get_context()) {
+    if (associated_with_executor_) {
+      trigger_notify_guard_condition();
     }
-    return notify_guard_condition_;
+    notify_guard_condition_ = nullptr;
   }
-  return nullptr;
+
+  if (!notify_guard_condition_) {
+    notify_guard_condition_ = std::make_shared<rclcpp::GuardCondition>(context_ptr);
+  }
+
+  return notify_guard_condition_;
 }
 
 void

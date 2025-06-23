@@ -17,7 +17,6 @@
 
 #include "rclcpp/clock.hpp"
 #include "rclcpp/macros.hpp"
-#include "rclcpp/node_interfaces/detail/node_interfaces_helpers.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
@@ -50,7 +49,5 @@ public:
 
 }  // namespace node_interfaces
 }  // namespace rclcpp
-
-RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(rclcpp::node_interfaces::NodeClockInterface, clock)
 
 #endif  // RCLCPP__NODE_INTERFACES__NODE_CLOCK_INTERFACE_HPP_

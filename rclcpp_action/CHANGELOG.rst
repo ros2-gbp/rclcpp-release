@@ -3,193 +3,52 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-28.1.10 (2025-06-23)
+16.0.13 (2025-06-23)
 --------------------
-* Replace std::default_random_engine with std::mt19937 (humble) (`#2847 <https://github.com/ros2/rclcpp/issues/2847>`_) (`#2867 <https://github.com/ros2/rclcpp/issues/2867>`_)
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2856 <https://github.com/ros2/rclcpp/issues/2856>`_)
+* Replace std::default_random_engine with std::mt19937 (humble) (`#2847 <https://github.com/ros2/rclcpp/issues/2847>`_)
+* Added missing chrono includes (backport `#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2857 <https://github.com/ros2/rclcpp/issues/2857>`_)
+* Harden rclcpp_action::convert(). (backport `#2786 <https://github.com/ros2/rclcpp/issues/2786>`_) (`#2788 <https://github.com/ros2/rclcpp/issues/2788>`_)
+* Contributors: keeponoiro, mergify[bot]
+
+16.0.12 (2025-03-25)
+--------------------
+
+16.0.11 (2024-11-25)
+--------------------
+* fix: Fixed race condition in action server between is_ready and take. Backport from iron `#2531 <https://github.com/ros2/rclcpp/issues/2531>`_ (`#2635 <https://github.com/ros2/rclcpp/issues/2635>`_)
+* Contributors: Camilo Camacho
+
+16.0.10 (2024-07-26)
+--------------------
+
+16.0.9 (2024-05-15)
+-------------------
+* Do not generate the exception when action service response timeout. (`#2464 <https://github.com/ros2/rclcpp/issues/2464>`_) (`#2518 <https://github.com/ros2/rclcpp/issues/2518>`_)
 * Contributors: mergify[bot]
 
-28.1.9 (2025-04-23)
--------------------
-* fix(rclcpp_action): Fix sleep of expire thread in case of canceled timer (`#2800 <https://github.com/ros2/rclcpp/issues/2800>`_)
-  This fixes a bug, that the expire action thread would not sleep as,
-  the sleep duration was not computed correctly.
-  Co-authored-by: Janosch Machowinski <J.Machowinski@cellumation.com>
-* Contributors: Janosch Machowinski
-
-28.1.8 (2025-04-02)
--------------------
-* Harden rclcpp_action::convert(). (`#2786 <https://github.com/ros2/rclcpp/issues/2786>`_) (`#2789 <https://github.com/ros2/rclcpp/issues/2789>`_)
-  * Harden rclcpp_action::convert().
-  * update docstring.
-  ---------
-  (cherry picked from commit ce86ef7e621d96ce50d6ec1b49e9e1cd4f0a828b)
-  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
-* Contributors: mergify[bot]
-
-28.1.7 (2025-03-26)
--------------------
-* fix: Fixed expiring of goals if events executor is used (`#2674 <https://github.com/ros2/rclcpp/issues/2674>`_)
-* Contributors: Janosch Machowinski
-
-28.1.6 (2024-12-18)
+16.0.8 (2024-01-24)
 -------------------
 
-28.1.5 (2024-09-19)
+16.0.7 (2023-11-13)
 -------------------
 
-28.1.4 (2024-09-06)
+16.0.6 (2023-09-19)
 -------------------
 
-28.1.3 (2024-06-27)
+16.0.5 (2023-07-17)
 -------------------
 
-28.1.2 (2024-05-13)
+16.0.4 (2023-04-25)
+-------------------
+* Revert "Revert "extract the result response before the callback is issued. (`#2133 <https://github.com/ros2/rclcpp/issues/2133>`_)" (`#2148 <https://github.com/ros2/rclcpp/issues/2148>`_)" (`#2152 <https://github.com/ros2/rclcpp/issues/2152>`_)
+* Revert "extract the result response before the callback is issued. (`#2133 <https://github.com/ros2/rclcpp/issues/2133>`_)" (`#2148 <https://github.com/ros2/rclcpp/issues/2148>`_)
+* extract the result response before the callback is issued. (`#2133 <https://github.com/ros2/rclcpp/issues/2133>`_)
+* Contributors: Tomoya Fujita
+
+16.0.3 (2023-01-10)
 -------------------
 
-28.1.1 (2024-04-24)
--------------------
-
-28.1.0 (2024-04-16)
--------------------
-* Remove references to index.ros.org. (`#2504 <https://github.com/ros2/rclcpp/issues/2504>`_)
-* Contributors: Chris Lalancette
-
-28.0.1 (2024-04-16)
--------------------
-* Callback after cancel (`#2281 <https://github.com/ros2/rclcpp/issues/2281>`_)
-  * feat(Client): Added function to stop callbacks of a goal handle
-  This function allows us to drop the handle in a locked context.
-  If we do not do this within a lock, there will be a race condition between
-  the deletion of the shared_ptr of the handle and the result / feedback
-  callbacks.
-  * fix: make Client goal handle recursive
-  This fixes deadlocks due to release of goal handles in callbacks etc.
-  * fix(ActionGoalClient): Fixed memory leak for nominal case
-  This fixes a memory leak due to a self reference in the ClientGoalHandle.
-  Note, this fix will only work, if the ClientGoalHandle ever receives
-  a result callback.
-  * doc: Updated documentation of rclcpp_action::Client::async_send_goal
-  * docs: Made the async_send_goal documentation more explicit
-  Co-authored-by: Janosch Machowinski <J.Machowinski@cellumation.com>
-* Remake of "fix: Fixed race condition in action server between is_ready and take" (`#2495 <https://github.com/ros2/rclcpp/issues/2495>`_)
-  Some background information: is_ready, take_data and execute data
-  may be called from different threads in any order. The code in the old
-  state expected them to be called in series, without interruption.
-  This lead to multiple race conditions, as the state of the pimpl objects
-  was altered by the three functions in a non thread safe way.
-  Co-authored-by: Janosch Machowinski <j.machowinski@nospam.org>
-* update rclcpp::Waitable API to use references and const (`#2467 <https://github.com/ros2/rclcpp/issues/2467>`_)
-* Contributors: William Woodall, jmachowinski
-
-28.0.0 (2024-03-28)
--------------------
-* Do not generate the exception when action service response timeout. (`#2464 <https://github.com/ros2/rclcpp/issues/2464>`_)
-  * Do not generate the exception when action service response timeout.
-  * address review comment.
-  ---------
-* Modify rclcpp_action::GoalUUID hashing algorithm (`#2441 <https://github.com/ros2/rclcpp/issues/2441>`_)
-  * Add unit tests for hashing rclcpp_action::GoalUUID's
-  * Use the FNV-1a hash algorithm for Goal UUID
-* Various cleanups to deal with uncrustify 0.78. (`#2439 <https://github.com/ros2/rclcpp/issues/2439>`_)
-  These should also work with uncrustify 0.72.
-* Update quality declaration documents (`#2427 <https://github.com/ros2/rclcpp/issues/2427>`_)
-* Contributors: Chris Lalancette, Christophe Bedard, Tomoya Fujita, mauropasse
-
-27.0.0 (2024-02-07)
--------------------
-
-26.0.0 (2024-01-24)
--------------------
-
-25.0.0 (2023-12-26)
--------------------
-* Switch to target_link_libraries. (`#2374 <https://github.com/ros2/rclcpp/issues/2374>`_)
-* Contributors: Chris Lalancette
-
-24.0.0 (2023-11-06)
--------------------
-
-23.2.0 (2023-10-09)
--------------------
-
-23.1.0 (2023-10-04)
--------------------
-
-23.0.0 (2023-09-08)
--------------------
-* Update API docs links in package READMEs (`#2302 <https://github.com/ros2/rclcpp/issues/2302>`_)
-* fix(ClientGoalHandle): Made mutex recursive to prevent deadlocks (`#2267 <https://github.com/ros2/rclcpp/issues/2267>`_)
-* Contributors: Christophe Bedard, jmachowinski
-
-22.2.0 (2023-09-07)
--------------------
-* Correct the position of a comment. (`#2290 <https://github.com/ros2/rclcpp/issues/2290>`_)
-* Fix a typo in a comment. (`#2283 <https://github.com/ros2/rclcpp/issues/2283>`_)
-* doc fix: call `canceled` only after goal state is in canceling. (`#2266 <https://github.com/ros2/rclcpp/issues/2266>`_)
-* Contributors: Chris Lalancette, Jiaqi Li, Tomoya Fujita
-
-22.1.0 (2023-08-21)
--------------------
-
-22.0.0 (2023-07-11)
--------------------
-
-21.3.0 (2023-06-12)
--------------------
-
-21.2.0 (2023-06-07)
--------------------
-
-21.1.1 (2023-05-11)
--------------------
-
-21.1.0 (2023-04-27)
--------------------
-
-21.0.0 (2023-04-18)
--------------------
-
-20.0.0 (2023-04-13)
--------------------
-* extract the result response before the callback is issued. (`#2132 <https://github.com/ros2/rclcpp/issues/2132>`_)
-* Update all rclcpp packages to C++17. (`#2121 <https://github.com/ros2/rclcpp/issues/2121>`_)
-* Fix the GoalUUID to_string representation (`#1999 <https://github.com/ros2/rclcpp/issues/1999>`_)
-* Contributors: Chris Lalancette, Nathan Wiebe Neufeldt, Tomoya Fujita
-
-19.3.0 (2023-03-01)
--------------------
-
-19.2.0 (2023-02-24)
--------------------
-
-19.1.0 (2023-02-14)
--------------------
-
-19.0.0 (2023-01-30)
--------------------
-
-18.0.0 (2022-12-29)
--------------------
-* Explicitly set callback type (`#2059 <https://github.com/ros2/rclcpp/issues/2059>`_)
-* Update maintainers (`#2043 <https://github.com/ros2/rclcpp/issues/2043>`_)
-* Contributors: Audrow Nash, mauropasse
-
-17.1.0 (2022-11-02)
--------------------
-* Do not clear entities callbacks on destruction (`#2002 <https://github.com/ros2/rclcpp/issues/2002>`_)
-* Contributors: mauropasse
-
-17.0.0 (2022-09-13)
--------------------
-* Revert "Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)" (`#1956 <https://github.com/ros2/rclcpp/issues/1956>`_)
-* Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)
-* Contributors: Hubert Liberacki, William Woodall
-
-16.2.0 (2022-05-03)
--------------------
-
-16.1.0 (2022-04-29)
+16.0.2 (2022-11-07)
 -------------------
 
 16.0.1 (2022-04-13)
