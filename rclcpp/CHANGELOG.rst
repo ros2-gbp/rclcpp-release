@@ -2,6 +2,13 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+30.0.0 (2025-07-01)
+-------------------
+* Hand-code logging.hpp (`#2870 <https://github.com/ros2/rclcpp/issues/2870>`_)
+* Adressed TODO in node_graph (`#2877 <https://github.com/ros2/rclcpp/issues/2877>`_)
+* fix test_publisher_with_system_default_qos. (`#2881 <https://github.com/ros2/rclcpp/issues/2881>`_)
+* Contributors: Alejandro Hernández Cordero, Chris Lalancette, Tomoya Fujita
+
 29.6.1 (2025-06-23)
 -------------------
 * Fix for memory leaks in rclcpp::SerializedMessage (`#2861 <https://github.com/ros2/rclcpp/issues/2861>`_)
