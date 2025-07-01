@@ -27,6 +27,11 @@ protected:
   {
     rclcpp::init(0, nullptr);
   }
+
+  static void TearDownTestCase()
+  {
+    rclcpp::shutdown();
+  }
 };
 
 /*
@@ -63,16 +68,6 @@ TEST_F(TestGuardCondition, construction_and_destruction) {
     auto gc = std::make_shared<rclcpp::GuardCondition>();
     // This just logs an error on destruction
     EXPECT_NO_THROW(gc.reset());
-  }
-}
-
-/*
- * Testing context accessor.
- */
-TEST_F(TestGuardCondition, get_context) {
-  {
-    auto gc = std::make_shared<rclcpp::GuardCondition>();
-    gc->get_context();
   }
 }
 
@@ -115,19 +110,11 @@ TEST_F(TestGuardCondition, add_to_wait_set) {
         "lib:rclcpp", rcl_wait_set_add_guard_condition, RCL_RET_OK);
 
       rcl_wait_set_t wait_set = rcl_get_zero_initialized_wait_set();
-      EXPECT_NO_THROW(gc->add_to_wait_set(&wait_set));
-      EXPECT_NO_THROW(gc->add_to_wait_set(&wait_set));
+      EXPECT_NO_THROW(gc->add_to_wait_set(wait_set));
+      EXPECT_NO_THROW(gc->add_to_wait_set(wait_set));
 
       rcl_wait_set_t wait_set_2 = rcl_get_zero_initialized_wait_set();
-      EXPECT_THROW(gc->add_to_wait_set(&wait_set_2), std::runtime_error);
-    }
-
-    {
-      auto mock = mocking_utils::patch_and_return(
-        "lib:rclcpp", rcl_wait_set_add_guard_condition, RCL_RET_ERROR);
-
-      auto gd = std::make_shared<rclcpp::GuardCondition>();
-      EXPECT_THROW(gd->add_to_wait_set(nullptr), rclcpp::exceptions::RCLError);
+      EXPECT_THROW(gc->add_to_wait_set(wait_set_2), std::runtime_error);
     }
   }
 }
@@ -163,4 +150,22 @@ TEST_F(TestGuardCondition, set_on_trigger_callback) {
     gc->set_on_trigger_callback(increase_c1_cb);
     EXPECT_EQ(c1.load(), 2u);
   }
+}
+
+/*
+ * Testing that callback and waitset are both notified by triggering gc
+ */
+TEST_F(TestGuardCondition, callback_and_waitset) {
+  auto gc = std::make_shared<rclcpp::GuardCondition>();
+  std::atomic<size_t> c1 {0};
+  auto increase_c1_cb = [&c1](size_t count_msgs) {c1 += count_msgs;};
+  gc->set_on_trigger_callback(increase_c1_cb);
+
+  rclcpp::WaitSet wait_set;
+  wait_set.add_guard_condition(gc);
+
+  gc->trigger();
+
+  EXPECT_EQ(rclcpp::WaitResultKind::Ready, wait_set.wait(std::chrono::seconds(1)).kind());
+  EXPECT_EQ(c1.load(), 1u);
 }

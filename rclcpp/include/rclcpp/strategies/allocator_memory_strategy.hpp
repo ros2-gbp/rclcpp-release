@@ -120,7 +120,7 @@ public:
       }
     }
     for (size_t i = 0; i < waitable_handles_.size(); ++i) {
-      if (!waitable_handles_[i]->is_ready(wait_set)) {
+      if (!waitable_handles_[i]->is_ready(*wait_set)) {
         waitable_handles_[i].reset();
       }
     }
@@ -201,6 +201,7 @@ public:
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add subscription to wait set: %s", rcl_get_error_string().str);
+        rcl_reset_error();
         return false;
       }
     }
@@ -210,6 +211,7 @@ public:
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add client to wait set: %s", rcl_get_error_string().str);
+        rcl_reset_error();
         return false;
       }
     }
@@ -219,6 +221,7 @@ public:
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add service to wait set: %s", rcl_get_error_string().str);
+        rcl_reset_error();
         return false;
       }
     }
@@ -228,6 +231,7 @@ public:
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add timer to wait set: %s", rcl_get_error_string().str);
+        rcl_reset_error();
         return false;
       }
     }
@@ -237,7 +241,7 @@ public:
     }
 
     for (const std::shared_ptr<Waitable> & waitable : waitable_handles_) {
-      waitable->add_to_wait_set(wait_set);
+      waitable->add_to_wait_set(*wait_set);
     }
     return true;
   }
@@ -370,7 +374,8 @@ public:
           ++it;
           continue;
         }
-        if (!timer->call()) {
+        auto data = timer->call();
+        if (!data) {
           // timer was cancelled, skip it.
           ++it;
           continue;
@@ -379,6 +384,7 @@ public:
         any_exec.timer = timer;
         any_exec.callback_group = group;
         any_exec.node_base = get_node_by_group(group, weak_groups_to_nodes);
+        any_exec.data = data;
         timer_handles_.erase(it);
         return;
       }

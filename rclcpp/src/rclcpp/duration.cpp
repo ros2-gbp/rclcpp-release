@@ -28,6 +28,8 @@
 
 #include "rcutils/logging_macros.h"
 
+#include "rclcpp/utilities.hpp"
+
 namespace rclcpp
 {
 
@@ -161,6 +163,13 @@ Duration::operator+(const rclcpp::Duration & rhs) const
     rcl_duration_.nanoseconds + rhs.rcl_duration_.nanoseconds);
 }
 
+Duration &
+Duration::operator+=(const rclcpp::Duration & rhs)
+{
+  *this = *this + rhs;
+  return *this;
+}
+
 void
 bounds_check_duration_difference(int64_t lhsns, int64_t rhsns, uint64_t max)
 {
@@ -188,6 +197,13 @@ Duration::operator-(const rclcpp::Duration & rhs) const
 
   return Duration::from_nanoseconds(
     rcl_duration_.nanoseconds - rhs.rcl_duration_.nanoseconds);
+}
+
+Duration &
+Duration::operator-=(const rclcpp::Duration & rhs)
+{
+  *this = *this - rhs;
+  return *this;
 }
 
 void
@@ -220,6 +236,13 @@ Duration::operator*(double scale) const
   return Duration::from_nanoseconds(
     static_cast<rcl_duration_value_t>(
       static_cast<long double>(rcl_duration_.nanoseconds) * scale_ld));
+}
+
+Duration &
+Duration::operator*=(double scale)
+{
+  *this = *this * scale;
+  return *this;
 }
 
 rcl_duration_value_t
@@ -293,6 +316,52 @@ Duration::from_nanoseconds(rcl_duration_value_t nanoseconds)
   Duration ret;
   ret.rcl_duration_.nanoseconds = nanoseconds;
   return ret;
+}
+
+builtin_interfaces::msg::Time
+operator+(const builtin_interfaces::msg::Time & lhs, const rclcpp::Duration & rhs)
+{
+  if (lhs.sec < 0) {
+    throw std::runtime_error("message time is negative");
+  }
+
+  rcl_time_point_value_t rcl_time;
+  rcl_time = RCL_S_TO_NS(static_cast<int64_t>(lhs.sec));
+  rcl_time += lhs.nanosec;
+
+  if (rclcpp::add_will_overflow(rcl_time, rhs.nanoseconds())) {
+    throw std::overflow_error("addition leads to int64_t overflow");
+  }
+  if (rclcpp::add_will_underflow(rcl_time, rhs.nanoseconds())) {
+    throw std::underflow_error("addition leads to int64_t underflow");
+  }
+
+  rcl_time += rhs.nanoseconds();
+
+  return convert_rcl_time_to_sec_nanos(rcl_time);
+}
+
+builtin_interfaces::msg::Time
+operator-(const builtin_interfaces::msg::Time & lhs, const rclcpp::Duration & rhs)
+{
+  if (lhs.sec < 0) {
+    throw std::runtime_error("message time is negative");
+  }
+
+  rcl_time_point_value_t rcl_time;
+  rcl_time = RCL_S_TO_NS(static_cast<int64_t>(lhs.sec));
+  rcl_time += lhs.nanosec;
+
+  if (rclcpp::sub_will_overflow(rcl_time, rhs.nanoseconds())) {
+    throw std::overflow_error("addition leads to int64_t overflow");
+  }
+  if (rclcpp::sub_will_underflow(rcl_time, rhs.nanoseconds())) {
+    throw std::underflow_error("addition leads to int64_t underflow");
+  }
+
+  rcl_time -= rhs.nanoseconds();
+
+  return convert_rcl_time_to_sec_nanos(rcl_time);
 }
 
 }  // namespace rclcpp

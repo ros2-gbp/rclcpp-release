@@ -39,27 +39,29 @@ static bool test_waitable_result = false;
 class TestWaitable : public rclcpp::Waitable
 {
 public:
-  void add_to_wait_set(rcl_wait_set_t *) override
+  void add_to_wait_set(rcl_wait_set_t &) override
   {
     if (!test_waitable_result) {
       throw std::runtime_error("TestWaitable add_to_wait_set failed");
     }
   }
 
-  bool is_ready(rcl_wait_set_t *) override
+  bool is_ready(const rcl_wait_set_t &) override
   {
     return test_waitable_result;
   }
 
-  std::shared_ptr<void>
-  take_data() override
-  {
-    return nullptr;
-  }
+  std::shared_ptr<void> take_data() override {return nullptr;}
+  void execute(const std::shared_ptr<void> &) override {}
 
-  void execute(std::shared_ptr<void> & data) override
+  void set_on_ready_callback(std::function<void(size_t, int)>) override {}
+  void clear_on_ready_callback() override {}
+
+  std::shared_ptr<void> take_data_by_entity_id(size_t) override {return nullptr;}
+
+  std::vector<std::shared_ptr<rclcpp::TimerBase>> get_timers() const override
   {
-    (void) data;
+    return {};
   }
 };
 
@@ -149,9 +151,9 @@ protected:
 
   std::shared_ptr<rclcpp::Node> create_node_with_service(const std::string & name)
   {
-    auto service_callback =
-      [](const test_msgs::srv::Empty::Request::SharedPtr,
-        test_msgs::srv::Empty::Response::SharedPtr) {};
+    auto service_callback = [](
+      const test_msgs::srv::Empty::Request::SharedPtr,
+      test_msgs::srv::Empty::Response::SharedPtr) {};
     auto node_with_service = create_node_with_disabled_callback_groups(name);
 
     auto callback_group =
@@ -162,7 +164,7 @@ protected:
 
     services_.push_back(
       node_with_service->create_service<test_msgs::srv::Empty>(
-        "service", std::move(service_callback), rmw_qos_profile_services_default, callback_group));
+        "service", std::move(service_callback), rclcpp::ServicesQoS(), callback_group));
     return node_with_service;
   }
 
@@ -177,7 +179,7 @@ protected:
 
     clients_.push_back(
       node_with_client->create_client<test_msgs::srv::Empty>(
-        "service", rmw_qos_profile_services_default, callback_group));
+        "service", rclcpp::ServicesQoS(), callback_group));
     return node_with_client;
   }
 
@@ -497,8 +499,8 @@ TEST_F(TestAllocatorMemoryStrategy, add_remove_waitables) {
 TEST_F(TestAllocatorMemoryStrategy, number_of_entities_with_subscription) {
   RclWaitSetSizes expected_sizes = {};
   expected_sizes.size_of_subscriptions = 1;
-  expected_sizes.size_of_events = 1;
-  expected_sizes.size_of_waitables = 1;
+  expected_sizes.size_of_events = 2;
+  expected_sizes.size_of_waitables = 2;
   auto node_with_subscription = create_node_with_subscription("subscription_node");
   EXPECT_TRUE(TestNumberOfEntitiesAfterCollection(node_with_subscription, expected_sizes));
 }
@@ -538,8 +540,8 @@ TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_bad_arguments) {
     });
   allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
   EXPECT_FALSE(allocator_memory_strategy()->add_handles_to_wait_set(nullptr));
-  EXPECT_TRUE(rcl_error_is_set());
-  rcl_reset_error();
+  // The error message is collected and already reset.
+  EXPECT_FALSE(rcl_error_is_set());
 }
 
 TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_subscription) {
@@ -789,11 +791,11 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_service_out_of_scope) {
       node->create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive);
 
-    auto service_callback =
-      [](const test_msgs::srv::Empty::Request::SharedPtr,
-        test_msgs::srv::Empty::Response::SharedPtr) {};
+    auto service_callback = [](
+      const test_msgs::srv::Empty::Request::SharedPtr,
+      test_msgs::srv::Empty::Response::SharedPtr) {};
     auto service = node->create_service<test_msgs::srv::Empty>(
-      "service", std::move(service_callback), rmw_qos_profile_services_default, callback_group);
+      "service", std::move(service_callback), rclcpp::ServicesQoS(), callback_group);
 
     node->for_each_callback_group(
       [node, &weak_groups_to_nodes](rclcpp::CallbackGroup::SharedPtr group_ptr)
@@ -831,7 +833,7 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_client_out_of_scope) {
       node->create_callback_group(
       rclcpp::CallbackGroupType::MutuallyExclusive);
     auto client = node->create_client<test_msgs::srv::Empty>(
-      "service", rmw_qos_profile_services_default, callback_group);
+      "service", rclcpp::ServicesQoS(), callback_group);
 
     weak_groups_to_nodes.insert(
       std::pair<rclcpp::CallbackGroup::WeakPtr,

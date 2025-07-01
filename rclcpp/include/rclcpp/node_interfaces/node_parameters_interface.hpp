@@ -15,8 +15,8 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_PARAMETERS_INTERFACE_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_PARAMETERS_INTERFACE_HPP_
 
+#include <functional>
 #include <map>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -25,6 +25,7 @@
 #include "rcl_interfaces/msg/set_parameters_result.hpp"
 
 #include "rclcpp/macros.hpp"
+#include "rclcpp/node_interfaces/detail/node_interfaces_helpers.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/visibility_control.hpp"
 
@@ -33,16 +34,36 @@ namespace rclcpp
 namespace node_interfaces
 {
 
+struct PreSetParametersCallbackHandle
+{
+  RCLCPP_SMART_PTR_DEFINITIONS(PreSetParametersCallbackHandle)
+
+  using PreSetParametersCallbackType =
+    std::function<void (std::vector<rclcpp::Parameter> &)>;
+
+  PreSetParametersCallbackType callback;
+};
+
 struct OnSetParametersCallbackHandle
 {
   RCLCPP_SMART_PTR_DEFINITIONS(OnSetParametersCallbackHandle)
 
-  using OnParametersSetCallbackType =
+  using OnSetParametersCallbackType =
     std::function<
     rcl_interfaces::msg::SetParametersResult(
       const std::vector<rclcpp::Parameter> &)>;
 
-  OnParametersSetCallbackType callback;
+  OnSetParametersCallbackType callback;
+};
+
+struct PostSetParametersCallbackHandle
+{
+  RCLCPP_SMART_PTR_DEFINITIONS(PostSetParametersCallbackHandle)
+
+  using PostSetParametersCallbackType =
+    std::function<void (const std::vector<rclcpp::Parameter> &)>;
+
+  PostSetParametersCallbackType callback;
 };
 
 /// Pure virtual interface class for the NodeParameters part of the Node API.
@@ -185,16 +206,46 @@ public:
   rcl_interfaces::msg::ListParametersResult
   list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const = 0;
 
-  using OnParametersSetCallbackType = OnSetParametersCallbackHandle::OnParametersSetCallbackType;
+  using OnSetParametersCallbackType = OnSetParametersCallbackHandle::OnSetParametersCallbackType;
+  using PostSetParametersCallbackType =
+    PostSetParametersCallbackHandle::PostSetParametersCallbackType;
+  using PreSetParametersCallbackType = PreSetParametersCallbackHandle::PreSetParametersCallbackType;
 
-  /// Add a callback for when parameters are being set.
+  /// Add a callback that gets triggered before parameters are validated.
+  /**
+   * \sa rclcpp::Node::add_pre_set_parameters_callback
+   */
+  RCLCPP_PUBLIC
+  virtual
+  PreSetParametersCallbackHandle::SharedPtr
+  add_pre_set_parameters_callback(PreSetParametersCallbackType callback) = 0;
+
+  /// Add a callback to validate parameters before they are set.
   /**
    * \sa rclcpp::Node::add_on_set_parameters_callback
    */
   RCLCPP_PUBLIC
   virtual
   OnSetParametersCallbackHandle::SharedPtr
-  add_on_set_parameters_callback(OnParametersSetCallbackType callback) = 0;
+  add_on_set_parameters_callback(OnSetParametersCallbackType callback) = 0;
+
+  /// Add a callback that gets triggered after parameters are set successfully.
+  /**
+   * \sa rclcpp::Node::add_post_set_parameters_callback
+   */
+  RCLCPP_PUBLIC
+  virtual
+  PostSetParametersCallbackHandle::SharedPtr
+  add_post_set_parameters_callback(PostSetParametersCallbackType callback) = 0;
+
+  /// Remove a callback registered with `add_pre_set_parameters_callback`.
+  /**
+   * \sa rclcpp::Node::remove_pre_set_parameters_callback
+   */
+  RCLCPP_PUBLIC
+  virtual
+  void
+  remove_pre_set_parameters_callback(const PreSetParametersCallbackHandle * const handler) = 0;
 
   /// Remove a callback registered with `add_on_set_parameters_callback`.
   /**
@@ -205,14 +256,45 @@ public:
   void
   remove_on_set_parameters_callback(const OnSetParametersCallbackHandle * const handler) = 0;
 
+  /// Remove a callback registered with `add_post_set_parameters_callback`.
+  /**
+   * \sa rclcpp::Node::remove_post_set_parameters_callback
+   */
+  RCLCPP_PUBLIC
+  virtual
+  void
+  remove_post_set_parameters_callback(const PostSetParametersCallbackHandle * const handler) = 0;
+
   /// Return the initial parameter values used by the NodeParameters to override default values.
   RCLCPP_PUBLIC
   virtual
   const std::map<std::string, rclcpp::ParameterValue> &
   get_parameter_overrides() const = 0;
+
+  /// Enable parameter modification recursively during parameter callbacks.
+  /**
+   * This function is used to enable parameter modification during parameter callbacks.
+   *
+   * There are times when it does not allow parameter modification, such as when the parameter
+   * callbacks are being called and tries to modify the parameters with set_parameter and
+   * declare_parameter to avoid recursive parameter modification.
+   * This is protected by rclcpp::node_interfaces::ParameterMutationRecursionGuard.
+   *
+   * This function is explicitly called to allow the recursive parameter operation during
+   * parameter callbacks by the application.
+   * Once it is enabled, the next parameter operation set/declare/undeclare_parameter are
+   * allowed to execute in the parameter callback. But, no more further recursive operation
+   * is allowed, unless user application calls this API again.
+   */
+  RCLCPP_PUBLIC
+  virtual
+  void
+  enable_parameter_modification() = 0;
 };
 
 }  // namespace node_interfaces
 }  // namespace rclcpp
+
+RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(rclcpp::node_interfaces::NodeParametersInterface, parameters)
 
 #endif  // RCLCPP__NODE_INTERFACES__NODE_PARAMETERS_INTERFACE_HPP_

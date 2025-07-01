@@ -36,6 +36,8 @@
 #ifndef RCLCPP_LIFECYCLE__LIFECYCLE_NODE_HPP_
 #define RCLCPP_LIFECYCLE__LIFECYCLE_NODE_HPP_
 
+#include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -49,13 +51,11 @@
 
 #include "rcl_interfaces/msg/list_parameters_result.hpp"
 #include "rcl_interfaces/msg/parameter_descriptor.hpp"
-#include "rcl_interfaces/msg/parameter_event.hpp"
 #include "rcl_interfaces/msg/set_parameters_result.hpp"
 
 #include "rclcpp/callback_group.hpp"
 #include "rclcpp/client.hpp"
 #include "rclcpp/clock.hpp"
-#include "rclcpp/context.hpp"
 #include "rclcpp/event.hpp"
 #include "rclcpp/generic_publisher.hpp"
 #include "rclcpp/generic_subscription.hpp"
@@ -72,6 +72,7 @@
 #include "rclcpp/node_interfaces/node_time_source_interface.hpp"
 #include "rclcpp/node_interfaces/node_timers_interface.hpp"
 #include "rclcpp/node_interfaces/node_topics_interface.hpp"
+#include "rclcpp/node_interfaces/node_type_descriptions_interface.hpp"
 #include "rclcpp/node_interfaces/node_waitables_interface.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/publisher.hpp"
@@ -82,6 +83,8 @@
 #include "rclcpp/subscription_options.hpp"
 #include "rclcpp/time.hpp"
 #include "rclcpp/timer.hpp"
+
+#include "rmw/types.h"
 
 #include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
 #include "rclcpp_lifecycle/lifecycle_publisher.hpp"
@@ -137,7 +140,7 @@ public:
     const rclcpp::NodeOptions & options = rclcpp::NodeOptions(),
     bool enable_communication_interface = true);
 
-  /// Create a node based on the node name and a rclcpp::Context.
+  /// Create a node based on the node name
   /**
    * \param[in] node_name Name of the node.
    * \param[in] namespace_ Namespace of the node.
@@ -169,6 +172,15 @@ public:
   RCLCPP_LIFECYCLE_PUBLIC
   const char *
   get_namespace() const;
+
+  /// Get the fully-qualified name of the node.
+  /**
+   * The fully-qualified name includes the local namespace and name of the node.
+   * \return fully-qualified name of the node.
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  const char *
+  get_fully_qualified_name() const;
 
   /// Get the logger of the node.
   /**
@@ -242,7 +254,7 @@ public:
     )
   );
 
-  /// Create a timer.
+  /// Create a timer that uses the wall clock to drive the callback.
   /**
    * \param[in] period Time interval between triggers of the callback.
    * \param[in] callback User-defined callback function.
@@ -255,15 +267,31 @@ public:
     CallbackT callback,
     rclcpp::CallbackGroup::SharedPtr group = nullptr);
 
+  /// Create a timer that uses the node clock to drive the callback.
+  /**
+   * \param[in] period Time interval between triggers of the callback.
+   * \param[in] callback User-defined callback function.
+   * \param[in] group Callback group to execute this timer's callback in.
+   */
+  template<typename DurationRepT = int64_t, typename DurationT = std::milli, typename CallbackT>
+  typename rclcpp::GenericTimer<CallbackT>::SharedPtr
+  create_timer(
+    std::chrono::duration<DurationRepT, DurationT> period,
+    CallbackT callback,
+    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+
   /// Create and return a Client.
   /**
-   * \sa rclcpp::Node::create_client
+   * \param[in] service_name The name on which the service is accessible.
+   * \param[in] qos Quality of service profile for client.
+   * \param[in] group Callback group to handle the reply to service calls.
+   * \return Shared pointer to the created client.
    */
   template<typename ServiceT>
   typename rclcpp::Client<ServiceT>::SharedPtr
   create_client(
     const std::string & service_name,
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_services_default,
+    const rclcpp::QoS & qos = rclcpp::ServicesQoS(),
     rclcpp::CallbackGroup::SharedPtr group = nullptr);
 
   /// Create and return a Service.
@@ -275,7 +303,7 @@ public:
   create_service(
     const std::string & service_name,
     CallbackT && callback,
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_services_default,
+    const rclcpp::QoS & qos = rclcpp::ServicesQoS(),
     rclcpp::CallbackGroup::SharedPtr group = nullptr);
 
   /// Create and return a GenericPublisher.
@@ -508,10 +536,30 @@ public:
   rcl_interfaces::msg::ListParametersResult
   list_parameters(const std::vector<std::string> & prefixes, uint64_t depth) const;
 
+  using PreSetParametersCallbackHandle =
+    rclcpp::node_interfaces::PreSetParametersCallbackHandle;
+  using PreSetParametersCallbackType =
+    rclcpp::node_interfaces::NodeParametersInterface::PreSetParametersCallbackType;
+
   using OnSetParametersCallbackHandle =
     rclcpp::node_interfaces::OnSetParametersCallbackHandle;
-  using OnParametersSetCallbackType =
-    rclcpp::node_interfaces::NodeParametersInterface::OnParametersSetCallbackType;
+  using OnSetParametersCallbackType =
+    rclcpp::node_interfaces::NodeParametersInterface::OnSetParametersCallbackType;
+
+  using PostSetParametersCallbackHandle =
+    rclcpp::node_interfaces::PostSetParametersCallbackHandle;
+  using PostSetParametersCallbackType =
+    rclcpp::node_interfaces::NodeParametersInterface::PostSetParametersCallbackType;
+
+  /// Add a callback that gets triggered before parameters are validated.
+  /**
+   * \sa rclcpp::Node::add_pre_set_parameters_callback
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  RCUTILS_WARN_UNUSED
+  rclcpp_lifecycle::LifecycleNode::PreSetParametersCallbackHandle::SharedPtr
+  add_pre_set_parameters_callback(
+    rclcpp_lifecycle::LifecycleNode::PreSetParametersCallbackType callback);
 
   /// Add a callback for when parameters are being set.
   /**
@@ -521,7 +569,26 @@ public:
   RCUTILS_WARN_UNUSED
   rclcpp_lifecycle::LifecycleNode::OnSetParametersCallbackHandle::SharedPtr
   add_on_set_parameters_callback(
-    rclcpp_lifecycle::LifecycleNode::OnParametersSetCallbackType callback);
+    rclcpp_lifecycle::LifecycleNode::OnSetParametersCallbackType callback);
+
+  /// Add a callback that gets triggered after parameters are set successfully.
+  /**
+   * \sa rclcpp::Node::add_post_set_parameters_callback
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  RCUTILS_WARN_UNUSED
+  rclcpp_lifecycle::LifecycleNode::PostSetParametersCallbackHandle::SharedPtr
+  add_post_set_parameters_callback(
+    rclcpp_lifecycle::LifecycleNode::PostSetParametersCallbackType callback);
+
+  /// Remove a callback registered with `add_pre_set_parameters_callback`.
+  /**
+   * \sa rclcpp::Node::remove_pre_set_parameters_callback
+  */
+  RCLCPP_LIFECYCLE_PUBLIC
+  void
+  remove_pre_set_parameters_callback(
+    const rclcpp_lifecycle::LifecycleNode::PreSetParametersCallbackHandle * const handler);
 
   /// Remove a callback registered with `add_on_set_parameters_callback`.
   /**
@@ -531,6 +598,15 @@ public:
   void
   remove_on_set_parameters_callback(
     const rclcpp_lifecycle::LifecycleNode::OnSetParametersCallbackHandle * const handler);
+
+  /// Remove a callback registered with `add_post_set_parameters_callback`.
+  /**
+   * \sa rclcpp::Node::remove_post_set_parameters_callback
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  void
+  remove_post_set_parameters_callback(
+    const rclcpp_lifecycle::LifecycleNode::PostSetParametersCallbackHandle * const handler);
 
   /// Return a vector of existing node names (string).
   /**
@@ -584,6 +660,22 @@ public:
   RCLCPP_LIFECYCLE_PUBLIC
   size_t
   count_subscribers(const std::string & topic_name) const;
+
+  /// Return the number of clients created for a given service.
+  /**
+   * \sa rclcpp::Node::count_clients
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  size_t
+  count_clients(const std::string & service_name) const;
+
+  /// Return the number of services created for a given service.
+  /**
+   * \sa rclcpp::Node::count_services
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  size_t
+  count_services(const std::string & service_name) const;
 
   /// Return the topic endpoint information about publishers on a given topic.
   /**
@@ -639,7 +731,7 @@ public:
   rclcpp::Clock::ConstSharedPtr
   get_clock() const;
 
-  /// Returns current time from the time source specified by clock_type.
+  /// Returns current time from the node clock.
   /**
    * \sa rclcpp::Clock::now
    */
@@ -719,6 +811,14 @@ public:
   rclcpp::node_interfaces::NodeTimeSourceInterface::SharedPtr
   get_node_time_source_interface();
 
+  /// Return the Node's internal NodeTypeDescriptionsInterface implementation.
+  /**
+   * \sa rclcpp::Node::get_node_type_descriptions_interface
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  rclcpp::node_interfaces::NodeTypeDescriptionsInterface::SharedPtr
+  get_node_type_descriptions_interface();
+
   /// Return the Node's internal NodeWaitablesInterface implementation.
   /**
    * \sa rclcpp::Node::get_node_waitables_interface
@@ -744,7 +844,7 @@ public:
    */
   RCLCPP_LIFECYCLE_PUBLIC
   const State &
-  get_current_state();
+  get_current_state() const;
 
   /// Return a list with the available states.
   /**
@@ -752,7 +852,7 @@ public:
    */
   RCLCPP_LIFECYCLE_PUBLIC
   std::vector<State>
-  get_available_states();
+  get_available_states() const;
 
   /// Return a list with the current available transitions.
   /**
@@ -760,7 +860,7 @@ public:
    */
   RCLCPP_LIFECYCLE_PUBLIC
   std::vector<Transition>
-  get_available_transitions();
+  get_available_transitions() const;
 
   /// Return a list with all the transitions.
   /**
@@ -768,7 +868,7 @@ public:
    */
   RCLCPP_LIFECYCLE_PUBLIC
   std::vector<Transition>
-  get_transition_graph();
+  get_transition_graph() const;
 
   /// Trigger the specified transition.
   /*
@@ -981,6 +1081,7 @@ private:
   rclcpp::node_interfaces::NodeClockInterface::SharedPtr node_clock_;
   rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters_;
   rclcpp::node_interfaces::NodeTimeSourceInterface::SharedPtr node_time_source_;
+  rclcpp::node_interfaces::NodeTypeDescriptionsInterface::SharedPtr node_type_descriptions_;
   rclcpp::node_interfaces::NodeWaitablesInterface::SharedPtr node_waitables_;
 
   const rclcpp::NodeOptions node_options_;

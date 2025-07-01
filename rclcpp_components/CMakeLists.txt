@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.5)
 
 project(rclcpp_components)
 
-# Default to C++14
+# Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(
@@ -20,7 +21,7 @@ find_package(composition_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rcpputils REQUIRED)
 
-# Add an interface library that can be dependend upon by libraries who register components
+# Add an interface library that can be depended upon by libraries who register components
 add_library(component INTERFACE)
 target_include_directories(component INTERFACE
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -37,12 +38,14 @@ add_library(
 target_include_directories(component_manager PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
-ament_target_dependencies(component_manager
-  "ament_index_cpp"
-  "class_loader"
-  "composition_interfaces"
-  "rclcpp"
-  "rcpputils"
+target_link_libraries(component_manager PUBLIC
+  ${composition_interfaces_TARGETS}
+  rclcpp::rclcpp
+)
+target_link_libraries(component_manager PRIVATE
+  ament_index_cpp::ament_index_cpp
+  class_loader::class_loader
+  rcpputils::rcpputils
 )
 target_compile_definitions(component_manager
   PRIVATE "RCLCPP_COMPONENTS_BUILDING_LIBRARY")
@@ -51,10 +54,13 @@ add_executable(
   component_container
   src/component_container.cpp
 )
-target_link_libraries(component_container component_manager)
-ament_target_dependencies(component_container
-  "rclcpp"
+target_link_libraries(component_container component_manager rclcpp::rclcpp)
+
+add_executable(
+  component_container_event
+  src/component_container_event.cpp
 )
+target_link_libraries(component_container_event component_manager rclcpp::rclcpp)
 
 set(node_main_template_install_dir "share/${PROJECT_NAME}")
 install(FILES
@@ -65,20 +71,13 @@ add_executable(
   component_container_mt
   src/component_container_mt.cpp
 )
-target_link_libraries(component_container_mt component_manager)
-ament_target_dependencies(component_container_mt
-  "rclcpp"
-)
+target_link_libraries(component_container_mt component_manager rclcpp::rclcpp)
 
 add_executable(
   component_container_isolated
   src/component_container_isolated.cpp
 )
-target_link_libraries(component_container_isolated component_manager)
-ament_target_dependencies(component_container_isolated
-  "rclcpp"
-)
-
+target_link_libraries(component_container_isolated component_manager rclcpp::rclcpp)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_link_libraries(component_container "stdc++fs")
@@ -152,7 +151,7 @@ install(
 
 # Install executables
 install(
-  TARGETS component_container component_container_mt component_container_isolated
+  TARGETS component_container component_container_mt component_container_isolated component_container_event
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
