@@ -2,35 +2,24 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-30.0.0 (2025-07-01)
+29.5.2 (2025-07-07)
 -------------------
-* Hand-code logging.hpp (`#2870 <https://github.com/ros2/rclcpp/issues/2870>`_)
-* Adressed TODO in node_graph (`#2877 <https://github.com/ros2/rclcpp/issues/2877>`_)
-* fix test_publisher_with_system_default_qos. (`#2881 <https://github.com/ros2/rclcpp/issues/2881>`_)
-* Contributors: Alejandro Hernández Cordero, Chris Lalancette, Tomoya Fujita
+* Shutdown deadlock fix jazzy (`#2887 <https://github.com/ros2/rclcpp/issues/2887>`_) (`#2888 <https://github.com/ros2/rclcpp/issues/2888>`_)
+* Fix test_publisher_with_system_default_qos (`#2881 <https://github.com/ros2/rclcpp/issues/2881>`_) (`#2884 <https://github.com/ros2/rclcpp/issues/2884>`_)
+* Contributors: Tomoya Fujita, Janosch Machowinski
 
-29.6.1 (2025-06-23)
+29.5.1 (2025-06-23)
 -------------------
-* Fix for memory leaks in rclcpp::SerializedMessage (`#2861 <https://github.com/ros2/rclcpp/issues/2861>`_)
-* Removed warning test_qos (`#2859 <https://github.com/ros2/rclcpp/issues/2859>`_)
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
-* get_all_data_impl() does not handle null pointers properly, causing segmentation fault (`#2840 <https://github.com/ros2/rclcpp/issues/2840>`_)
-* QoSInitialization::from_rmw does not validate invalid history policy values, leading to silent failures (`#2841 <https://github.com/ros2/rclcpp/issues/2841>`_)
-* remove get_notify_guard_condition from NodeBaseInterface. (`#2839 <https://github.com/ros2/rclcpp/issues/2839>`_)
-* Removed deprecated StaticSingleThreadedExecutor (`#2835 <https://github.com/ros2/rclcpp/issues/2835>`_)
-* Removed deprecated rcpputils Path (`#2834 <https://github.com/ros2/rclcpp/issues/2834>`_)
-* Add range constraints for applicable array parameters (`#2828 <https://github.com/ros2/rclcpp/issues/2828>`_)
-* Update RingBufferImplementation to clear internal data. (`#2837 <https://github.com/ros2/rclcpp/issues/2837>`_)
-* Removed deprecated cancel_sleep_or_wait (`#2836 <https://github.com/ros2/rclcpp/issues/2836>`_)
-* Add missing 's' to 'NodeParametersInterface' in doc/comment (`#2831 <https://github.com/ros2/rclcpp/issues/2831>`_)
-* subordinate node consistent behavior and update docstring. (`#2822 <https://github.com/ros2/rclcpp/issues/2822>`_)
-* Contributors: Alejandro Hernández Cordero, Alex Youngs, Christophe Bedard, Michael Carlstrom, Michael Orlov, Tomoya Fujita
-
-29.6.0 (2025-04-25)
--------------------
+* Removed warning test_qos (`#2859 <https://github.com/ros2/rclcpp/issues/2859>`_) (`#2873 <https://github.com/ros2/rclcpp/issues/2873>`_)
+* Fix for memory leaks in rclcpp::SerializedMessage (`#2861 <https://github.com/ros2/rclcpp/issues/2861>`_) (`#2863 <https://github.com/ros2/rclcpp/issues/2863>`_)
+* get_all_data_impl() does not handle null pointers properly, causing segmentation fault (backport `#2840 <https://github.com/ros2/rclcpp/issues/2840>`_) (`#2850 <https://github.com/ros2/rclcpp/issues/2850>`_)
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2855 <https://github.com/ros2/rclcpp/issues/2855>`_)
+* QoSInitialization::from_rmw does not validate invalid history policy values, leading to silent failures (`#2841 <https://github.com/ros2/rclcpp/issues/2841>`_) (`#2846 <https://github.com/ros2/rclcpp/issues/2846>`_)
+* Add missing 's' to 'NodeParametersInterface' in doc/comment (`#2831 <https://github.com/ros2/rclcpp/issues/2831>`_) (`#2833 <https://github.com/ros2/rclcpp/issues/2833>`_)
+* subordinate node consistent behavior and update docstring. (`#2822 <https://github.com/ros2/rclcpp/issues/2822>`_) (`#2830 <https://github.com/ros2/rclcpp/issues/2830>`_)
 * throws std::invalid_argument if ParameterEvent is NULL. (`#2814 <https://github.com/ros2/rclcpp/issues/2814>`_)
 * Removed clang warnings (`#2823 <https://github.com/ros2/rclcpp/issues/2823>`_)
-* Contributors: Alejandro Hernández Cordero, Tomoya Fujita
+* Contributors: Alejandro Hernández Cordero, Tomoya Fujita, mergify[bot]
 
 29.5.0 (2025-04-18)
 -------------------

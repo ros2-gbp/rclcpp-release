@@ -3,17 +3,14 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-30.0.0 (2025-07-01)
+29.5.2 (2025-07-07)
 -------------------
 
-29.6.1 (2025-06-23)
+29.5.1 (2025-06-23)
 -------------------
-* Replace std::default_random_engine with std::mt19937 (rolling) (`#2843 <https://github.com/ros2/rclcpp/issues/2843>`_)
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
-* Contributors: Alejandro Hernández Cordero, keeponoiro
-
-29.6.0 (2025-04-25)
--------------------
+* Replace std::default_random_engine with std::mt19937 (rolling) (`#2843 <https://github.com/ros2/rclcpp/issues/2843>`_) (`#2866 <https://github.com/ros2/rclcpp/issues/2866>`_)
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2855 <https://github.com/ros2/rclcpp/issues/2855>`_)
+* Contributors: mergify[bot]
 
 29.5.0 (2025-04-18)
 -------------------

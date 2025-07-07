@@ -56,12 +56,6 @@ add_executable(
 )
 target_link_libraries(component_container component_manager rclcpp::rclcpp)
 
-add_executable(
-  component_container_event
-  src/component_container_event.cpp
-)
-target_link_libraries(component_container_event component_manager rclcpp::rclcpp)
-
 set(node_main_template_install_dir "share/${PROJECT_NAME}")
 install(FILES
   src/node_main.cpp.in
@@ -151,7 +145,7 @@ install(
 
 # Install executables
 install(
-  TARGETS component_container component_container_mt component_container_isolated component_container_event
+  TARGETS component_container component_container_mt component_container_isolated
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
