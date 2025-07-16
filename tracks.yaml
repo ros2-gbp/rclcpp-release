@@ -192,7 +192,7 @@ tracks:
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc} --os-name rhel
     devel_branch: humble
-    last_version: 16.0.13
+    last_version: 16.0.14
     name: rclcpp
     patches: null
     release_inc: '1'
