@@ -15,13 +15,24 @@
 #ifndef RCLCPP__EXECUTORS__STATIC_SINGLE_THREADED_EXECUTOR_HPP_
 #define RCLCPP__EXECUTORS__STATIC_SINGLE_THREADED_EXECUTOR_HPP_
 
-#include <atomic>
 #include <chrono>
+#include <cassert>
+#include <cstdlib>
 #include <memory>
+#include <vector>
+#include <string>
+
+#include "rmw/rmw.h"
 
 #include "rclcpp/executor.hpp"
-#include "rclcpp/executors/executor_entities_collection.hpp"
-#include "rclcpp/executors/single_threaded_executor.hpp"
+#include "rclcpp/executors/static_executor_entities_collector.hpp"
+#include "rclcpp/experimental/executable_list.hpp"
+#include "rclcpp/macros.hpp"
+#include "rclcpp/memory_strategies.hpp"
+#include "rclcpp/node.hpp"
+#include "rclcpp/rate.hpp"
+#include "rclcpp/utilities.hpp"
+#include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
 {
@@ -31,15 +42,9 @@ namespace executors
 /// Static executor implementation
 /**
  * This executor is a static version of the original single threaded executor.
- * It contains some performance optimization to avoid unnecessary reconstructions of
- * the executable list for every iteration.
+ * It's static because it doesn't reconstruct the executable list for every iteration.
  * All nodes, callbackgroups, timers, subscriptions etc. are created before
  * spin() is called, and modified only when an entity is added/removed to/from a node.
- * This executor is deprecated because these performance improvements have now been
- * applied to all other executors.
- * This executor is also considered unstable due to known bugs.
- * See the unit-tests that are only applied to `StandardExecutors` for information
- * on the known limitations.
  *
  * To run this executor instead of SingleThreadedExecutor replace:
  * rclcpp::executors::SingleThreadedExecutor exec;
@@ -50,8 +55,7 @@ namespace executors
  * exec.spin();
  * exec.remove_node(node);
  */
-class [[deprecated("Use rclcpp::executors::SingleThreadedExecutor")]] StaticSingleThreadedExecutor
-  : public rclcpp::Executor
+class StaticSingleThreadedExecutor : public rclcpp::Executor
 {
 public:
   RCLCPP_SMART_PTR_DEFINITIONS(StaticSingleThreadedExecutor)
@@ -61,7 +65,7 @@ public:
   explicit StaticSingleThreadedExecutor(
     const rclcpp::ExecutorOptions & options = rclcpp::ExecutorOptions());
 
-  /// Default destructor.
+  /// Default destrcutor.
   RCLCPP_PUBLIC
   virtual ~StaticSingleThreadedExecutor();
 
@@ -112,31 +116,105 @@ public:
   void
   spin_all(std::chrono::nanoseconds max_duration) override;
 
+  /// Add a callback group to an executor.
+  /**
+   * \sa rclcpp::Executor::add_callback_group
+   */
+  RCLCPP_PUBLIC
+  void
+  add_callback_group(
+    rclcpp::CallbackGroup::SharedPtr group_ptr,
+    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+    bool notify = true) override;
+
+  /// Remove callback group from the executor
+  /**
+   * \sa rclcpp::Executor::remove_callback_group
+   */
+  RCLCPP_PUBLIC
+  void
+  remove_callback_group(
+    rclcpp::CallbackGroup::SharedPtr group_ptr,
+    bool notify = true) override;
+
+  /// Add a node to the executor.
+  /**
+   * \sa rclcpp::Executor::add_node
+   */
+  RCLCPP_PUBLIC
+  void
+  add_node(
+    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+    bool notify = true) override;
+
+  /// Convenience function which takes Node and forwards NodeBaseInterface.
+  /**
+   * \sa rclcpp::StaticSingleThreadedExecutor::add_node
+   */
+  RCLCPP_PUBLIC
+  void
+  add_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify = true) override;
+
+  /// Remove a node from the executor.
+  /**
+   * \sa rclcpp::Executor::remove_node
+   */
+  RCLCPP_PUBLIC
+  void
+  remove_node(
+    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+    bool notify = true) override;
+
+  /// Convenience function which takes Node and forwards NodeBaseInterface.
+  /**
+   * \sa rclcpp::Executor::remove_node
+   */
+  RCLCPP_PUBLIC
+  void
+  remove_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify = true) override;
+
+  RCLCPP_PUBLIC
+  std::vector<rclcpp::CallbackGroup::WeakPtr>
+  get_all_callback_groups() override;
+
+  /// Get callback groups that belong to executor.
+  /**
+   * \sa rclcpp::Executor::get_manually_added_callback_groups()
+   */
+  RCLCPP_PUBLIC
+  std::vector<rclcpp::CallbackGroup::WeakPtr>
+  get_manually_added_callback_groups() override;
+
+  /// Get callback groups that belong to executor.
+  /**
+   * \sa rclcpp::Executor::get_automatically_added_callback_groups_from_nodes()
+   */
+  RCLCPP_PUBLIC
+  std::vector<rclcpp::CallbackGroup::WeakPtr>
+  get_automatically_added_callback_groups_from_nodes() override;
+
 protected:
   /**
    * @brief Executes ready executables from wait set.
-   * @param collection entities to evaluate for ready executables.
-   * @param wait_result result to check for ready executables.
    * @param spin_once if true executes only the first ready executable.
    * @return true if any executable was ready.
    */
+  RCLCPP_PUBLIC
   bool
-  execute_ready_executables(
-    const rclcpp::executors::ExecutorEntitiesCollection & collection,
-    rclcpp::WaitResult<rclcpp::WaitSet> & wait_result,
-    bool spin_once);
+  execute_ready_executables(bool spin_once = false);
 
+  RCLCPP_PUBLIC
   void
   spin_some_impl(std::chrono::nanoseconds max_duration, bool exhaustive);
 
+  RCLCPP_PUBLIC
   void
   spin_once_impl(std::chrono::nanoseconds timeout) override;
 
-  std::optional<rclcpp::WaitResult<rclcpp::WaitSet>>
-  collect_and_wait(std::chrono::nanoseconds timeout);
-
 private:
   RCLCPP_DISABLE_COPY(StaticSingleThreadedExecutor)
+
+  StaticExecutorEntitiesCollector::SharedPtr entities_collector_;
 };
 
 }  // namespace executors

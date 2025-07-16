@@ -74,23 +74,29 @@ struct FunctionObjectOneIntOneChar
 
 struct ObjectMember
 {
-  int callback_one_bool([[maybe_unused]] bool a)
+  int callback_one_bool(bool a)
   {
+    (void)a;
     return 7;
   }
 
-  int callback_one_bool_const([[maybe_unused]] bool a) const
+  int callback_one_bool_const(bool a) const
   {
+    (void)a;
     return 7;
   }
 
-  int callback_two_bools([[maybe_unused]] bool a, [[maybe_unused]] bool b)
+  int callback_two_bools(bool a, bool b)
   {
+    (void)a;
+    (void)b;
     return 8;
   }
 
-  int callback_one_bool_one_float([[maybe_unused]] bool a, [[maybe_unused]] float b)
+  int callback_one_bool_one_float(bool a, float b)
   {
+    (void)a;
+    (void)b;
     return 9;
   }
 };
@@ -206,15 +212,20 @@ TEST(TestFunctionTraits, arity) {
       return 0;
     };
 
-  auto lambda_one_int = []([[maybe_unused]] int one) {
+  auto lambda_one_int = [](int one) {
+      (void)one;
       return 1;
     };
 
-  auto lambda_two_ints = []([[maybe_unused]] int one, [[maybe_unused]] int two) {
+  auto lambda_two_ints = [](int one, int two) {
+      (void)one;
+      (void)two;
       return 2;
     };
 
-  auto lambda_one_int_one_char = []([[maybe_unused]] int one, [[maybe_unused]] char two) {
+  auto lambda_one_int_one_char = [](int one, char two) {
+      (void)one;
+      (void)two;
       return 3;
     };
 
@@ -292,15 +303,20 @@ TEST(TestFunctionTraits, argument_types) {
     >::value, "Functor accepts a char as second argument");
 
   // Test lambdas
-  auto lambda_one_int = []([[maybe_unused]] int one) {
+  auto lambda_one_int = [](int one) {
+      (void)one;
       return 1;
     };
 
-  auto lambda_two_ints = []([[maybe_unused]] int one, [[maybe_unused]] int two) {
+  auto lambda_two_ints = [](int one, int two) {
+      (void)one;
+      (void)two;
       return 2;
     };
 
-  auto lambda_one_int_one_char = []([[maybe_unused]] int one, [[maybe_unused]]  char two) {
+  auto lambda_one_int_one_char = [](int one, char two) {
+      (void)one;
+      (void)two;
       return 3;
     };
 
@@ -377,7 +393,6 @@ TEST(TestFunctionTraits, argument_types) {
 
   auto bind_one_bool = std::bind(
     &ObjectMember::callback_one_bool, &object_member, std::placeholders::_1);
-  (void)bind_one_bool;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -387,7 +402,6 @@ TEST(TestFunctionTraits, argument_types) {
 
   auto bind_one_bool_const = std::bind(
     &ObjectMember::callback_one_bool_const, &object_member, std::placeholders::_1);
-  (void)bind_one_bool_const;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -399,7 +413,6 @@ TEST(TestFunctionTraits, argument_types) {
   auto bind_two_bools = std::bind(
     &ObjectMember::callback_two_bools, &object_member, std::placeholders::_1,
     std::placeholders::_2);
-  (void)bind_two_bools;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -416,7 +429,6 @@ TEST(TestFunctionTraits, argument_types) {
   auto bind_one_bool_one_float = std::bind(
     &ObjectMember::callback_one_bool_one_float, &object_member, std::placeholders::_1,
     std::placeholders::_2);
-  (void)bind_one_bool_one_float;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -435,7 +447,6 @@ TEST(TestFunctionTraits, argument_types) {
     >::value, "Functor accepts a float as second argument");
 
   auto bind_one_int = std::bind(func_one_int, std::placeholders::_1);
-  (void)bind_one_int;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -444,7 +455,6 @@ TEST(TestFunctionTraits, argument_types) {
     >::value, "Functor accepts an int as first argument");
 
   auto bind_two_ints = std::bind(func_two_ints, std::placeholders::_1, std::placeholders::_2);
-  (void)bind_two_ints;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -460,7 +470,6 @@ TEST(TestFunctionTraits, argument_types) {
 
   auto bind_one_int_one_char = std::bind(
     func_one_int_one_char, std::placeholders::_1, std::placeholders::_2);
-  (void)bind_one_int_one_char;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -517,20 +526,22 @@ TEST(TestFunctionTraits, check_arguments) {
     "Functor accepts an int and a char as arguments");
 
   // Test lambdas
-  auto lambda_one_int = []([[maybe_unused]] int one) {
+  auto lambda_one_int = [](int one) {
+      (void)one;
       return 1;
     };
-  (void)lambda_one_int;  // to quiet clang
 
-  auto lambda_two_ints = []([[maybe_unused]] int one, [[maybe_unused]] int two) {
+  auto lambda_two_ints = [](int one, int two) {
+      (void)one;
+      (void)two;
       return 2;
     };
-  (void)lambda_two_ints;  // to quiet clang
 
-  auto lambda_one_int_one_char = []([[maybe_unused]] int one, [[maybe_unused]]  char two) {
+  auto lambda_one_int_one_char = [](int one, char two) {
+      (void)one;
+      (void)two;
       return 3;
     };
-  (void)lambda_one_int_one_char;  // to quiet clang
 
   static_assert(
     rclcpp::function_traits::check_arguments<decltype(lambda_one_int), int>::value,
@@ -561,7 +572,6 @@ TEST(TestFunctionTraits, check_arguments) {
 
   auto bind_one_bool = std::bind(
     &ObjectMember::callback_one_bool, &object_member, std::placeholders::_1);
-  (void)bind_one_bool;  // to quiet clang
 
   // Test std::bind functions
   static_assert(
@@ -570,7 +580,6 @@ TEST(TestFunctionTraits, check_arguments) {
 
   auto bind_one_bool_const = std::bind(
     &ObjectMember::callback_one_bool_const, &object_member, std::placeholders::_1);
-  (void)bind_one_bool_const;  // to quiet clang
 
   // Test std::bind functions
   static_assert(
@@ -582,11 +591,14 @@ TEST(TestFunctionTraits, check_arguments) {
    Tests that same_arguments work.
 */
 TEST(TestFunctionTraits, same_arguments) {
-  auto lambda_one_int = []([[maybe_unused]] int one) {
+  auto lambda_one_int = [](int one) {
+      (void)one;
       return 1;
     };
 
-  auto lambda_two_ints = []([[maybe_unused]] int one, [[maybe_unused]]  int two) {
+  auto lambda_two_ints = [](int one, int two) {
+      (void)one;
+      (void)two;
       return 1;
     };
 
@@ -634,7 +646,8 @@ TEST(TestFunctionTraits, return_type) {
     "Functor return ints");
 
   // Test lambda
-  auto lambda_one_int_return_double = []([[maybe_unused]] int one) -> double {
+  auto lambda_one_int_return_double = [](int one) -> double {
+      (void)one;
       return 1.0;
     };
 
@@ -672,15 +685,20 @@ TEST(TestFunctionTraits, sfinae_match) {
       return 0;
     };
 
-  auto lambda_one_int = []([[maybe_unused]] int one) {
+  auto lambda_one_int = [](int one) {
+      (void)one;
       return 1;
     };
 
-  auto lambda_two_ints = []([[maybe_unused]] int one, [[maybe_unused]]  int two) {
+  auto lambda_two_ints = [](int one, int two) {
+      (void)one;
+      (void)two;
       return 2;
     };
 
-  auto lambda_one_int_one_char = []([[maybe_unused]] int one, [[maybe_unused]]  char two) {
+  auto lambda_one_int_one_char = [](int one, char two) {
+      (void)one;
+      (void)two;
       return 3;
     };
 
@@ -727,7 +745,6 @@ TEST_F(TestMember, bind_member_functor) {
   auto bind_member_functor = std::bind(
     &TestMember::MemberFunctor, this, std::placeholders::_1,
     std::placeholders::_2, std::placeholders::_3);
-  (void)bind_member_functor;  // to quiet clang
 
   static_assert(
     rclcpp::function_traits::check_arguments<decltype(bind_member_functor), int, float,

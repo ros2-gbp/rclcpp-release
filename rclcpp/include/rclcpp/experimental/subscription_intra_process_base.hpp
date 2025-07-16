@@ -19,7 +19,6 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <vector>
 
 #include "rcl/wait.h"
 #include "rmw/impl/cpp/demangle.hpp"
@@ -53,7 +52,7 @@ public:
   {}
 
   RCLCPP_PUBLIC
-  virtual ~SubscriptionIntraProcessBase() = default;
+  virtual ~SubscriptionIntraProcessBase();
 
   RCLCPP_PUBLIC
   size_t
@@ -61,31 +60,23 @@ public:
 
   RCLCPP_PUBLIC
   void
-  add_to_wait_set(rcl_wait_set_t & wait_set) override;
-
-  RCLCPP_PUBLIC
-  virtual
-  size_t
-  available_capacity() const = 0;
-
-  RCLCPP_PUBLIC
-  bool
-  is_durability_transient_local() const;
+  add_to_wait_set(rcl_wait_set_t * wait_set) override;
 
   bool
-  is_ready(const rcl_wait_set_t & wait_set) override = 0;
+  is_ready(rcl_wait_set_t * wait_set) override = 0;
 
   std::shared_ptr<void>
   take_data() override = 0;
 
   std::shared_ptr<void>
-  take_data_by_entity_id([[maybe_unused]] size_t id) override
+  take_data_by_entity_id(size_t id) override
   {
+    (void)id;
     return take_data();
   }
 
   void
-  execute(const std::shared_ptr<void> & data) override = 0;
+  execute(std::shared_ptr<void> & data) override = 0;
 
   virtual
   bool
@@ -178,13 +169,6 @@ public:
   {
     std::lock_guard<std::recursive_mutex> lock(callback_mutex_);
     on_new_message_callback_ = nullptr;
-  }
-
-  RCLCPP_PUBLIC
-  std::vector<std::shared_ptr<rclcpp::TimerBase>>
-  get_timers() const override
-  {
-    return {};
   }
 
 protected:

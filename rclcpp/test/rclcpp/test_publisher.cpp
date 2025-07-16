@@ -14,7 +14,6 @@
 
 #include <gtest/gtest.h>
 
-#include <future>
 #include <chrono>
 #include <memory>
 #include <string>
@@ -25,8 +24,6 @@
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/rclcpp.hpp"
-
-#include "rcutils/env.h"
 
 #include "../mocking_utils/patch.hpp"
 #include "../utils/rclcpp_gtest_macros.hpp"
@@ -39,7 +36,9 @@ class TestPublisher : public ::testing::Test
 public:
   static void SetUpTestCase()
   {
-    rclcpp::init(0, nullptr);
+    if (!rclcpp::ok()) {
+      rclcpp::init(0, nullptr);
+    }
   }
 
 protected:
@@ -51,11 +50,6 @@ protected:
   void TearDown()
   {
     node.reset();
-  }
-
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
   }
 
   rclcpp::Node::SharedPtr node;
@@ -85,7 +79,6 @@ class TestPublisherSub : public ::testing::Test
 protected:
   static void SetUpTestCase()
   {
-    rclcpp::init(0, nullptr);
   }
 
   void SetUp()
@@ -97,11 +90,6 @@ protected:
   void TearDown()
   {
     node.reset();
-  }
-
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
   }
 
   rclcpp::Node::SharedPtr node;
@@ -196,10 +184,12 @@ TEST_F(TestPublisher, test_publisher_with_system_default_qos) {
   // explicitly enable intra-process comm with publisher option
   auto options = rclcpp::PublisherOptions();
   options.use_intra_process_comm = rclcpp::IntraProcessSetting::Enable;
+  // intraprocess communication allowed only with volatile durability
+  rclcpp::QoS qos = rclcpp::QoS(10).durability_volatile();
   using test_msgs::msg::Empty;
   ASSERT_NO_THROW(
   {
-    auto publisher = node->create_publisher<Empty>("topic", rclcpp::SystemDefaultsQoS(), options);
+    auto publisher = node->create_publisher<Empty>("topic", qos, options);
   });
 }
 
@@ -221,7 +211,11 @@ static std::vector<TestParameters> invalid_qos_profiles()
 {
   std::vector<TestParameters> parameters;
 
-  parameters.reserve(1);
+  parameters.reserve(2);
+  parameters.push_back(
+    TestParameters(
+      rclcpp::QoS(rclcpp::KeepLast(10)).transient_local(),
+      "transient_local_qos"));
   parameters.push_back(
     TestParameters(
       rclcpp::QoS(rclcpp::KeepAll()),
@@ -266,9 +260,10 @@ const rosidl_message_type_support_t EmptyTypeSupport()
   return *rosidl_typesupport_cpp::get_message_type_support_handle<test_msgs::msg::Empty>();
 }
 
-const rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> PublisherOptions()
+const rcl_publisher_options_t PublisherOptions()
 {
-  return rclcpp::PublisherOptionsWithAllocator<std::allocator<void>>();
+  return rclcpp::PublisherOptionsWithAllocator<std::allocator<void>>().template
+         to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10));
 }
 
 class TestPublisherBase : public rclcpp::PublisherBase
@@ -276,9 +271,7 @@ class TestPublisherBase : public rclcpp::PublisherBase
 public:
   explicit TestPublisherBase(rclcpp::Node * node)
   : rclcpp::PublisherBase(
-      node->get_node_base_interface().get(), "topic", EmptyTypeSupport(),
-      PublisherOptions().to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10)),
-      PublisherOptions().event_callbacks, PublisherOptions().use_default_callbacks) {}
+      node->get_node_base_interface().get(), "topic", EmptyTypeSupport(), PublisherOptions()) {}
 };
 
 /*
@@ -430,23 +423,17 @@ TEST_F(TestPublisher, intra_process_publish_failures) {
   std::allocator<void> allocator;
   {
     rclcpp::LoanedMessage<test_msgs::msg::Empty> loaned_msg(*publisher, allocator);
-    EXPECT_NO_THROW(publisher->publish(std::move(loaned_msg)));
+    RCLCPP_EXPECT_THROW_EQ(
+      publisher->publish(std::move(loaned_msg)),
+      std::runtime_error("storing loaned messages in intra process is not supported yet"));
   }
 
   {
     rclcpp::LoanedMessage<test_msgs::msg::Empty> loaned_msg(*publisher, allocator);
-    auto msg = loaned_msg.release();  // this will unmanage the ownership of the message
+    loaned_msg.release();
     RCLCPP_EXPECT_THROW_EQ(
       publisher->publish(std::move(loaned_msg)),
       std::runtime_error("loaned message is not valid"));
-    // if the message is actually loaned from the middleware but not be published,
-    // it is user responsibility to return the message to the middleware manually
-    if (publisher->can_loan_messages()) {
-      ASSERT_EQ(
-        RCL_RET_OK,
-        rcl_return_loaned_message_from_publisher(
-          publisher->get_publisher_handle().get(), msg.get()));
-    }
   }
   // a zero depth with KEEP_LAST doesn't make sense,
   // this will be interpreted as SystemDefaultQoS by rclcpp.
@@ -502,7 +489,7 @@ public:
 
   void publish_loaned_message(rclcpp::LoanedMessage<MessageT, AllocatorT> && loaned_msg)
   {
-    this->do_loaned_message_publish(loaned_msg.release());
+    this->do_loaned_message_publish(std::move(loaned_msg.release()));
   }
 
   void call_default_incompatible_qos_callback(rclcpp::QOSOfferedIncompatibleQoSInfo & event) const
@@ -514,11 +501,6 @@ public:
 TEST_F(TestPublisher, do_loaned_message_publish_error) {
   initialize();
   using PublisherT = TestPublisherProtectedMethods<test_msgs::msg::Empty, std::allocator<void>>;
-  // This test only passes when message is allocated on heap, not middleware.
-  // Since `do_loaned_message_publish()` will fail, there is no way to return the message
-  // to the middleware.
-  // This eventually fails to destroy publisher handle in the implementation.
-  ASSERT_TRUE(rcutils_set_env("ROS_DISABLE_LOANED_MESSAGES", "1"));
   auto publisher =
     node->create_publisher<test_msgs::msg::Empty, std::allocator<void>, PublisherT>("topic", 10);
 
@@ -550,7 +532,7 @@ TEST_F(TestPublisher, run_event_handlers) {
 
   for (const auto & key_event_pair : publisher->get_event_handlers()) {
     auto handler = key_event_pair.second;
-    const std::shared_ptr<void> data = handler->take_data();
+    std::shared_ptr<void> data = handler->take_data();
     handler->execute(data);
   }
 }
@@ -649,41 +631,6 @@ TEST_P(TestPublisherWaitForAllAcked, check_wait_for_all_acked_with_QosPolicy) {
   EXPECT_TRUE(pub->wait_for_all_acked(std::chrono::milliseconds(6000)));
 }
 
-TEST_F(TestPublisher, lowest_available_ipm_capacity) {
-  constexpr auto history_depth = 10u;
-
-  initialize(rclcpp::NodeOptions().use_intra_process_comms(true));
-
-  rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> options_ipm_disabled;
-  options_ipm_disabled.use_intra_process_comm = rclcpp::IntraProcessSetting::Disable;
-
-  rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> options_ipm_enabled;
-  options_ipm_enabled.use_intra_process_comm = rclcpp::IntraProcessSetting::Enable;
-
-  auto do_nothing = [](std::shared_ptr<const test_msgs::msg::Strings>) {};
-  auto pub_ipm_disabled = node->create_publisher<test_msgs::msg::Strings>(
-    "topic", history_depth,
-    options_ipm_disabled);
-  auto pub_ipm_enabled = node->create_publisher<test_msgs::msg::Strings>(
-    "topic", history_depth,
-    options_ipm_enabled);
-  auto sub = node->create_subscription<test_msgs::msg::Strings>(
-    "topic",
-    history_depth,
-    do_nothing);
-
-  ASSERT_EQ(1, pub_ipm_enabled->get_intra_process_subscription_count());
-  ASSERT_EQ(0, pub_ipm_disabled->lowest_available_ipm_capacity());
-  ASSERT_EQ(history_depth, pub_ipm_enabled->lowest_available_ipm_capacity());
-
-  auto msg = std::make_shared<test_msgs::msg::Strings>();
-  ASSERT_NO_THROW(pub_ipm_disabled->publish(*msg));
-  ASSERT_NO_THROW(pub_ipm_enabled->publish(*msg));
-
-  ASSERT_EQ(0, pub_ipm_disabled->lowest_available_ipm_capacity());
-  ASSERT_EQ(history_depth - 1u, pub_ipm_enabled->lowest_available_ipm_capacity());
-}
-
 INSTANTIATE_TEST_SUITE_P(
   TestWaitForAllAckedWithParm,
   TestPublisherWaitForAllAcked,
@@ -694,133 +641,3 @@ INSTANTIATE_TEST_SUITE_P(
       rclcpp::QoS(1).best_effort(), rclcpp::QoS(1).best_effort()),
     std::pair<rclcpp::QoS, rclcpp::QoS>(
       rclcpp::QoS(1).reliable(), rclcpp::QoS(1).best_effort())));
-
-TEST_F(TestPublisher, intra_process_transient_local) {
-  constexpr auto history_depth = 10u;
-  initialize(rclcpp::NodeOptions().use_intra_process_comms(true));
-  rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> pub_options_ipm_disabled;
-  pub_options_ipm_disabled.use_intra_process_comm = rclcpp::IntraProcessSetting::Disable;
-
-  rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> pub_options_ipm_enabled;
-  pub_options_ipm_enabled.use_intra_process_comm = rclcpp::IntraProcessSetting::Enable;
-
-  auto pub_ipm_enabled_transient_local_enabled = node->create_publisher<test_msgs::msg::Empty>(
-    "topic1",
-    rclcpp::QoS(rclcpp::KeepLast(history_depth)).transient_local(), pub_options_ipm_enabled);
-  auto pub_ipm_disabled_transient_local_enabled = node->create_publisher<test_msgs::msg::Empty>(
-    "topic2",
-    rclcpp::QoS(rclcpp::KeepLast(history_depth)).transient_local(), pub_options_ipm_disabled);
-  auto pub_ipm_enabled_transient_local_disabled = node->create_publisher<test_msgs::msg::Empty>(
-    "topic3",
-    rclcpp::QoS(rclcpp::KeepLast(history_depth)), pub_options_ipm_enabled);
-  auto pub_ipm_disabled_transient_local_disabled = node->create_publisher<test_msgs::msg::Empty>(
-    "topic4",
-    rclcpp::QoS(rclcpp::KeepLast(history_depth)), pub_options_ipm_disabled);
-
-  test_msgs::msg::Empty msg;
-  pub_ipm_enabled_transient_local_enabled->publish(msg);
-  pub_ipm_disabled_transient_local_enabled->publish(msg);
-  pub_ipm_enabled_transient_local_disabled->publish(msg);
-  pub_ipm_disabled_transient_local_disabled->publish(msg);
-
-  auto do_nothing = [](std::shared_ptr<const test_msgs::msg::Empty>) {};
-  struct IntraProcessCallback
-  {
-    void callback_fun(size_t) {called = true;}
-    bool called = false;
-  };
-  rclcpp::SubscriptionOptions sub_options_ipm_disabled;
-  sub_options_ipm_disabled.use_intra_process_comm = rclcpp::IntraProcessSetting::Disable;
-  rclcpp::SubscriptionOptions sub_options_ipm_enabled;
-  sub_options_ipm_enabled.use_intra_process_comm = rclcpp::IntraProcessSetting::Enable;
-  IntraProcessCallback callback1, callback2, callback3, callback4;
-  auto sub_ipm_enabled_transient_local_enabled = node->create_subscription<test_msgs::msg::Empty>(
-    "topic1",
-    rclcpp::QoS(rclcpp::KeepLast(history_depth)).transient_local(),
-    do_nothing, sub_options_ipm_enabled);
-  sub_ipm_enabled_transient_local_enabled->set_on_new_intra_process_message_callback(
-    std::bind(&IntraProcessCallback::callback_fun, &callback1, std::placeholders::_1));
-  auto sub_ipm_disabled_transient_local_enabled = node->create_subscription<test_msgs::msg::Empty>(
-    "topic2",
-    rclcpp::QoS(rclcpp::KeepLast(history_depth)).transient_local(),
-    do_nothing, sub_options_ipm_disabled);
-  sub_ipm_disabled_transient_local_enabled->set_on_new_intra_process_message_callback(
-    std::bind(&IntraProcessCallback::callback_fun, &callback2, std::placeholders::_1));
-  auto sub_ipm_enabled_transient_local_disabled = node->create_subscription<test_msgs::msg::Empty>(
-    "topic3",
-    rclcpp::QoS(rclcpp::KeepLast(history_depth)),
-    do_nothing, sub_options_ipm_enabled);
-  sub_ipm_enabled_transient_local_disabled->set_on_new_intra_process_message_callback(
-    std::bind(&IntraProcessCallback::callback_fun, &callback3, std::placeholders::_1));
-  auto sub_ipm_disabled_transient_local_disabled = node->create_subscription<test_msgs::msg::Empty>(
-    "topic4",
-    rclcpp::QoS(rclcpp::KeepLast(history_depth)),
-    do_nothing, sub_options_ipm_disabled);
-  sub_ipm_disabled_transient_local_disabled->set_on_new_intra_process_message_callback(
-    std::bind(&IntraProcessCallback::callback_fun, &callback4, std::placeholders::_1));
-
-  EXPECT_TRUE(pub_ipm_enabled_transient_local_enabled->is_durability_transient_local());
-  EXPECT_TRUE(pub_ipm_disabled_transient_local_enabled->is_durability_transient_local());
-  EXPECT_FALSE(pub_ipm_enabled_transient_local_disabled->is_durability_transient_local());
-  EXPECT_FALSE(pub_ipm_disabled_transient_local_disabled->is_durability_transient_local());
-
-  EXPECT_EQ(1, pub_ipm_enabled_transient_local_enabled->get_intra_process_subscription_count());
-  EXPECT_EQ(0, pub_ipm_disabled_transient_local_enabled->get_intra_process_subscription_count());
-  EXPECT_EQ(1, pub_ipm_enabled_transient_local_disabled->get_intra_process_subscription_count());
-  EXPECT_EQ(0, pub_ipm_disabled_transient_local_disabled->get_intra_process_subscription_count());
-
-  EXPECT_EQ(
-    history_depth - 1u,
-    pub_ipm_enabled_transient_local_enabled->lowest_available_ipm_capacity());
-  EXPECT_EQ(0, pub_ipm_disabled_transient_local_enabled->lowest_available_ipm_capacity());
-  EXPECT_EQ(
-    history_depth,
-    pub_ipm_enabled_transient_local_disabled->lowest_available_ipm_capacity());
-  EXPECT_EQ(0, pub_ipm_disabled_transient_local_disabled->lowest_available_ipm_capacity());
-
-  EXPECT_TRUE(callback1.called);
-  EXPECT_FALSE(callback2.called);
-  EXPECT_FALSE(callback3.called);
-  EXPECT_FALSE(callback4.called);
-}
-
-TEST_F(TestPublisher, intra_process_inter_process_mix_transient_local) {
-  constexpr auto history_depth = 10u;
-  initialize(rclcpp::NodeOptions().use_intra_process_comms(true));
-
-  rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> pub_options_ipm_enabled;
-  pub_options_ipm_enabled.use_intra_process_comm = rclcpp::IntraProcessSetting::Enable;
-
-  auto pub_ipm_enabled_transient_local_enabled = node->create_publisher<test_msgs::msg::Empty>(
-    "topic1",
-    rclcpp::QoS(rclcpp::KeepLast(history_depth)).transient_local(), pub_options_ipm_enabled);
-
-  test_msgs::msg::Empty msg;
-  pub_ipm_enabled_transient_local_enabled->publish(msg);
-
-  auto do_nothing = [](std::shared_ptr<const test_msgs::msg::Empty>) {};
-  struct SubscriptionCallback
-  {
-    void callback_fun(size_t) {called.set_value();}
-    std::promise<void> called;
-  };
-  rclcpp::SubscriptionOptions sub_options_ipm_disabled;
-  sub_options_ipm_disabled.use_intra_process_comm = rclcpp::IntraProcessSetting::Disable;
-  SubscriptionCallback intra_callback, inter_callback;
-  std::future<void> intra_callback_future = intra_callback.called.get_future(),
-    inter_callback_future = inter_callback.called.get_future();
-  auto sub_ipm_disabled_transient_local_enabled = node->create_subscription<test_msgs::msg::Empty>(
-    "topic1",
-    rclcpp::QoS(rclcpp::KeepLast(history_depth)).transient_local(),
-    do_nothing, sub_options_ipm_disabled);
-  sub_ipm_disabled_transient_local_enabled->set_on_new_intra_process_message_callback(
-    std::bind(&SubscriptionCallback::callback_fun, &intra_callback, std::placeholders::_1));
-  sub_ipm_disabled_transient_local_enabled->set_on_new_message_callback(
-    std::bind(&SubscriptionCallback::callback_fun, &inter_callback, std::placeholders::_1));
-  rclcpp::executors::SingleThreadedExecutor executor;
-  executor.add_node(node);
-  EXPECT_EQ(executor.spin_until_future_complete(inter_callback_future,
-    std::chrono::milliseconds(100)), rclcpp::FutureReturnCode::SUCCESS);
-  EXPECT_EQ(executor.spin_until_future_complete(intra_callback_future,
-    std::chrono::milliseconds(100)), rclcpp::FutureReturnCode::TIMEOUT);
-}

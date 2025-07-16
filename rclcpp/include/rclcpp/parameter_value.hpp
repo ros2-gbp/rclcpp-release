@@ -24,7 +24,6 @@
 
 #include "rcl_interfaces/msg/parameter_type.hpp"
 #include "rcl_interfaces/msg/parameter_value.hpp"
-#include "rclcpp/exceptions/exceptions.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
@@ -359,7 +358,7 @@ private:
 /// Return the value of a parameter as a string
 RCLCPP_PUBLIC
 std::string
-to_string(const ParameterValue & value);
+to_string(const ParameterValue & type);
 
 }  // namespace rclcpp
 

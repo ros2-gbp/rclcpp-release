@@ -3,207 +3,60 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-29.5.2 (2025-07-07)
--------------------
+16.0.14 (2025-07-16)
+--------------------
 
-29.5.1 (2025-06-23)
--------------------
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2855 <https://github.com/ros2/rclcpp/issues/2855>`_)
+16.0.13 (2025-06-23)
+--------------------
+* Added missing chrono includes (backport `#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2857 <https://github.com/ros2/rclcpp/issues/2857>`_)
+* should pull valid transition before trying to change the state. (backport `#2774 <https://github.com/ros2/rclcpp/issues/2774>`_) (`#2785 <https://github.com/ros2/rclcpp/issues/2785>`_)
 * Contributors: mergify[bot]
 
-29.5.0 (2025-04-18)
+16.0.12 (2025-03-25)
+--------------------
+
+16.0.11 (2024-11-25)
+--------------------
+
+16.0.10 (2024-07-26)
+--------------------
+* revert call shutdown in LifecycleNode destructor (Humble) (`#2560 <https://github.com/ros2/rclcpp/issues/2560>`_)
+* lifecycle node dtor shutdown should be called only in primary state. (`#2544 <https://github.com/ros2/rclcpp/issues/2544>`_)
+* rclcpp::shutdown should not be called before LifecycleNode dtor. (backport `#2527 <https://github.com/ros2/rclcpp/issues/2527>`_) (`#2538 <https://github.com/ros2/rclcpp/issues/2538>`_)
+* Contributors: Tomoya Fujita, mergify[bot]
+
+16.0.9 (2024-05-15)
+-------------------
+* call shutdown in LifecycleNode dtor to avoid leaving the device in un… (`#2450 <https://github.com/ros2/rclcpp/issues/2450>`_) (`#2491 <https://github.com/ros2/rclcpp/issues/2491>`_)
+* Contributors: mergify[bot]
+
+16.0.8 (2024-01-24)
 -------------------
 
-29.4.0 (2025-04-04)
--------------------
-* should pull valid transition before trying to change the state. (`#2774 <https://github.com/ros2/rclcpp/issues/2774>`_)
-* use maybe_unused attribute for the portability. (`#2758 <https://github.com/ros2/rclcpp/issues/2758>`_)
-* Collect log messages from rcl, and reset. (`#2720 <https://github.com/ros2/rclcpp/issues/2720>`_)
-* Contributors: Tomoya Fujita
-
-29.3.0 (2024-12-20)
--------------------
-* Update docstring for `rclcpp::Node::now()` (`#2696 <https://github.com/ros2/rclcpp/issues/2696>`_)
-* Contributors: Patrick Roncagliolo
-
-29.2.0 (2024-11-25)
+16.0.7 (2023-11-13)
 -------------------
 
-29.1.0 (2024-11-20)
+16.0.6 (2023-09-19)
 -------------------
-* Fix error message in rclcpp_lifecycle::State::reset() (`#2647 <https://github.com/ros2/rclcpp/issues/2647>`_)
-* Contributors: Christophe Bedard
+* Switch lifecycle to use the RCLCPP macros Signed-off-by: Tony Najjar <tony.najjar.1997@gmail.com> (`#2234 <https://github.com/ros2/rclcpp/issues/2234>`_)
+* Contributors: Tony Najjar
 
-29.0.0 (2024-10-03)
+16.0.5 (2023-07-17)
 -------------------
-* Shutdown the context before context's destructor is invoked in tests (`#2633 <https://github.com/ros2/rclcpp/issues/2633>`_)
-* LifecycleNode bugfix and add test cases (`#2562 <https://github.com/ros2/rclcpp/issues/2562>`_)
-* Properly test get_service_names_and_types_by_node in rclcpp_lifecycle (`#2599 <https://github.com/ros2/rclcpp/issues/2599>`_)
-* Contributors: Alejandro Hernández Cordero, Christophe Bedard, Tomoya Fujita
+* Fix thread safety in LifecycleNode::get_current_state() for Humble (`#2183 <https://github.com/ros2/rclcpp/issues/2183>`_)
+  * add initially-failing test case
+  * apply changes to LifecycleNodeInterfaceImpl from `#1756 <https://github.com/ros2/rclcpp/issues/1756>`_
+  * add static member to State for managing state_handle\_ access
+  * allow parallel read access in MutexMap
+* Contributors: Joseph Schornak
 
-28.3.3 (2024-07-29)
--------------------
-
-28.3.2 (2024-07-24)
--------------------
-* Removed deprecated methods and classes (`#2575 <https://github.com/ros2/rclcpp/issues/2575>`_)
-* Fix the lifecycle tests on RHEL-9. (`#2583 <https://github.com/ros2/rclcpp/issues/2583>`_)
-  * Fix the lifecycle tests on RHEL-9.
-  The full explanation is in the comment, but basically since
-  RHEL doesn't support mocking_utils::inject_on_return, we have
-  to split out certain tests to make sure resources within a
-  process don't collide.
-  Co-authored-by: Alejandro Hernández Cordero <ahcorde@gmail.com>
-* Contributors: Alejandro Hernández Cordero, Chris Lalancette
-
-28.3.1 (2024-06-25)
+16.0.4 (2023-04-25)
 -------------------
 
-28.3.0 (2024-06-17)
--------------------
-* revert call shutdown in LifecycleNode destructor (`#2557 <https://github.com/ros2/rclcpp/issues/2557>`_)
-* LifecycleNode shutdown on dtor only with valid context. (`#2545 <https://github.com/ros2/rclcpp/issues/2545>`_)
-* call shutdown in LifecycleNode dtor to avoid leaving the device in unknown state (2nd) (`#2528 <https://github.com/ros2/rclcpp/issues/2528>`_)
-* rclcpp::shutdown should not be called before LifecycleNode dtor. (`#2527 <https://github.com/ros2/rclcpp/issues/2527>`_)
-* Revert "call shutdown in LifecycleNode dtor to avoid leaving the device in un… (`#2450 <https://github.com/ros2/rclcpp/issues/2450>`_)" (`#2522 <https://github.com/ros2/rclcpp/issues/2522>`_)
-* Add 'mimick' label to tests which use Mimick (`#2516 <https://github.com/ros2/rclcpp/issues/2516>`_)
-* Contributors: Chris Lalancette, Scott K Logan, Tomoya Fujita
-
-28.2.0 (2024-04-26)
+16.0.3 (2023-01-10)
 -------------------
 
-28.1.0 (2024-04-16)
--------------------
-* Remove references to index.ros.org. (`#2504 <https://github.com/ros2/rclcpp/issues/2504>`_)
-* Contributors: Chris Lalancette
-
-28.0.1 (2024-04-16)
--------------------
-* call shutdown in LifecycleNode dtor to avoid leaving the device in un… (`#2450 <https://github.com/ros2/rclcpp/issues/2450>`_)
-  * call shutdown in LifecycleNode dtor to avoid leaving the device in unknown state.
-  * add test to verify LifecycleNode::shutdown is called on destructor.
-  ---------
-* Contributors: Tomoya Fujita
-
-28.0.0 (2024-03-28)
--------------------
-* Update quality declaration documents (`#2427 <https://github.com/ros2/rclcpp/issues/2427>`_)
-* Contributors: Christophe Bedard
-
-27.0.0 (2024-02-07)
--------------------
-
-26.0.0 (2024-01-24)
--------------------
-* Increase timeout for rclcpp_lifecycle to 360 (`#2395 <https://github.com/ros2/rclcpp/issues/2395>`_)
-* Contributors: Jorge Perez
-
-25.0.0 (2023-12-26)
--------------------
-
-24.0.0 (2023-11-06)
--------------------
-* Fix rclcpp_lifecycle inclusion on Windows. (`#2331 <https://github.com/ros2/rclcpp/issues/2331>`_)
-* Contributors: Chris Lalancette
-
-23.2.0 (2023-10-09)
--------------------
-* add clients & services count (`#2072 <https://github.com/ros2/rclcpp/issues/2072>`_)
-* Contributors: Minju, Lee
-
-23.1.0 (2023-10-04)
--------------------
-
-23.0.0 (2023-09-08)
--------------------
-* Update API docs links in package READMEs (`#2302 <https://github.com/ros2/rclcpp/issues/2302>`_)
-* Contributors: Christophe Bedard
-
-22.2.0 (2023-09-07)
--------------------
-* add logger level service to lifecycle node. (`#2277 <https://github.com/ros2/rclcpp/issues/2277>`_)
-* Contributors: Tomoya Fujita
-
-22.1.0 (2023-08-21)
--------------------
-* Stop using constref signature of benchmark DoNotOptimize. (`#2238 <https://github.com/ros2/rclcpp/issues/2238>`_)
-* Contributors: Chris Lalancette
-
-22.0.0 (2023-07-11)
--------------------
-* Implement get_node_type_descriptions_interface for lifecyclenode and add smoke test for it (`#2237 <https://github.com/ros2/rclcpp/issues/2237>`_)
-* Switch lifecycle to use the RCLCPP macros. (`#2233 <https://github.com/ros2/rclcpp/issues/2233>`_)
-* Add new node interface TypeDescriptionsInterface to provide GetTypeDescription service (`#2224 <https://github.com/ros2/rclcpp/issues/2224>`_)
-* Contributors: Chris Lalancette, Emerson Knapp
-
-21.3.0 (2023-06-12)
--------------------
-
-21.2.0 (2023-06-07)
--------------------
-
-21.1.1 (2023-05-11)
--------------------
-
-21.1.0 (2023-04-27)
--------------------
-
-21.0.0 (2023-04-18)
--------------------
-* Add support for logging service. (`#2122 <https://github.com/ros2/rclcpp/issues/2122>`_)
-* Support publishing loaned messages in LifecyclePublisher (`#2159 <https://github.com/ros2/rclcpp/issues/2159>`_)
-* Contributors: Lei Liu, Michael Babenko
-
-20.0.0 (2023-04-13)
--------------------
-* Fixes to silence some clang warnings. (`#2127 <https://github.com/ros2/rclcpp/issues/2127>`_)
-* Update all rclcpp packages to C++17. (`#2121 <https://github.com/ros2/rclcpp/issues/2121>`_)
-* Use the correct macro for LifecycleNode::get_fully_qualified_name (`#2117 <https://github.com/ros2/rclcpp/issues/2117>`_)
-* add get_fully_qualified_name to rclcpp_lifecycle (`#2115 <https://github.com/ros2/rclcpp/issues/2115>`_)
-* Contributors: Chris Lalancette, Steve Macenski
-
-19.3.0 (2023-03-01)
--------------------
-
-19.2.0 (2023-02-24)
--------------------
-
-19.1.0 (2023-02-14)
--------------------
-
-19.0.0 (2023-01-30)
--------------------
-
-18.0.0 (2022-12-29)
--------------------
-* Implement Unified Node Interface (NodeInterfaces class) (`#2041 <https://github.com/ros2/rclcpp/issues/2041>`_)
-* Add clock type to node_options (`#1982 <https://github.com/ros2/rclcpp/issues/1982>`_)
-* Update maintainers (`#2043 <https://github.com/ros2/rclcpp/issues/2043>`_)
-* Contributors: Audrow Nash, Jeffery Hsu, methylDragon
-
-17.1.0 (2022-11-02)
--------------------
-* LifecycleNode on_configure doc fix. (`#2034 <https://github.com/ros2/rclcpp/issues/2034>`_)
-* Bugfix 20210810 get current state (`#1756 <https://github.com/ros2/rclcpp/issues/1756>`_)
-* Make lifecycle impl get_current_state() const. (`#2031 <https://github.com/ros2/rclcpp/issues/2031>`_)
-* Cleanup the lifecycle implementation (`#2027 <https://github.com/ros2/rclcpp/issues/2027>`_)
-* Cleanup the rclcpp_lifecycle dependencies. (`#2021 <https://github.com/ros2/rclcpp/issues/2021>`_)
-* Contributors: Chris Lalancette, Tomoya Fujita
-
-17.0.0 (2022-09-13)
--------------------
-* Revert "Revert "Add a create_timer method to Node and `LifecycleNode` classes (`#1975 <https://github.com/ros2/rclcpp/issues/1975>`_)" (`#2009 <https://github.com/ros2/rclcpp/issues/2009>`_) (`#2010 <https://github.com/ros2/rclcpp/issues/2010>`_)
-* Revert "Add a `create_timer` method to `Node` and `LifecycleNode` classes (`#1975 <https://github.com/ros2/rclcpp/issues/1975>`_)" (`#2009 <https://github.com/ros2/rclcpp/issues/2009>`_)
-* Add a `create_timer` method to `Node` and `LifecycleNode` classes (`#1975 <https://github.com/ros2/rclcpp/issues/1975>`_)
-* Support pre-set and post-set parameter callbacks in addition to on-set-parameter-callback. (`#1947 <https://github.com/ros2/rclcpp/issues/1947>`_)
-* Make create_service accept rclcpp::QoS (`#1969 <https://github.com/ros2/rclcpp/issues/1969>`_)
-* Make create_client accept rclcpp::QoS (`#1964 <https://github.com/ros2/rclcpp/issues/1964>`_)
-* Contributors: Andrew Symington, Deepanshu Bansal, Ivan Santiago Paunovic, Shane Loretz
-
-16.2.0 (2022-05-03)
--------------------
-
-16.1.0 (2022-04-29)
+16.0.2 (2022-11-07)
 -------------------
 
 16.0.1 (2022-04-13)
