@@ -164,7 +164,7 @@ TEST_F(TestServer, construction_and_destruction_callback_group)
 TEST_F(TestServer, construction_and_destruction_server_init_error)
 {
   auto mock = mocking_utils::patch_and_return(
-    "lib:rclcpp_action", rcl_action_server_init, RCL_RET_ERROR);
+    "lib:rclcpp_action", rcl_action_server_init2, RCL_RET_ERROR);
   auto node = std::make_shared<rclcpp::Node>("construct_node", "/rclcpp_action/construct");
 
   EXPECT_THROW(
@@ -1073,6 +1073,21 @@ protected:
   std::shared_ptr<GoalHandle> goal_handle_;
 };
 
+TEST_F(TestBasicServer, test_configure_introspection)
+{
+  EXPECT_THROW(
+    action_server_->configure_introspection(
+      nullptr, rclcpp::SystemDefaultsQoS(), RCL_SERVICE_INTROSPECTION_CONTENTS),
+      std::invalid_argument);
+
+  EXPECT_NO_THROW(
+    action_server_->configure_introspection(
+      node_->get_clock(), rclcpp::SystemDefaultsQoS(), RCL_SERVICE_INTROSPECTION_CONTENTS));
+
+  // No method was found to make rcl_action_server_configure_action_introspection return
+  // a value other than RCL_RET_OK. mocking_utils::patch_and_return does not work for this function.
+}
+
 class TestGoalRequestServer : public TestBasicServer {};
 
 TEST_F(TestGoalRequestServer, execute_goal_request_received_take_goal)
@@ -1107,12 +1122,15 @@ TEST_F(TestGoalRequestServer, is_ready_rcl_error) {
   {
     EXPECT_EQ(RCL_RET_OK, rcl_wait_set_fini(&wait_set));
   });
-  EXPECT_NO_THROW(action_server_->add_to_wait_set(&wait_set));
+  EXPECT_NO_THROW(action_server_->add_to_wait_set(wait_set));
 
-  EXPECT_TRUE(action_server_->is_ready(&wait_set));
+  EXPECT_TRUE(action_server_->is_ready(wait_set));
+
+  EXPECT_NO_THROW(action_server_->take_data());
+
   auto mock = mocking_utils::patch_and_return(
     "lib:rclcpp_action", rcl_action_server_wait_set_get_entities_ready, RCL_RET_ERROR);
-  EXPECT_THROW(action_server_->is_ready(&wait_set), rclcpp::exceptions::RCLError);
+  EXPECT_THROW(action_server_->is_ready(wait_set), rclcpp::exceptions::RCLError);
 }
 
 TEST_F(TestGoalRequestServer, execute_goal_request_received_take_goal_request_errors)

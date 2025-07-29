@@ -14,6 +14,7 @@
 
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -160,21 +161,57 @@ TEST(TestLogger, set_level) {
   EXPECT_EQ(RCUTILS_RET_OK, rcutils_logging_shutdown());
 }
 
+TEST(TestLogger, get_effective_level) {
+  ASSERT_EQ(RCUTILS_RET_OK, rcutils_logging_initialize());
+
+  rclcpp::Logger logger = rclcpp::get_logger("test_logger");
+  rclcpp::Logger child_logger = rclcpp::get_logger("test_logger.child");
+
+  // set child logger level unset to test effective level
+  child_logger.set_level(rclcpp::Logger::Level::Unset);
+
+  // default
+  EXPECT_EQ(rclcpp::Logger::Level::Info, logger.get_effective_level());
+  EXPECT_EQ(rclcpp::Logger::Level::Info, child_logger.get_effective_level());
+
+  // unset
+  logger.set_level(rclcpp::Logger::Level::Unset);
+  EXPECT_EQ(rclcpp::Logger::Level::Info, logger.get_effective_level());
+  EXPECT_EQ(rclcpp::Logger::Level::Info, child_logger.get_effective_level());
+
+  // debug
+  logger.set_level(rclcpp::Logger::Level::Debug);
+  EXPECT_EQ(rclcpp::Logger::Level::Debug, logger.get_effective_level());
+  EXPECT_EQ(rclcpp::Logger::Level::Debug, child_logger.get_effective_level());
+
+  // info
+  logger.set_level(rclcpp::Logger::Level::Info);
+  EXPECT_EQ(rclcpp::Logger::Level::Info, logger.get_effective_level());
+  EXPECT_EQ(rclcpp::Logger::Level::Info, child_logger.get_effective_level());
+
+  // warn
+  logger.set_level(rclcpp::Logger::Level::Warn);
+  EXPECT_EQ(rclcpp::Logger::Level::Warn, logger.get_effective_level());
+  EXPECT_EQ(rclcpp::Logger::Level::Warn, child_logger.get_effective_level());
+
+  // error
+  logger.set_level(rclcpp::Logger::Level::Error);
+  EXPECT_EQ(rclcpp::Logger::Level::Error, logger.get_effective_level());
+  EXPECT_EQ(rclcpp::Logger::Level::Error, child_logger.get_effective_level());
+
+  // fatal
+  logger.set_level(rclcpp::Logger::Level::Fatal);
+  EXPECT_EQ(rclcpp::Logger::Level::Fatal, logger.get_effective_level());
+  EXPECT_EQ(rclcpp::Logger::Level::Fatal, child_logger.get_effective_level());
+}
+
 TEST(TestLogger, get_logging_directory) {
   ASSERT_EQ(true, rcutils_set_env("HOME", "/fake_home_dir"));
   ASSERT_EQ(true, rcutils_set_env("USERPROFILE", nullptr));
   ASSERT_EQ(true, rcutils_set_env("ROS_LOG_DIR", nullptr));
   ASSERT_EQ(true, rcutils_set_env("ROS_HOME", nullptr));
 
-  auto path = rclcpp::get_logging_directory();
-  auto expected_path = rcpputils::fs::path{"/fake_home_dir"} / ".ros" / "log";
-
-  // TODO(ivanpauno): Add operator== to rcpputils::fs::path
-  auto it = path.cbegin();
-  auto eit = expected_path.cbegin();
-  for (; it != path.cend() && eit != expected_path.cend(); ++it, ++eit) {
-    EXPECT_EQ(*eit, *it);
-  }
-  EXPECT_EQ(it, path.cend());
-  EXPECT_EQ(eit, expected_path.cend());
+  auto path = rclcpp::get_log_directory();
+  auto expected_path = std::filesystem::path{"/fake_home_dir"} / ".ros" / "log";
+  EXPECT_EQ(path, expected_path);
 }
