@@ -14,6 +14,7 @@
 
 #include "rclcpp/context.hpp"
 
+#include <map>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -142,11 +143,52 @@ rclcpp_logging_output_handler(
 }
 }  // extern "C"
 
+/**
+ * Global storage for pre and post shutdown recursive mutexes.
+ * Note, this is a ABI compatibility hack.
+ */
+class MutexLookup
+{
+  std::mutex m;
+
+  struct MutexHolder
+  {
+    std::recursive_mutex on_shutdown_callbacks_mutex_;
+    std::recursive_mutex pre_shutdown_callbacks_mutex_;
+  };
+
+  std::map<const Context *, std::unique_ptr<MutexHolder>> mutexMap;
+
+public:
+  MutexHolder & getMutexes(const Context *forContext)
+  {
+    auto it = mutexMap.find(forContext);
+    if(it == mutexMap.end()) {
+      it = mutexMap.emplace(forContext, std::make_unique<MutexHolder>()).first;
+    }
+
+    return *(it->second);
+  }
+
+  /**
+   * Only supposed to be called on deletion of context
+   */
+  void removeMutexes(const Context *forContext)
+  {
+    mutexMap.erase(forContext);
+  }
+};
+
+MutexLookup mutexStorage;
+
 Context::Context()
 : rcl_context_(nullptr),
   shutdown_reason_(""),
   logging_mutex_(nullptr)
-{}
+{
+  // allocate mutexes
+  mutexStorage.getMutexes(this);
+}
 
 Context::~Context()
 {
@@ -165,6 +207,9 @@ Context::~Context()
   } catch (...) {
     RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "unhandled exception in ~Context()");
   }
+
+  // delete mutexes
+  mutexStorage.removeMutexes(this);
 }
 
 RCLCPP_LOCAL
@@ -212,27 +257,28 @@ Context::init(
   }
   rcl_context_.reset(context, __delete_context);
 
-  try {
-    if (init_options.auto_initialize_logging()) {
-      logging_mutex_ = get_global_logging_mutex();
-      std::lock_guard<std::recursive_mutex> guard(*logging_mutex_);
-      size_t & count = get_logging_reference_count();
-      if (0u == count) {
-        ret = rcl_logging_configure_with_output_handler(
-          &rcl_context_->global_arguments,
-          rcl_init_options_get_allocator(init_options.get_rcl_init_options()),
-          rclcpp_logging_output_handler);
-        if (RCL_RET_OK != ret) {
-          rclcpp::exceptions::throw_from_rcl_error(ret, "failed to configure logging");
-        }
-      } else {
-        RCLCPP_WARN(
-          rclcpp::get_logger("rclcpp"),
-          "logging was initialized more than once");
+  if (init_options.auto_initialize_logging()) {
+    logging_mutex_ = get_global_logging_mutex();
+    std::lock_guard<std::recursive_mutex> guard(*logging_mutex_);
+    size_t & count = get_logging_reference_count();
+    if (0u == count) {
+      ret = rcl_logging_configure_with_output_handler(
+        &rcl_context_->global_arguments,
+        rcl_init_options_get_allocator(init_options.get_rcl_init_options()),
+        rclcpp_logging_output_handler);
+      if (RCL_RET_OK != ret) {
+        rcl_context_.reset();
+        rclcpp::exceptions::throw_from_rcl_error(ret, "failed to configure logging");
       }
-      ++count;
+    } else {
+      RCLCPP_WARN(
+        rclcpp::get_logger("rclcpp"),
+        "logging was initialized more than once");
     }
+    ++count;
+  }
 
+  try {
     std::vector<std::string> unparsed_ros_arguments = detail::get_unparsed_ros_arguments(
       argc, argv, &(rcl_context_->global_arguments), rcl_get_default_allocator());
     if (!unparsed_ros_arguments.empty()) {
@@ -310,7 +356,8 @@ Context::shutdown(const std::string & reason)
 
   // call each pre-shutdown callback
   {
-    std::lock_guard<std::recursive_mutex> lock{pre_shutdown_callbacks_mutex_};
+    std::lock_guard<std::recursive_mutex> lock{mutexStorage.getMutexes(
+        this).pre_shutdown_callbacks_mutex_};
     // callbacks may delete other callbacks during the execution,
     // therefore we need to save a copy and check before execution
     // if the next callback is still present
@@ -332,7 +379,8 @@ Context::shutdown(const std::string & reason)
   shutdown_reason_ = reason;
   // call each shutdown callback
   {
-    std::lock_guard<std::recursive_mutex> lock(on_shutdown_callbacks_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutexStorage.getMutexes(
+      this).on_shutdown_callbacks_mutex_);
     // callbacks may delete other callbacks during the execution,
     // therefore we need to save a copy and check before execution
     // if the next callback is still present
@@ -412,10 +460,12 @@ Context::add_shutdown_callback(
     shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
 
   if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
-    std::lock_guard<std::recursive_mutex> lock(pre_shutdown_callbacks_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutexStorage.getMutexes(
+      this).pre_shutdown_callbacks_mutex_);
     pre_shutdown_callbacks_.emplace_back(callback_shared_ptr);
   } else {
-    std::lock_guard<std::recursive_mutex> lock(on_shutdown_callbacks_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutexStorage.getMutexes(
+      this).on_shutdown_callbacks_mutex_);
     on_shutdown_callbacks_.emplace_back(callback_shared_ptr);
   }
 
@@ -446,6 +496,7 @@ Context::remove_shutdown_callback(
         return false;
       }
       callback_vector.erase(iter);
+
       return true;
     };
 
@@ -453,9 +504,11 @@ Context::remove_shutdown_callback(
     shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
 
   if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
-    return remove_callback(pre_shutdown_callbacks_mutex_, pre_shutdown_callbacks_);
+    return remove_callback(mutexStorage.getMutexes(this).pre_shutdown_callbacks_mutex_,
+      pre_shutdown_callbacks_);
   } else {
-    return remove_callback(on_shutdown_callbacks_mutex_, on_shutdown_callbacks_);
+    return remove_callback(mutexStorage.getMutexes(this).on_shutdown_callbacks_mutex_,
+      on_shutdown_callbacks_);
   }
 }
 
@@ -488,9 +541,11 @@ Context::get_shutdown_callback() const
     shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
 
   if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
-    return get_callback_vector(pre_shutdown_callbacks_mutex_, pre_shutdown_callbacks_);
+    return get_callback_vector(mutexStorage.getMutexes(this).pre_shutdown_callbacks_mutex_,
+      pre_shutdown_callbacks_);
   } else {
-    return get_callback_vector(on_shutdown_callbacks_mutex_, on_shutdown_callbacks_);
+    return get_callback_vector(mutexStorage.getMutexes(this).on_shutdown_callbacks_mutex_,
+      on_shutdown_callbacks_);
   }
 }
 
