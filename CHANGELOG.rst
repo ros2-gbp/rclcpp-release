@@ -2,6 +2,53 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+28.1.11 (2025-08-06)
+--------------------
+* Fix `start_type_description_service` param handling (`#2897 <https://github.com/ros2/rclcpp/issues/2897>`_) (`#2909 <https://github.com/ros2/rclcpp/issues/2909>`_)
+  * Fix `start_type_description_service` param handling
+  * Add test
+  * Demonstrate different exceptions depending on node options
+  * Same exact exception and `what()` message in both cases
+  * Uncrustify
+  ---------
+  (cherry picked from commit 4fb558ae7b2ce7ce9b546e103beaac4f99991e5c)
+  Co-authored-by: Patrick Roncagliolo <ronca.pat@gmail.com>
+* Add qos parameter for wait_for_message function (`#2903 <https://github.com/ros2/rclcpp/issues/2903>`_) (`#2906 <https://github.com/ros2/rclcpp/issues/2906>`_)
+  (cherry picked from commit 2fcef70ea78c2c3a45391e59aebb265c05113050)
+  Co-authored-by: Sriharsha Ghanta <ghanta_sriharsha@mymail.sutd.edu.sg>
+  Co-authored-by: Alejandro Hernandez Cordero <ahcorde@gmail.com>
+* [jazzy] Expose `typesupport_helpers` API needed for the Rosbag2 (backport `#2858 <https://github.com/ros2/rclcpp/issues/2858>`_) (`#2902 <https://github.com/ros2/rclcpp/issues/2902>`_)
+  * Expose `typesupport_helpers` API needed for the Rosbag2 (`#2858 <https://github.com/ros2/rclcpp/issues/2858>`_)
+  * Expose extract_type_identifier and get_typesupport_library_path API
+  - Rationale: We need to use this API in the Rosbag2
+  - Reference PR https://github.com/ros2/rosbag2/pull/2017 in the Rosbag2
+  * Use C++ style in doxygen documentation
+  ---------
+  (cherry picked from commit 448287b1090567181c809e59a3c72eed5ef4c69c)
+  # Conflicts:
+  #	rclcpp/include/rclcpp/typesupport_helpers.hpp
+  * Address merge conflicts
+  ---------
+  Co-authored-by: Michael Orlov <morlovmr@gmail.com>
+* Fujitatomoya/test append parameter override (`#2896 <https://github.com/ros2/rclcpp/issues/2896>`_) (`#2900 <https://github.com/ros2/rclcpp/issues/2900>`_)
+  (cherry picked from commit 84c6fb1cfc945521680a0e1fccf5b32237acbcc3)
+  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
+* Add overload of `append_parameter_override` (`#2891 <https://github.com/ros2/rclcpp/issues/2891>`_) (`#2895 <https://github.com/ros2/rclcpp/issues/2895>`_)
+  (cherry picked from commit fa0cf2da31dfae7c83f185e3bf18cb8fd55f0f57)
+  Co-authored-by: Patrick Roncagliolo <ronca.pat@gmail.com>
+* Event exec timer fix for https://github.com/ros2/rclcpp/issues/2889 (`#2890 <https://github.com/ros2/rclcpp/issues/2890>`_)
+  Co-authored-by: Janosch Machowinski <J.Machowinski@cellumation.com>
+  Co-authored-by: Alejandro Hernández Cordero <ahcorde@gmail.com>
+* Shutdown deadlock fix jazzy (`#2887 <https://github.com/ros2/rclcpp/issues/2887>`_)
+  * fix: Don't deadlock if removing shutdown callbacks in a shutdown callback
+  * refactor: Made fix API compatible
+  ---------
+  Co-authored-by: Janosch Machowinski <J.Machowinski@cellumation.com>
+* fix test_publisher_with_system_default_qos. (`#2881 <https://github.com/ros2/rclcpp/issues/2881>`_) (`#2883 <https://github.com/ros2/rclcpp/issues/2883>`_)
+  (cherry picked from commit e6577c6792f76a74e303cc0c061e89abeb8cb1a6)
+  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
+* Contributors: Janosch Machowinski, mergify[bot]
+
 28.1.10 (2025-06-23)
 --------------------
 * Fix for memory leaks in rclcpp::SerializedMessage (`#2861 <https://github.com/ros2/rclcpp/issues/2861>`_) (`#2864 <https://github.com/ros2/rclcpp/issues/2864>`_)
