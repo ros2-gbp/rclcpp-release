@@ -3,6 +3,9 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+28.1.11 (2025-08-06)
+--------------------
+
 28.1.10 (2025-06-23)
 --------------------
 * Replace std::default_random_engine with std::mt19937 (humble) (`#2847 <https://github.com/ros2/rclcpp/issues/2847>`_) (`#2867 <https://github.com/ros2/rclcpp/issues/2867>`_)
