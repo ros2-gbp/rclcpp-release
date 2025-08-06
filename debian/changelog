@@ -1,0 +1,643 @@
+ros-jazzy-rclcpp-components (28.1.11-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 05 Aug 2025 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.10-1noble) noble; urgency=high
+
+  * Added missing chrono includes (#2854 <https://github.com/ros2/rclcpp/issues/2854>) (#2856 <https://github.com/ros2/rclcpp/issues/2856>)
+  * Contributors: mergify[bot]
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 22 Jun 2025 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.9-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 22 Apr 2025 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.8-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 01 Apr 2025 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.7-1noble) noble; urgency=high
+
+  * add NO_UNDEFINED_SYMBOLS to rclcpp_components_register_node cmake macro (#2746 <https://github.com/ros2/rclcpp/issues/2746>)
+  * Contributors: Jonas Otto
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 25 Mar 2025 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.6-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 17 Dec 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.5-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 18 Sep 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.4-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 05 Sep 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.3-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 26 Jun 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.2-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 12 May 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.1-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 23 Apr 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.1.0-1noble) noble; urgency=high
+
+  * Remove references to index.ros.org. (#2504 <https://github.com/ros2/rclcpp/issues/2504>)
+  * Contributors: Chris Lalancette
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 15 Apr 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.0.1-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 15 Apr 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (28.0.0-1noble) noble; urgency=high
+
+  * Add EXECUTOR docs (#2440 <https://github.com/ros2/rclcpp/issues/2440>)
+  * Update quality declaration documents (#2427 <https://github.com/ros2/rclcpp/issues/2427>)
+  * crash on no class found (#2415 <https://github.com/ros2/rclcpp/issues/2415>)
+    * crash on no class found
+    * error on no class found instead of no callback groups
+    Co-authored-by: Chris Lalancette <mailto:clalancette@gmail.com>
+  * Contributors: Adam Aposhian, Christophe Bedard, Ruddick Lawrence
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 27 Mar 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (27.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 06 Feb 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (26.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 23 Jan 2024 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (25.0.0-1noble) noble; urgency=high
+
+  * Switch to target_link_libraries. (#2374 <https://github.com/ros2/rclcpp/issues/2374>)
+  * feat(rclcpp_components): support events executor in node main template (#2366 <https://github.com/ros2/rclcpp/issues/2366>)
+  * fix(rclcpp_components): increase the service queue sizes in component_container (#2363 <https://github.com/ros2/rclcpp/issues/2363>)
+  * Contributors: Chris Lalancette, Daisuke Nishimatsu, M. Fatih Cırıt
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 25 Dec 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (24.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 05 Nov 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (23.2.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 08 Oct 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (23.1.0-1noble) noble; urgency=high
+
+  * Add missing header required by the rclcpp::NodeOptions type (#2324 <https://github.com/ros2/rclcpp/issues/2324>)
+  * Contributors: Ignacio Vizzo
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 03 Oct 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (23.0.0-1noble) noble; urgency=high
+
+  * Update API docs links in package READMEs (#2302 <https://github.com/ros2/rclcpp/issues/2302>)
+  * Contributors: Christophe Bedard
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 07 Sep 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (22.2.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 06 Sep 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (22.1.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 20 Aug 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (22.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 10 Jul 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (21.3.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 11 Jun 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (21.2.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 06 Jun 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (21.1.1-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 10 May 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (21.1.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 26 Apr 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (21.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 17 Apr 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (20.0.0-1noble) noble; urgency=high
+
+  * Update all rclcpp packages to C++17. (#2121 <https://github.com/ros2/rclcpp/issues/2121>)
+  * Contributors: Chris Lalancette
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 12 Apr 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (19.3.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 28 Feb 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (19.2.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 23 Feb 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (19.1.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 13 Feb 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (19.0.0-1noble) noble; urgency=high
+
+  * Improve component_manager_isolated shutdown (#2085 <https://github.com/ros2/rclcpp/issues/2085>)
+  * Contributors: Michael Carroll
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 29 Jan 2023 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (18.0.0-1noble) noble; urgency=high
+
+  * Update maintainers (#2043 <https://github.com/ros2/rclcpp/issues/2043>)
+  * Contributors: Audrow Nash
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 28 Dec 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (17.1.0-1noble) noble; urgency=high
+
+  * use unique ptr and remove unuseful container (#2013 <https://github.com/ros2/rclcpp/issues/2013>)
+  * Contributors: Chen Lihui
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 01 Nov 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (17.0.0-1noble) noble; urgency=high
+
+  * Revert "Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (#1821 <https://github.com/ros2/rclcpp/issues/1821>) (#1874 <https://github.com/ros2/rclcpp/issues/1874>)" (#1956 <https://github.com/ros2/rclcpp/issues/1956>)
+  * Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (#1821 <https://github.com/ros2/rclcpp/issues/1821>) (#1874 <https://github.com/ros2/rclcpp/issues/1874>)
+  * Contributors: Hubert Liberacki, William Woodall
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 12 Sep 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (16.2.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 02 May 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (16.1.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 28 Apr 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (16.0.1-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 12 Apr 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (16.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 07 Apr 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (15.4.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 04 Apr 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (15.3.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 29 Mar 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (15.2.0-1noble) noble; urgency=high
+
+  * Select executor in node registration (#1898 <https://github.com/ros2/rclcpp/issues/1898>)
+  * Fix rosdoc2 issues in rclcpp (#1897 <https://github.com/ros2/rclcpp/issues/1897>)
+  * Fix bugprone-exception-escape in node_main.cpp.in (#1895 <https://github.com/ros2/rclcpp/issues/1895>)
+  * Contributors: Alberto Soragna, Chris Lalancette, Hirokazu Ishida
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 23 Mar 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (15.1.0-1noble) noble; urgency=high
+
+  * small improvements to node_main.cpp.in
+  * Install headers to include/${PROJECT_NAME} (#1888 <https://github.com/ros2/rclcpp/issues/1888>)
+  * Use spin() in component_manager_isolated.hpp (#1881 <https://github.com/ros2/rclcpp/issues/1881>)
+  * add use_global_arguments for node options of component nodes (#1776 <https://github.com/ros2/rclcpp/issues/1776>)
+  * Contributors: Alberto Soragna, Shane Loretz, gezp
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 28 Feb 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (15.0.0-1noble) noble; urgency=high
+
+  * Add rclcpp_components::component (#1855 <https://github.com/ros2/rclcpp/issues/1855>)
+  * Contributors: Shane Loretz
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 13 Jan 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (14.1.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 04 Jan 2022 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (14.0.0-1noble) noble; urgency=high
+
+  * Add parameter to configure number of thread (#1708 <https://github.com/ros2/rclcpp/issues/1708>)
+  * remove RCLCPP_COMPONENTS_PUBLIC in class ComponentManagerIsolated (#1843 <https://github.com/ros2/rclcpp/issues/1843>)
+  * create component_container_isolated (#1781 <https://github.com/ros2/rclcpp/issues/1781>)
+  * Remove author by request (#1818 <https://github.com/ros2/rclcpp/issues/1818>)
+  * Update maintainers (#1817 <https://github.com/ros2/rclcpp/issues/1817>)
+  * Suppress clang dead-store warnings in the benchmarks. (#1802 <https://github.com/ros2/rclcpp/issues/1802>)
+  * Contributors: Chris Lalancette, Daisuke Nishimatsu, Jacob Perron, gezp
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 16 Dec 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (13.1.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 17 Oct 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (13.0.0-1noble) noble; urgency=high
+
+  * Update client API to be able to remove pending requests. (#1734 <https://github.com/ros2/rclcpp/issues/1734>)
+  * Contributors: Ivan Santiago Paunovic
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 22 Aug 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (12.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 25 Jul 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (11.2.0-1noble) noble; urgency=high
+
+  * Deprecate method names that use CamelCase in rclcpp_components. (#1716 <https://github.com/ros2/rclcpp/issues/1716>)
+  * Contributors: Rebecca Butler
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 20 Jul 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (11.1.0-1noble) noble; urgency=high
+
+  * Added a hook to generate node options in ComponentManager (#1702 <https://github.com/ros2/rclcpp/issues/1702>)
+  * Contributors: Rebecca Butler
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 12 Jul 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (11.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 17 May 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (10.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 10 May 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (9.0.2-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 13 Apr 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (9.0.1-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 11 Apr 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (9.0.0-1noble) noble; urgency=high
+
+  * updating quality declaration links (re: ros2/docs.ros2.org#52 <https://github.com/ros2/docs.ros2.org/issues/52>) (#1615 <https://github.com/ros2/rclcpp/issues/1615>)
+  * Contributors: shonigmann
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 05 Apr 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (8.2.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 30 Mar 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (8.1.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 24 Mar 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (8.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 22 Mar 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (7.0.1-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 21 Mar 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (7.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 17 Mar 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (6.3.1-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 07 Feb 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (6.3.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 24 Jan 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (6.2.0-1noble) noble; urgency=high
+
+  * Use std compliant non-method std::filesystem::exists function (#1502 <https://github.com/ros2/rclcpp/issues/1502>)
+  * Fix string literal warnings (#1442 <https://github.com/ros2/rclcpp/issues/1442>)
+  * Contributors: Audrow Nash, Josh Langsfeld
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 07 Jan 2021 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (6.1.0-1noble) noble; urgency=high
+
+  * Update QDs to QL 1 (#1477 <https://github.com/ros2/rclcpp/issues/1477>)
+  * Add benchmarks for components (#1476 <https://github.com/ros2/rclcpp/issues/1476>)
+  * Contributors: Scott K Logan, Stephen Brawner
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 09 Dec 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (6.0.0-1noble) noble; urgency=high
+
+  * Bump rclcpp packages to Quality Level 2 (#1445 <https://github.com/ros2/rclcpp/issues/1445>)
+  * Contributors: Louise Poubel
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 17 Nov 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (5.1.0-1noble) noble; urgency=high
+
+  * Update maintainers (#1384 <https://github.com/ros2/rclcpp/issues/1384>)
+  * ComponentManager: switch off parameter services and event publisher (#1333 <https://github.com/ros2/rclcpp/issues/1333>)
+  * Contributors: Ivan Santiago Paunovic, Martijn Buijs
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 01 Nov 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (5.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 17 Sep 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (4.0.0-1noble) noble; urgency=high
+
+  * Bump to QD to level 3 and fixed links (#1158 <https://github.com/ros2/rclcpp/issues/1158>)
+  * Include original exception in ComponentManagerException (#1157 <https://github.com/ros2/rclcpp/issues/1157>)
+  * Contributors: Alejandro Hernández Cordero, Martijn Buijs, Tomoya Fujita
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 08 Jul 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (3.0.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 17 Jun 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (2.0.0-1noble) noble; urgency=high
+
+  * Added missing virtual destructors. (#1149 <https://github.com/ros2/rclcpp/issues/1149>)
+  * Add Security Vulnerability Policy pointing to REP-2006. (#1130 <https://github.com/ros2/rclcpp/issues/1130>)
+  * Contributors: Chris Lalancette, Ivan Santiago Paunovic
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 31 May 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (1.1.0-1noble) noble; urgency=high
+
+  * Improve documentation (#1106 <https://github.com/ros2/rclcpp/issues/1106>)
+  * Fixed rep links and added more details to dependencies in quality declaration (#1116 <https://github.com/ros2/rclcpp/issues/1116>)
+  * Added dockblock to ComponentManager class (#1102 <https://github.com/ros2/rclcpp/issues/1102>)
+  * Update quality declaration to reflect version 1.0 (#1115 <https://github.com/ros2/rclcpp/issues/1115>)
+  * Contributors: Alejandro Hernández Cordero, Stephen Brawner
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 25 May 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (1.0.0-1noble) noble; urgency=high
+
+  * Increasing test coverage of rclcpp_components (#1044 <https://github.com/ros2/rclcpp/issues/1044>)
+    * Increasing test coverage of rclcpp_components
+    Signed-off-by: Stephen Brawner <mailto:brawner@gmail.com>
+    * PR fixup
+    Signed-off-by: Stephen Brawner <mailto:brawner@gmail.com>
+    * Fixup
+    Signed-off-by: Stephen Brawner <mailto:brawner@gmail.com>
+    * Removing throws test for now
+    Signed-off-by: Stephen Brawner <mailto:brawner@gmail.com>
+  * Contributors: brawner
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 11 May 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.9.1-1noble) noble; urgency=high
+
+  * Added Quality declaration: rclcpp, rclpp_action, rclcpp_components andrclcpp_lifecycle (#1100 <https://github.com/ros2/rclcpp/issues/1100>)
+  * Contributors: Alejandro Hernández Cordero
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 07 May 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.9.0-1noble) noble; urgency=high
+
+  * Added rclcpp_components Doxyfile (#1091 <https://github.com/ros2/rclcpp/issues/1091>)
+  * Deprecate redundant namespaces (#1083 <https://github.com/ros2/rclcpp/issues/1083>)
+  * Export targets in addition to include directories / libraries (#1088 <https://github.com/ros2/rclcpp/issues/1088>)
+  * Export component manager (#1070 <https://github.com/ros2/rclcpp/issues/1070>)
+  * Install the component_manager library (#1068 <https://github.com/ros2/rclcpp/issues/1068>)
+  * Make Component Manager public (#1065 <https://github.com/ros2/rclcpp/issues/1065>)
+  * Remove absolute path from installed CMake code (#948 <https://github.com/ros2/rclcpp/issues/948>)
+  * Fix function docblock, check for unparsed arguments (#945 <https://github.com/ros2/rclcpp/issues/945>)
+  * Contributors: Alejandro Hernández Cordero, DensoADAS, Dirk Thomas, Jacob Perron, Karsten Knese, Michael Carroll, William Woodall
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 28 Apr 2020 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.8.3-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Mon, 18 Nov 2019 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.8.2-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 17 Nov 2019 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.8.1-1noble) noble; urgency=high
+
+  * Enable intra-process comm via LoadNode request. (#871 <https://github.com/ros2/rclcpp/issues/871>)
+  * Aggregate all component manager API tests. (#876 <https://github.com/ros2/rclcpp/issues/876>)
+  * Contributors: Michel Hidalgo
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 22 Oct 2019 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.8.0-1noble) noble; urgency=high
+
+  * Force explicit --ros-args in NodeOptions::arguments(). (#845 <https://github.com/ros2/rclcpp/issues/845>)
+  * Use of -r/--remap flags where appropriate. (#834 <https://github.com/ros2/rclcpp/issues/834>)
+  * Add line break after first open paren in multiline function call (#785 <https://github.com/ros2/rclcpp/issues/785>)
+  * fix linter issue (#795 <https://github.com/ros2/rclcpp/issues/795>)
+  * Remove non-package from ament_target_dependencies() (#793 <https://github.com/ros2/rclcpp/issues/793>)
+  * fix for multiple nodes not being recognized (#790 <https://github.com/ros2/rclcpp/issues/790>)
+  * Cmake infrastructure for creating components (#784 <https://github.com/ros2/rclcpp/issues/784>)
+  * Contributors: Dan Rose, Michel Hidalgo, Shane Loretz, Siddharth Kucheria
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 25 Sep 2019 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.7.5-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 29 May 2019 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.7.4-1noble) noble; urgency=high
+
+  * Rename parameter options (#745 <https://github.com/ros2/rclcpp/issues/745>)
+  * don't use global arguments for components loaded into the manager (#736 <https://github.com/ros2/rclcpp/issues/736>)
+  * Contributors: Dirk Thomas, William Woodall
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 28 May 2019 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.7.3-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 19 May 2019 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.7.2-1noble) noble; urgency=high
+
+  * Updated to support changes to ``Node::get_node_names()``. (#698 <https://github.com/ros2/rclcpp/issues/698>)
+  * Contributors: jhdcs
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 07 May 2019 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.7.1-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 25 Apr 2019 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.7.0-1noble) noble; urgency=high
+
+  * Introduce rclcpp_components to implement composition (#665 <https://github.com/ros2/rclcpp/issues/665>)
+  * Contributors: Michael Carroll
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sat, 13 Apr 2019 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.6.2-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Tue, 11 Dec 2018 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.6.1-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 05 Dec 2018 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.6.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 18 Nov 2018 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.5.1-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Wed, 27 Jun 2018 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.5.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Sun, 24 Jun 2018 16:00:00 -0000
+
+ros-jazzy-rclcpp-components (0.4.0-1noble) noble; urgency=high
+
+
+
+ -- Ivan Paunovic <ivanpauno@ekumenlabs.com>  Thu, 07 Dec 2017 16:00:00 -0000
+
+
