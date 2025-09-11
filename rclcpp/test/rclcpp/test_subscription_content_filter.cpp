@@ -30,7 +30,14 @@
 
 #include "test_msgs/msg/basic_types.hpp"
 
-class TestContentFilterSubscription : public ::testing::Test
+#ifdef RMW_IMPLEMENTATION
+# define CLASSNAME_(NAME, SUFFIX) NAME ## __ ## SUFFIX
+# define CLASSNAME(NAME, SUFFIX) CLASSNAME_(NAME, SUFFIX)
+#else
+# define CLASSNAME(NAME, SUFFIX) NAME
+#endif
+
+class CLASSNAME (TestContentFilterSubscription, RMW_IMPLEMENTATION) : public ::testing::Test
 {
 public:
   static void SetUpTestCase()
@@ -69,13 +76,11 @@ public:
   {
     using clock = std::chrono::system_clock;
     auto start = clock::now();
-    rclcpp::executors::SingleThreadedExecutor executor;
-    executor.add_node(node);
     while (!condition()) {
       if ((clock::now() - start) > timeout) {
         return false;
       }
-      executor.spin_some();
+      rclcpp::spin_some(node);
     }
     return true;
   }
@@ -108,8 +113,7 @@ bool operator==(const test_msgs::msg::BasicTypes & m1, const test_msgs::msg::Bas
          m1.uint64_value == m2.uint64_value;
 }
 
-TEST_F(TestContentFilterSubscription, is_cft_enabled)
-{
+TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), is_cft_enabled) {
   {
     auto mock = mocking_utils::patch_and_return(
       "lib:rclcpp", rcl_subscription_is_cft_enabled, false);
@@ -123,8 +127,7 @@ TEST_F(TestContentFilterSubscription, is_cft_enabled)
   }
 }
 
-TEST_F(TestContentFilterSubscription, get_content_filter_error)
-{
+TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), get_content_filter_error) {
   auto mock = mocking_utils::patch_and_return(
     "lib:rclcpp", rcl_subscription_get_content_filter, RCL_RET_ERROR);
 
@@ -134,8 +137,7 @@ TEST_F(TestContentFilterSubscription, get_content_filter_error)
     rclcpp::exceptions::RCLError);
 }
 
-TEST_F(TestContentFilterSubscription, set_content_filter_error)
-{
+TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), set_content_filter_error) {
   auto mock = mocking_utils::patch_and_return(
     "lib:rclcpp", rcl_subscription_set_content_filter, RCL_RET_ERROR);
 
@@ -146,8 +148,7 @@ TEST_F(TestContentFilterSubscription, set_content_filter_error)
     rclcpp::exceptions::RCLError);
 }
 
-TEST_F(TestContentFilterSubscription, get_content_filter)
-{
+TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), get_content_filter) {
   rclcpp::ContentFilterOptions options;
 
   if (sub->is_cft_enabled()) {
@@ -163,8 +164,7 @@ TEST_F(TestContentFilterSubscription, get_content_filter)
   }
 }
 
-TEST_F(TestContentFilterSubscription, set_content_filter)
-{
+TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), set_content_filter) {
   if (sub->is_cft_enabled()) {
     EXPECT_NO_THROW(
       sub->set_content_filter(filter_expression_init, expression_parameters_2));
@@ -175,13 +175,7 @@ TEST_F(TestContentFilterSubscription, set_content_filter)
   }
 }
 
-TEST_F(TestContentFilterSubscription, content_filter_get_begin)
-{
-  std::string rmw_implementation_str = std::string(rmw_get_implementation_identifier());
-  if (rmw_implementation_str == "rmw_zenoh_cpp") {
-    GTEST_SKIP();
-  }
-
+TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), content_filter_get_begin) {
   using namespace std::chrono_literals;
   {
     test_msgs::msg::BasicTypes msg;
@@ -223,13 +217,7 @@ TEST_F(TestContentFilterSubscription, content_filter_get_begin)
   }
 }
 
-TEST_F(TestContentFilterSubscription, content_filter_get_later)
-{
-  std::string rmw_implementation_str = std::string(rmw_get_implementation_identifier());
-  if (rmw_implementation_str == "rmw_zenoh_cpp") {
-    GTEST_SKIP();
-  }
-
+TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), content_filter_get_later) {
   using namespace std::chrono_literals;
   {
     test_msgs::msg::BasicTypes msg;
@@ -276,13 +264,7 @@ TEST_F(TestContentFilterSubscription, content_filter_get_later)
   }
 }
 
-TEST_F(TestContentFilterSubscription, content_filter_reset)
-{
-  std::string rmw_implementation_str = std::string(rmw_get_implementation_identifier());
-  if (rmw_implementation_str == "rmw_zenoh_cpp") {
-    GTEST_SKIP();
-  }
-
+TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), content_filter_reset) {
   using namespace std::chrono_literals;
   {
     test_msgs::msg::BasicTypes msg;
@@ -329,8 +311,11 @@ TEST_F(TestContentFilterSubscription, content_filter_reset)
   }
 }
 
-TEST_F(TestContentFilterSubscription, create_two_content_filters_with_same_topic_name_and_destroy)
-{
+TEST_F(
+  CLASSNAME(
+    TestContentFilterSubscription,
+    RMW_IMPLEMENTATION), create_two_content_filters_with_same_topic_name_and_destroy) {
+
   // Create another content filter
   auto options = rclcpp::SubscriptionOptions();
 

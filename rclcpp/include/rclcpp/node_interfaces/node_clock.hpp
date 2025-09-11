@@ -15,7 +15,6 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_CLOCK_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_CLOCK_HPP_
 
-#include "rcl/time.h"
 #include "rclcpp/clock.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
@@ -43,8 +42,7 @@ public:
     rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics,
     rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph,
     rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services,
-    rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr node_logging,
-    rcl_clock_type_t clock_type);
+    rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr node_logging);
 
   RCLCPP_PUBLIC
   virtual
@@ -69,7 +67,7 @@ private:
   rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services_;
   rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr node_logging_;
 
-  rclcpp::Clock::SharedPtr clock_;
+  rclcpp::Clock::SharedPtr ros_clock_;
 };
 
 }  // namespace node_interfaces
