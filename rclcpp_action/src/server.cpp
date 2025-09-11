@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <inttypes.h>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -20,6 +21,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <deque>
 
 #include "rcl_action/action_server.h"
 #include "rcl_action/wait.h"
@@ -27,7 +29,6 @@
 #include "rcpputils/scope_exit.hpp"
 
 #include "action_msgs/msg/goal_status_array.hpp"
-#include "action_msgs/srv/cancel_goal.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp_action/server.hpp"
 
@@ -70,14 +71,6 @@ struct ServerBaseData
   : data(std::move(data_in)) {}
 };
 
-enum class ActionEventType : std::size_t
-{
-  GoalService,
-  ResultService,
-  CancelService,
-  Expired,
-};
-
 class ServerBaseImpl
 {
 public:
@@ -87,6 +80,146 @@ public:
   )
   : clock_(clock), logger_(logger)
   {
+  }
+
+  ~ServerBaseImpl()
+  {
+    stop_expire_thread();
+  }
+
+  std::recursive_mutex expire_thread_reentrant_mutex_;
+  std::thread expire_thread;
+
+  // must be a class member, so keep it in scope
+  std::function<void(size_t)> expire_reset_callback;
+
+  rclcpp::ClockConditionalVariable::SharedPtr expire_cv;
+  std::atomic<bool> expire_time_changed = false;
+  std::atomic<bool> terminate_expire_thread = true;
+
+  void
+  stop_expire_thread()
+  {
+    std::lock_guard<std::recursive_mutex> lock(expire_thread_reentrant_mutex_);
+    if(expire_cv) {
+      {
+        // Note, even though terminate_expire_thread is an atomic, we
+        // need to acquire the mutex, to avoid a race between the wait_until
+        // and the setting of this terminate_expire_thread
+        std::lock_guard<std::mutex> l(expire_cv->mutex());
+        terminate_expire_thread = true;
+      }
+      expire_cv->notify_one();
+      expire_thread.join();
+      expire_reset_callback = std::function<void(size_t)>();
+      expire_cv.reset();
+    }
+  }
+
+  void
+  start_expire_thread(std::function<void(size_t, int)> expire_ready_cb)
+  {
+    {
+      std::lock_guard<std::recursive_mutex> lock(expire_thread_reentrant_mutex_);
+      if(expire_cv) {
+        return;
+      }
+
+      terminate_expire_thread = false;
+      expire_cv = std::make_shared<rclcpp::ClockConditionalVariable>(clock_);
+    }
+
+    rclcpp::Context::SharedPtr context = rclcpp::contexts::get_global_default_context();
+    std::shared_ptr<rcl_context_t> rcl_context = context->get_rcl_context();
+
+    rcl_wait_set_t wait_set = rcl_get_zero_initialized_wait_set();
+    rcl_ret_t ret =
+      rcl_wait_set_init(&wait_set, num_subscriptions_, num_guard_conditions_, num_timers_,
+        num_clients_, num_services_, 0, rcl_context.get(), rcl_get_default_allocator());
+    if(ret != RCL_RET_OK) {
+      throw std::runtime_error("Internal error starting timer thread");
+    }
+
+    ret = rcl_action_wait_set_add_action_server(
+      &wait_set, action_server_.get(), NULL);
+    if (RCL_RET_OK != ret) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "ServerBase::add_to_wait_set() failed");
+    }
+
+    // extract the timer from the wait set
+    const rcl_timer_t *expire_timer = wait_set.timers[0];
+
+    // don't need the wait set any more
+    ret = rcl_wait_set_fini(&wait_set);
+
+    // the maybe_unused is needed here to satisfy cpplint
+    expire_reset_callback = [this] ([[maybe_unused]] size_t reset_calls)
+      {
+        {
+          std::lock_guard<std::mutex> l(expire_cv->mutex());
+          expire_time_changed = true;
+        }
+        expire_cv->notify_one();
+      };
+
+    rcl_event_callback_t rcl_reset_callback = rclcpp::detail::cpp_callback_trampoline<
+      decltype(expire_reset_callback), const void *, size_t>;
+
+    ret = rcl_timer_set_on_reset_callback(expire_timer, rcl_reset_callback,
+        static_cast<const void *>(&expire_reset_callback));
+    if (ret != RCL_RET_OK) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "Failed to set timer on reset callback");
+    }
+
+    expire_thread = std::thread([this, expire_timer, expire_ready_callback = expire_ready_cb]() {
+          rcl_clock_type_t clock_type = clock_->get_clock_type();
+
+          while(!terminate_expire_thread) {
+            {
+              std::unique_lock<std::mutex> l(expire_cv->mutex());
+
+              // reset to false, we are handling the time change right now
+              expire_time_changed = false;
+              int64_t time_until_call = 0;
+
+              auto ret2 = rcl_timer_get_time_until_next_call(expire_timer, &time_until_call);
+              if (ret2 == RCL_RET_TIMER_CANCELED) {
+                rclcpp::Duration endless(std::chrono::hours(100));
+                expire_cv->wait_until(l, clock_->now() + endless, [this] () -> bool {
+                  return expire_time_changed || terminate_expire_thread;
+                });
+                continue;
+              }
+
+              if(time_until_call > 0) {
+                rclcpp::Time next_wakeup(clock_->now().nanoseconds() + time_until_call, clock_type);
+                expire_cv->wait_until(l, next_wakeup, [this] () -> bool {
+                  return expire_time_changed || terminate_expire_thread;
+                });
+              }
+            }
+
+            // don't call expire callback if we are terminating
+            if(terminate_expire_thread) {
+              return;
+            }
+
+            bool is_ready = false;
+            if(rcl_timer_is_ready(expire_timer, &is_ready) == RCL_RET_OK && is_ready) {
+              // we need to cancel the timer here, to avoid a endless loop
+              // in case a new goal expires, the timer will be reset.
+              auto ret2 = rcl_timer_cancel(const_cast<rcl_timer_t *>(expire_timer));
+              if(ret2 != RCL_RET_OK) {
+                rclcpp::exceptions::throw_from_rcl_error(ret2, "Failed to cancel timer");
+              }
+
+              std::lock_guard<std::recursive_mutex> lock(expire_thread_reentrant_mutex_);
+              if(expire_ready_callback) {
+                expire_ready_callback(1, static_cast<int>(ServerBase::EntityType::Expired));
+              }
+            }
+          }
+      });
   }
 
   // Lock for action_server_
@@ -113,11 +246,8 @@ public:
   // rcl goal handles are kept so api to send result doesn't try to access freed memory
   std::unordered_map<GoalUUID, std::shared_ptr<rcl_action_goal_handle_t>> goal_handles_;
 
-
   // next ready event for taking, will be set by is_ready and will be processed by take_data
   std::atomic<size_t> next_ready_event;
-  // used to indicate that next_ready_event has no ready event for processing
-  static constexpr size_t NO_EVENT_READY = std::numeric_limits<size_t>::max();
 
   rclcpp::Logger logger_;
 };
@@ -177,7 +307,6 @@ ServerBase::ServerBase(
 
 ServerBase::~ServerBase()
 {
-  clear_on_ready_callback();
 }
 
 size_t
@@ -211,18 +340,18 @@ ServerBase::get_number_of_ready_guard_conditions()
 }
 
 void
-ServerBase::add_to_wait_set(rcl_wait_set_t * wait_set)
+ServerBase::add_to_wait_set(rcl_wait_set_t & wait_set)
 {
   std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
   rcl_ret_t ret = rcl_action_wait_set_add_action_server(
-    wait_set, pimpl_->action_server_.get(), NULL);
+    &wait_set, pimpl_->action_server_.get(), NULL);
   if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret, "ServerBase::add_to_wait_set() failed");
   }
 }
 
 bool
-ServerBase::is_ready(rcl_wait_set_t * wait_set)
+ServerBase::is_ready(const rcl_wait_set_t & wait_set)
 {
   bool goal_request_ready;
   bool cancel_request_ready;
@@ -232,7 +361,7 @@ ServerBase::is_ready(rcl_wait_set_t * wait_set)
   {
     std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
     ret = rcl_action_server_wait_set_get_entities_ready(
-      wait_set,
+      &wait_set,
       pimpl_->action_server_.get(),
       &goal_request_ready,
       &cancel_request_ready,
@@ -244,25 +373,25 @@ ServerBase::is_ready(rcl_wait_set_t * wait_set)
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
 
-  pimpl_->next_ready_event = ServerBaseImpl::NO_EVENT_READY;
+  pimpl_->next_ready_event = std::numeric_limits<uint32_t>::max();
 
   if (goal_request_ready) {
-    pimpl_->next_ready_event = static_cast<uint32_t>(ActionEventType::GoalService);
+    pimpl_->next_ready_event = static_cast<uint32_t>(EntityType::GoalService);
     return true;
   }
 
   if (cancel_request_ready) {
-    pimpl_->next_ready_event = static_cast<uint32_t>(ActionEventType::CancelService);
+    pimpl_->next_ready_event = static_cast<uint32_t>(EntityType::CancelService);
     return true;
   }
 
   if (result_request_ready) {
-    pimpl_->next_ready_event = static_cast<uint32_t>(ActionEventType::ResultService);
+    pimpl_->next_ready_event = static_cast<uint32_t>(EntityType::ResultService);
     return true;
   }
 
   if (goal_expired) {
-    pimpl_->next_ready_event = static_cast<uint32_t>(ActionEventType::Expired);
+    pimpl_->next_ready_event = static_cast<uint32_t>(EntityType::Expired);
     return true;
   }
 
@@ -272,10 +401,10 @@ ServerBase::is_ready(rcl_wait_set_t * wait_set)
 std::shared_ptr<void>
 ServerBase::take_data()
 {
-  size_t next_ready_event = pimpl_->next_ready_event.exchange(ServerBaseImpl::NO_EVENT_READY);
+  size_t next_ready_event = pimpl_->next_ready_event.exchange(std::numeric_limits<uint32_t>::max());
 
-  if (next_ready_event == ServerBaseImpl::NO_EVENT_READY) {
-    throw std::runtime_error("Taking data from action server but no ready event");
+  if (next_ready_event == std::numeric_limits<uint32_t>::max()) {
+    throw std::runtime_error("ServerBase::take_data() called but no data is ready");
   }
 
   return take_data_by_entity_id(next_ready_event);
@@ -284,20 +413,10 @@ ServerBase::take_data()
 std::shared_ptr<void>
 ServerBase::take_data_by_entity_id(size_t id)
 {
-  static_assert(
-    static_cast<size_t>(EntityType::GoalService) ==
-    static_cast<size_t>(ActionEventType::GoalService));
-  static_assert(
-    static_cast<size_t>(EntityType::ResultService) ==
-    static_cast<size_t>(ActionEventType::ResultService));
-  static_assert(
-    static_cast<size_t>(EntityType::CancelService) ==
-    static_cast<size_t>(ActionEventType::CancelService));
-
   std::shared_ptr<ServerBaseData> data_ptr;
   // Mark as ready the entity from which we want to take data
-  switch (static_cast<ActionEventType>(id)) {
-    case ActionEventType::GoalService:
+  switch (static_cast<EntityType>(id)) {
+    case EntityType::GoalService:
       {
         rcl_ret_t ret;
         rcl_action_goal_info_t goal_info = rcl_action_get_zero_initialized_goal_info();
@@ -315,7 +434,7 @@ ServerBase::take_data_by_entity_id(size_t id)
           ServerBaseData::GoalRequestData(ret, goal_info, request_header, message));
       }
       break;
-    case ActionEventType::ResultService:
+    case EntityType::ResultService:
       {
         rcl_ret_t ret;
         // Get the result request message
@@ -330,7 +449,7 @@ ServerBase::take_data_by_entity_id(size_t id)
           ServerBaseData::ResultRequestData(ret, result_request, request_header));
       }
       break;
-    case ActionEventType::CancelService:
+    case EntityType::CancelService:
       {
         rcl_ret_t ret;
         rmw_request_id_t request_header;
@@ -349,7 +468,7 @@ ServerBase::take_data_by_entity_id(size_t id)
           ServerBaseData::CancelRequestData(ret, request, request_header));
       }
       break;
-    case ActionEventType::Expired:
+    case EntityType::Expired:
       {
         data_ptr =
           std::make_shared<ServerBaseData>(ServerBaseData::GoalExpiredData());
@@ -361,10 +480,10 @@ ServerBase::take_data_by_entity_id(size_t id)
 }
 
 void
-ServerBase::execute(std::shared_ptr<void> & data_in)
+ServerBase::execute(const std::shared_ptr<void> & data_in)
 {
   if (!data_in) {
-    throw std::runtime_error("Executing action server but 'data' is empty");
+    throw std::runtime_error("ServerBase::execute: give data pointer was null");
   }
 
   std::shared_ptr<ServerBaseData> data_ptr = std::static_pointer_cast<ServerBaseData>(data_in);
@@ -373,13 +492,15 @@ ServerBase::execute(std::shared_ptr<void> & data_in)
     [&](auto && data) -> void {
       using T = std::decay_t<decltype(data)>;
       if constexpr (std::is_same_v<T, ServerBaseData::GoalRequestData>) {
-        execute_goal_request_received(data_in);
+        execute_goal_request_received(
+          std::get<0>(data), std::get<1>(data), std::get<2>(data),
+          std::get<3>(data));
       }
       if constexpr (std::is_same_v<T, ServerBaseData::CancelRequestData>) {
-        execute_cancel_request_received(data_in);
+        execute_cancel_request_received(std::get<0>(data), std::get<1>(data), std::get<2>(data));
       }
       if constexpr (std::is_same_v<T, ServerBaseData::ResultRequestData>) {
-        execute_result_request_received(data_in);
+        execute_result_request_received(std::get<0>(data), std::get<1>(data), std::get<2>(data));
       }
       if constexpr (std::is_same_v<T, ServerBaseData::GoalExpiredData>) {
         execute_check_expired_goals();
@@ -389,17 +510,12 @@ ServerBase::execute(std::shared_ptr<void> & data_in)
 }
 
 void
-ServerBase::execute_goal_request_received(std::shared_ptr<void> & data)
+ServerBase::execute_goal_request_received(
+  rcl_ret_t ret,
+  rcl_action_goal_info_t goal_info,
+  rmw_request_id_t request_header,
+  const std::shared_ptr<void> message)
 {
-  std::shared_ptr<ServerBaseData> data_ptr = std::static_pointer_cast<ServerBaseData>(data);
-  const ServerBaseData::GoalRequestData & gData(
-    std::get<ServerBaseData::GoalRequestData>(data_ptr->data));
-
-  rcl_ret_t ret = std::get<0>(gData);
-  rcl_action_goal_info_t goal_info = std::get<1>(gData);
-  rmw_request_id_t request_header = std::get<2>(gData);
-  const std::shared_ptr<void> message = std::get<3>(gData);
-
   if (RCL_RET_ACTION_SERVER_TAKE_FAILED == ret) {
     // Ignore take failure because connext fails if it receives a sample without valid data.
     // This happens when a client shuts down and connext receives a sample saying the client is
@@ -485,21 +601,14 @@ ServerBase::execute_goal_request_received(std::shared_ptr<void> & data)
     // Tell user to start executing action
     call_goal_accepted_callback(handle, uuid, message);
   }
-  data.reset();
 }
 
 void
-ServerBase::execute_cancel_request_received(std::shared_ptr<void> & data)
+ServerBase::execute_cancel_request_received(
+  rcl_ret_t ret,
+  std::shared_ptr<action_msgs::srv::CancelGoal::Request> request,
+  rmw_request_id_t request_header)
 {
-  std::shared_ptr<ServerBaseData> data_ptr = std::static_pointer_cast<ServerBaseData>(data);
-  const ServerBaseData::CancelRequestData & gData(
-    std::get<ServerBaseData::CancelRequestData>(data_ptr->data));
-
-  rcl_ret_t ret = std::get<0>(gData);
-  std::shared_ptr<action_msgs::srv::CancelGoal::Request> request = std::get<1>(gData);
-  rmw_request_id_t request_header = std::get<2>(gData);
-
-
   if (RCL_RET_ACTION_SERVER_TAKE_FAILED == ret) {
     // Ignore take failure because connext fails if it receives a sample without valid data.
     // This happens when a client shuts down and connext receives a sample saying the client is
@@ -586,20 +695,14 @@ ServerBase::execute_cancel_request_received(std::shared_ptr<void> & data)
   if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret);
   }
-  data.reset();
 }
 
 void
-ServerBase::execute_result_request_received(std::shared_ptr<void> & data)
+ServerBase::execute_result_request_received(
+  rcl_ret_t ret,
+  std::shared_ptr<void> result_request,
+  rmw_request_id_t request_header)
 {
-  std::shared_ptr<ServerBaseData> data_ptr = std::static_pointer_cast<ServerBaseData>(data);
-  const ServerBaseData::ResultRequestData & gData(
-    std::get<ServerBaseData::ResultRequestData>(data_ptr->data));
-
-  rcl_ret_t ret = std::get<0>(gData);
-  std::shared_ptr<void> result_request = std::get<1>(gData);
-  rmw_request_id_t request_header = std::get<2>(gData);
-
   if (RCL_RET_ACTION_SERVER_TAKE_FAILED == ret) {
     // Ignore take failure because connext fails if it receives a sample without valid data.
     // This happens when a client shuts down and connext receives a sample saying the client is
@@ -652,7 +755,6 @@ ServerBase::execute_result_request_received(std::shared_ptr<void> & data)
       rclcpp::exceptions::throw_from_rcl_error(rcl_ret);
     }
   }
-  data.reset();
 }
 
 void
@@ -824,6 +926,8 @@ ServerBase::set_on_ready_callback(std::function<void(size_t, int)> callback)
             "is not callable.");
   }
 
+  pimpl_->start_expire_thread(callback);
+
   set_callback_to_entity(EntityType::GoalService, callback);
   set_callback_to_entity(EntityType::ResultService, callback);
   set_callback_to_entity(EntityType::CancelService, callback);
@@ -861,7 +965,7 @@ ServerBase::set_callback_to_entity(
   // been replaced but the middleware hasn't been told about the new one yet.
   set_on_ready_callback(
     entity_type,
-    rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
+    rclcpp::detail::cpp_callback_trampoline<decltype(new_callback), const void *, size_t>,
     static_cast<const void *>(&new_callback));
 
   std::lock_guard<std::recursive_mutex> lock(listener_mutex_);
@@ -881,7 +985,7 @@ ServerBase::set_callback_to_entity(
     auto & cb = it->second;
     set_on_ready_callback(
       entity_type,
-      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
+      rclcpp::detail::cpp_callback_trampoline<decltype(it->second), const void *, size_t>,
       static_cast<const void *>(&cb));
   }
 
@@ -944,6 +1048,7 @@ ServerBase::clear_on_ready_callback()
     set_on_ready_callback(EntityType::GoalService, nullptr, nullptr);
     set_on_ready_callback(EntityType::ResultService, nullptr, nullptr);
     set_on_ready_callback(EntityType::CancelService, nullptr, nullptr);
+    pimpl_->stop_expire_thread();
     on_ready_callback_set_ = false;
   }
 

@@ -23,16 +23,17 @@ namespace rclcpp
 {
 
 GuardCondition::GuardCondition(
-  rclcpp::Context::SharedPtr context,
+  const rclcpp::Context::SharedPtr & context,
   rcl_guard_condition_options_t guard_condition_options)
-: context_(context), rcl_guard_condition_{rcl_get_zero_initialized_guard_condition()}
+: rcl_guard_condition_{rcl_get_zero_initialized_guard_condition()}
 {
-  if (!context_) {
+  if (!context) {
     throw std::invalid_argument("context argument unexpectedly nullptr");
   }
+
   rcl_ret_t ret = rcl_guard_condition_init(
     &this->rcl_guard_condition_,
-    context_->get_rcl_context().get(),
+    context->get_rcl_context().get(),
     guard_condition_options);
   if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret, "failed to create guard condition");
@@ -53,12 +54,6 @@ GuardCondition::~GuardCondition()
   }
 }
 
-rclcpp::Context::SharedPtr
-GuardCondition::get_context() const
-{
-  return context_;
-}
-
 rcl_guard_condition_t &
 GuardCondition::get_rcl_guard_condition()
 {
@@ -74,16 +69,19 @@ GuardCondition::get_rcl_guard_condition() const
 void
 GuardCondition::trigger()
 {
-  std::lock_guard<std::recursive_mutex> lock(reentrant_mutex_);
+  rcl_ret_t ret = rcl_trigger_guard_condition(&rcl_guard_condition_);
+  if (RCL_RET_OK != ret) {
+    rclcpp::exceptions::throw_from_rcl_error(ret);
+  }
 
-  if (on_trigger_callback_) {
-    on_trigger_callback_(1);
-  } else {
-    rcl_ret_t ret = rcl_trigger_guard_condition(&rcl_guard_condition_);
-    if (RCL_RET_OK != ret) {
-      rclcpp::exceptions::throw_from_rcl_error(ret);
+  {
+    std::lock_guard<std::recursive_mutex> lock(reentrant_mutex_);
+
+    if (on_trigger_callback_) {
+      on_trigger_callback_(1);
+    } else {
+      unread_count_++;
     }
-    unread_count_++;
   }
 }
 
@@ -94,19 +92,19 @@ GuardCondition::exchange_in_use_by_wait_set_state(bool in_use_state)
 }
 
 void
-GuardCondition::add_to_wait_set(rcl_wait_set_t * wait_set)
+GuardCondition::add_to_wait_set(rcl_wait_set_t & wait_set)
 {
   std::lock_guard<std::recursive_mutex> lock(reentrant_mutex_);
 
   if (exchange_in_use_by_wait_set_state(true)) {
-    if (wait_set != wait_set_) {
+    if (&wait_set != wait_set_) {
       throw std::runtime_error("guard condition has already been added to a wait set.");
     }
   } else {
-    wait_set_ = wait_set;
+    wait_set_ = &wait_set;
   }
 
-  rcl_ret_t ret = rcl_wait_set_add_guard_condition(wait_set, &this->rcl_guard_condition_, NULL);
+  rcl_ret_t ret = rcl_wait_set_add_guard_condition(&wait_set, &this->rcl_guard_condition_, NULL);
   if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(
       ret, "failed to add guard condition to wait set");
@@ -125,10 +123,9 @@ GuardCondition::set_on_trigger_callback(std::function<void(size_t)> callback)
       callback(unread_count_);
       unread_count_ = 0;
     }
-    return;
+  } else {
+    on_trigger_callback_ = nullptr;
   }
-
-  on_trigger_callback_ = nullptr;
 }
 
 }  // namespace rclcpp
