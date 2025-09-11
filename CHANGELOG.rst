@@ -2,6 +2,14 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+16.0.15 (2025-09-11)
+--------------------
+* Allow for implicitly convertable loggers as well (`#2922 <https://github.com/ros2/rclcpp/issues/2922>`_) (`#2936 <https://github.com/ros2/rclcpp/issues/2936>`_) (`#2938 <https://github.com/ros2/rclcpp/issues/2938>`_)
+* Fix: improve exception context for parameter_value_from (backport `#2917 <https://github.com/ros2/rclcpp/issues/2917>`_) (`#2921 <https://github.com/ros2/rclcpp/issues/2921>`_)
+* Removed warning test_qos (`#2859 <https://github.com/ros2/rclcpp/issues/2859>`_) (`#2925 <https://github.com/ros2/rclcpp/issues/2925>`_)
+* Add qos parameter for wait_for_message function (`#2903 <https://github.com/ros2/rclcpp/issues/2903>`_) (`#2907 <https://github.com/ros2/rclcpp/issues/2907>`_)
+* Contributors: mergify[bot]
+
 16.0.14 (2025-07-16)
 --------------------
 * fix test_publisher_with_system_default_qos. (backport `#2881 <https://github.com/ros2/rclcpp/issues/2881>`_) (`#2882 <https://github.com/ros2/rclcpp/issues/2882>`_)
