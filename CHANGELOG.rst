@@ -2,6 +2,13 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+28.1.12 (2025-09-11)
+--------------------
+* Removed warning test_qos (`#2859 <https://github.com/ros2/rclcpp/issues/2859>`_) (`#2945 <https://github.com/ros2/rclcpp/issues/2945>`_)
+* Allow for implicitly convertable loggers as well (`#2922 <https://github.com/ros2/rclcpp/issues/2922>`_) (`#2936 <https://github.com/ros2/rclcpp/issues/2936>`_) (`#2937 <https://github.com/ros2/rclcpp/issues/2937>`_)
+* Fix: improve exception context for parameter_value_from (`#2917 <https://github.com/ros2/rclcpp/issues/2917>`_) (`#2920 <https://github.com/ros2/rclcpp/issues/2920>`_)
+* Contributors: mergify[bot]
+
 28.1.11 (2025-08-06)
 --------------------
 * Fix `start_type_description_service` param handling (`#2897 <https://github.com/ros2/rclcpp/issues/2897>`_) (`#2909 <https://github.com/ros2/rclcpp/issues/2909>`_)
