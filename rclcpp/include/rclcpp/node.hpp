@@ -44,6 +44,7 @@
 #include "rclcpp/event.hpp"
 #include "rclcpp/generic_client.hpp"
 #include "rclcpp/generic_publisher.hpp"
+#include "rclcpp/generic_service.hpp"
 #include "rclcpp/generic_subscription.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/macros.hpp"
@@ -259,22 +260,6 @@ public:
 
   /// Create and return a Client.
   /**
-   * \param[in] service_name The topic to service on.
-   * \param[in] qos_profile rmw_qos_profile_t Quality of service profile for client.
-   * \param[in] group Callback group to call the service.
-   * \return Shared pointer to the created client.
-   * \deprecated use rclcpp::QoS instead of rmw_qos_profile_t
-   */
-  template<typename ServiceT>
-  [[deprecated("use rclcpp::QoS instead of rmw_qos_profile_t")]]
-  typename rclcpp::Client<ServiceT>::SharedPtr
-  create_client(
-    const std::string & service_name,
-    const rmw_qos_profile_t & qos_profile,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
-
-  /// Create and return a Client.
-  /**
    * \param[in] service_name The name on which the service is accessible.
    * \param[in] qos Quality of service profile for client.
    * \param[in] group Callback group to handle the reply to service calls.
@@ -285,24 +270,6 @@ public:
   create_client(
     const std::string & service_name,
     const rclcpp::QoS & qos = rclcpp::ServicesQoS(),
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
-
-  /// Create and return a Service.
-  /**
-   * \param[in] service_name The topic to service on.
-   * \param[in] callback User-defined callback function.
-   * \param[in] qos_profile rmw_qos_profile_t Quality of service profile for client.
-   * \param[in] group Callback group to call the service.
-   * \return Shared pointer to the created service.
-   * \deprecated use rclcpp::QoS instead of rmw_qos_profile_t
-   */
-  template<typename ServiceT, typename CallbackT>
-  [[deprecated("use rclcpp::QoS instead of rmw_qos_profile_t")]]
-  typename rclcpp::Service<ServiceT>::SharedPtr
-  create_service(
-    const std::string & service_name,
-    CallbackT && callback,
-    const rmw_qos_profile_t & qos_profile,
     rclcpp::CallbackGroup::SharedPtr group = nullptr);
 
   /// Create and return a Service.
@@ -334,6 +301,24 @@ public:
   create_generic_client(
     const std::string & service_name,
     const std::string & service_type,
+    const rclcpp::QoS & qos = rclcpp::ServicesQoS(),
+    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+
+  /// Create and return a GenericService.
+  /**
+   * \param[in] service_name The topic to service on.
+   * \param[in] service_type The name of service type, e.g. "std_srvs/srv/SetBool"
+   * \param[in] callback User-defined callback function.
+   * \param[in] qos Quality of service profile for the service.
+   * \param[in] group Callback group to call the service.
+   * \return Shared pointer to the created service.
+   */
+  template<typename CallbackT>
+  typename rclcpp::GenericService::SharedPtr
+  create_generic_service(
+    const std::string & service_name,
+    const std::string & service_type,
+    CallbackT && callback,
     const rclcpp::QoS & qos = rclcpp::ServicesQoS(),
     rclcpp::CallbackGroup::SharedPtr group = nullptr);
 
@@ -1015,8 +1000,6 @@ public:
     rclcpp::node_interfaces::OnSetParametersCallbackHandle;
   using OnSetParametersCallbackType =
     rclcpp::node_interfaces::NodeParametersInterface::OnSetParametersCallbackType;
-  using OnParametersSetCallbackType [[deprecated("use OnSetParametersCallbackType instead")]] =
-    OnSetParametersCallbackType;
 
   using PostSetParametersCallbackHandle =
     rclcpp::node_interfaces::PostSetParametersCallbackHandle;
@@ -1447,7 +1430,7 @@ public:
   rclcpp::Clock::ConstSharedPtr
   get_clock() const;
 
-  /// Returns current time from the time source specified by clock_type.
+  /// Returns current time from the node clock.
   /**
    * \sa rclcpp::Clock::now
    */
@@ -1576,6 +1559,10 @@ public:
    * which has been created using an existing instance of this class, but which
    * has an additional sub-namespace (short for subordinate namespace)
    * associated with it.
+   * A subordinate node and an instance of this class share all the node interfaces
+   * such as `rclcpp::node_interfaces::NodeParametersInterface`.
+   * Subordinate nodes are primarily used to organize namespaces and provide a
+   * hierarchical structure, but they are not meant to be completely independent nodes.
    * The sub-namespace will extend the node's namespace for the purpose of
    * creating additional entities, such as Publishers, Subscriptions, Service
    * Clients and Servers, and so on.
