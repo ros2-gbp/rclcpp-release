@@ -1,0 +1,12 @@
+Source: ros-rolling-rclcpp-action
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-rolling-action-msgs, ros-rolling-ament-cmake-gtest <!nocheck>, ros-rolling-ament-cmake-ros, ros-rolling-ament-lint-auto <!nocheck>, ros-rolling-ament-lint-common <!nocheck>, ros-rolling-mimick-vendor <!nocheck>, ros-rolling-performance-test-fixture <!nocheck>, ros-rolling-rcl, ros-rolling-rcl-action, ros-rolling-rclcpp, ros-rolling-rcpputils, ros-rolling-rosidl-runtime-c, ros-rolling-test-msgs <!nocheck>, ros-rolling-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-rolling-rclcpp-action
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-action-msgs, ros-rolling-rcl, ros-rolling-rcl-action, ros-rolling-rclcpp, ros-rolling-rcpputils, ros-rolling-rosidl-runtime-c, ros-rolling-ros-workspace
+Description: Adds action APIs for C++.
