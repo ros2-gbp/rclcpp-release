@@ -3,19 +3,32 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-29.5.3 (2025-09-11)
--------------------
-* Clearer warning message, the old one lacked information and was perhaps misleading (`#2927 <https://github.com/ros2/rclcpp/issues/2927>`_) (`#2931 <https://github.com/ros2/rclcpp/issues/2931>`_)
-* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_) (`#2915 <https://github.com/ros2/rclcpp/issues/2915>`_)
-* Contributors: mergify[bot]
-
-29.5.2 (2025-07-07)
+30.1.2 (2025-10-21)
 -------------------
 
-29.5.1 (2025-06-23)
+30.1.1 (2025-09-11)
 -------------------
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2855 <https://github.com/ros2/rclcpp/issues/2855>`_)
-* Contributors: mergify[bot]
+* deprecate rclcpp::spin_some and rclcpp::spin_all (`#2848 <https://github.com/ros2/rclcpp/issues/2848>`_)
+* Clearer warning message, the old one lacked information and was perhaps misleading (`#2927 <https://github.com/ros2/rclcpp/issues/2927>`_)
+* Contributors: Alberto Soragna, Peter Mitrano (AR)
+
+30.1.0 (2025-07-29)
+-------------------
+* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_)
+  cmake version < then 3.10 is deprecated
+* Contributors: mosfet80
+
+30.0.0 (2025-07-01)
+-------------------
+
+29.6.1 (2025-06-23)
+-------------------
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
+* introduce rcl_lifecycle_get_transition_label_by_id(). (`#2827 <https://github.com/ros2/rclcpp/issues/2827>`_)
+* Contributors: Alejandro Hernández Cordero, Tomoya Fujita
+
+29.6.0 (2025-04-25)
+-------------------
 
 29.5.0 (2025-04-18)
 -------------------
