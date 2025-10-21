@@ -2,6 +2,9 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+28.1.13 (2025-10-21)
+--------------------
+
 28.1.12 (2025-09-11)
 --------------------
 * Removed warning test_qos (`#2859 <https://github.com/ros2/rclcpp/issues/2859>`_) (`#2945 <https://github.com/ros2/rclcpp/issues/2945>`_)

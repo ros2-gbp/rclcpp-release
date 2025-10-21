@@ -3,6 +3,11 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+28.1.13 (2025-10-21)
+--------------------
+* it misses the iterator second to lock the weakptr. (`#2958 <https://github.com/ros2/rclcpp/issues/2958>`_) (`#2960 <https://github.com/ros2/rclcpp/issues/2960>`_)
+* Contributors: mergify[bot]
+
 28.1.12 (2025-09-11)
 --------------------
 
