@@ -3,6 +3,9 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+28.1.13 (2025-10-21)
+--------------------
+
 28.1.12 (2025-09-11)
 --------------------
 * Clearer warning message, the old one lacked information and was perhaps misleading (`#2927 <https://github.com/ros2/rclcpp/issues/2927>`_) (`#2932 <https://github.com/ros2/rclcpp/issues/2932>`_)
