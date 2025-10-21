@@ -36,6 +36,9 @@ using rclcpp::graph_listener::GraphListener;
 
 NodeGraph::NodeGraph(rclcpp::node_interfaces::NodeBaseInterface * node_base)
 : node_base_(node_base),
+  graph_listener_(
+    node_base->get_context()->get_sub_context<GraphListener>(node_base->get_context())
+  ),
   should_add_to_graph_listener_(true),
   graph_users_count_(0)
 {}
@@ -47,7 +50,7 @@ NodeGraph::~NodeGraph()
   // graph listener after checking that it was not here.
   if (!should_add_to_graph_listener_.exchange(false)) {
     // If it was already false, then it needs to now be removed.
-    node_base_->get_context()->get_graph_listener()->remove_node(this);
+    graph_listener_->remove_node(this);
   }
 }
 
@@ -416,7 +419,7 @@ NodeGraph::get_node_names_and_namespaces() const
         rcl_get_error_string().str;
       rcl_reset_error();
     }
-    RCUTILS_LOG_ERROR_NAMED("rclcpp", "%s", error_msg.c_str());
+    // TODO(karsten1987): Append rcutils_error_message once it's in master
     throw std::runtime_error(error_msg);
   }
 
@@ -431,15 +434,20 @@ NodeGraph::get_node_names_and_namespaces() const
   std::string error;
   rcl_ret_t ret_names = rcutils_string_array_fini(&node_names_c);
   if (ret_names != RCUTILS_RET_OK) {
-    error = std::string("could not destroy node names: ") + rcl_get_error_string().str;
+    // *INDENT-OFF*
+    // TODO(karsten1987): Append rcutils_error_message once it's in master
+    error = "could not destroy node names";
+    // *INDENT-ON*
   }
   rcl_ret_t ret_ns = rcutils_string_array_fini(&node_namespaces_c);
   if (ret_ns != RCUTILS_RET_OK) {
-    error += std::string(", could not destroy node namespaces: ") + rcl_get_error_string().str;
+    // *INDENT-OFF*
+    // TODO(karsten1987): Append rcutils_error_message once it's in master
+    error += ", could not destroy node namespaces";
+    // *INDENT-ON*
   }
 
   if (ret_names != RCUTILS_RET_OK || ret_ns != RCUTILS_RET_OK) {
-    RCUTILS_LOG_ERROR_NAMED("rclcpp", "%s", error.c_str());
     throw std::runtime_error(error);
   }
 
@@ -595,8 +603,8 @@ NodeGraph::get_graph_event()
   }
   // on first call, add node to graph_listener_
   if (should_add_to_graph_listener_.exchange(false)) {
-    node_base_->get_context()->get_graph_listener()->add_node(this);
-    node_base_->get_context()->get_graph_listener()->start_if_not_started();
+    graph_listener_->add_node(this);
+    graph_listener_->start_if_not_started();
   }
   return event;
 }

@@ -16,7 +16,6 @@
 #define RCLCPP_COMPONENTS__REGISTER_NODE_MACRO_HPP__
 
 #include "class_loader/class_loader.hpp"
-#include "rclcpp_components/node_factory.hpp"
 #include "rclcpp_components/node_factory_template.hpp"
 
 /// Register a component that can be dynamically loaded at runtime.

@@ -2,33 +2,21 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-30.1.2 (2025-10-21)
+29.5.4 (2025-10-21)
 -------------------
 
-30.1.1 (2025-09-11)
+29.5.3 (2025-09-11)
 -------------------
-* Cleanup the dependencies in rclcpp_components. (`#2918 <https://github.com/ros2/rclcpp/issues/2918>`_)
-* Contributors: Chris Lalancette
+* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_) (`#2915 <https://github.com/ros2/rclcpp/issues/2915>`_)
+* Contributors: mergify[bot]
 
-30.1.0 (2025-07-29)
+29.5.2 (2025-07-07)
 -------------------
-* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_)
-* Contributors: mosfet80
 
-30.0.0 (2025-07-01)
+29.5.1 (2025-06-23)
 -------------------
-* NEW PR: Add component_container for EventsExecutor (`#2885 <https://github.com/ros2/rclcpp/issues/2885>`_)
-* make sure that plugin arg includes the double colon. (`#2878 <https://github.com/ros2/rclcpp/issues/2878>`_)
-* Contributors: Mihir Rao, Tomoya Fujita
-
-29.6.1 (2025-06-23)
--------------------
-* set thread names by node in component container isolated (`#2871 <https://github.com/ros2/rclcpp/issues/2871>`_)
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
-* Contributors: Adam Aposhian, Alejandro Hernández Cordero
-
-29.6.0 (2025-04-25)
--------------------
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2855 <https://github.com/ros2/rclcpp/issues/2855>`_)
+* Contributors: mergify[bot]
 
 29.5.0 (2025-04-18)
 -------------------

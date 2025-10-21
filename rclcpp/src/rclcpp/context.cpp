@@ -14,6 +14,7 @@
 
 #include "rclcpp/context.hpp"
 
+#include <map>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -28,7 +29,7 @@
 #include "rclcpp/detail/utilities.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/logging.hpp"
-#include "rclcpp/graph_listener.hpp"
+
 #include "rcutils/error_handling.h"
 #include "rcutils/macros.h"
 
@@ -142,12 +143,52 @@ rclcpp_logging_output_handler(
 }
 }  // extern "C"
 
+/**
+ * Global storage for pre and post shutdown recursive mutexes.
+ * Note, this is a ABI compatibility hack.
+ */
+class MutexLookup
+{
+  std::mutex m;
+
+  struct MutexHolder
+  {
+    std::recursive_mutex on_shutdown_callbacks_mutex_;
+    std::recursive_mutex pre_shutdown_callbacks_mutex_;
+  };
+
+  std::map<const Context *, std::unique_ptr<MutexHolder>> mutexMap;
+
+public:
+  MutexHolder & getMutexes(const Context *forContext)
+  {
+    auto it = mutexMap.find(forContext);
+    if(it == mutexMap.end()) {
+      it = mutexMap.emplace(forContext, std::make_unique<MutexHolder>()).first;
+    }
+
+    return *(it->second);
+  }
+
+  /**
+   * Only supposed to be called on deletion of context
+   */
+  void removeMutexes(const Context *forContext)
+  {
+    mutexMap.erase(forContext);
+  }
+};
+
+MutexLookup mutexStorage;
+
 Context::Context()
 : rcl_context_(nullptr),
   shutdown_reason_(""),
-  logging_mutex_(nullptr),
-  graph_listener_(nullptr)
-{}
+  logging_mutex_(nullptr)
+{
+  // allocate mutexes
+  mutexStorage.getMutexes(this);
+}
 
 Context::~Context()
 {
@@ -166,6 +207,9 @@ Context::~Context()
   } catch (...) {
     RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "unhandled exception in ~Context()");
   }
+
+  // delete mutexes
+  mutexStorage.removeMutexes(this);
 }
 
 RCLCPP_LOCAL
@@ -244,24 +288,6 @@ Context::init(
 
     weak_contexts_ = get_weak_contexts();
     weak_contexts_->add_context(this->shared_from_this());
-
-
-    std::lock_guard<std::recursive_mutex> lock (on_shutdown_callbacks_mutex_);
-
-    graph_listener_ = std::make_shared<graph_listener::GraphListener>(shared_from_this());
-
-    if (!graph_listener_->is_started()) {
-    // Register an on_shutdown hook to shutdown the graph listener.
-    // This is important to ensure that the wait set is finalized before
-    // destruction of static objects occurs.
-      std::weak_ptr<rclcpp::graph_listener::GraphListener> weak_graph_listener = graph_listener_;
-      on_shutdown ([weak_graph_listener]() {
-          auto shared_graph_listener = weak_graph_listener.lock();
-          if(shared_graph_listener) {
-            shared_graph_listener->shutdown(std::nothrow);
-          }
-    });
-    }
   } catch (const std::exception & e) {
     ret = rcl_shutdown(rcl_context_.get());
     rcl_context_.reset();
@@ -329,7 +355,8 @@ Context::shutdown(const std::string & reason)
 
   // call each pre-shutdown callback
   {
-    std::lock_guard<std::recursive_mutex> lock{pre_shutdown_callbacks_mutex_};
+    std::lock_guard<std::recursive_mutex> lock{mutexStorage.getMutexes(
+        this).pre_shutdown_callbacks_mutex_};
     // callbacks may delete other callbacks during the execution,
     // therefore we need to save a copy and check before execution
     // if the next callback is still present
@@ -351,7 +378,8 @@ Context::shutdown(const std::string & reason)
   shutdown_reason_ = reason;
   // call each shutdown callback
   {
-    std::lock_guard<std::recursive_mutex> lock(on_shutdown_callbacks_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutexStorage.getMutexes(
+      this).on_shutdown_callbacks_mutex_);
     // callbacks may delete other callbacks during the execution,
     // therefore we need to save a copy and check before execution
     // if the next callback is still present
@@ -431,10 +459,12 @@ Context::add_shutdown_callback(
     shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
 
   if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
-    std::lock_guard<std::recursive_mutex> lock(pre_shutdown_callbacks_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutexStorage.getMutexes(
+      this).pre_shutdown_callbacks_mutex_);
     pre_shutdown_callbacks_.emplace_back(callback_shared_ptr);
   } else {
-    std::lock_guard<std::recursive_mutex> lock(on_shutdown_callbacks_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutexStorage.getMutexes(
+      this).on_shutdown_callbacks_mutex_);
     on_shutdown_callbacks_.emplace_back(callback_shared_ptr);
   }
 
@@ -465,6 +495,7 @@ Context::remove_shutdown_callback(
         return false;
       }
       callback_vector.erase(iter);
+
       return true;
     };
 
@@ -472,9 +503,11 @@ Context::remove_shutdown_callback(
     shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
 
   if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
-    return remove_callback(pre_shutdown_callbacks_mutex_, pre_shutdown_callbacks_);
+    return remove_callback(mutexStorage.getMutexes(this).pre_shutdown_callbacks_mutex_,
+      pre_shutdown_callbacks_);
   } else {
-    return remove_callback(on_shutdown_callbacks_mutex_, on_shutdown_callbacks_);
+    return remove_callback(mutexStorage.getMutexes(this).on_shutdown_callbacks_mutex_,
+      on_shutdown_callbacks_);
   }
 }
 
@@ -507,9 +540,11 @@ Context::get_shutdown_callback() const
     shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
 
   if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
-    return get_callback_vector(pre_shutdown_callbacks_mutex_, pre_shutdown_callbacks_);
+    return get_callback_vector(mutexStorage.getMutexes(this).pre_shutdown_callbacks_mutex_,
+      pre_shutdown_callbacks_);
   } else {
-    return get_callback_vector(on_shutdown_callbacks_mutex_, on_shutdown_callbacks_);
+    return get_callback_vector(mutexStorage.getMutexes(this).on_shutdown_callbacks_mutex_,
+      on_shutdown_callbacks_);
   }
 }
 
@@ -517,12 +552,6 @@ std::shared_ptr<rcl_context_t>
 Context::get_rcl_context()
 {
   return rcl_context_;
-}
-
-std::shared_ptr<rclcpp::graph_listener::GraphListener>
-Context::get_graph_listener()
-{
-  return graph_listener_;
 }
 
 bool
