@@ -226,28 +226,36 @@ private:
     rclcpp::init(0, nullptr);
     lifecycle_node_ = std::make_shared<EmptyLifecycleNode>();
     lifecycle_client_ = std::make_shared<LifecycleServiceClient>("client");
-
-    executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
-    spinner_ = std::thread([this]() {
-          executor_->add_node(lifecycle_node_->get_node_base_interface());
-          executor_->add_node(lifecycle_client_);
-          executor_->spin();
-    });
+    spinner_ = std::thread(&TestLifecycleServiceClient::spin, this);
   }
 
   void TearDown() override
   {
-    while(!executor_->is_spinning()) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    {
+      std::lock_guard<std::mutex> guard(shutdown_mutex_);
+      rclcpp::shutdown();
     }
-    executor_->cancel();
     spinner_.join();
-    rclcpp::shutdown();
+  }
+
+  void spin()
+  {
+    while (true) {
+      {
+        std::lock_guard<std::mutex> guard(shutdown_mutex_);
+        if (!rclcpp::ok()) {
+          break;
+        }
+        rclcpp::spin_some(lifecycle_node_->get_node_base_interface());
+        rclcpp::spin_some(lifecycle_client_);
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
   }
 
   std::shared_ptr<EmptyLifecycleNode> lifecycle_node_;
   std::shared_ptr<LifecycleServiceClient> lifecycle_client_;
-  std::shared_ptr<rclcpp::executors::SingleThreadedExecutor> executor_;
+  std::mutex shutdown_mutex_;
   std::thread spinner_;
 };
 
@@ -447,39 +455,34 @@ TEST_F(TestLifecycleServiceClientRCLErrors, call_services_rcl_errors) {
   auto mock = mocking_utils::patch_and_return(
     "lib:rclcpp_lifecycle", rcl_lifecycle_state_machine_is_initialized, RCL_RET_ERROR);
 
-  rclcpp::executors::SingleThreadedExecutor lifecycle_node_executor;
-  lifecycle_node_executor.add_node(lifecycle_node->get_node_base_interface());
-  rclcpp::executors::SingleThreadedExecutor client_executor;
-  client_executor.add_node(lifecycle_client);
-
   // on_change_state
   lifecycle_client->change_state(
     lifecycle_msgs::msg::Transition::TRANSITION_CONFIGURE);
-  client_executor.spin_some();
+  rclcpp::spin_some(lifecycle_client);
   EXPECT_THROW(
-    lifecycle_node_executor.spin_some(), std::runtime_error);
+    rclcpp::spin_some(lifecycle_node->get_node_base_interface()), std::runtime_error);
 
   // on_get_state
   lifecycle_client->get_state();
-  client_executor.spin_some();
+  rclcpp::spin_some(lifecycle_client);
   EXPECT_THROW(
-    lifecycle_node_executor.spin_some(), std::runtime_error);
+    rclcpp::spin_some(lifecycle_node->get_node_base_interface()), std::runtime_error);
 
   // on_get_avilable_states
   lifecycle_client->get_available_states();
-  client_executor.spin_some();
+  rclcpp::spin_some(lifecycle_client);
   EXPECT_THROW(
-    lifecycle_node_executor.spin_some(), std::runtime_error);
+    rclcpp::spin_some(lifecycle_node->get_node_base_interface()), std::runtime_error);
 
   // on_get_available_transitions
   lifecycle_client->get_available_transitions();
-  client_executor.spin_some();
+  rclcpp::spin_some(lifecycle_client);
   EXPECT_THROW(
-    lifecycle_node_executor.spin_some(), std::runtime_error);
+    rclcpp::spin_some(lifecycle_node->get_node_base_interface()), std::runtime_error);
 
   // on_get_transition_graph
   lifecycle_client->get_transition_graph();
-  client_executor.spin_some();
+  rclcpp::spin_some(lifecycle_client);
   EXPECT_THROW(
-    lifecycle_node_executor.spin_some(), std::runtime_error);
+    rclcpp::spin_some(lifecycle_node->get_node_base_interface()), std::runtime_error);
 }

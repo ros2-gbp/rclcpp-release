@@ -3,38 +3,29 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-30.1.3 (2025-11-18)
+29.5.5 (2025-11-18)
 -------------------
-* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_)
-* Contributors: Tim Clephas
+* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_) (`#2989 <https://github.com/ros2/rclcpp/issues/2989>`_)
+* Contributors: mergify[bot]
 
-30.1.2 (2025-10-21)
+29.5.4 (2025-10-21)
 -------------------
-* it misses the iterator second to lock the weakptr. (`#2958 <https://github.com/ros2/rclcpp/issues/2958>`_)
-* try aborting before canceling 1st on dtor of ServerGoalHandle. (`#2953 <https://github.com/ros2/rclcpp/issues/2953>`_)
-* Contributors: Tomoya Fujita
+* it misses the iterator second to lock the weakptr. (`#2958 <https://github.com/ros2/rclcpp/issues/2958>`_) (`#2959 <https://github.com/ros2/rclcpp/issues/2959>`_)
+* Contributors: mergify[bot]
 
-30.1.1 (2025-09-11)
+29.5.3 (2025-09-11)
 -------------------
-* deprecate rclcpp::spin_some and rclcpp::spin_all (`#2848 <https://github.com/ros2/rclcpp/issues/2848>`_)
-* Contributors: Alberto Soragna
+* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_) (`#2915 <https://github.com/ros2/rclcpp/issues/2915>`_)
+* Contributors: mergify[bot]
 
-30.1.0 (2025-07-29)
--------------------
-* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_)
-* Contributors: mosfet80
-
-30.0.0 (2025-07-01)
+29.5.2 (2025-07-07)
 -------------------
 
-29.6.1 (2025-06-23)
+29.5.1 (2025-06-23)
 -------------------
-* Replace std::default_random_engine with std::mt19937 (rolling) (`#2843 <https://github.com/ros2/rclcpp/issues/2843>`_)
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
-* Contributors: Alejandro Hernández Cordero, keeponoiro
-
-29.6.0 (2025-04-25)
--------------------
+* Replace std::default_random_engine with std::mt19937 (rolling) (`#2843 <https://github.com/ros2/rclcpp/issues/2843>`_) (`#2866 <https://github.com/ros2/rclcpp/issues/2866>`_)
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2855 <https://github.com/ros2/rclcpp/issues/2855>`_)
+* Contributors: mergify[bot]
 
 29.5.0 (2025-04-18)
 -------------------
