@@ -15,7 +15,7 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_BASE_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_BASE_HPP_
 
-#include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -39,13 +39,6 @@ class NodeBase : public NodeBaseInterface, public std::enable_shared_from_this<N
 public:
   RCLCPP_SMART_PTR_ALIASES_ONLY(NodeBase)
 
-  /// Constructor.
-  /**
-   * If nullptr (default) is given for the default_callback_group, one will
-   * be created by the constructor using the create_callback_group() method,
-   * but virtual dispatch will not occur so overrides of that method will not
-   * be used.
-   */
   RCLCPP_PUBLIC
   NodeBase(
     const std::string & node_name,
@@ -53,8 +46,7 @@ public:
     rclcpp::Context::SharedPtr context,
     const rcl_node_options_t & rcl_node_options,
     bool use_intra_process_default,
-    bool enable_topic_statistics_default,
-    rclcpp::CallbackGroup::SharedPtr default_callback_group = nullptr);
+    bool enable_topic_statistics_default);
 
   RCLCPP_PUBLIC
   virtual
@@ -121,18 +113,9 @@ public:
   std::atomic_bool &
   get_associated_with_executor_atomic() override;
 
-  [[deprecated("Use get_shared_notify_guard_condition or trigger_notify_guard_condition instead")]]
   RCLCPP_PUBLIC
   rclcpp::GuardCondition &
   get_notify_guard_condition() override;
-
-  RCLCPP_PUBLIC
-  rclcpp::GuardCondition::SharedPtr
-  get_shared_notify_guard_condition() override;
-
-  RCLCPP_PUBLIC
-  void
-  trigger_notify_guard_condition() override;
 
   RCLCPP_PUBLIC
   bool
@@ -162,7 +145,7 @@ private:
 
   /// Guard condition for notifying the Executor of changes to this node.
   mutable std::recursive_mutex notify_guard_condition_mutex_;
-  std::shared_ptr<rclcpp::GuardCondition> notify_guard_condition_;
+  rclcpp::GuardCondition notify_guard_condition_;
   bool notify_guard_condition_is_valid_;
 };
 

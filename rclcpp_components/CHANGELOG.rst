@@ -2,164 +2,58 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-28.1.14 (2025-11-18)
+16.0.16 (2025-11-18)
 --------------------
-* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_) (`#2990 <https://github.com/ros2/rclcpp/issues/2990>`_)
+* Fix REP url locations (backport `#2987 <https://github.com/ros2/rclcpp/issues/2987>`_) (`#2991 <https://github.com/ros2/rclcpp/issues/2991>`_)
 * Contributors: mergify[bot]
 
-28.1.13 (2025-10-21)
+16.0.15 (2025-09-11)
 --------------------
 
-28.1.12 (2025-09-11)
+16.0.14 (2025-07-16)
 --------------------
 
-28.1.11 (2025-08-06)
+16.0.13 (2025-06-23)
 --------------------
-
-28.1.10 (2025-06-23)
---------------------
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2856 <https://github.com/ros2/rclcpp/issues/2856>`_)
+* Added missing chrono includes (backport `#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2857 <https://github.com/ros2/rclcpp/issues/2857>`_)
 * Contributors: mergify[bot]
 
-28.1.9 (2025-04-23)
+16.0.12 (2025-03-25)
+--------------------
+* Redundant .c_str() usage in rclcpp_components triggers ament_clang_tidy warning (`#2718 <https://github.com/ros2/rclcpp/issues/2718>`_)
+* Contributors: LihanChen2004
+
+16.0.11 (2024-11-25)
+--------------------
+
+16.0.10 (2024-07-26)
+--------------------
+
+16.0.9 (2024-05-15)
 -------------------
 
-28.1.8 (2025-04-02)
+16.0.8 (2024-01-24)
+-------------------
+* Add missing header required by the rclcpp::NodeOptions type (`#2324 <https://github.com/ros2/rclcpp/issues/2324>`_) (`#2407 <https://github.com/ros2/rclcpp/issues/2407>`_)
+* fix(rclcpp_components): increase the service queue sizes in component_container (backport `#2363 <https://github.com/ros2/rclcpp/issues/2363>`_) (`#2380 <https://github.com/ros2/rclcpp/issues/2380>`_)
+* Contributors: mergify[bot]
+
+16.0.7 (2023-11-13)
 -------------------
 
-28.1.7 (2025-03-26)
--------------------
-* add NO_UNDEFINED_SYMBOLS to rclcpp_components_register_node cmake macro (`#2746 <https://github.com/ros2/rclcpp/issues/2746>`_)
-* Contributors: Jonas Otto
-
-28.1.6 (2024-12-18)
+16.0.6 (2023-09-19)
 -------------------
 
-28.1.5 (2024-09-19)
+16.0.5 (2023-07-17)
 -------------------
 
-28.1.4 (2024-09-06)
+16.0.4 (2023-04-25)
 -------------------
 
-28.1.3 (2024-06-27)
+16.0.3 (2023-01-10)
 -------------------
 
-28.1.2 (2024-05-13)
--------------------
-
-28.1.1 (2024-04-24)
--------------------
-
-28.1.0 (2024-04-16)
--------------------
-* Remove references to index.ros.org. (`#2504 <https://github.com/ros2/rclcpp/issues/2504>`_)
-* Contributors: Chris Lalancette
-
-28.0.1 (2024-04-16)
--------------------
-
-28.0.0 (2024-03-28)
--------------------
-* Add EXECUTOR docs (`#2440 <https://github.com/ros2/rclcpp/issues/2440>`_)
-* Update quality declaration documents (`#2427 <https://github.com/ros2/rclcpp/issues/2427>`_)
-* crash on no class found (`#2415 <https://github.com/ros2/rclcpp/issues/2415>`_)
-  * crash on no class found
-  * error on no class found instead of no callback groups
-  Co-authored-by: Chris Lalancette <clalancette@gmail.com>
-* Contributors: Adam Aposhian, Christophe Bedard, Ruddick Lawrence
-
-27.0.0 (2024-02-07)
--------------------
-
-26.0.0 (2024-01-24)
--------------------
-
-25.0.0 (2023-12-26)
--------------------
-* Switch to target_link_libraries. (`#2374 <https://github.com/ros2/rclcpp/issues/2374>`_)
-* feat(rclcpp_components): support events executor in node main template (`#2366 <https://github.com/ros2/rclcpp/issues/2366>`_)
-* fix(rclcpp_components): increase the service queue sizes in component_container (`#2363 <https://github.com/ros2/rclcpp/issues/2363>`_)
-* Contributors: Chris Lalancette, Daisuke Nishimatsu, M. Fatih Cırıt
-
-24.0.0 (2023-11-06)
--------------------
-
-23.2.0 (2023-10-09)
--------------------
-
-23.1.0 (2023-10-04)
--------------------
-* Add missing header required by the rclcpp::NodeOptions type (`#2324 <https://github.com/ros2/rclcpp/issues/2324>`_)
-* Contributors: Ignacio Vizzo
-
-23.0.0 (2023-09-08)
--------------------
-* Update API docs links in package READMEs (`#2302 <https://github.com/ros2/rclcpp/issues/2302>`_)
-* Contributors: Christophe Bedard
-
-22.2.0 (2023-09-07)
--------------------
-
-22.1.0 (2023-08-21)
--------------------
-
-22.0.0 (2023-07-11)
--------------------
-
-21.3.0 (2023-06-12)
--------------------
-
-21.2.0 (2023-06-07)
--------------------
-
-21.1.1 (2023-05-11)
--------------------
-
-21.1.0 (2023-04-27)
--------------------
-
-21.0.0 (2023-04-18)
--------------------
-
-20.0.0 (2023-04-13)
--------------------
-* Update all rclcpp packages to C++17. (`#2121 <https://github.com/ros2/rclcpp/issues/2121>`_)
-* Contributors: Chris Lalancette
-
-19.3.0 (2023-03-01)
--------------------
-
-19.2.0 (2023-02-24)
--------------------
-
-19.1.0 (2023-02-14)
--------------------
-
-19.0.0 (2023-01-30)
--------------------
-* Improve component_manager_isolated shutdown (`#2085 <https://github.com/ros2/rclcpp/issues/2085>`_)
-* Contributors: Michael Carroll
-
-18.0.0 (2022-12-29)
--------------------
-* Update maintainers (`#2043 <https://github.com/ros2/rclcpp/issues/2043>`_)
-* Contributors: Audrow Nash
-
-17.1.0 (2022-11-02)
--------------------
-* use unique ptr and remove unuseful container (`#2013 <https://github.com/ros2/rclcpp/issues/2013>`_)
-* Contributors: Chen Lihui
-
-17.0.0 (2022-09-13)
--------------------
-* Revert "Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)" (`#1956 <https://github.com/ros2/rclcpp/issues/1956>`_)
-* Introduce executors new spin_for method, replace spin_until_future_complete with spin_until_complete. (`#1821 <https://github.com/ros2/rclcpp/issues/1821>`_) (`#1874 <https://github.com/ros2/rclcpp/issues/1874>`_)
-* Contributors: Hubert Liberacki, William Woodall
-
-16.2.0 (2022-05-03)
--------------------
-
-16.1.0 (2022-04-29)
+16.0.2 (2022-11-07)
 -------------------
 
 16.0.1 (2022-04-13)

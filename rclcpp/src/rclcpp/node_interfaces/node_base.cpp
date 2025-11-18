@@ -20,9 +20,6 @@
 #include "rclcpp/node_interfaces/node_base.hpp"
 
 #include "rcl/arguments.h"
-#include "rcl/node_type_cache.h"
-#include "rcl/logging.h"
-#include "rcl/logging_rosout.h"
 #include "rclcpp/exceptions.hpp"
 #include "rcutils/logging_macros.h"
 #include "rmw/validate_namespace.h"
@@ -40,15 +37,14 @@ NodeBase::NodeBase(
   rclcpp::Context::SharedPtr context,
   const rcl_node_options_t & rcl_node_options,
   bool use_intra_process_default,
-  bool enable_topic_statistics_default,
-  rclcpp::CallbackGroup::SharedPtr default_callback_group)
+  bool enable_topic_statistics_default)
 : context_(context),
   use_intra_process_default_(use_intra_process_default),
   enable_topic_statistics_default_(enable_topic_statistics_default),
   node_handle_(nullptr),
-  default_callback_group_(default_callback_group),
+  default_callback_group_(nullptr),
   associated_with_executor_(false),
-  notify_guard_condition_(std::make_shared<rclcpp::GuardCondition>(context)),
+  notify_guard_condition_(context),
   notify_guard_condition_is_valid_(false)
 {
   // Create the rcl node and store it in a shared_ptr with a custom destructor.
@@ -57,12 +53,17 @@ NodeBase::NodeBase(
   std::shared_ptr<std::recursive_mutex> logging_mutex = get_global_logging_mutex();
 
   rcl_ret_t ret;
-
-  // TODO(ivanpauno): /rosout Qos should be reconfigurable.
-  ret = rcl_node_init(
-    rcl_node.get(),
-    node_name.c_str(), namespace_.c_str(),
-    context_->get_rcl_context().get(), &rcl_node_options);
+  {
+    std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
+    // TODO(ivanpauno): /rosout Qos should be reconfigurable.
+    // TODO(ivanpauno): Instead of mutually excluding rcl_node_init with the global logger mutex,
+    // rcl_logging_rosout_init_publisher_for_node could be decoupled from there and be called
+    // here directly.
+    ret = rcl_node_init(
+      rcl_node.get(),
+      node_name.c_str(), namespace_.c_str(),
+      context_->get_rcl_context().get(), &rcl_node_options);
+  }
   if (ret != RCL_RET_OK) {
     if (ret == RCL_RET_NODE_INVALID_NAME) {
       rcl_reset_error();  // discard rcl_node_init error
@@ -112,29 +113,13 @@ NodeBase::NodeBase(
     throw_from_rcl_error(ret, "failed to initialize rcl node");
   }
 
-  // The initialization for the rosout publisher
-  if (rcl_logging_rosout_enabled() && rcl_node_options.enable_rosout) {
-    std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
-    ret = rcl_logging_rosout_init_publisher_for_node(rcl_node.get());
-    if (ret != RCL_RET_OK) {
-      throw_from_rcl_error(ret, "failed to initialize rosout publisher");
-    }
-  }
-
   node_handle_.reset(
     rcl_node.release(),
-    [logging_mutex, rcl_node_options](rcl_node_t * node) -> void {
-      {
-        std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
-        if (rcl_logging_rosout_enabled() && rcl_node_options.enable_rosout) {
-          rcl_ret_t ret = rcl_logging_rosout_fini_publisher_for_node(node);
-          if (ret != RCL_RET_OK) {
-            RCUTILS_LOG_ERROR_NAMED(
-              "rclcpp",
-              "Error in destruction of rosout publisher: %s", rcl_get_error_string().str);
-          }
-        }
-      }
+    [logging_mutex](rcl_node_t * node) -> void {
+      std::lock_guard<std::recursive_mutex> guard(*logging_mutex);
+      // TODO(ivanpauno): Instead of mutually excluding rcl_node_fini with the global logger mutex,
+      // rcl_logging_rosout_fini_publisher_for_node could be decoupled from there and be called
+      // here directly.
       if (rcl_node_fini(node) != RCL_RET_OK) {
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
@@ -143,14 +128,9 @@ NodeBase::NodeBase(
       delete node;
     });
 
-  // Create the default callback group, if needed.
-  if (nullptr == default_callback_group_) {
-    using rclcpp::CallbackGroupType;
-    // Default callback group is mutually exclusive and automatically associated with
-    // any executors that this node is added to.
-    default_callback_group_ =
-      NodeBase::create_callback_group(CallbackGroupType::MutuallyExclusive, true);
-  }
+  // Create the default callback group.
+  using rclcpp::CallbackGroupType;
+  default_callback_group_ = create_callback_group(CallbackGroupType::MutuallyExclusive);
 
   // Indicate the notify_guard_condition is now valid.
   notify_guard_condition_is_valid_ = true;
@@ -220,20 +200,9 @@ NodeBase::create_callback_group(
 {
   auto group = std::make_shared<rclcpp::CallbackGroup>(
     group_type,
-    context_->weak_from_this(),
     automatically_add_to_executor_with_node);
   std::lock_guard<std::mutex> lock(callback_groups_mutex_);
   callback_groups_.push_back(group);
-
-  // This guard condition is generally used to signal to this node's executor that a callback
-  // group has been added that should be considered for new entities.
-  // If this is creating the default callback group, then the notify guard condition won't be
-  // ready or needed yet, as the node is not done being constructed and therefore cannot be added.
-  // If the callback group is not automatically associated with this node's executors, then
-  // triggering the guard condition is also unnecessary, it will be manually added to an exector.
-  if (notify_guard_condition_is_valid_ && automatically_add_to_executor_with_node) {
-    this->trigger_notify_guard_condition();
-  }
   return group;
 }
 
@@ -280,27 +249,7 @@ NodeBase::get_notify_guard_condition()
   if (!notify_guard_condition_is_valid_) {
     throw std::runtime_error("failed to get notify guard condition because it is invalid");
   }
-  return *notify_guard_condition_;
-}
-
-rclcpp::GuardCondition::SharedPtr
-NodeBase::get_shared_notify_guard_condition()
-{
-  std::lock_guard<std::recursive_mutex> notify_condition_lock(notify_guard_condition_mutex_);
-  if (!notify_guard_condition_is_valid_) {
-    return nullptr;
-  }
   return notify_guard_condition_;
-}
-
-void
-NodeBase::trigger_notify_guard_condition()
-{
-  std::lock_guard<std::recursive_mutex> notify_condition_lock(notify_guard_condition_mutex_);
-  if (!notify_guard_condition_is_valid_) {
-    throw std::runtime_error("failed to trigger notify guard condition because it is invalid");
-  }
-  notify_guard_condition_->trigger();
 }
 
 bool
