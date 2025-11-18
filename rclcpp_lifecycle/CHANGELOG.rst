@@ -3,6 +3,12 @@ Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+16.0.16 (2025-11-18)
+--------------------
+* Fix REP url locations (backport `#2987 <https://github.com/ros2/rclcpp/issues/2987>`_) (`#2991 <https://github.com/ros2/rclcpp/issues/2991>`_)
+* Add get_parameter_or overload returning value or alternative (`#2973 <https://github.com/ros2/rclcpp/issues/2973>`_) (`#2978 <https://github.com/ros2/rclcpp/issues/2978>`_)
+* Contributors: mergify[bot]
+
 16.0.15 (2025-09-11)
 --------------------
 * Add a clearer warning message, the old one lacked information and was misleading (`#2924 <https://github.com/ros2/rclcpp/issues/2924>`_)
