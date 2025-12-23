@@ -2,6 +2,14 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+16.0.17 (2025-12-23)
+--------------------
+* Unified Node Interfaces: Add const version of get_node_x_interface() (`#3006 <https://github.com/ros2/rclcpp/issues/3006>`_) (`#3010 <https://github.com/ros2/rclcpp/issues/3010>`_)
+* [Humble] Implement Unified Node Interface (NodeInterfaces class) (backport `#2041 <https://github.com/ros2/rclcpp/issues/2041>`_) (`#3002 <https://github.com/ros2/rclcpp/issues/3002>`_)
+* remove I/O from signal handler. (`#3000 <https://github.com/ros2/rclcpp/issues/3000>`_) (`#3005 <https://github.com/ros2/rclcpp/issues/3005>`_)
+* correct test function descriptions (backport `#2970 <https://github.com/ros2/rclcpp/issues/2970>`_) (`#2994 <https://github.com/ros2/rclcpp/issues/2994>`_)
+* Contributors: fabianhirmann, mergify[bot]
+
 16.0.16 (2025-11-18)
 --------------------
 * Fix REP url locations (backport `#2987 <https://github.com/ros2/rclcpp/issues/2987>`_) (`#2991 <https://github.com/ros2/rclcpp/issues/2991>`_)
