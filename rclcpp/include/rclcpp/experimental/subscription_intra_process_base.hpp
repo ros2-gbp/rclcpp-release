@@ -19,6 +19,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "rcl/wait.h"
 #include "rmw/impl/cpp/demangle.hpp"
@@ -52,7 +53,7 @@ public:
   {}
 
   RCLCPP_PUBLIC
-  virtual ~SubscriptionIntraProcessBase();
+  virtual ~SubscriptionIntraProcessBase() = default;
 
   RCLCPP_PUBLIC
   size_t
@@ -60,23 +61,47 @@ public:
 
   RCLCPP_PUBLIC
   void
-  add_to_wait_set(rcl_wait_set_t * wait_set) override;
+  add_to_wait_set(rcl_wait_set_t & wait_set) override;
+
+  RCLCPP_PUBLIC
+  virtual
+  size_t
+  available_capacity() const = 0;
+
+  RCLCPP_PUBLIC
+  bool
+  is_durability_transient_local() const;
 
   bool
-  is_ready(rcl_wait_set_t * wait_set) override = 0;
+  is_ready(const rcl_wait_set_t & wait_set) override = 0;
 
   std::shared_ptr<void>
   take_data() override = 0;
 
   std::shared_ptr<void>
-  take_data_by_entity_id(size_t id) override
+  take_data_by_entity_id([[maybe_unused]] size_t id) override
   {
-    (void)id;
     return take_data();
   }
 
   void
-  execute(std::shared_ptr<void> & data) override = 0;
+  execute(const std::shared_ptr<void> & data) override = 0;
+
+  /// Disable callbacks from being called
+  /**
+   * This function temporary disable on_new_message_callback to prevent it from being called.
+   */
+  RCLCPP_PUBLIC
+  virtual
+  void disable_callbacks();
+
+  /// Enable the callbacks to be called
+  /**
+    * This function enable the on_new_message_callback if it was previously set.
+    */
+  RCLCPP_PUBLIC
+  virtual
+  void enable_callbacks();
 
   virtual
   bool
@@ -149,7 +174,7 @@ public:
         }
       };
 
-    std::lock_guard<std::recursive_mutex> lock(callback_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(on_new_message_callback_mutex_);
     on_new_message_callback_ = new_callback;
 
     if (unread_count_ > 0) {
@@ -167,13 +192,21 @@ public:
   void
   clear_on_ready_callback() override
   {
-    std::lock_guard<std::recursive_mutex> lock(callback_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(on_new_message_callback_mutex_);
     on_new_message_callback_ = nullptr;
   }
 
+  RCLCPP_PUBLIC
+  std::vector<std::shared_ptr<rclcpp::TimerBase>>
+  get_timers() const override
+  {
+    return {};
+  }
+
 protected:
-  std::recursive_mutex callback_mutex_;
+  std::recursive_mutex on_new_message_callback_mutex_;
   std::function<void(size_t)> on_new_message_callback_ {nullptr};
+  bool on_new_message_callback_disabled_{false};
   size_t unread_count_{0};
   rclcpp::GuardCondition gc_;
 
@@ -183,11 +216,13 @@ protected:
   void
   invoke_on_new_message()
   {
-    std::lock_guard<std::recursive_mutex> lock(this->callback_mutex_);
-    if (this->on_new_message_callback_) {
-      this->on_new_message_callback_(1);
-    } else {
-      this->unread_count_++;
+    std::lock_guard<std::recursive_mutex> lock(this->on_new_message_callback_mutex_);
+    if (!on_new_message_callback_disabled_) {
+      if (this->on_new_message_callback_) {
+        this->on_new_message_callback_(1);
+      } else {
+        this->unread_count_++;
+      }
     }
   }
 

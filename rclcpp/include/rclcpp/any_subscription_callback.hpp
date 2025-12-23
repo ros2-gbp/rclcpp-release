@@ -15,12 +15,14 @@
 #ifndef RCLCPP__ANY_SUBSCRIPTION_CALLBACK_HPP_
 #define RCLCPP__ANY_SUBSCRIPTION_CALLBACK_HPP_
 
+#include <atomic>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
-#include <variant>  // NOLINT[build/include_order]
+#include <variant>
 
 #include "rosidl_runtime_cpp/traits.hpp"
 #include "tracetools/tracetools.h"
@@ -30,18 +32,18 @@
 #include "rclcpp/detail/subscription_callback_type_helper.hpp"
 #include "rclcpp/function_traits.hpp"
 #include "rclcpp/message_info.hpp"
+#include "rclcpp/serialization.hpp"
 #include "rclcpp/serialized_message.hpp"
 #include "rclcpp/type_adapter.hpp"
-
-
-template<class>
-inline constexpr bool always_false_v = false;
 
 namespace rclcpp
 {
 
 namespace detail
 {
+
+template<class>
+inline constexpr bool always_false_v = false;
 
 template<typename MessageT, typename AllocatorT>
 struct MessageDeleterHelper
@@ -158,13 +160,14 @@ struct AnySubscriptionCallbackPossibleTypes
 template<
   typename MessageT,
   typename AllocatorT,
-  bool is_adapted_type = rclcpp::TypeAdapter<MessageT>::is_specialized::value
+  bool is_adapted_type = rclcpp::TypeAdapter<MessageT>::is_specialized::value,
+  bool is_serialized_type = serialization_traits::is_serialized_message_class<MessageT>::value
 >
 struct AnySubscriptionCallbackHelper;
 
 /// Specialization for when MessageT is not a TypeAdapter.
 template<typename MessageT, typename AllocatorT>
-struct AnySubscriptionCallbackHelper<MessageT, AllocatorT, false>
+struct AnySubscriptionCallbackHelper<MessageT, AllocatorT, false, false>
 {
   using CallbackTypes = AnySubscriptionCallbackPossibleTypes<MessageT, AllocatorT>;
 
@@ -194,7 +197,7 @@ struct AnySubscriptionCallbackHelper<MessageT, AllocatorT, false>
 
 /// Specialization for when MessageT is a TypeAdapter.
 template<typename MessageT, typename AllocatorT>
-struct AnySubscriptionCallbackHelper<MessageT, AllocatorT, true>
+struct AnySubscriptionCallbackHelper<MessageT, AllocatorT, true, false>
 {
   using CallbackTypes = AnySubscriptionCallbackPossibleTypes<MessageT, AllocatorT>;
 
@@ -227,6 +230,26 @@ struct AnySubscriptionCallbackHelper<MessageT, AllocatorT, true>
     typename CallbackTypes::SharedPtrROSMessageCallback,
     typename CallbackTypes::SharedPtrWithInfoCallback,
     typename CallbackTypes::SharedPtrWithInfoROSMessageCallback,
+    typename CallbackTypes::SharedPtrSerializedMessageCallback,
+    typename CallbackTypes::SharedPtrSerializedMessageWithInfoCallback
+  >;
+};
+
+/// Specialization for when MessageT is a SerializedMessage to exclude duplicated declarations.
+template<typename MessageT, typename AllocatorT>
+struct AnySubscriptionCallbackHelper<MessageT, AllocatorT, false, true>
+{
+  using CallbackTypes = AnySubscriptionCallbackPossibleTypes<MessageT, AllocatorT>;
+
+  using variant_type = std::variant<
+    typename CallbackTypes::ConstRefSerializedMessageCallback,
+    typename CallbackTypes::ConstRefSerializedMessageWithInfoCallback,
+    typename CallbackTypes::UniquePtrSerializedMessageCallback,
+    typename CallbackTypes::UniquePtrSerializedMessageWithInfoCallback,
+    typename CallbackTypes::SharedConstPtrSerializedMessageCallback,
+    typename CallbackTypes::SharedConstPtrSerializedMessageWithInfoCallback,
+    typename CallbackTypes::ConstRefSharedConstPtrSerializedMessageCallback,
+    typename CallbackTypes::ConstRefSharedConstPtrSerializedMessageWithInfoCallback,
     typename CallbackTypes::SharedPtrSerializedMessageCallback,
     typename CallbackTypes::SharedPtrSerializedMessageWithInfoCallback
   >;
@@ -354,7 +377,19 @@ public:
     allocator::set_allocator_for_deleter(&ros_message_type_deleter_, &ros_message_type_allocator_);
   }
 
-  AnySubscriptionCallback(const AnySubscriptionCallback &) = default;
+  AnySubscriptionCallback(const AnySubscriptionCallback & other)
+  : callback_variant_(other.callback_variant_),
+    callback_disabled_(other.callback_disabled_.load()),
+    subscribed_type_allocator_(other.subscribed_type_allocator_),
+    subscribed_type_deleter_(other.subscribed_type_deleter_),
+    ros_message_type_allocator_(other.ros_message_type_allocator_),
+    ros_message_type_deleter_(other.ros_message_type_deleter_),
+    serialized_message_allocator_(other.serialized_message_allocator_),
+    serialized_message_deleter_(other.serialized_message_deleter_)
+  {
+    allocator::set_allocator_for_deleter(&subscribed_type_deleter_, &subscribed_type_allocator_);
+    allocator::set_allocator_for_deleter(&ros_message_type_deleter_, &ros_message_type_allocator_);
+  }
 
   /// Generic function for setting the callback.
   /**
@@ -372,56 +407,24 @@ public:
     // converted to one another, e.g. shared_ptr and unique_ptr.
     using scbth = detail::SubscriptionCallbackTypeHelper<MessageT, CallbackT>;
 
-    // Determine if the given CallbackT is a deprecated signature or not.
-    constexpr auto is_deprecated =
-      rclcpp::function_traits::same_arguments<
-      typename scbth::callback_type,
-      std::function<void(std::shared_ptr<MessageT>)>
-      >::value
-      ||
-      rclcpp::function_traits::same_arguments<
-      typename scbth::callback_type,
-      std::function<void(std::shared_ptr<MessageT>, const rclcpp::MessageInfo &)>
-      >::value;
-
-    // Use the discovered type to force the type of callback when assigning
-    // into the variant.
-    if constexpr (is_deprecated) {
-      // If deprecated, call sub-routine that is deprecated.
-      set_deprecated(static_cast<typename scbth::callback_type>(callback));
-    } else {
-      // Otherwise just assign it.
-      callback_variant_ = static_cast<typename scbth::callback_type>(callback);
-    }
+    callback_variant_ = static_cast<typename scbth::callback_type>(callback);
 
     // Return copy of self for easier testing, normally will be compiled out.
     return *this;
   }
 
-  /// Function for shared_ptr to non-const MessageT, which is deprecated.
-  template<typename SetT>
-#if !defined(RCLCPP_AVOID_DEPRECATIONS_FOR_UNIT_TESTS)
-  // suppress deprecation warnings in `test_any_subscription_callback.cpp`
-  [[deprecated("use 'void(std::shared_ptr<const MessageT>)' instead")]]
-#endif
-  void
-  set_deprecated(std::function<void(std::shared_ptr<SetT>)> callback)
+  /// Disable the callback from being called during dispatch.
+  void disable()
   {
-    callback_variant_ = callback;
+    std::unique_lock<std::recursive_mutex> callback_lock(callback_mutex_);
+    callback_disabled_.store(true);
   }
 
-  /// Function for shared_ptr to non-const MessageT with MessageInfo, which is deprecated.
-  template<typename SetT>
-#if !defined(RCLCPP_AVOID_DEPRECATIONS_FOR_UNIT_TESTS)
-  // suppress deprecation warnings in `test_any_subscription_callback.cpp`
-  [[deprecated(
-          "use 'void(std::shared_ptr<const MessageT>, const rclcpp::MessageInfo &)' instead"
-  )]]
-#endif
-  void
-  set_deprecated(std::function<void(std::shared_ptr<SetT>, const rclcpp::MessageInfo &)> callback)
+  /// Enable the callback to be called during dispatch.
+  void enable()
   {
-    callback_variant_ = callback;
+    std::unique_lock<std::recursive_mutex> callback_lock(callback_mutex_);
+    callback_disabled_.store(false);
   }
 
   std::unique_ptr<ROSMessageType, ROSMessageTypeDeleter>
@@ -487,12 +490,18 @@ public:
   }
 
   // Dispatch when input is a ros message and the output could be anything.
-  void
+  template<typename TMsg = ROSMessageType>
+  typename std::enable_if<!serialization_traits::is_serialized_message_class<TMsg>::value,
+    void>::type
   dispatch(
     std::shared_ptr<ROSMessageType> message,
     const rclcpp::MessageInfo & message_info)
   {
-    TRACEPOINT(callback_start, static_cast<const void *>(this), false);
+    std::unique_lock<std::recursive_mutex> callback_lock(callback_mutex_);
+    if (callback_disabled_.load()) {
+      return;
+    }
+    TRACETOOLS_TRACEPOINT(callback_start, static_cast<const void *>(this), false);
     // Check if the variant is "unset", throw if it is.
     if (callback_variant_.index() == 0) {
       if (std::get<0>(callback_variant_) == nullptr) {
@@ -580,19 +589,23 @@ public:
         }
         // condition to catch unhandled callback types
         else {  // NOLINT[readability/braces]
-          static_assert(always_false_v<T>, "unhandled callback type");
+          static_assert(detail::always_false_v<T>, "unhandled callback type");
         }
       }, callback_variant_);
-    TRACEPOINT(callback_end, static_cast<const void *>(this));
+    TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
   }
 
   // Dispatch when input is a serialized message and the output could be anything.
   void
   dispatch(
-    std::shared_ptr<rclcpp::SerializedMessage> serialized_message,
+    std::shared_ptr<const rclcpp::SerializedMessage> serialized_message,
     const rclcpp::MessageInfo & message_info)
   {
-    TRACEPOINT(callback_start, static_cast<const void *>(this), false);
+    std::unique_lock<std::recursive_mutex> callback_lock(callback_mutex_);
+    if (callback_disabled_.load()) {
+      return;
+    }
+    TRACETOOLS_TRACEPOINT(callback_start, static_cast<const void *>(this), false);
     // Check if the variant is "unset", throw if it is.
     if (callback_variant_.index() == 0) {
       if (std::get<0>(callback_variant_) == nullptr) {
@@ -660,10 +673,10 @@ public:
         }
         // condition to catch unhandled callback types
         else {  // NOLINT[readability/braces]
-          static_assert(always_false_v<T>, "unhandled callback type");
+          static_assert(detail::always_false_v<T>, "unhandled callback type");
         }
       }, callback_variant_);
-    TRACEPOINT(callback_end, static_cast<const void *>(this));
+    TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
   }
 
   void
@@ -671,7 +684,11 @@ public:
     std::shared_ptr<const SubscribedType> message,
     const rclcpp::MessageInfo & message_info)
   {
-    TRACEPOINT(callback_start, static_cast<const void *>(this), true);
+    std::unique_lock<std::recursive_mutex> callback_lock(callback_mutex_);
+    if (callback_disabled_.load()) {
+      return;
+    }
+    TRACETOOLS_TRACEPOINT(callback_start, static_cast<const void *>(this), true);
     // Check if the variant is "unset", throw if it is.
     if (callback_variant_.index() == 0) {
       if (std::get<0>(callback_variant_) == nullptr) {
@@ -790,10 +807,10 @@ public:
         }
         // condition to catch unhandled callback types
         else {  // NOLINT[readability/braces]
-          static_assert(always_false_v<T>, "unhandled callback type");
+          static_assert(detail::always_false_v<T>, "unhandled callback type");
         }
       }, callback_variant_);
-    TRACEPOINT(callback_end, static_cast<const void *>(this));
+    TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
   }
 
   void
@@ -801,7 +818,11 @@ public:
     std::unique_ptr<SubscribedType, SubscribedTypeDeleter> message,
     const rclcpp::MessageInfo & message_info)
   {
-    TRACEPOINT(callback_start, static_cast<const void *>(this), true);
+    std::unique_lock<std::recursive_mutex> callback_lock(callback_mutex_);
+    if (callback_disabled_.load()) {
+      return;
+    }
+    TRACETOOLS_TRACEPOINT(callback_start, static_cast<const void *>(this), true);
     // Check if the variant is "unset", throw if it is.
     if (callback_variant_.index() == 0) {
       if (std::get<0>(callback_variant_) == nullptr) {
@@ -924,10 +945,10 @@ public:
         }
         // condition to catch unhandled callback types
         else {  // NOLINT[readability/braces]
-          static_assert(always_false_v<T>, "unhandled callback type");
+          static_assert(detail::always_false_v<T>, "unhandled callback type");
         }
       }, callback_variant_);
-    TRACEPOINT(callback_end, static_cast<const void *>(this));
+    TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
   }
 
   constexpr
@@ -965,10 +986,14 @@ public:
 #ifndef TRACETOOLS_DISABLED
     std::visit(
       [this](auto && callback) {
-        TRACEPOINT(
-          rclcpp_callback_register,
-          static_cast<const void *>(this),
-          tracetools::get_symbol(callback));
+        if (TRACETOOLS_TRACEPOINT_ENABLED(rclcpp_callback_register)) {
+          char * symbol = tracetools::get_symbol(callback);
+          TRACETOOLS_DO_TRACEPOINT(
+            rclcpp_callback_register,
+            static_cast<const void *>(this),
+            symbol);
+          std::free(symbol);
+        }
       }, callback_variant_);
 #endif  // TRACETOOLS_DISABLED
   }
@@ -991,6 +1016,8 @@ private:
   //   http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2162r0.html
   // For now, compose the variant into this class as a private attribute.
   typename HelperT::variant_type callback_variant_;
+  std::recursive_mutex callback_mutex_;
+  std::atomic_bool callback_disabled_{false};
 
   SubscribedTypeAllocator subscribed_type_allocator_;
   SubscribedTypeDeleter subscribed_type_deleter_;

@@ -74,6 +74,38 @@ ParameterEventHandler::add_parameter_callback(
   return handle;
 }
 
+bool
+ParameterEventHandler::configure_nodes_filter(const std::vector<std::string> & node_names)
+{
+  if (node_names.empty()) {
+    // Clear content filter
+    event_subscription_->set_content_filter("");
+    if (event_subscription_->is_cft_enabled()) {
+      return false;
+    }
+    return true;
+  }
+
+  std::string filter_expression;
+  size_t total = node_names.size();
+  for (size_t i = 0; i < total; ++i) {
+    filter_expression += "node = %" + std::to_string(i);
+    if (i < total - 1) {
+      filter_expression += " OR ";
+    }
+  }
+
+  // Enclose each node name in "'".
+  std::vector<std::string> quoted_node_names;
+  for (const auto & name : node_names) {
+    quoted_node_names.push_back("'" + resolve_path(name) + "'");
+  }
+
+  event_subscription_->set_content_filter(filter_expression, quoted_node_names);
+
+  return event_subscription_->is_cft_enabled();
+}
+
 void
 ParameterEventHandler::remove_parameter_callback(
   ParameterCallbackHandle::SharedPtr callback_handle)
@@ -133,9 +165,13 @@ ParameterEventHandler::get_parameter_from_event(
 {
   rclcpp::Parameter p;
   if (!get_parameter_from_event(event, p, parameter_name, node_name)) {
-    throw std::runtime_error(
-            "Parameter '" + parameter_name + "' of node '" + node_name +
-            "' is not part of parameter event");
+    if (event.node == node_name) {
+      return rclcpp::Parameter(parameter_name, rclcpp::PARAMETER_NOT_SET);
+    } else {
+      throw std::runtime_error(
+              "The node name '" + node_name + "' of parameter '" + parameter_name +
+              +"' doesn't match the node name '" + event.node + "' in parameter event");
+    }
   }
   return p;
 }

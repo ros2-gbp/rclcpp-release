@@ -128,6 +128,11 @@ public:
    * If start_if_not_started() was never called, this function still succeeds,
    * but start_if_not_started() still cannot be called after this function.
    *
+   * Note that if you override this method, but leave shutdown to be called in
+   * the destruction of this base class, it will not call the overridden
+   * version from your base class.
+   * So you need to ensure you call your class's shutdown() in its destructor.
+   *
    * \throws rclcpp::execptions::RCLError from rcl_guard_condition_fini()
    * \throws rclcpp::execptions::RCLError from rcl_wait_set_fini()
    * \throws std::system_error anything std::mutex::lock() throws
@@ -148,6 +153,12 @@ public:
   virtual
   bool
   is_shutdown();
+
+  /// Return true if the graph listener was started.
+  RCLCPP_PUBLIC
+  virtual
+  bool
+  is_started();
 
 protected:
   /// Main function for the listening thread.
@@ -176,7 +187,6 @@ private:
   void
   __shutdown();
 
-  std::weak_ptr<rclcpp::Context> weak_parent_context_;
   std::shared_ptr<rcl_context_t> rcl_parent_context_;
 
   std::thread listener_thread_;
