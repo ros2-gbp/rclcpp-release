@@ -202,17 +202,9 @@ TEST_F(TestNode, GetParameterFromEvent)
   EXPECT_THROW(
     ParameterEventHandler::get_parameter_from_event(*multiple, "my_int", wrong_name),
     std::runtime_error);
-
-  // Parameter not part of event
-  // with correct node
-  rclcpp::Parameter expect_notset_ret("my_notset", rclcpp::PARAMETER_NOT_SET);
-  rclcpp::Parameter ret;
-  EXPECT_NO_THROW(
-    ret = ParameterEventHandler::get_parameter_from_event(*multiple, "my_notset", node_name););
-  EXPECT_EQ(ret, expect_notset_ret);
-  // with incorrect node
+  // Throws if parameter not part of event
   EXPECT_THROW(
-    ParameterEventHandler::get_parameter_from_event(*multiple, "my_notset", wrong_name),
+    ParameterEventHandler::get_parameter_from_event(*diff_ns_bool, "my_int", node_name),
     std::runtime_error);
 }
 
