@@ -18,3 +18,4 @@ foreach(resource_index ${_RCLCPP_COMPONENTS_PACKAGE_RESOURCE_INDICES})
   ament_index_register_resource(
     ${resource_index} CONTENT "${_RCLCPP_COMPONENTS_${resource_index}__NODES}")
 endforeach()
+
