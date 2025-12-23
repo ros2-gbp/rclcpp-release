@@ -94,8 +94,6 @@ public:
   void handle_dynamic_message(
     const DynamicMessage::SharedPtr &,
     const rclcpp::MessageInfo &) override {}
-  void disable_callbacks() override {}
-  void enable_callbacks() override {}
 };
 
 class TestNodeTopics : public ::testing::Test
