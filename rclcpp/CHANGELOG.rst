@@ -2,6 +2,13 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+28.1.16 (2026-01-21)
+--------------------
+* Improve the robustness of the TopicEndpointInfo constructor (`#3013 <https://github.com/ros2/rclcpp/issues/3013>`_) (`#3015 <https://github.com/ros2/rclcpp/issues/3015>`_)
+  (cherry picked from commit 7f783cbf587a2897572263b48b9583d8021f3958)
+  Co-authored-by: Barry Xu <barry.xu@sony.com>
+* Contributors: mergify[bot]
+
 28.1.15 (2025-12-23)
 --------------------
 * Unified Node Interfaces: Add const version of get_node_x_interface() (`#3006 <https://github.com/ros2/rclcpp/issues/3006>`_) (`#3009 <https://github.com/ros2/rclcpp/issues/3009>`_)
