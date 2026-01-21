@@ -30,8 +30,15 @@
 
 using namespace std::chrono_literals;
 
+/// We want to test everything for both the wall and generic timer.
+enum class TimerType
+{
+  WALL_TIMER,
+  GENERIC_TIMER,
+};
+
 /// Timer testing bring up and teardown
-class TestTimer : public ::testing::Test
+class TestTimer : public ::testing::TestWithParam<TimerType>
 {
 protected:
   void SetUp() override
@@ -44,7 +51,29 @@ protected:
 
     test_node = std::make_shared<rclcpp::Node>("test_timer_node");
 
-    timer = test_node->create_wall_timer(
+    auto timer_callback = [this]() -> void {
+        this->has_timer_run.store(true);
+
+        if (this->cancel_timer.load()) {
+          this->timer->cancel();
+        }
+        // prevent any tests running timer from blocking
+        this->executor->cancel();
+      };
+
+    // Store the timer type for use in TEST_P declarations.
+    timer_type = GetParam();
+    switch (timer_type) {
+      case TimerType::WALL_TIMER:
+        timer = test_node->create_wall_timer(100ms, timer_callback);
+        EXPECT_TRUE(timer->is_steady());
+        break;
+      case TimerType::GENERIC_TIMER:
+        timer = test_node->create_timer(100ms, timer_callback);
+        EXPECT_FALSE(timer->is_steady());
+        break;
+    }
+    timer_without_autostart = test_node->create_wall_timer(
       100ms,
       [this]() -> void
       {
@@ -55,9 +84,8 @@ protected:
         }
         // prevent any tests running timer from blocking
         this->executor->cancel();
-      }
-    );
-    EXPECT_TRUE(timer->is_steady());
+      }, nullptr, false);
+    EXPECT_TRUE(timer_without_autostart->is_steady());
 
     executor->add_node(test_node);
     // don't start spinning, let the test dictate when
@@ -72,12 +100,14 @@ protected:
   }
 
   // set to true if the timer callback executed, false otherwise
+  TimerType timer_type;
   std::atomic<bool> has_timer_run;
   // flag used to cancel the timer in the timer callback. If true cancel the timer, otherwise
   // cancel the executor (preventing any tests from blocking)
   std::atomic<bool> cancel_timer;
   rclcpp::Node::SharedPtr test_node;
   std::shared_ptr<rclcpp::TimerBase> timer;
+  std::shared_ptr<rclcpp::TimerBase> timer_without_autostart;
   std::shared_ptr<rclcpp::executors::SingleThreadedExecutor> executor;
 };
 
@@ -91,7 +121,7 @@ void test_initial_conditions(
 }
 
 /// Simple test
-TEST_F(TestTimer, test_simple_cancel)
+TEST_P(TestTimer, test_simple_cancel)
 {
   // expect clean state, don't run otherwise
   test_initial_conditions(timer, has_timer_run);
@@ -104,7 +134,7 @@ TEST_F(TestTimer, test_simple_cancel)
 }
 
 /// Test state when using reset
-TEST_F(TestTimer, test_is_canceled_reset)
+TEST_P(TestTimer, test_is_canceled_reset)
 {
   // expect clean state, don't run otherwise
   test_initial_conditions(timer, has_timer_run);
@@ -129,7 +159,7 @@ TEST_F(TestTimer, test_is_canceled_reset)
 }
 
 /// Run and check state, cancel the executor
-TEST_F(TestTimer, test_run_cancel_executor)
+TEST_P(TestTimer, test_run_cancel_executor)
 {
   // expect clean state, don't run otherwise
   test_initial_conditions(timer, has_timer_run);
@@ -146,7 +176,7 @@ TEST_F(TestTimer, test_run_cancel_executor)
 }
 
 /// Run and check state, cancel the timer
-TEST_F(TestTimer, test_run_cancel_timer)
+TEST_P(TestTimer, test_run_cancel_timer)
 {
   // expect clean state, don't run otherwise
   test_initial_conditions(timer, has_timer_run);
@@ -159,7 +189,7 @@ TEST_F(TestTimer, test_run_cancel_timer)
   EXPECT_TRUE(timer->is_canceled());
 }
 
-TEST_F(TestTimer, test_bad_arguments) {
+TEST_P(TestTimer, test_bad_arguments) {
   auto node_base = rclcpp::node_interfaces::get_node_base_interface(test_node);
   auto context = node_base->get_context();
 
@@ -198,13 +228,19 @@ TEST_F(TestTimer, test_bad_arguments) {
     rclcpp::exceptions::RCLError);
 }
 
-TEST_F(TestTimer, callback_with_timer) {
+TEST_P(TestTimer, callback_with_timer) {
   rclcpp::TimerBase * timer_ptr = nullptr;
-  timer = test_node->create_wall_timer(
-    std::chrono::milliseconds(1),
-    [&timer_ptr](rclcpp::TimerBase & timer) {
+  auto timer_callback = [&timer_ptr](rclcpp::TimerBase & timer) {
       timer_ptr = &timer;
-    });
+    };
+  switch (timer_type) {
+    case TimerType::WALL_TIMER:
+      timer = test_node->create_wall_timer(1ms, timer_callback);
+      break;
+    case TimerType::GENERIC_TIMER:
+      timer = test_node->create_timer(1ms, timer_callback);
+      break;
+  }
   auto start = std::chrono::steady_clock::now();
   while (nullptr == timer_ptr &&
     (std::chrono::steady_clock::now() - start) < std::chrono::milliseconds(100))
@@ -216,13 +252,41 @@ TEST_F(TestTimer, callback_with_timer) {
   EXPECT_FALSE(timer_ptr->is_ready());
 }
 
-TEST_F(TestTimer, callback_with_period_zero) {
+TEST_P(TestTimer, callback_with_timer_info) {
+  rclcpp::TimerInfo info;
+  auto timer_callback = [&info](const rclcpp::TimerInfo & timer_info) {
+      info = timer_info;
+    };
+  switch (timer_type) {
+    case TimerType::WALL_TIMER:
+      timer = test_node->create_wall_timer(1ms, timer_callback);
+      break;
+    case TimerType::GENERIC_TIMER:
+      timer = test_node->create_timer(1ms, timer_callback);
+      break;
+  }
+  auto start = std::chrono::steady_clock::now();
+  while (info.actual_call_time.nanoseconds() == 0 &&
+    (std::chrono::steady_clock::now() - start) < std::chrono::milliseconds(100))
+  {
+    executor->spin_once(std::chrono::milliseconds(10));
+  }
+  EXPECT_GE(info.actual_call_time, info.expected_call_time);
+}
+
+TEST_P(TestTimer, callback_with_period_zero) {
   rclcpp::TimerBase * timer_ptr = nullptr;
-  timer = test_node->create_wall_timer(
-    std::chrono::milliseconds(0),
-    [&timer_ptr](rclcpp::TimerBase & timer) {
+  auto timer_callback = [&timer_ptr](rclcpp::TimerBase & timer) {
       timer_ptr = &timer;
-    });
+    };
+  switch (timer_type) {
+    case TimerType::WALL_TIMER:
+      timer = test_node->create_wall_timer(0ms, timer_callback);
+      break;
+    case TimerType::GENERIC_TIMER:
+      timer = test_node->create_timer(0ms, timer_callback);
+      break;
+  }
   auto start = std::chrono::steady_clock::now();
   while (nullptr == timer_ptr &&
     (std::chrono::steady_clock::now() - start) < std::chrono::milliseconds(100))
@@ -235,7 +299,7 @@ TEST_F(TestTimer, callback_with_period_zero) {
 }
 
 /// Test internal failures using mocks
-TEST_F(TestTimer, test_failures_with_exceptions)
+TEST_P(TestTimer, test_failures_with_exceptions)
 {
   // expect clean state, don't run otherwise
   test_initial_conditions(timer, has_timer_run);
@@ -243,12 +307,14 @@ TEST_F(TestTimer, test_failures_with_exceptions)
     std::shared_ptr<rclcpp::TimerBase> timer_to_test_destructor;
     // Test destructor failure, just logs a msg
     auto mock = mocking_utils::inject_on_return("lib:rclcpp", rcl_timer_fini, RCL_RET_ERROR);
-    EXPECT_NO_THROW(
-    {
+    if (timer_type == TimerType::WALL_TIMER) {
       timer_to_test_destructor =
-      test_node->create_wall_timer(std::chrono::milliseconds(0), [](void) {});
-      timer_to_test_destructor.reset();
-    });
+        test_node->create_wall_timer(std::chrono::milliseconds(0), [](void) {});
+    } else {
+      timer_to_test_destructor =
+        test_node->create_timer(std::chrono::milliseconds(0), [](void) {});
+    }
+    timer_to_test_destructor.reset();
   }
   {
     auto mock = mocking_utils::patch_and_return(
@@ -282,4 +348,35 @@ TEST_F(TestTimer, test_failures_with_exceptions)
       timer->time_until_trigger(),
       std::runtime_error("Timer could not get time until next call: error not set"));
   }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+  PerTimerType, TestTimer,
+  ::testing::Values(TimerType::WALL_TIMER, TimerType::GENERIC_TIMER),
+  [](const ::testing::TestParamInfo<TimerType> & info) -> std::string {
+    switch (info.param) {
+      case TimerType::WALL_TIMER:
+        return std::string("wall_timer");
+      case TimerType::GENERIC_TIMER:
+        return std::string("generic_timer");
+      default:
+        break;
+    }
+    return std::string("unknown");
+  }
+);
+
+/// Simple test of a timer without autostart
+TEST_P(TestTimer, test_timer_without_autostart)
+{
+  EXPECT_TRUE(timer_without_autostart->is_canceled());
+  EXPECT_EQ(
+    timer_without_autostart->time_until_trigger().count(),
+    std::chrono::nanoseconds::max().count());
+  // Reset to change start timer
+  timer_without_autostart->reset();
+  EXPECT_LE(
+    timer_without_autostart->time_until_trigger().count(),
+    std::chrono::nanoseconds::max().count());
+  EXPECT_FALSE(timer_without_autostart->is_canceled());
 }

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RCLCPP__QOS_EVENT_HPP_
-#define RCLCPP__QOS_EVENT_HPP_
+#ifndef RCLCPP__EVENT_HANDLER_HPP_
+#define RCLCPP__EVENT_HANDLER_HPP_
 
 #include <functional>
 #include <memory>
@@ -25,6 +25,7 @@
 #include "rcl/event_callback.h"
 #include "rmw/impl/cpp/demangle.hpp"
 #include "rmw/incompatible_qos_events_statuses.h"
+#include "rmw/events_statuses/incompatible_type.h"
 
 #include "rcutils/logging_macros.h"
 
@@ -45,6 +46,9 @@ using QOSMessageLostInfo = rmw_message_lost_status_t;
 using QOSOfferedIncompatibleQoSInfo = rmw_offered_qos_incompatible_event_status_t;
 using QOSRequestedIncompatibleQoSInfo = rmw_requested_qos_incompatible_event_status_t;
 
+using IncompatibleTypeInfo = rmw_incompatible_type_status_t;
+using MatchedInfo = rmw_matched_status_t;
+
 using QOSDeadlineRequestedCallbackType = std::function<void (QOSDeadlineRequestedInfo &)>;
 using QOSDeadlineOfferedCallbackType = std::function<void (QOSDeadlineOfferedInfo &)>;
 using QOSLivelinessChangedCallbackType = std::function<void (QOSLivelinessChangedInfo &)>;
@@ -54,12 +58,18 @@ using QOSOfferedIncompatibleQoSCallbackType = std::function<void (QOSOfferedInco
 using QOSRequestedIncompatibleQoSCallbackType =
   std::function<void (QOSRequestedIncompatibleQoSInfo &)>;
 
+using IncompatibleTypeCallbackType = std::function<void (IncompatibleTypeInfo &)>;
+using PublisherMatchedCallbackType = std::function<void (MatchedInfo &)>;
+using SubscriptionMatchedCallbackType = std::function<void (MatchedInfo &)>;
+
 /// Contains callbacks for various types of events a Publisher can receive from the middleware.
 struct PublisherEventCallbacks
 {
   QOSDeadlineOfferedCallbackType deadline_callback;
   QOSLivelinessLostCallbackType liveliness_callback;
   QOSOfferedIncompatibleQoSCallbackType incompatible_qos_callback;
+  IncompatibleTypeCallbackType incompatible_type_callback;
+  PublisherMatchedCallbackType matched_callback;
 };
 
 /// Contains callbacks for non-message events that a Subscription can receive from the middleware.
@@ -69,6 +79,8 @@ struct SubscriptionEventCallbacks
   QOSLivelinessChangedCallbackType liveliness_callback;
   QOSRequestedIncompatibleQoSCallbackType incompatible_qos_callback;
   QOSMessageLostCallbackType message_lost_callback;
+  IncompatibleTypeCallbackType incompatible_type_callback;
+  SubscriptionMatchedCallbackType matched_callback;
 };
 
 class UnsupportedEventTypeException : public exceptions::RCLErrorBase, public std::runtime_error
@@ -86,7 +98,7 @@ public:
     const std::string & prefix);
 };
 
-class QOSEventHandlerBase : public Waitable
+class EventHandlerBase : public Waitable
 {
 public:
   enum class EntityType : std::size_t
@@ -95,7 +107,7 @@ public:
   };
 
   RCLCPP_PUBLIC
-  virtual ~QOSEventHandlerBase();
+  virtual ~EventHandlerBase();
 
   /// Get the number of ready events
   RCLCPP_PUBLIC
@@ -105,12 +117,12 @@ public:
   /// Add the Waitable to a wait set.
   RCLCPP_PUBLIC
   void
-  add_to_wait_set(rcl_wait_set_t * wait_set) override;
+  add_to_wait_set(rcl_wait_set_t & wait_set) override;
 
   /// Check if the Waitable is ready.
   RCLCPP_PUBLIC
   bool
-  is_ready(rcl_wait_set_t * wait_set) override;
+  is_ready(const rcl_wait_set_t & wait_set) override;
 
   /// Set a callback to be called when each new event instance occurs.
   /**
@@ -166,14 +178,14 @@ public:
           RCLCPP_ERROR_STREAM(
             // TODO(wjwwood): get this class access to the node logger it is associated with
             rclcpp::get_logger("rclcpp"),
-            "rclcpp::QOSEventHandlerBase@" << this <<
+            "rclcpp::EventHandlerBase@" << this <<
               " caught " << rmw::impl::cpp::demangle(exception) <<
               " exception in user-provided callback for the 'on ready' callback: " <<
               exception.what());
         } catch (...) {
           RCLCPP_ERROR_STREAM(
             rclcpp::get_logger("rclcpp"),
-            "rclcpp::QOSEventHandlerBase@" << this <<
+            "rclcpp::EventHandlerBase@" << this <<
               " caught unhandled exception in user-provided callback " <<
               "for the 'on ready' callback");
         }
@@ -185,7 +197,7 @@ public:
     // This two-step setting, prevents a gap where the old std::function has
     // been replaced but the middleware hasn't been told about the new one yet.
     set_on_new_event_callback(
-      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
+      rclcpp::detail::cpp_callback_trampoline<decltype(new_callback), const void *, size_t>,
       static_cast<const void *>(&new_callback));
 
     // Store the std::function to keep it in scope, also overwrites the existing one.
@@ -193,7 +205,8 @@ public:
 
     // Set it again, now using the permanent storage.
     set_on_new_event_callback(
-      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
+      rclcpp::detail::cpp_callback_trampoline<
+        decltype(on_new_event_callback_), const void *, size_t>,
       static_cast<const void *>(&on_new_event_callback_));
   }
 
@@ -213,18 +226,21 @@ protected:
   void
   set_on_new_event_callback(rcl_event_callback_t callback, const void * user_data);
 
-  rcl_event_t event_handle_;
-  size_t wait_set_event_index_;
   std::recursive_mutex callback_mutex_;
   std::function<void(size_t)> on_new_event_callback_{nullptr};
+
+  rcl_event_t event_handle_;
+  size_t wait_set_event_index_;
 };
 
+using QOSEventHandlerBase [[deprecated("Use rclcpp::EventHandlerBase")]] = EventHandlerBase;
+
 template<typename EventCallbackT, typename ParentHandleT>
-class QOSEventHandler : public QOSEventHandlerBase
+class EventHandler : public EventHandlerBase
 {
 public:
   template<typename InitFuncT, typename EventTypeEnum>
-  QOSEventHandler(
+  EventHandler(
     const EventCallbackT & callback,
     InitFuncT init_func,
     ParentHandleT parent_handle,
@@ -242,6 +258,16 @@ public:
         rclcpp::exceptions::throw_from_rcl_error(ret, "Failed to initialize event");
       }
     }
+  }
+
+  ~EventHandler()
+  {
+    // Since the rmw event listener holds a reference to the
+    // "on ready" callback, we need to clear it on destruction of this class.
+    // This clearing is not needed for other rclcpp entities like pub/subs, since
+    // they do own the underlying rmw entities, which are destroyed
+    // on their rclcpp destructors, thus no risk of dangling pointers.
+    clear_on_ready_callback();
   }
 
   /// Take data so that the callback cannot be scheduled again
@@ -268,7 +294,7 @@ public:
 
   /// Execute any entities of the Waitable that are ready.
   void
-  execute(std::shared_ptr<void> & data) override
+  execute(const std::shared_ptr<void> & data) override
   {
     if (!data) {
       throw std::runtime_error("'data' is empty");
@@ -286,6 +312,10 @@ private:
   EventCallbackT event_callback_;
 };
 
+template<typename EventCallbackT, typename ParentHandleT>
+using QOSEventHandler [[deprecated("Use rclcpp::EventHandler")]] = EventHandler<EventCallbackT,
+    ParentHandleT>;
+
 }  // namespace rclcpp
 
-#endif  // RCLCPP__QOS_EVENT_HPP_
+#endif  // RCLCPP__EVENT_HANDLER_HPP_
