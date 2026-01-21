@@ -3,6 +3,20 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+28.1.16 (2026-01-21)
+--------------------
+* Update exception documentation for goal cancellation in ServerGoalHandle (`#3019 <https://github.com/ros2/rclcpp/issues/3019>`_) (`#3023 <https://github.com/ros2/rclcpp/issues/3023>`_)
+  * Update exception documentation for goal cancellation
+  The documentation for the canceled function is misleading.
+  Previously, the description said:
+  1. "Only call this if the goal is canceling." and
+  2. "\throws rclcpp::exceptions::RCLError If the goal is in any state besides executing."
+  This is a contradiction.
+  Experimentally verified that if the goal is executing and this method is called, an error is thrown. This makes the second statement wrong => correct the statement in the documentation.
+  (cherry picked from commit 6397047d4795f594cf65dd360d70f5c9c3618700)
+  Co-authored-by: Andrei Costinescu <AndreiCostinescu@users.noreply.github.com>
+* Contributors: mergify[bot]
+
 28.1.15 (2025-12-23)
 --------------------
 
