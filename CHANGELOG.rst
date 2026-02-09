@@ -3,6 +3,9 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+28.1.17 (2026-02-09)
+--------------------
+
 28.1.16 (2026-01-21)
 --------------------
 * Update exception documentation for goal cancellation in ServerGoalHandle (`#3019 <https://github.com/ros2/rclcpp/issues/3019>`_) (`#3023 <https://github.com/ros2/rclcpp/issues/3023>`_)
