@@ -2,6 +2,13 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+16.0.18 (2026-02-09)
+--------------------
+* print warning message on owner node if the parameter operation fails. (backport `#3037 <https://github.com/ros2/rclcpp/issues/3037>`_) (`#3040 <https://github.com/ros2/rclcpp/issues/3040>`_)
+* fix context in wait for message wait set (`#3030 <https://github.com/ros2/rclcpp/issues/3030>`_) (`#3033 <https://github.com/ros2/rclcpp/issues/3033>`_)
+* Improve the robustness of the TopicEndpointInfo constructor (backport `#3013 <https://github.com/ros2/rclcpp/issues/3013>`_) (`#3016 <https://github.com/ros2/rclcpp/issues/3016>`_)
+* Contributors: mergify[bot]
+
 16.0.17 (2025-12-23)
 --------------------
 * Unified Node Interfaces: Add const version of get_node_x_interface() (`#3006 <https://github.com/ros2/rclcpp/issues/3006>`_) (`#3010 <https://github.com/ros2/rclcpp/issues/3010>`_)
