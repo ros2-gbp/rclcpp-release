@@ -201,7 +201,6 @@ public:
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add subscription to wait set: %s", rcl_get_error_string().str);
-        rcl_reset_error();
         return false;
       }
     }
@@ -211,7 +210,6 @@ public:
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add client to wait set: %s", rcl_get_error_string().str);
-        rcl_reset_error();
         return false;
       }
     }
@@ -221,7 +219,6 @@ public:
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add service to wait set: %s", rcl_get_error_string().str);
-        rcl_reset_error();
         return false;
       }
     }
@@ -231,7 +228,6 @@ public:
         RCUTILS_LOG_ERROR_NAMED(
           "rclcpp",
           "Couldn't add timer to wait set: %s", rcl_get_error_string().str);
-        rcl_reset_error();
         return false;
       }
     }

@@ -20,7 +20,6 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 #include "rcl/error_handling.h"
 #include "rcl/event_callback.h"
@@ -222,13 +221,6 @@ public:
     }
   }
 
-  RCLCPP_PUBLIC
-  std::vector<std::shared_ptr<rclcpp::TimerBase>>
-  get_timers() const override
-  {
-    return {};
-  }
-
 protected:
   RCLCPP_PUBLIC
   void
@@ -240,6 +232,8 @@ protected:
   rcl_event_t event_handle_;
   size_t wait_set_event_index_;
 };
+
+using QOSEventHandlerBase [[deprecated("Use rclcpp::EventHandlerBase")]] = EventHandlerBase;
 
 template<typename EventCallbackT, typename ParentHandleT>
 class EventHandler : public EventHandlerBase
@@ -286,15 +280,15 @@ public:
       RCUTILS_LOG_ERROR_NAMED(
         "rclcpp",
         "Couldn't take event info: %s", rcl_get_error_string().str);
-      rcl_reset_error();
       return nullptr;
     }
     return std::static_pointer_cast<void>(std::make_shared<EventCallbackInfoT>(callback_info));
   }
 
   std::shared_ptr<void>
-  take_data_by_entity_id([[maybe_unused]] size_t id) override
+  take_data_by_entity_id(size_t id) override
   {
+    (void)id;
     return take_data();
   }
 
@@ -317,6 +311,11 @@ private:
   ParentHandleT parent_handle_;
   EventCallbackT event_callback_;
 };
+
+template<typename EventCallbackT, typename ParentHandleT>
+using QOSEventHandler [[deprecated("Use rclcpp::EventHandler")]] = EventHandler<EventCallbackT,
+    ParentHandleT>;
+
 }  // namespace rclcpp
 
 #endif  // RCLCPP__EVENT_HANDLER_HPP_

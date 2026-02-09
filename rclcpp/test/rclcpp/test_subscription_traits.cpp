@@ -26,44 +26,41 @@
 
 #include "test_msgs/msg/empty.hpp"
 
-void serialized_callback_copy([[maybe_unused]] rcl_serialized_message_t unused)
+void serialized_callback_copy(rcl_serialized_message_t unused)
 {
-  // This function is intentionally left empty.
+  (void) unused;
 }
 
-void serialized_callback_shared_ptr(
-  [[maybe_unused]] std::shared_ptr<rcl_serialized_message_t> unused)
+void serialized_callback_shared_ptr(std::shared_ptr<rcl_serialized_message_t> unused)
 {
-  // This function is intentionally left empty.
+  (void) unused;
 }
 
-void not_serialized_callback([[maybe_unused]] char * unused)
+void not_serialized_callback(char * unused)
 {
-  // This function is intentionally left empty.
+  (void) unused;
 }
 
-void not_serialized_shared_ptr_callback([[maybe_unused]] std::shared_ptr<char> unused)
+void not_serialized_shared_ptr_callback(std::shared_ptr<char> unused)
 {
-  // This function is intentionally left empty.
+  (void) unused;
 }
 
 void not_serialized_unique_ptr_callback(
-  [[maybe_unused]]
   test_msgs::msg::Empty::UniquePtrWithDeleter<rclcpp::allocator::Deleter<std::allocator<void>,
   test_msgs::msg::Empty>> unused)
 {
-  // This function is intentionally left empty.
+  (void) unused;
 }
 
-void rclcpp_serialized_callback_copy([[maybe_unused]] rclcpp::SerializedMessage unused)
+void rclcpp_serialized_callback_copy(rclcpp::SerializedMessage unused)
 {
-  // This function is intentionally left empty.
+  (void) unused;
 }
 
-void rclcpp_serialized_callback_shared_ptr(
-  [[maybe_unused]] std::shared_ptr<rclcpp::SerializedMessage> unused)
+void rclcpp_serialized_callback_shared_ptr(std::shared_ptr<rclcpp::SerializedMessage> unused)
 {
-  // This function is intentionally left empty.
+  (void) unused;
 }
 
 TEST(TestSubscriptionTraits, is_serialized_callback) {
@@ -88,9 +85,9 @@ TEST(TestSubscriptionTraits, is_serialized_callback) {
     rclcpp::subscription_traits::is_serialized_callback<decltype(cb4)>::value == false,
     "passing a std::shared_tr<char> is not a serialized callback");
 
-  auto cb5 = []([[maybe_unused]] rcl_serialized_message_t unused) -> void
+  auto cb5 = [](rcl_serialized_message_t unused) -> void
     {
-      // This function is intentionally left empty.
+      (void) unused;
     };
   static_assert(
     rclcpp::subscription_traits::is_serialized_callback<decltype(cb5)>::value == false,
@@ -99,10 +96,9 @@ TEST(TestSubscriptionTraits, is_serialized_callback) {
   using MessageT = test_msgs::msg::Empty;
   using MessageTAllocator = std::allocator<void>;
   using MessageTDeallocator = rclcpp::allocator::Deleter<MessageTAllocator, MessageT>;
-  auto cb6 = [](
-    [[maybe_unused]] MessageT::UniquePtrWithDeleter<MessageTDeallocator> unique_msg_ptr) -> void
+  auto cb6 = [](MessageT::UniquePtrWithDeleter<MessageTDeallocator> unique_msg_ptr) -> void
     {
-      // This function is intentionally left empty.
+      (void) unique_msg_ptr;
     };
   static_assert(
     rclcpp::subscription_traits::is_serialized_callback<decltype(cb6)>::value == false,
@@ -171,9 +167,9 @@ TEST(TestSubscriptionTraits, callback_messages) {
       rclcpp::subscription_traits::has_message_type<decltype(cb4)>::type>::value,
     "not serialized shared_ptr callback message type is std::shared_ptr<char>");
 
-  auto cb5 = []([[maybe_unused]] rcl_serialized_message_t unused) -> void
+  auto cb5 = [](rcl_serialized_message_t unused) -> void
     {
-      // This function is intentionally left empty.
+      (void) unused;
     };
   static_assert(
     std::is_same<
@@ -184,10 +180,9 @@ TEST(TestSubscriptionTraits, callback_messages) {
   using MessageT = test_msgs::msg::Empty;
   using MessageTAllocator = std::allocator<MessageT>;
   using MessageTDeallocator = rclcpp::allocator::Deleter<MessageTAllocator, MessageT>;
-  auto cb6 = [](
-    [[maybe_unused]] std::unique_ptr<MessageT, MessageTDeallocator> unique_msg_ptr) -> void
+  auto cb6 = [](std::unique_ptr<MessageT, MessageTDeallocator> unique_msg_ptr) -> void
     {
-      // This function is intentionally left empty.
+      (void) unique_msg_ptr;
     };
   static_assert(
     std::is_same<

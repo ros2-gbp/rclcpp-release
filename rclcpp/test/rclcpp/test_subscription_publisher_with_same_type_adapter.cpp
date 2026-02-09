@@ -57,17 +57,21 @@ struct TypeAdapter<std::string, rclcpp::msg::String>
 
   static void
   convert_to_ros_message(
-    [[maybe_unused]] const custom_type & source,
-    [[maybe_unused]] ros_message_type & destination)
+    const custom_type & source,
+    ros_message_type & destination)
   {
+    (void) source;
+    (void) destination;
     throw std::runtime_error("This should not happen");
   }
 
   static void
   convert_to_custom(
-    [[maybe_unused]] const ros_message_type & source,
-    [[maybe_unused]] custom_type & destination)
+    const ros_message_type & source,
+    custom_type & destination)
   {
+    (void) source;
+    (void) destination;
     throw std::runtime_error("This should not happen");
   }
 };

@@ -110,8 +110,9 @@ public:
   }
 
   bool
-  is_ready([[maybe_unused]] const rcl_wait_set_t & wait_set) override
+  is_ready(const rcl_wait_set_t & wait_set) override
   {
+    (void) wait_set;
     return buffer_->has_data();
   }
 

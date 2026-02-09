@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <inttypes.h>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -74,28 +75,157 @@ class ServerBaseImpl
 {
 public:
   ServerBaseImpl(
-    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base,
-    const rosidl_action_type_support_t * type_support,
     rclcpp::Clock::SharedPtr clock,
     rclcpp::Logger logger
   )
-  : node_handle_(node_base->get_shared_rcl_node_handle()),
-    action_type_support_(type_support),
-    clock_(clock),
-    logger_(logger)
+  : clock_(clock), logger_(logger)
   {
+  }
+
+  ~ServerBaseImpl()
+  {
+    stop_expire_thread();
+  }
+
+  std::recursive_mutex expire_thread_reentrant_mutex_;
+  std::thread expire_thread;
+
+  // must be a class member, so keep it in scope
+  std::function<void(size_t)> expire_reset_callback;
+
+  rclcpp::ClockConditionalVariable::SharedPtr expire_cv;
+  std::atomic<bool> expire_time_changed = false;
+  std::atomic<bool> terminate_expire_thread = true;
+
+  void
+  stop_expire_thread()
+  {
+    std::lock_guard<std::recursive_mutex> lock(expire_thread_reentrant_mutex_);
+    if(expire_cv) {
+      {
+        // Note, even though terminate_expire_thread is an atomic, we
+        // need to acquire the mutex, to avoid a race between the wait_until
+        // and the setting of this terminate_expire_thread
+        std::lock_guard<std::mutex> l(expire_cv->mutex());
+        terminate_expire_thread = true;
+      }
+      expire_cv->notify_one();
+      expire_thread.join();
+      expire_reset_callback = std::function<void(size_t)>();
+      expire_cv.reset();
+    }
+  }
+
+  void
+  start_expire_thread(std::function<void(size_t, int)> expire_ready_cb)
+  {
+    {
+      std::lock_guard<std::recursive_mutex> lock(expire_thread_reentrant_mutex_);
+      if(expire_cv) {
+        return;
+      }
+
+      terminate_expire_thread = false;
+      expire_cv = std::make_shared<rclcpp::ClockConditionalVariable>(clock_);
+    }
+
+    rclcpp::Context::SharedPtr context = rclcpp::contexts::get_global_default_context();
+    std::shared_ptr<rcl_context_t> rcl_context = context->get_rcl_context();
+
+    rcl_wait_set_t wait_set = rcl_get_zero_initialized_wait_set();
+    rcl_ret_t ret =
+      rcl_wait_set_init(&wait_set, num_subscriptions_, num_guard_conditions_, num_timers_,
+        num_clients_, num_services_, 0, rcl_context.get(), rcl_get_default_allocator());
+    if(ret != RCL_RET_OK) {
+      throw std::runtime_error("Internal error starting timer thread");
+    }
+
+    ret = rcl_action_wait_set_add_action_server(
+      &wait_set, action_server_.get(), NULL);
+    if (RCL_RET_OK != ret) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "ServerBase::add_to_wait_set() failed");
+    }
+
+    // extract the timer from the wait set
+    const rcl_timer_t *expire_timer = wait_set.timers[0];
+
+    // don't need the wait set any more
+    ret = rcl_wait_set_fini(&wait_set);
+
+    // the maybe_unused is needed here to satisfy cpplint
+    expire_reset_callback = [this] ([[maybe_unused]] size_t reset_calls)
+      {
+        {
+          std::lock_guard<std::mutex> l(expire_cv->mutex());
+          expire_time_changed = true;
+        }
+        expire_cv->notify_one();
+      };
+
+    rcl_event_callback_t rcl_reset_callback = rclcpp::detail::cpp_callback_trampoline<
+      decltype(expire_reset_callback), const void *, size_t>;
+
+    ret = rcl_timer_set_on_reset_callback(expire_timer, rcl_reset_callback,
+        static_cast<const void *>(&expire_reset_callback));
+    if (ret != RCL_RET_OK) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "Failed to set timer on reset callback");
+    }
+
+    expire_thread = std::thread([this, expire_timer, expire_ready_callback = expire_ready_cb]() {
+          rcl_clock_type_t clock_type = clock_->get_clock_type();
+
+          while(!terminate_expire_thread) {
+            {
+              std::unique_lock<std::mutex> l(expire_cv->mutex());
+
+              // reset to false, we are handling the time change right now
+              expire_time_changed = false;
+              int64_t time_until_call = 0;
+
+              auto ret2 = rcl_timer_get_time_until_next_call(expire_timer, &time_until_call);
+              if (ret2 == RCL_RET_TIMER_CANCELED) {
+                rclcpp::Duration endless(std::chrono::hours(100));
+                expire_cv->wait_until(l, clock_->now() + endless, [this] () -> bool {
+                  return expire_time_changed || terminate_expire_thread;
+                });
+                continue;
+              }
+
+              if(time_until_call > 0) {
+                rclcpp::Time next_wakeup(clock_->now().nanoseconds() + time_until_call, clock_type);
+                expire_cv->wait_until(l, next_wakeup, [this] () -> bool {
+                  return expire_time_changed || terminate_expire_thread;
+                });
+              }
+            }
+
+            // don't call expire callback if we are terminating
+            if(terminate_expire_thread) {
+              return;
+            }
+
+            bool is_ready = false;
+            if(rcl_timer_is_ready(expire_timer, &is_ready) == RCL_RET_OK && is_ready) {
+              // we need to cancel the timer here, to avoid a endless loop
+              // in case a new goal expires, the timer will be reset.
+              auto ret2 = rcl_timer_cancel(const_cast<rcl_timer_t *>(expire_timer));
+              if(ret2 != RCL_RET_OK) {
+                rclcpp::exceptions::throw_from_rcl_error(ret2, "Failed to cancel timer");
+              }
+
+              std::lock_guard<std::recursive_mutex> lock(expire_thread_reentrant_mutex_);
+              if(expire_ready_callback) {
+                expire_ready_callback(1, static_cast<int>(ServerBase::EntityType::Expired));
+              }
+            }
+          }
+      });
   }
 
   // Lock for action_server_
   std::recursive_mutex action_server_reentrant_mutex_;
 
-  std::shared_ptr<rcl_node_t> node_handle_;
-
-  const rosidl_action_type_support_t * action_type_support_;
-
   rclcpp::Clock::SharedPtr clock_;
-
-  rclcpp::TimerBase::SharedPtr expire_timer_;
 
   // Do not declare this before clock_ as this depends on clock_(see #1526)
   std::shared_ptr<rcl_action_server_t> action_server_;
@@ -133,8 +263,7 @@ ServerBase::ServerBase(
   const rcl_action_server_options_t & options
 )
 : pimpl_(new ServerBaseImpl(
-      node_base, type_support, node_clock->get_clock(),
-      node_logging->get_logger().get_child("rclcpp_action")))
+      node_clock->get_clock(), node_logging->get_logger().get_child("rclcpp_action")))
 {
   auto deleter = [node_base](rcl_action_server_t * ptr)
     {
@@ -144,9 +273,7 @@ ServerBase::ServerBase(
         if (RCL_RET_OK != ret) {
           RCLCPP_DEBUG(
             rclcpp::get_logger("rclcpp_action"),
-            "failed to fini rcl_action_server_t in deleter: %s",
-            rcl_get_error_string().str);
-          rcl_reset_error();
+            "failed to fini rcl_action_server_t in deleter");
         }
         delete ptr;
       }
@@ -156,17 +283,10 @@ ServerBase::ServerBase(
   *(pimpl_->action_server_) = rcl_action_get_zero_initialized_server();
 
   rcl_node_t * rcl_node = node_base->get_rcl_node_handle();
+  rcl_clock_t * rcl_clock = pimpl_->clock_->get_clock_handle();
 
-  // This timer callback will never be called, we are only interested in
-  // weather the timer itself becomes ready or not.
-  std::function<void()> timer_callback = [] () {};
-  pimpl_->expire_timer_ = std::make_shared<rclcpp::GenericTimer<decltype (timer_callback)>>(
-      node_clock->get_clock(), std::chrono::nanoseconds(options.result_timeout.nanoseconds),
-      std::move(timer_callback), node_base->get_context(), false);
-
-  rcl_ret_t ret = rcl_action_server_init2(
-      pimpl_->action_server_.get(), rcl_node, pimpl_->expire_timer_->get_timer_handle().get(),
-      type_support, name.c_str(), &options);
+  rcl_ret_t ret = rcl_action_server_init(
+    pimpl_->action_server_.get(), rcl_node, rcl_clock, type_support, name.c_str(), &options);
 
   if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret);
@@ -445,9 +565,7 @@ ServerBase::execute_goal_request_received(
           if (RCL_RET_OK != fail_ret) {
             RCLCPP_DEBUG(
               rclcpp::get_logger("rclcpp_action"),
-              "failed to fini rcl_action_goal_handle_t in deleter: %s",
-              rcl_get_error_string().str);
-            rcl_reset_error();
+              "failed to fini rcl_action_goal_handle_t in deleter");
           }
           delete ptr;
         }
@@ -808,6 +926,8 @@ ServerBase::set_on_ready_callback(std::function<void(size_t, int)> callback)
             "is not callable.");
   }
 
+  pimpl_->start_expire_thread(callback);
+
   set_callback_to_entity(EntityType::GoalService, callback);
   set_callback_to_entity(EntityType::ResultService, callback);
   set_callback_to_entity(EntityType::CancelService, callback);
@@ -928,40 +1048,9 @@ ServerBase::clear_on_ready_callback()
     set_on_ready_callback(EntityType::GoalService, nullptr, nullptr);
     set_on_ready_callback(EntityType::ResultService, nullptr, nullptr);
     set_on_ready_callback(EntityType::CancelService, nullptr, nullptr);
+    pimpl_->stop_expire_thread();
     on_ready_callback_set_ = false;
   }
 
   entity_type_to_on_ready_callback_.clear();
-}
-
-std::vector<std::shared_ptr<rclcpp::TimerBase>>
-ServerBase::get_timers() const
-{
-  return {pimpl_->expire_timer_};
-}
-
-void
-ServerBase::configure_introspection(
-  rclcpp::Clock::SharedPtr clock, const rclcpp::QoS & qos_service_event_pub,
-  rcl_service_introspection_state_t introspection_state)
-{
-  rcl_publisher_options_t pub_opts = rcl_publisher_get_default_options();
-  pub_opts.qos = qos_service_event_pub.get_rmw_qos_profile();
-
-  if (clock == nullptr) {
-    throw std::invalid_argument("clock is nullptr");
-  }
-
-  rcl_ret_t ret = rcl_action_server_configure_action_introspection(
-    pimpl_->action_server_.get(),
-    pimpl_->node_handle_.get(),
-    clock->get_clock_handle(),
-    pimpl_->action_type_support_,
-    pub_opts,
-    introspection_state);
-
-  if (RCL_RET_OK != ret) {
-    rclcpp::exceptions::throw_from_rcl_error(
-      ret, "failed to configure action server introspection");
-  }
 }

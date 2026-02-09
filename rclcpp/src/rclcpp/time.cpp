@@ -60,10 +60,6 @@ Time::Time(int32_t seconds, uint32_t nanoseconds, rcl_clock_type_t clock_type)
 Time::Time(int64_t nanoseconds, rcl_clock_type_t clock_type)
 : rcl_time_(init_time_point(clock_type))
 {
-  if (nanoseconds < 0) {
-    throw std::runtime_error("cannot store a negative time point in rclcpp::Time");
-  }
-
   rcl_time_.nanoseconds = nanoseconds;
 }
 
@@ -253,9 +249,6 @@ Time::operator+=(const rclcpp::Duration & rhs)
   }
 
   rcl_time_.nanoseconds += rhs.nanoseconds();
-  if (rcl_time_.nanoseconds < 0) {
-    throw std::runtime_error("cannot store a negative time point in rclcpp::Time");
-  }
 
   return *this;
 }
@@ -271,9 +264,6 @@ Time::operator-=(const rclcpp::Duration & rhs)
   }
 
   rcl_time_.nanoseconds -= rhs.nanoseconds();
-  if (rcl_time_.nanoseconds < 0) {
-    throw std::runtime_error("cannot store a negative time point in rclcpp::Time");
-  }
 
   return *this;
 }

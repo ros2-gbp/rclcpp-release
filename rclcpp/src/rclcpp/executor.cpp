@@ -66,7 +66,7 @@ Executor::Executor(const rclcpp::ExecutorOptions & options)
   notify_waitable_(std::make_shared<rclcpp::executors::ExecutorNotifyWaitable>(
       [this]() {
         this->entities_need_rebuild_.store(true);
-      }, options.context)),
+      })),
   entities_need_rebuild_(true),
   collector_(notify_waitable_),
   wait_set_({}, {}, {}, {}, {}, {}, options.context),
@@ -131,7 +131,7 @@ Executor::~Executor()
 }
 
 void
-Executor::handle_updated_entities(bool notify)
+Executor::trigger_entity_recollect(bool notify)
 {
   this->entities_need_rebuild_.store(true);
 
@@ -169,17 +169,18 @@ Executor::get_automatically_added_callback_groups_from_nodes()
 void
 Executor::add_callback_group(
   rclcpp::CallbackGroup::SharedPtr group_ptr,
-  [[maybe_unused]] rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
   bool notify)
 {
+  (void) node_ptr;
   this->collector_.add_callback_group(group_ptr);
 
   try {
-    this->handle_updated_entities(notify);
+    this->trigger_entity_recollect(notify);
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string(
-              "Failed to handle entities update on callback group add: ") + ex.what());
+              "Failed to trigger guard condition on callback group add: ") + ex.what());
   }
 }
 
@@ -189,11 +190,11 @@ Executor::add_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_pt
   this->collector_.add_node(node_ptr);
 
   try {
-    this->handle_updated_entities(notify);
+    this->trigger_entity_recollect(notify);
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string(
-              "Failed to handle entities update on node add: ") + ex.what());
+              "Failed to trigger guard condition on node add: ") + ex.what());
   }
 }
 
@@ -205,11 +206,11 @@ Executor::remove_callback_group(
   this->collector_.remove_callback_group(group_ptr);
 
   try {
-    this->handle_updated_entities(notify);
+    this->trigger_entity_recollect(notify);
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string(
-              "Failed to handle entities update on callback group remove: ") + ex.what());
+              "Failed to trigger guard condition on callback group remove: ") + ex.what());
   }
 }
 
@@ -225,11 +226,11 @@ Executor::remove_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node
   this->collector_.remove_node(node_ptr);
 
   try {
-    this->handle_updated_entities(notify);
+    this->trigger_entity_recollect(notify);
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
             std::string(
-              "Failed to handle entities update on node remove: ") + ex.what());
+              "Failed to trigger guard condition on node remove: ") + ex.what());
   }
 }
 
@@ -584,7 +585,6 @@ Executor::execute_subscription(rclcpp::SubscriptionBase::SharedPtr subscription)
                 "rcl_return_loaned_message_from_subscription() failed for subscription on topic "
                 "'%s': %s",
                 subscription->get_topic_name(), rcl_get_error_string().str);
-              rcl_reset_error();
             }
             loaned_msg = nullptr;
           }
@@ -746,15 +746,32 @@ Executor::wait_for_work(std::chrono::nanoseconds timeout)
   // Clear any previous wait result
   this->wait_result_.reset();
 
+  // we need to make sure that callback groups don't get out of scope
+  // during the wait. As in jazzy, they are not covered by the DynamicStorage,
+  // we explicitly hold them here as a bugfix
+  std::vector<rclcpp::CallbackGroup::SharedPtr> cbgs;
+
   {
     std::lock_guard<std::mutex> guard(mutex_);
 
     if (this->entities_need_rebuild_.exchange(false) || current_collection_.empty()) {
       this->collect_entities();
     }
+
+    auto callback_groups = this->collector_.get_all_callback_groups();
+    cbgs.resize(callback_groups.size());
+    for(const auto & w_ptr : callback_groups) {
+      auto shr_ptr = w_ptr.lock();
+      if(shr_ptr) {
+        cbgs.push_back(std::move(shr_ptr));
+      }
+    }
   }
 
   this->wait_result_.emplace(wait_set_.wait(timeout));
+
+  // drop references to the callback groups, before trying to execute anything
+  cbgs.clear();
 
   if (!this->wait_result_ || this->wait_result_->kind() == WaitResultKind::Empty) {
     RCUTILS_LOG_WARN_NAMED(

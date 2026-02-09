@@ -307,7 +307,7 @@ public:
    * \param[in] node_handle NodeBaseInterface pointer that is used in part of the setup.
    * \param[in] service_name Name of the topic to publish to.
    * \param[in] any_callback User defined callback to call when a client request is received.
-   * \param[in] service_options options for the service.
+   * \param[in] service_options options for the subscription.
    */
   Service(
     std::shared_ptr<rcl_node_t> node_handle,
@@ -504,9 +504,6 @@ public:
    * \param[in] clock clock to use to generate introspection timestamps
    * \param[in] qos_service_event_pub QoS settings to use when creating the introspection publisher
    * \param[in] introspection_state the state to set introspection to
-   *
-   * \throws anything rclcpp::exceptions::throw_from_rcl_error can throw if
-   *   it failed to configure introspection.
    */
   void
   configure_introspection(

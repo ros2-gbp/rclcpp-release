@@ -107,11 +107,6 @@ protected:
     param_handler.reset();
   }
 
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
-  }
-
   rcl_interfaces::msg::ParameterEvent::SharedPtr same_node_int;
   rcl_interfaces::msg::ParameterEvent::SharedPtr same_node_double;
   rcl_interfaces::msg::ParameterEvent::SharedPtr diff_node_int;
