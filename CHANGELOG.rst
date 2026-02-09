@@ -2,6 +2,13 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+28.1.17 (2026-02-09)
+--------------------
+* print warning message on owner node if the parameter operation fails. (`#3037 <https://github.com/ros2/rclcpp/issues/3037>`_) (`#3039 <https://github.com/ros2/rclcpp/issues/3039>`_)
+* remove test_static_executor_entities_collector.cpp (`#3041 <https://github.com/ros2/rclcpp/issues/3041>`_) (`#3046 <https://github.com/ros2/rclcpp/issues/3046>`_)
+* fix context in wait for message wait set (`#3030 <https://github.com/ros2/rclcpp/issues/3030>`_) (`#3032 <https://github.com/ros2/rclcpp/issues/3032>`_)
+* Contributors: mergify[bot]
+
 28.1.16 (2026-01-21)
 --------------------
 * Improve the robustness of the TopicEndpointInfo constructor (`#3013 <https://github.com/ros2/rclcpp/issues/3013>`_) (`#3015 <https://github.com/ros2/rclcpp/issues/3015>`_)
