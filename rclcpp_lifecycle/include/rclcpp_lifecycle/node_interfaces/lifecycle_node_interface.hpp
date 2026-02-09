@@ -17,17 +17,11 @@
 
 #include "lifecycle_msgs/msg/transition.hpp"
 
+#include "rcl_lifecycle/rcl_lifecycle.h"
+
 #include "rclcpp_lifecycle/state.hpp"
 #include "rclcpp_lifecycle/visibility_control.h"
 #include "rclcpp/node_interfaces/detail/node_interfaces_helpers.hpp"
-
-// When windows.h is included, ERROR is defined as a macro.  So the use of it later in this file,
-// even as an enum, causes compilation errors.  Work around this by undefining the macro here,
-// and then redefining when this header is finished being included.
-#if defined(_WIN32)
-#pragma push_macro("ERROR")
-#undef ERROR
-#endif
 
 namespace rclcpp_lifecycle
 {
@@ -62,7 +56,7 @@ public:
 
   /// Callback function for configure transition
   /*
-   * \return SUCCESS by default
+   * \return true by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -70,7 +64,7 @@ public:
 
   /// Callback function for cleanup transition
   /*
-   * \return SUCCESS by default
+   * \return true by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -78,7 +72,7 @@ public:
 
   /// Callback function for shutdown transition
   /*
-   * \return SUCCESS by default
+   * \return true by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -86,7 +80,7 @@ public:
 
   /// Callback function for activate transition
   /*
-   * \return SUCCESS by default
+   * \return true by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -94,7 +88,7 @@ public:
 
   /// Callback function for deactivate transition
   /*
-   * \return SUCCESS by default
+   * \return true by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -102,7 +96,7 @@ public:
 
   /// Callback function for errorneous transition
   /*
-   * \return SUCCESS by default
+   * \return false by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -115,10 +109,6 @@ public:
 
 }  // namespace node_interfaces
 }  // namespace rclcpp_lifecycle
-
-#if defined(_WIN32)
-#pragma pop_macro("ERROR")
-#endif
 
 RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface, lifecycle_node)

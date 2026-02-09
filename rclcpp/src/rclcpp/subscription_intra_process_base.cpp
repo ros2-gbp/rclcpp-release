@@ -17,10 +17,15 @@
 
 using rclcpp::experimental::SubscriptionIntraProcessBase;
 
-void
-SubscriptionIntraProcessBase::add_to_wait_set(rcl_wait_set_t & wait_set)
+SubscriptionIntraProcessBase::~SubscriptionIntraProcessBase()
 {
-  detail::add_guard_condition_to_rcl_wait_set(wait_set, gc_);
+  clear_on_ready_callback();
+}
+
+void
+SubscriptionIntraProcessBase::add_to_wait_set(rcl_wait_set_t * wait_set)
+{
+  detail::add_guard_condition_to_rcl_wait_set(*wait_set, gc_);
 }
 
 const char *
@@ -33,10 +38,4 @@ rclcpp::QoS
 SubscriptionIntraProcessBase::get_actual_qos() const
 {
   return qos_profile_;
-}
-
-bool
-SubscriptionIntraProcessBase::is_durability_transient_local() const
-{
-  return qos_profile_.durability() == rclcpp::DurabilityPolicy::TransientLocal;
 }

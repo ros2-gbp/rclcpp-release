@@ -18,7 +18,6 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
-#include <optional>
 #include <memory>
 #include <sstream>
 #include <thread>
@@ -44,12 +43,6 @@
 namespace rclcpp
 {
 
-struct TimerInfo
-{
-  Time expected_call_time;
-  Time actual_call_time;
-};
-
 class TimerBase
 {
 public:
@@ -60,17 +53,12 @@ public:
    * \param clock A clock to use for time and sleeping
    * \param period The interval at which the timer fires
    * \param context node context
-   * \param autostart timer state on initialization
-   *
-   * In order to activate a timer that is not started on initialization,
-   * user should call the reset() method.
    */
   RCLCPP_PUBLIC
   explicit TimerBase(
     Clock::SharedPtr clock,
     std::chrono::nanoseconds period,
-    rclcpp::Context::SharedPtr context,
-    bool autostart = true);
+    rclcpp::Context::SharedPtr context);
 
   /// TimerBase destructor
   RCLCPP_PUBLIC
@@ -108,20 +96,16 @@ public:
    * The multithreaded executor takes advantage of this to avoid scheduling
    * the callback multiple times.
    *
-   * \return a valid shared_ptr if the callback should be executed,
-   *         an invalid shared_ptr (nullptr) if the timer was canceled.
+   * \return `true` if the callback should be executed, `false` if the timer was canceled.
    */
   RCLCPP_PUBLIC
-  virtual std::shared_ptr<void>
+  virtual bool
   call() = 0;
 
   /// Call the callback function when the timer signal is emitted.
-  /**
-   * \param[in] data the pointer returned by the call function
-   */
   RCLCPP_PUBLIC
   virtual void
-  execute_callback(const std::shared_ptr<void> & data) = 0;
+  execute_callback() = 0;
 
   RCLCPP_PUBLIC
   std::shared_ptr<const rcl_timer_t>
@@ -165,61 +149,23 @@ public:
   bool
   exchange_in_use_by_wait_set_state(bool in_use_state);
 
-  /// Set a callback to be called when the timer is reset
-  /**
-   * You should aim to make this callback fast and not blocking.
-   * If you need to do a lot of work or wait for some other event, you should
-   * spin it off to another thread.
-   *
-   * Calling it again will override any previously set callback.
-   * An exception will be thrown if the callback is not callable.
-   *
-   * This function is thread-safe.
-   *
-   * If you want more information available in the callback,
-   * you may use a lambda with captures or std::bind.
-   *
-   * \param[in] callback functor to be called whenever timer is reset
-   */
-  RCLCPP_PUBLIC
-  void
-  set_on_reset_callback(std::function<void(size_t)> callback);
-
-  /// Unset the callback registered for reset timer
-  RCLCPP_PUBLIC
-  void
-  clear_on_reset_callback();
-
 protected:
-  std::recursive_mutex callback_mutex_;
-  // Declare callback before timer_handle_, so on destruction
-  // the callback is destroyed last. Otherwise, the rcl timer
-  // callback would point briefly to a destroyed function.
-  // Clearing the callback on timer destructor also makes sure
-  // the rcl callback is cleared before on_reset_callback_.
-  std::function<void(size_t)> on_reset_callback_{nullptr};
-
   Clock::SharedPtr clock_;
   std::shared_ptr<rcl_timer_t> timer_handle_;
 
   std::atomic<bool> in_use_by_wait_set_{false};
-
-  RCLCPP_PUBLIC
-  void
-  set_on_reset_callback(rcl_event_callback_t callback, const void * user_data);
 };
+
 
 using VoidCallbackType = std::function<void ()>;
 using TimerCallbackType = std::function<void (TimerBase &)>;
-using TimerInfoCallbackType = std::function<void (const TimerInfo &)>;
 
 /// Generic timer. Periodically executes a user-specified callback.
 template<
   typename FunctorT,
   typename std::enable_if<
     rclcpp::function_traits::same_arguments<FunctorT, VoidCallbackType>::value ||
-    rclcpp::function_traits::same_arguments<FunctorT, TimerCallbackType>::value ||
-    rclcpp::function_traits::same_arguments<FunctorT, TimerInfoCallbackType>::value
+    rclcpp::function_traits::same_arguments<FunctorT, TimerCallbackType>::value
   >::type * = nullptr
 >
 class GenericTimer : public TimerBase
@@ -233,28 +179,21 @@ public:
    * \param[in] period The interval at which the timer fires.
    * \param[in] callback User-specified callback function.
    * \param[in] context custom context to be used.
-   * \param autostart timer state on initialization
    */
   explicit GenericTimer(
     Clock::SharedPtr clock, std::chrono::nanoseconds period, FunctorT && callback,
-    rclcpp::Context::SharedPtr context, bool autostart = true
+    rclcpp::Context::SharedPtr context
   )
-  : TimerBase(clock, period, context, autostart), callback_(std::forward<FunctorT>(callback))
+  : TimerBase(clock, period, context), callback_(std::forward<FunctorT>(callback))
   {
-    TRACETOOLS_TRACEPOINT(
+    TRACEPOINT(
       rclcpp_timer_callback_added,
       static_cast<const void *>(get_timer_handle().get()),
-      reinterpret_cast<const void *>(&callback_));
-#ifndef TRACETOOLS_DISABLED
-    if (TRACETOOLS_TRACEPOINT_ENABLED(rclcpp_callback_register)) {
-      char * symbol = tracetools::get_symbol(callback_);
-      TRACETOOLS_DO_TRACEPOINT(
-        rclcpp_callback_register,
-        reinterpret_cast<const void *>(&callback_),
-        symbol);
-      std::free(symbol);
-    }
-#endif
+      static_cast<const void *>(&callback_));
+    TRACEPOINT(
+      rclcpp_callback_register,
+      static_cast<const void *>(&callback_),
+      tracetools::get_symbol(callback_));
   }
 
   /// Default destructor.
@@ -268,29 +207,28 @@ public:
    * \sa rclcpp::TimerBase::call
    * \throws std::runtime_error if it failed to notify timer that callback will occurr
    */
-  std::shared_ptr<void>
+  bool
   call() override
   {
-    auto timer_call_info_ = std::make_shared<rcl_timer_call_info_t>();
-    rcl_ret_t ret = rcl_timer_call_with_info(timer_handle_.get(), timer_call_info_.get());
+    rcl_ret_t ret = rcl_timer_call(timer_handle_.get());
     if (ret == RCL_RET_TIMER_CANCELED) {
-      return nullptr;
+      return false;
     }
     if (ret != RCL_RET_OK) {
       throw std::runtime_error("Failed to notify timer that callback occurred");
     }
-    return timer_call_info_;
+    return true;
   }
 
   /**
    * \sa rclcpp::TimerBase::execute_callback
    */
   void
-  execute_callback(const std::shared_ptr<void> & data) override
+  execute_callback() override
   {
-    TRACETOOLS_TRACEPOINT(callback_start, reinterpret_cast<const void *>(&callback_), false);
-    execute_callback_delegate<>(*static_cast<rcl_timer_call_info_t *>(data.get()));
-    TRACETOOLS_TRACEPOINT(callback_end, reinterpret_cast<const void *>(&callback_));
+    TRACEPOINT(callback_start, static_cast<const void *>(&callback_), false);
+    execute_callback_delegate<>();
+    TRACEPOINT(callback_end, static_cast<const void *>(&callback_));
   }
 
   // void specialization
@@ -301,7 +239,7 @@ public:
     >::type * = nullptr
   >
   void
-  execute_callback_delegate(const rcl_timer_call_info_t &)
+  execute_callback_delegate()
   {
     callback_();
   }
@@ -313,24 +251,9 @@ public:
     >::type * = nullptr
   >
   void
-  execute_callback_delegate(const rcl_timer_call_info_t &)
+  execute_callback_delegate()
   {
     callback_(*this);
-  }
-
-
-  template<
-    typename CallbackT = FunctorT,
-    typename std::enable_if<
-      rclcpp::function_traits::same_arguments<CallbackT, TimerInfoCallbackType>::value
-    >::type * = nullptr
-  >
-  void
-  execute_callback_delegate(const rcl_timer_call_info_t & timer_call_info)
-  {
-    const TimerInfo info{Time{timer_call_info.expected_call_time, clock_->get_clock_type()},
-      Time{timer_call_info.actual_call_time, clock_->get_clock_type()}};
-    callback_(info);
   }
 
   /// Is the clock steady (i.e. is the time between ticks constant?)
@@ -351,8 +274,7 @@ template<
   typename FunctorT,
   typename std::enable_if<
     rclcpp::function_traits::same_arguments<FunctorT, VoidCallbackType>::value ||
-    rclcpp::function_traits::same_arguments<FunctorT, TimerCallbackType>::value ||
-    rclcpp::function_traits::same_arguments<FunctorT, TimerInfoCallbackType>::value
+    rclcpp::function_traits::same_arguments<FunctorT, TimerCallbackType>::value
   >::type * = nullptr
 >
 class WallTimer : public GenericTimer<FunctorT>
@@ -365,15 +287,13 @@ public:
    * \param period The interval at which the timer fires
    * \param callback The callback function to execute every interval
    * \param context node context
-   * \param autostart timer state on initialization
    */
   WallTimer(
     std::chrono::nanoseconds period,
     FunctorT && callback,
-    rclcpp::Context::SharedPtr context,
-    bool autostart = true)
+    rclcpp::Context::SharedPtr context)
   : GenericTimer<FunctorT>(
-      std::make_shared<Clock>(RCL_STEADY_TIME), period, std::move(callback), context, autostart)
+      std::make_shared<Clock>(RCL_STEADY_TIME), period, std::move(callback), context)
   {}
 
 protected:

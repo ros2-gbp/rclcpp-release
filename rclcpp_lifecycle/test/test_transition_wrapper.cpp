@@ -18,11 +18,9 @@
 #include <utility>
 #include <vector>
 
-#include "rcl_lifecycle/rcl_lifecycle.h"
+#include "rcutils/testing/fault_injection.h"
 
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
-
-#include "rcutils/testing/fault_injection.h"
 
 #include "./mocking_utils/patch.hpp"
 

@@ -161,6 +161,8 @@ public:
 
   // next ready event for taking, will be set by is_ready and will be processed by take_data
   std::atomic<size_t> next_ready_event;
+  // used to indicate that next_ready_event has no ready event for processing
+  static constexpr size_t NO_EVENT_READY = std::numeric_limits<size_t>::max();
 
   rclcpp::Context::SharedPtr context_;
   rclcpp::node_interfaces::NodeGraphInterface::WeakPtr node_graph_;
@@ -198,6 +200,7 @@ ClientBase::ClientBase(
 
 ClientBase::~ClientBase()
 {
+  clear_on_ready_callback();
 }
 
 bool
@@ -226,6 +229,7 @@ bool
 ClientBase::wait_for_action_server_nanoseconds(std::chrono::nanoseconds timeout)
 {
   auto start = std::chrono::steady_clock::now();
+  // make an event to reuse, rather than create a new one each time
   auto node_ptr = pimpl_->node_graph_.lock();
   if (!node_ptr) {
     throw rclcpp::exceptions::InvalidNodeError();
@@ -234,7 +238,6 @@ ClientBase::wait_for_action_server_nanoseconds(std::chrono::nanoseconds timeout)
   if (this->action_server_is_ready()) {
     return true;
   }
-  // make an event to reuse, rather than create a new one each time
   auto event = node_ptr->get_graph_event();
   if (timeout == std::chrono::nanoseconds(0)) {
     // check was non-blocking, return immediately
@@ -316,18 +319,18 @@ ClientBase::get_number_of_ready_services()
 }
 
 void
-ClientBase::add_to_wait_set(rcl_wait_set_t & wait_set)
+ClientBase::add_to_wait_set(rcl_wait_set_t * wait_set)
 {
   std::lock_guard<std::recursive_mutex> lock(pimpl_->action_client_mutex_);
   rcl_ret_t ret = rcl_action_wait_set_add_action_client(
-    &wait_set, pimpl_->client_handle.get(), nullptr, nullptr);
+    wait_set, pimpl_->client_handle.get(), nullptr, nullptr);
   if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret, "ClientBase::add_to_wait_set() failed");
   }
 }
 
 bool
-ClientBase::is_ready(const rcl_wait_set_t & wait_set)
+ClientBase::is_ready(rcl_wait_set_t * wait_set)
 {
   bool is_feedback_ready{false};
   bool is_status_ready{false};
@@ -339,7 +342,7 @@ ClientBase::is_ready(const rcl_wait_set_t & wait_set)
   {
     std::lock_guard<std::recursive_mutex> lock(pimpl_->action_client_mutex_);
     ret = rcl_action_client_wait_set_get_entities_ready(
-      &wait_set, pimpl_->client_handle.get(),
+      wait_set, pimpl_->client_handle.get(),
       &is_feedback_ready,
       &is_status_ready,
       &is_goal_response_ready,
@@ -351,7 +354,7 @@ ClientBase::is_ready(const rcl_wait_set_t & wait_set)
     }
   }
 
-  pimpl_->next_ready_event = std::numeric_limits<size_t>::max();
+  pimpl_->next_ready_event = ClientBaseImpl::NO_EVENT_READY;
 
   if (is_feedback_ready) {
     pimpl_->next_ready_event = static_cast<size_t>(EntityType::FeedbackSubscription);
@@ -415,7 +418,7 @@ ClientBase::handle_result_response(
   const rmw_request_id_t & response_header,
   std::shared_ptr<void> response)
 {
-  std::map<int64_t, ResponseCallback>::node_type pending_result_response;
+  ResponseCallback response_callback;
   {
     std::lock_guard<std::mutex> guard(pimpl_->result_requests_mutex);
     const int64_t & sequence_number = response_header.sequence_number;
@@ -423,10 +426,9 @@ ClientBase::handle_result_response(
       RCLCPP_ERROR(pimpl_->logger, "unknown result response, ignoring...");
       return;
     }
-    pending_result_response =
-      pimpl_->pending_result_responses.extract(sequence_number);
+    response_callback = std::move(pimpl_->pending_result_responses[sequence_number]);
+    pimpl_->pending_result_responses.erase(sequence_number);
   }
-  auto & response_callback = pending_result_response.mapped();
   response_callback(response);
 }
 
@@ -534,7 +536,7 @@ ClientBase::set_callback_to_entity(
   // been replaced but the middleware hasn't been told about the new one yet.
   set_on_ready_callback(
     entity_type,
-    rclcpp::detail::cpp_callback_trampoline<decltype(new_callback), const void *, size_t>,
+    rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
     static_cast<const void *>(&new_callback));
 
   std::lock_guard<std::recursive_mutex> lock(listener_mutex_);
@@ -554,7 +556,7 @@ ClientBase::set_callback_to_entity(
     auto & cb = it->second;
     set_on_ready_callback(
       entity_type,
-      rclcpp::detail::cpp_callback_trampoline<decltype(it->second), const void *, size_t>,
+      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
       static_cast<const void *>(&cb));
   }
 
@@ -647,10 +649,10 @@ std::shared_ptr<void>
 ClientBase::take_data()
 {
   // next_ready_event is an atomic, caching localy
-  size_t next_ready_event = pimpl_->next_ready_event.exchange(std::numeric_limits<uint32_t>::max());
+  size_t next_ready_event = pimpl_->next_ready_event.exchange(ClientBaseImpl::NO_EVENT_READY);
 
-  if (next_ready_event == std::numeric_limits<uint32_t>::max()) {
-    throw std::runtime_error("Taking data from action client but nothing is ready");
+  if (next_ready_event == ClientBaseImpl::NO_EVENT_READY) {
+    throw std::runtime_error("Taking data from action client but no ready event");
   }
 
   return take_data_by_entity_id(next_ready_event);
@@ -748,10 +750,10 @@ ClientBase::take_data_by_entity_id(size_t id)
 }
 
 void
-ClientBase::execute(const std::shared_ptr<void> & data_in)
+ClientBase::execute(std::shared_ptr<void> & data_in)
 {
   if (!data_in) {
-    throw std::invalid_argument("'data_in' is unexpectedly empty");
+    throw std::runtime_error("Executing action client but 'data' is empty");
   }
 
   std::shared_ptr<ClientBaseData> data_ptr = std::static_pointer_cast<ClientBaseData>(data_in);

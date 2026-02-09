@@ -18,7 +18,6 @@
 #include <string>
 
 #include "rcl_lifecycle/data_types.h"
-
 #include "rclcpp_lifecycle/state.hpp"
 #include "rclcpp_lifecycle/visibility_control.h"
 

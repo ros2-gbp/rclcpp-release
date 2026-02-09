@@ -32,7 +32,8 @@ NodeServices::add_service(
 {
   if (group) {
     if (!node_base_->callback_group_in_node(group)) {
-      throw rclcpp::exceptions::MissingGroupNodeException("service");
+      // TODO(jacquelinekay): use custom exception
+      throw std::runtime_error("Cannot create service, group not in node.");
     }
   } else {
     group = node_base_->get_default_callback_group();
@@ -41,8 +42,9 @@ NodeServices::add_service(
   group->add_service(service_base_ptr);
 
   // Notify the executor that a new service was created using the parent Node.
+  auto & node_gc = node_base_->get_notify_guard_condition();
   try {
-    node_base_->trigger_notify_guard_condition();
+    node_gc.trigger();
     group->trigger_notify_guard_condition();
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
@@ -57,7 +59,8 @@ NodeServices::add_client(
 {
   if (group) {
     if (!node_base_->callback_group_in_node(group)) {
-      throw rclcpp::exceptions::MissingGroupNodeException("client");
+      // TODO(jacquelinekay): use custom exception
+      throw std::runtime_error("Cannot create client, group not in node.");
     }
   } else {
     group = node_base_->get_default_callback_group();
@@ -66,8 +69,9 @@ NodeServices::add_client(
   group->add_client(client_base_ptr);
 
   // Notify the executor that a new client was created using the parent Node.
+  auto & node_gc = node_base_->get_notify_guard_condition();
   try {
-    node_base_->trigger_notify_guard_condition();
+    node_gc.trigger();
     group->trigger_notify_guard_condition();
   } catch (const rclcpp::exceptions::RCLError & ex) {
     throw std::runtime_error(
