@@ -287,6 +287,18 @@ public:
    * Adding subscriptions, timers, services, etc. with blocking or long running
    * callbacks may cause the function exceed the max_duration significantly.
    *
+   * Work that is ready to be done is collected only once, and when collecting that work
+   * entities which may have multiple pieces of work ready will only be executed at most
+   * one time.
+   * The reason for this is that it is not possible to tell if, for example, a ready
+   * subscription has only one message ready or multiple without checking again.
+   * Because, in order to find out if there are multiple messages, one message must
+   * be taken and executed before checking again if that subscription is still ready.
+   * However, this function only checks for ready entities to work on once,
+   * and so it will never execute a single entity more than once per call to this function.
+   * See spin_all() variants for a function that will repeatedly work on a single entity
+   * in a single call.
+   *
    * If there is no work to be done when this called, it will return immediately
    * because the collecting of available work is non-blocking.
    * Before each piece of ready work is executed this function checks if the
@@ -359,6 +371,9 @@ public:
    *   If the time spent inside the blocking loop exceeds this timeout, return a TIMEOUT return
    *   code.
    * \return The return code, one of `SUCCESS`, `INTERRUPTED`, or `TIMEOUT`.
+   * \note This method will check the future and the timeout only when the executor is woken up.
+   *   If this future is unrelated to an executor's entity, this method will not correctly detect
+   *   when it's completed and therefore may wait forever and never time out.
    */
   template<typename FutureT, typename TimeRepT = int64_t, typename TimeT = std::milli>
   FutureReturnCode
@@ -541,8 +556,9 @@ protected:
    *
    * \param[in] notify if true will execute a trigger that will wake up a waiting executor
    */
-  void
-  trigger_entity_recollect(bool notify);
+  RCLCPP_PUBLIC
+  virtual void
+  handle_updated_entities(bool notify);
 
   /// Spinning state, used to prevent multi threaded calls to spin and to cancel blocking spins.
   std::atomic_bool spinning;

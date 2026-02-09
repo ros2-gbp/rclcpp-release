@@ -3,84 +3,99 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-28.1.16 (2026-01-21)
---------------------
-* Update exception documentation for goal cancellation in ServerGoalHandle (`#3019 <https://github.com/ros2/rclcpp/issues/3019>`_) (`#3023 <https://github.com/ros2/rclcpp/issues/3023>`_)
-  * Update exception documentation for goal cancellation
-  The documentation for the canceled function is misleading.
-  Previously, the description said:
-  1. "Only call this if the goal is canceling." and
-  2. "\throws rclcpp::exceptions::RCLError If the goal is in any state besides executing."
-  This is a contradiction.
-  Experimentally verified that if the goal is executing and this method is called, an error is thrown. This makes the second statement wrong => correct the statement in the documentation.
-  (cherry picked from commit 6397047d4795f594cf65dd360d70f5c9c3618700)
-  Co-authored-by: Andrei Costinescu <AndreiCostinescu@users.noreply.github.com>
-* Contributors: mergify[bot]
-
-28.1.15 (2025-12-23)
---------------------
-
-28.1.14 (2025-11-18)
---------------------
-* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_) (`#2990 <https://github.com/ros2/rclcpp/issues/2990>`_)
-* Contributors: mergify[bot]
-
-28.1.13 (2025-10-21)
---------------------
-* it misses the iterator second to lock the weakptr. (`#2958 <https://github.com/ros2/rclcpp/issues/2958>`_) (`#2960 <https://github.com/ros2/rclcpp/issues/2960>`_)
-* Contributors: mergify[bot]
-
-28.1.12 (2025-09-11)
---------------------
-
-28.1.11 (2025-08-06)
---------------------
-
-28.1.10 (2025-06-23)
---------------------
-* Replace std::default_random_engine with std::mt19937 (humble) (`#2847 <https://github.com/ros2/rclcpp/issues/2847>`_) (`#2867 <https://github.com/ros2/rclcpp/issues/2867>`_)
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2856 <https://github.com/ros2/rclcpp/issues/2856>`_)
-* Contributors: mergify[bot]
-
-28.1.9 (2025-04-23)
+30.1.5 (2026-02-09)
 -------------------
-* fix(rclcpp_action): Fix sleep of expire thread in case of canceled timer (`#2800 <https://github.com/ros2/rclcpp/issues/2800>`_)
-  This fixes a bug, that the expire action thread would not sleep as,
-  the sleep duration was not computed correctly.
-  Co-authored-by: Janosch Machowinski <J.Machowinski@cellumation.com>
-* Contributors: Janosch Machowinski
+* remove default: so that compiler can detect the missing case. (`#3048 <https://github.com/ros2/rclcpp/issues/3048>`_)
+* Update exception documentation for goal cancellation in ServerGoalHandle (`#3019 <https://github.com/ros2/rclcpp/issues/3019>`_)
+* Contributors: Andrei Costinescu, Tomoya Fujita
 
-28.1.8 (2025-04-02)
--------------------
-* Harden rclcpp_action::convert(). (`#2786 <https://github.com/ros2/rclcpp/issues/2786>`_) (`#2789 <https://github.com/ros2/rclcpp/issues/2789>`_)
-  * Harden rclcpp_action::convert().
-  * update docstring.
-  ---------
-  (cherry picked from commit ce86ef7e621d96ce50d6ec1b49e9e1cd4f0a828b)
-  Co-authored-by: Tomoya Fujita <Tomoya.Fujita@sony.com>
-* Contributors: mergify[bot]
-
-28.1.7 (2025-03-26)
--------------------
-* fix: Fixed expiring of goals if events executor is used (`#2674 <https://github.com/ros2/rclcpp/issues/2674>`_)
-* Contributors: Janosch Machowinski
-
-28.1.6 (2024-12-18)
+30.1.4 (2025-12-23)
 -------------------
 
-28.1.5 (2024-09-19)
+30.1.3 (2025-11-18)
+-------------------
+* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_)
+* Contributors: Tim Clephas
+
+30.1.2 (2025-10-21)
+-------------------
+* it misses the iterator second to lock the weakptr. (`#2958 <https://github.com/ros2/rclcpp/issues/2958>`_)
+* try aborting before canceling 1st on dtor of ServerGoalHandle. (`#2953 <https://github.com/ros2/rclcpp/issues/2953>`_)
+* Contributors: Tomoya Fujita
+
+30.1.1 (2025-09-11)
+-------------------
+* deprecate rclcpp::spin_some and rclcpp::spin_all (`#2848 <https://github.com/ros2/rclcpp/issues/2848>`_)
+* Contributors: Alberto Soragna
+
+30.1.0 (2025-07-29)
+-------------------
+* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_)
+* Contributors: mosfet80
+
+30.0.0 (2025-07-01)
 -------------------
 
-28.1.4 (2024-09-06)
+29.6.1 (2025-06-23)
+-------------------
+* Replace std::default_random_engine with std::mt19937 (rolling) (`#2843 <https://github.com/ros2/rclcpp/issues/2843>`_)
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
+* Contributors: Alejandro Hernández Cordero, keeponoiro
+
+29.6.0 (2025-04-25)
 -------------------
 
-28.1.3 (2024-06-27)
+29.5.0 (2025-04-18)
+-------------------
+* Use std::recursive_mutex for action requests. (`#2798 <https://github.com/ros2/rclcpp/issues/2798>`_)
+* Contributors: Tomoya Fujita
+
+29.4.0 (2025-04-04)
+-------------------
+* Remove warning (`#2790 <https://github.com/ros2/rclcpp/issues/2790>`_)
+* Harden rclcpp_action::convert(). (`#2786 <https://github.com/ros2/rclcpp/issues/2786>`_)
+* Add new interfaces to enable introspection for action (`#2743 <https://github.com/ros2/rclcpp/issues/2743>`_)
+* use maybe_unused attribute for the portability. (`#2758 <https://github.com/ros2/rclcpp/issues/2758>`_)
+* fix: Expose timers used by rclcpp::Waitables (`#2699 <https://github.com/ros2/rclcpp/issues/2699>`_)
+* Collect log messages from rcl, and reset. (`#2720 <https://github.com/ros2/rclcpp/issues/2720>`_)
+* Contributors: Alejandro Hernández Cordero, Barry Xu, Janosch Machowinski, Tomoya Fujita
+
+29.3.0 (2024-12-20)
+-------------------
+* Make ament_cmake a buildtool dependency (`#2689 <https://github.com/ros2/rclcpp/issues/2689>`_)
+* Contributors: Nathan Wiebe Neufeldt
+
+29.2.0 (2024-11-25)
 -------------------
 
-28.1.2 (2024-05-13)
+29.1.0 (2024-11-20)
+-------------------
+* Fix documentation typo in server_goal_handle.hpp (`#2669 <https://github.com/ros2/rclcpp/issues/2669>`_)
+* Contributors: YR
+
+29.0.0 (2024-10-03)
+-------------------
+* Increase the timeout for the cppcheck on rclcpp_action. (`#2640 <https://github.com/ros2/rclcpp/issues/2640>`_)
+* add smart pointer macros definitions to action server and client base classes (`#2631 <https://github.com/ros2/rclcpp/issues/2631>`_)
+* Contributors: Alberto Soragna, Chris Lalancette
+
+28.3.3 (2024-07-29)
 -------------------
 
-28.1.1 (2024-04-24)
+28.3.2 (2024-07-24)
+-------------------
+
+28.3.1 (2024-06-25)
+-------------------
+* Fix typo in function doc (`#2563 <https://github.com/ros2/rclcpp/issues/2563>`_)
+* Contributors: Christophe Bedard
+
+28.3.0 (2024-06-17)
+-------------------
+* Add 'mimick' label to tests which use Mimick (`#2516 <https://github.com/ros2/rclcpp/issues/2516>`_)
+* Contributors: Scott K Logan
+
+28.2.0 (2024-04-26)
 -------------------
 
 28.1.0 (2024-04-16)

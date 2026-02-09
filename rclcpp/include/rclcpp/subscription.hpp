@@ -90,18 +90,6 @@ public:
   using ROSMessageTypeAllocator = typename ROSMessageTypeAllocatorTraits::allocator_type;
   using ROSMessageTypeDeleter = allocator::Deleter<ROSMessageTypeAllocator, ROSMessageType>;
 
-  using MessageAllocatorTraits [[deprecated("use ROSMessageTypeAllocatorTraits")]] =
-    ROSMessageTypeAllocatorTraits;
-  using MessageAllocator [[deprecated("use ROSMessageTypeAllocator")]] =
-    ROSMessageTypeAllocator;
-  using MessageDeleter [[deprecated("use ROSMessageTypeDeleter")]] =
-    ROSMessageTypeDeleter;
-
-  using ConstMessageSharedPtr [[deprecated]] = std::shared_ptr<const ROSMessageType>;
-  using MessageUniquePtr
-  [[deprecated("use std::unique_ptr<ROSMessageType, ROSMessageTypeDeleter> instead")]] =
-    std::unique_ptr<ROSMessageType, ROSMessageTypeDeleter>;
-
 private:
   using SubscriptionTopicStatisticsSharedPtr =
     std::shared_ptr<rclcpp::topic_statistics::SubscriptionTopicStatistics>;
@@ -221,13 +209,11 @@ public:
   /// Called after construction to continue setup that requires shared_from_this().
   void
   post_init_setup(
-    rclcpp::node_interfaces::NodeBaseInterface * node_base,
-    const rclcpp::QoS & qos,
-    const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
+    [[maybe_unused]] rclcpp::node_interfaces::NodeBaseInterface * node_base,
+    [[maybe_unused]] const rclcpp::QoS & qos,
+    [[maybe_unused]] const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
   {
-    (void)node_base;
-    (void)qos;
-    (void)options;
+    // This function is intentionally left empty.
   }
 
   /// Take the next message from the inter-process subscription.
@@ -291,6 +277,50 @@ public:
   create_serialized_message() override
   {
     return message_memory_strategy_->borrow_serialized_message();
+  }
+
+  /// Disable callbacks from being called
+  /**
+    * This method will block, until any subscription's callbacks provided during construction
+    * currently being executed are finished.
+    * \note This method also temporary removes the on new message callback and all
+    * on new event callbacks from the rmw layer to prevent them from being called. However, this
+    * method will not block and wait until the currently executing on_new_[message]event callbacks
+    * are finished.
+    */
+  void
+  disable_callbacks() override
+  {
+    SubscriptionBase::disable_callbacks();
+    any_callback_.disable();
+    if (subscription_intra_process_) {
+      subscription_intra_process_->disable_callbacks();
+    }
+    for (const auto & [_, event_ptr] : event_handlers_) {
+      if (event_ptr) {
+        event_ptr->disable();
+      }
+    }
+  }
+
+  /// Enable the callbacks to be called
+  /**
+    * This method is thread safe, and provides a safe way to atomically enable the callbacks
+    * in a multithreaded environment.
+    */
+  void
+  enable_callbacks() override
+  {
+    SubscriptionBase::enable_callbacks();
+    any_callback_.enable();
+    if (subscription_intra_process_) {
+      subscription_intra_process_->enable_callbacks();
+    }
+    for (const auto & [_, event_ptr] : event_handlers_) {
+      if (event_ptr) {
+        event_ptr->enable();
+      }
+    }
   }
 
   void
@@ -434,20 +464,17 @@ public:
 
   void
   return_dynamic_message(
-    rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message) override
+    [[maybe_unused]] rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message) override
   {
-    (void) message;
     throw rclcpp::exceptions::UnimplementedError(
             "return_dynamic_message is not implemented for Subscription");
   }
 
   void
   handle_dynamic_message(
-    const rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message,
-    const rclcpp::MessageInfo & message_info) override
+    [[maybe_unused]] const rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message,
+    [[maybe_unused]] const rclcpp::MessageInfo & message_info) override
   {
-    (void) message;
-    (void) message_info;
     throw rclcpp::exceptions::UnimplementedError(
             "handle_dynamic_message is not implemented for Subscription");
   }

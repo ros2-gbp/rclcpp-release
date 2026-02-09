@@ -51,13 +51,18 @@ public:
     return test_waitable_result;
   }
 
-  std::shared_ptr<void>
-  take_data() override
-  {
-    return nullptr;
-  }
-
+  std::shared_ptr<void> take_data() override {return nullptr;}
   void execute(const std::shared_ptr<void> &) override {}
+
+  void set_on_ready_callback(std::function<void(size_t, int)>) override {}
+  void clear_on_ready_callback() override {}
+
+  std::shared_ptr<void> take_data_by_entity_id(size_t) override {return nullptr;}
+
+  std::vector<std::shared_ptr<rclcpp::TimerBase>> get_timers() const override
+  {
+    return {};
+  }
 };
 
 struct RclWaitSetSizes
@@ -535,8 +540,8 @@ TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_bad_arguments) {
     });
   allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
   EXPECT_FALSE(allocator_memory_strategy()->add_handles_to_wait_set(nullptr));
-  EXPECT_TRUE(rcl_error_is_set());
-  rcl_reset_error();
+  // The error message is collected and already reset.
+  EXPECT_FALSE(rcl_error_is_set());
 }
 
 TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_subscription) {
@@ -803,7 +808,8 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_service_out_of_scope) {
       });
     allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
   }
-  EXPECT_EQ(1u, allocator_memory_strategy()->number_of_ready_services());
+  // service is out of scope here, so should be cleaned up already.
+  EXPECT_EQ(0u, allocator_memory_strategy()->number_of_ready_services());
 
   rclcpp::AnyExecutable result;
   allocator_memory_strategy()->get_next_service(result, weak_groups_to_nodes);
@@ -838,7 +844,8 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_client_out_of_scope) {
 
     allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
   }
-  EXPECT_EQ(1u, allocator_memory_strategy()->number_of_ready_clients());
+  // client is out of scope here, so should be cleaned up already.
+  EXPECT_EQ(0u, allocator_memory_strategy()->number_of_ready_clients());
 
   rclcpp::AnyExecutable result;
   allocator_memory_strategy()->get_next_client(result, weak_groups_to_nodes);
@@ -866,7 +873,8 @@ TEST_F(TestAllocatorMemoryStrategy, get_next_timer_out_of_scope) {
       });
     allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
   }
-  EXPECT_EQ(1u, allocator_memory_strategy()->number_of_ready_timers());
+  // timer is out of scope here, so should be cleaned up already.
+  EXPECT_EQ(0u, allocator_memory_strategy()->number_of_ready_timers());
 
   rclcpp::AnyExecutable result;
   allocator_memory_strategy()->get_next_timer(result, weak_groups_to_nodes);

@@ -96,22 +96,6 @@ public:
   using ROSMessageTypeAllocator = typename ROSMessageTypeAllocatorTraits::allocator_type;
   using ROSMessageTypeDeleter = allocator::Deleter<ROSMessageTypeAllocator, ROSMessageType>;
 
-  using MessageAllocatorTraits
-  [[deprecated("use PublishedTypeAllocatorTraits")]] =
-    PublishedTypeAllocatorTraits;
-  using MessageAllocator
-  [[deprecated("use PublishedTypeAllocator")]] =
-    PublishedTypeAllocator;
-  using MessageDeleter
-  [[deprecated("use PublishedTypeDeleter")]] =
-    PublishedTypeDeleter;
-  using MessageUniquePtr
-  [[deprecated("use std::unique_ptr<PublishedType, PublishedTypeDeleter>")]] =
-    std::unique_ptr<PublishedType, PublishedTypeDeleter>;
-  using MessageSharedPtr
-  [[deprecated("use std::shared_ptr<const PublishedType>")]] =
-    std::shared_ptr<const PublishedType>;
-
   using BufferSharedPtr = typename rclcpp::experimental::buffers::IntraProcessBuffer<
     ROSMessageType,
     ROSMessageTypeAllocator,
@@ -128,8 +112,8 @@ public:
    *
    * \param[in] node_base NodeBaseInterface pointer that is used in part of the setup.
    * \param[in] topic Name of the topic to publish to.
-   * \param[in] qos QoS profile for Subcription.
-   * \param[in] options Options for the subscription.
+   * \param[in] qos QoS profile for the publisher.
+   * \param[in] options Options for the publisher.
    */
   Publisher(
     rclcpp::node_interfaces::NodeBaseInterface * node_base,
@@ -159,12 +143,9 @@ public:
   post_init_setup(
     rclcpp::node_interfaces::NodeBaseInterface * node_base,
     const std::string & topic,
-    const rclcpp::QoS & qos,
-    const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options)
+    [[maybe_unused]] const rclcpp::QoS & qos,
+    [[maybe_unused]] const rclcpp::PublisherOptionsWithAllocator<AllocatorT> & options)
   {
-    (void)qos;
-    (void)options;
-
     // If needed, setup intra process communication.
     if (rclcpp::detail::resolve_use_intra_process(options_, *node_base)) {
       auto context = node_base->get_context();
@@ -206,7 +187,7 @@ public:
    * the loaned message will be directly allocated in the middleware.
    * If not, the message allocator of this rclcpp::Publisher instance is being used.
    *
-   * With a call to \sa `publish` the LoanedMessage instance is being returned to the middleware
+   * With a call to `publish` the LoanedMessage instance is being returned to the middleware
    * or free'd accordingly to the allocator.
    * If the message is not being published but processed differently, the destructor of this
    * class will either return the message to the middleware or deallocate it via the internal
@@ -433,13 +414,6 @@ public:
     }
   }
 
-  [[deprecated("use get_published_type_allocator() or get_ros_message_type_allocator() instead")]]
-  std::shared_ptr<PublishedTypeAllocator>
-  get_allocator() const
-  {
-    return std::make_shared<PublishedTypeAllocator>(published_type_allocator_);
-  }
-
   PublishedTypeAllocator
   get_published_type_allocator() const
   {
@@ -600,6 +574,13 @@ protected:
   std::unique_ptr<PublishedType, PublishedTypeDeleter>
   duplicate_type_adapt_message_as_unique_ptr(const PublishedType & msg)
   {
+    /// Assert that the published type has no overloaded operator new since this leads to
+    /// new/delete mismatch (see https://github.com/ros2/rclcpp/issues/2951)
+    static_assert(!detail::has_overloaded_operator_new_v<PublishedType>,
+        "When publishing by value (i.e. when calling publish(const T& msg)), the published "
+    "message type must not have an overloaded operator new. In this case, please use the "
+    "publish(std::unique_ptr<T> msg) method instead.");
+
     auto ptr = PublishedTypeAllocatorTraits::allocate(published_type_allocator_, 1);
     PublishedTypeAllocatorTraits::construct(published_type_allocator_, ptr, msg);
     return std::unique_ptr<PublishedType, PublishedTypeDeleter>(ptr, published_type_deleter_);
