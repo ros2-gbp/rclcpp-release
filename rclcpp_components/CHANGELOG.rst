@@ -2,48 +2,32 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-30.1.5 (2026-02-09)
--------------------
-* Add library dependency to node executable in rclcpp_components_register_node (`#3047 <https://github.com/ros2/rclcpp/issues/3047>`_)
-* Contributors: YuJin Hong
-
-30.1.4 (2025-12-23)
--------------------
-* Updated deprecated ament_index_cpp API (`#3011 <https://github.com/ros2/rclcpp/issues/3011>`_)
-* Contributors: Alejandro Hernández Cordero
-
-30.1.3 (2025-11-18)
--------------------
-* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_)
-* Contributors: Tim Clephas
-
-30.1.2 (2025-10-21)
+29.5.7 (2026-02-09)
 -------------------
 
-30.1.1 (2025-09-11)
+29.5.6 (2025-12-23)
 -------------------
-* Cleanup the dependencies in rclcpp_components. (`#2918 <https://github.com/ros2/rclcpp/issues/2918>`_)
-* Contributors: Chris Lalancette
 
-30.1.0 (2025-07-29)
+29.5.5 (2025-11-18)
 -------------------
-* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_)
-* Contributors: mosfet80
+* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_) (`#2989 <https://github.com/ros2/rclcpp/issues/2989>`_)
+* Contributors: mergify[bot]
 
-30.0.0 (2025-07-01)
+29.5.4 (2025-10-21)
 -------------------
-* NEW PR: Add component_container for EventsExecutor (`#2885 <https://github.com/ros2/rclcpp/issues/2885>`_)
-* make sure that plugin arg includes the double colon. (`#2878 <https://github.com/ros2/rclcpp/issues/2878>`_)
-* Contributors: Mihir Rao, Tomoya Fujita
 
-29.6.1 (2025-06-23)
+29.5.3 (2025-09-11)
 -------------------
-* set thread names by node in component container isolated (`#2871 <https://github.com/ros2/rclcpp/issues/2871>`_)
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
-* Contributors: Adam Aposhian, Alejandro Hernández Cordero
+* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_) (`#2915 <https://github.com/ros2/rclcpp/issues/2915>`_)
+* Contributors: mergify[bot]
 
-29.6.0 (2025-04-25)
+29.5.2 (2025-07-07)
 -------------------
+
+29.5.1 (2025-06-23)
+-------------------
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2855 <https://github.com/ros2/rclcpp/issues/2855>`_)
+* Contributors: mergify[bot]
 
 29.5.0 (2025-04-18)
 -------------------

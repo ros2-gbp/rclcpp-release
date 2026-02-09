@@ -14,8 +14,7 @@
 
 #include <memory>
 
-#include "rclcpp/executors/multi_threaded_executor.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "rclcpp_components/component_manager.hpp"
 
@@ -36,6 +35,4 @@ int main(int argc, char * argv[])
   }
   exec->add_node(node);
   exec->spin();
-
-  return 0;
 }

@@ -16,10 +16,8 @@
 #include <vector>
 #include <string>
 
-#include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/executors/multi_threaded_executor.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "rclcpp/utilities.hpp"
-
 #include "rclcpp_components/component_manager_isolated.hpp"
 
 int main(int argc, char * argv[])
@@ -48,6 +46,4 @@ int main(int argc, char * argv[])
   }
   exec->add_node(node);
   exec->spin();
-
-  return 0;
 }

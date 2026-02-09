@@ -30,11 +30,9 @@
 # :type RESOURCE_INDEX: string
 # :param NO_UNDEFINED_SYMBOLS: add linker flags to deny undefined symbols
 # :type NO_UNDEFINED_SYMBOLS: option
-# :param SKIP_LIBRARY_DEPENDENCY: skip adding dependency on the library target
-# :type SKIP_LIBRARY_DEPENDENCY: option
 #
 macro(rclcpp_components_register_node target)
-  cmake_parse_arguments(ARGS "NO_UNDEFINED_SYMBOLS;SKIP_LIBRARY_DEPENDENCY" "PLUGIN;EXECUTABLE;EXECUTOR;RESOURCE_INDEX" "" ${ARGN})
+  cmake_parse_arguments(ARGS "NO_UNDEFINED_SYMBOLS" "PLUGIN;EXECUTABLE;EXECUTOR;RESOURCE_INDEX" "" ${ARGN})
   if(ARGS_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "rclcpp_components_register_node() called with unused "
       "arguments: ${ARGS_UNPARSED_ARGUMENTS}")
@@ -59,9 +57,6 @@ macro(rclcpp_components_register_node target)
     message(STATUS "Setting executor non-default value ${executor}")
   endif()
 
-  if("${ARGS_PLUGIN}" MATCHES "^[^:]+:[^:]+$")
-    message(FATAL_ERROR "PLUGIN argument '${ARGS_PLUGIN}' appears to be incorrect. (e.g., 'package_name::ClassName').")
-  endif()
   set(component ${ARGS_PLUGIN})
   set(node ${ARGS_EXECUTABLE})
   _rclcpp_components_register_package_hook()
@@ -99,9 +94,6 @@ macro(rclcpp_components_register_node target)
   file(GENERATE OUTPUT ${PROJECT_BINARY_DIR}/rclcpp_components/node_main_${node}.cpp
     INPUT ${PROJECT_BINARY_DIR}/rclcpp_components/node_main_configured_${node}.cpp.in)
   add_executable(${node} ${PROJECT_BINARY_DIR}/rclcpp_components/node_main_${node}.cpp)
-  if(NOT ARGS_SKIP_LIBRARY_DEPENDENCY)
-    add_dependencies(${node} ${target})
-  endif()
   target_link_libraries(${node}
     class_loader::class_loader
     rclcpp::rclcpp

@@ -14,8 +14,7 @@
 
 #include <memory>
 
-#include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "rclcpp_components/component_manager.hpp"
 
@@ -27,6 +26,4 @@ int main(int argc, char * argv[])
   auto node = std::make_shared<rclcpp_components::ComponentManager>(exec);
   exec->add_node(node);
   exec->spin();
-
-  return 0;
 }

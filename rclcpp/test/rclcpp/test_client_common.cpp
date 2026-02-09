@@ -112,12 +112,10 @@ protected:
     auto req_id = client->async_send_request(request, std::move(callback));
 
     auto start = std::chrono::steady_clock::now();
-    rclcpp::executors::SingleThreadedExecutor executor;
-    executor.add_node(node);
     while (!received_response &&
       (std::chrono::steady_clock::now() - start) < timeout)
     {
-      executor.spin_some();
+      rclcpp::spin_some(node);
     }
 
     if (!received_response) {
@@ -358,12 +356,10 @@ TYPED_TEST(TestAllClientTypesWithServer, on_new_response_callback)
 
   this->template async_send_request<ClientType, test_msgs::srv::Empty::Request>(client, request);
   auto start = std::chrono::steady_clock::now();
-  rclcpp::executors::SingleThreadedExecutor executor;
-  executor.add_node(server_node);
   while (server_requests_count == 0 &&
     (std::chrono::steady_clock::now() - start) < std::chrono::seconds(10))
   {
-    executor.spin_some();
+    rclcpp::spin_some(server_node);
   }
 
   ASSERT_EQ(server_requests_count, 1u);
@@ -384,7 +380,7 @@ TYPED_TEST(TestAllClientTypesWithServer, on_new_response_callback)
   while (server_requests_count == 1 &&
     (std::chrono::steady_clock::now() - start) < std::chrono::seconds(10))
   {
-    executor.spin_some();
+    rclcpp::spin_some(server_node);
   }
 
   ASSERT_EQ(server_requests_count, 2u);
@@ -406,7 +402,7 @@ TYPED_TEST(TestAllClientTypesWithServer, on_new_response_callback)
   while (server_requests_count < 5 &&
     (std::chrono::steady_clock::now() - start) < std::chrono::seconds(10))
   {
-    executor.spin_some();
+    rclcpp::spin_some(server_node);
   }
 
   ASSERT_EQ(server_requests_count, 5u);
@@ -496,12 +492,10 @@ void client_async_send_request_callback_with_request(
   auto req_id = client->async_send_request(request, std::move(callback));
 
   auto start = std::chrono::steady_clock::now();
-  rclcpp::executors::SingleThreadedExecutor executor;
-  executor.add_node(node);
   while (!received_response &&
     (std::chrono::steady_clock::now() - start) < std::chrono::seconds(1))
   {
-    executor.spin_some();
+    rclcpp::spin_some(node);
   }
   EXPECT_TRUE(received_response);
   EXPECT_FALSE(client->remove_pending_request(req_id));
@@ -559,29 +553,25 @@ void client_qos_depth(rclcpp::Node::SharedPtr node)
   }
 
   auto start = std::chrono::steady_clock::now();
-  rclcpp::executors::SingleThreadedExecutor server_executor;
-  server_executor.add_node(server_node);
   while ((server_cb_count_ < client_requests) &&
     (std::chrono::steady_clock::now() - start) < 2s)
   {
-    server_executor.spin_some();
+    rclcpp::spin_some(server_node);
     std::this_thread::sleep_for(2ms);
   }
 
   EXPECT_GT(server_cb_count_, client_qos_profile.depth());
 
   start = std::chrono::steady_clock::now();
-  rclcpp::executors::SingleThreadedExecutor client_executor;
-  client_executor.add_node(node);
   while ((client_cb_count_ < client_qos_profile.depth()) &&
     (std::chrono::steady_clock::now() - start) < 1s)
   {
-    client_executor.spin_some();
+    rclcpp::spin_some(node);
   }
 
   // Spin an extra time to check if client QoS depth has been ignored,
   // so more client callbacks might be called than expected.
-  client_executor.spin_some();
+  rclcpp::spin_some(node);
 
   EXPECT_EQ(client_cb_count_, client_qos_profile.depth());
 }

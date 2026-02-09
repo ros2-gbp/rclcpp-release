@@ -21,7 +21,7 @@
 #include "rclcpp/rclcpp.hpp"
 
 /*
-   Constructor
+   Construtctor
  */
 TEST(TestIntraProcessBuffer, constructor) {
   using MessageT = char;
