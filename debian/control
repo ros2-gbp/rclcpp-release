@@ -1,0 +1,12 @@
+Source: ros-kilted-rclcpp
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), python3-dev, ros-kilted-ament-cmake-gen-version-h, ros-kilted-ament-cmake-gmock <!nocheck>, ros-kilted-ament-cmake-google-benchmark <!nocheck>, ros-kilted-ament-cmake-gtest <!nocheck>, ros-kilted-ament-cmake-ros, ros-kilted-ament-index-cpp, ros-kilted-ament-lint-auto <!nocheck>, ros-kilted-ament-lint-common <!nocheck>, ros-kilted-builtin-interfaces, ros-kilted-libstatistics-collector, ros-kilted-mimick-vendor <!nocheck>, ros-kilted-performance-test-fixture <!nocheck>, ros-kilted-rcl, ros-kilted-rcl-interfaces, ros-kilted-rcl-logging-interface, ros-kilted-rcl-yaml-param-parser, ros-kilted-rcpputils, ros-kilted-rcutils, ros-kilted-rmw, ros-kilted-rmw <!nocheck>, ros-kilted-rmw-implementation-cmake <!nocheck>, ros-kilted-rosgraph-msgs, ros-kilted-rosidl-default-generators <!nocheck>, ros-kilted-rosidl-dynamic-typesupport, ros-kilted-rosidl-runtime-c, ros-kilted-rosidl-runtime-cpp, ros-kilted-rosidl-typesupport-c, ros-kilted-rosidl-typesupport-cpp, ros-kilted-statistics-msgs, ros-kilted-test-msgs <!nocheck>, ros-kilted-tracetools, ros-kilted-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-kilted-rclcpp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-kilted-ament-index-cpp, ros-kilted-builtin-interfaces, ros-kilted-libstatistics-collector, ros-kilted-rcl, ros-kilted-rcl-interfaces, ros-kilted-rcl-logging-interface, ros-kilted-rcl-yaml-param-parser, ros-kilted-rcpputils, ros-kilted-rcutils, ros-kilted-rmw, ros-kilted-rosgraph-msgs, ros-kilted-rosidl-dynamic-typesupport, ros-kilted-rosidl-runtime-c, ros-kilted-rosidl-runtime-cpp, ros-kilted-rosidl-typesupport-c, ros-kilted-rosidl-typesupport-cpp, ros-kilted-statistics-msgs, ros-kilted-tracetools, ros-kilted-ros-workspace
+Description: The ROS client library in C++.
