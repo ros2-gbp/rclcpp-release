@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <string>
@@ -25,6 +25,7 @@
 #include "rclcpp/loaned_message.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include "rclcpp/msg/large_message.hpp"
 #include "rclcpp/msg/string.hpp"
 
 
@@ -87,12 +88,35 @@ struct TypeAdapter<int, rclcpp::msg::String>
 
   static void
   convert_to_ros_message(
+    [[maybe_unused]] const custom_type & source,
+    [[maybe_unused]] ros_message_type & destination)
+  {
+    throw std::runtime_error("This should not happen");
+  }
+
+  static void
+  convert_to_custom(
+    [[maybe_unused]] const ros_message_type & source,
+    [[maybe_unused]] custom_type & destination)
+  {
+    // This function is intentionally left empty.
+  }
+};
+
+template<>
+struct TypeAdapter<std::string, rclcpp::msg::LargeMessage>
+{
+  using is_specialized = std::true_type;
+  using custom_type = std::string;
+  using ros_message_type = rclcpp::msg::LargeMessage;
+
+  static void
+  convert_to_ros_message(
     const custom_type & source,
     ros_message_type & destination)
   {
-    (void) source;
-    (void) destination;
-    throw std::runtime_error("This should not happen");
+    destination.size = source.size();
+    std::memcpy(destination.data.data(), source.data(), source.size());
   }
 
   static void
@@ -100,8 +124,8 @@ struct TypeAdapter<int, rclcpp::msg::String>
     const ros_message_type & source,
     custom_type & destination)
   {
-    (void) source;
-    (void) destination;
+    destination.resize(source.size);
+    std::memcpy(destination.data(), source.data.data(), source.size);
   }
 };
 
@@ -138,9 +162,9 @@ TEST_F(TestPublisher, conversion_exception_is_passed_up) {
     options.use_intra_process_comms(is_intra_process);
 
     auto callback =
-      [](const rclcpp::msg::String::ConstSharedPtr msg) -> void
+      []([[maybe_unused]] const rclcpp::msg::String::ConstSharedPtr msg) -> void
       {
-        (void)msg;
+        // This function is intentionally left empty.
       };
 
     auto node = std::make_shared<rclcpp::Node>("my_node", "/ns", options);
@@ -335,4 +359,42 @@ TEST_F(TestPublisher, check_type_adapted_message_is_sent_and_received) {
     rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> options;
     assert_message_was_received();
   }
+}
+
+TEST_F(TestPublisher, test_large_message_unique)
+{
+  // There have been some bugs in the past when trying to type-adapt large messages
+  // (larger than the stack size).  Here we just make sure that a 10MB message works,
+  // which is larger than the default stack size on Linux.
+
+  using StringTypeAdapter = rclcpp::TypeAdapter<std::string, rclcpp::msg::LargeMessage>;
+
+  auto node = std::make_shared<rclcpp::Node>("my_node", "/ns", rclcpp::NodeOptions());
+
+  const std::string topic_name = "topic_name";
+
+  auto pub = node->create_publisher<StringTypeAdapter>(topic_name, 1);
+
+  static constexpr size_t length = 10 * 1024 * 1024;
+  auto message_data = std::make_unique<std::string>(length, '#');
+  pub->publish(std::move(message_data));
+}
+
+TEST_F(TestPublisher, test_large_message_constref)
+{
+  // There have been some bugs in the past when trying to type-adapt large messages
+  // (larger than the stack size).  Here we just make sure that a 10MB message works,
+  // which is larger than the default stack size on Linux.
+
+  using StringTypeAdapter = rclcpp::TypeAdapter<std::string, rclcpp::msg::LargeMessage>;
+
+  auto node = std::make_shared<rclcpp::Node>("my_node", "/ns", rclcpp::NodeOptions());
+
+  const std::string topic_name = "topic_name";
+
+  auto pub = node->create_publisher<StringTypeAdapter>(topic_name, 1);
+
+  static constexpr size_t length = 10 * 1024 * 1024;
+  std::string message_data(length, '#');
+  pub->publish(message_data);
 }

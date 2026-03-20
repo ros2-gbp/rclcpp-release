@@ -16,23 +16,26 @@
 #define RCLCPP__CLIENT_HPP_
 
 #include <atomic>
+#include <functional>
 #include <future>
-#include <unordered_map>
 #include <memory>
 #include <mutex>
-#include <optional>  // NOLINT, cpplint doesn't think this is a cpp std header
+#include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
-#include <variant>  // NOLINT
+#include <variant>
 #include <vector>
 
 #include "rcl/client.h"
 #include "rcl/error_handling.h"
 #include "rcl/event_callback.h"
+#include "rcl/service_introspection.h"
 #include "rcl/wait.h"
 
+#include "rclcpp/clock.hpp"
 #include "rclcpp/detail/cpp_callback_trampoline.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/expand_topic_or_service_name.hpp"
@@ -66,14 +69,6 @@ struct FutureAndRequestId
 
   /// Allow implicit conversions to `std::future` by reference.
   operator FutureT &() {return this->future;}
-
-  /// Deprecated, use the `future` member variable instead.
-  /**
-   * Allow implicit conversions to `std::future` by value.
-   * \deprecated
-   */
-  [[deprecated("FutureAndRequestId: use .future instead of an implicit conversion")]]
-  operator FutureT() {return this->future;}
 
   // delegate future like methods in the std::future impl_
 
@@ -112,6 +107,29 @@ struct FutureAndRequestId
   /// Destructor.
   ~FutureAndRequestId() = default;
 };
+
+template<typename PendingRequestsT, typename AllocatorT = std::allocator<int64_t>>
+size_t
+prune_requests_older_than_impl(
+  PendingRequestsT & pending_requests,
+  std::mutex & pending_requests_mutex,
+  std::chrono::time_point<std::chrono::system_clock> time_point,
+  std::vector<int64_t, AllocatorT> * pruned_requests = nullptr)
+{
+  std::lock_guard guard(pending_requests_mutex);
+  auto old_size = pending_requests.size();
+  for (auto it = pending_requests.begin(), last = pending_requests.end(); it != last; ) {
+    if (it->second.first < time_point) {
+      if (pruned_requests) {
+        pruned_requests->push_back(it->first);
+      }
+      it = pending_requests.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  return old_size - pending_requests.size();
+}
 }  // namespace detail
 
 namespace node_interfaces
@@ -127,10 +145,10 @@ public:
   RCLCPP_PUBLIC
   ClientBase(
     rclcpp::node_interfaces::NodeBaseInterface * node_base,
-    rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph);
+    const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr & node_graph);
 
   RCLCPP_PUBLIC
-  virtual ~ClientBase();
+  virtual ~ClientBase() = default;
 
   /// Take the next response for this client as a type erased pointer.
   /**
@@ -203,7 +221,8 @@ public:
   virtual std::shared_ptr<void> create_response() = 0;
   virtual std::shared_ptr<rmw_request_id_t> create_request_header() = 0;
   virtual void handle_response(
-    std::shared_ptr<rmw_request_id_t> request_header, std::shared_ptr<void> response) = 0;
+    const std::shared_ptr<rmw_request_id_t> & request_header,
+    const std::shared_ptr<void> & response) = 0;
 
   /// Exchange the "in use by wait set" state for this client.
   /**
@@ -278,7 +297,7 @@ public:
    * \param[in] callback functor to be called when a new response is received
    */
   void
-  set_on_new_response_callback(std::function<void(size_t)> callback)
+  set_on_new_response_callback(const std::function<void(size_t)> & callback)
   {
     if (!callback) {
       throw std::invalid_argument(
@@ -312,7 +331,7 @@ public:
     // This two-step setting, prevents a gap where the old std::function has
     // been replaced but the middleware hasn't been told about the new one yet.
     set_on_new_response_callback(
-      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
+      rclcpp::detail::cpp_callback_trampoline<decltype(new_callback), const void *, size_t>,
       static_cast<const void *>(&new_callback));
 
     // Store the std::function to keep it in scope, also overwrites the existing one.
@@ -320,7 +339,8 @@ public:
 
     // Set it again, now using the permanent storage.
     set_on_new_response_callback(
-      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
+      rclcpp::detail::cpp_callback_trampoline<
+        decltype(on_new_response_callback_), const void *, size_t>,
       static_cast<const void *>(&on_new_response_callback_));
   }
 
@@ -359,12 +379,16 @@ protected:
   std::shared_ptr<rclcpp::Context> context_;
   rclcpp::Logger node_logger_;
 
+  std::recursive_mutex callback_mutex_;
+  // It is important to declare on_new_response_callback_ before
+  // client_handle_, so on destruction the client is
+  // destroyed first. Otherwise, the rmw client callback
+  // would point briefly to a destroyed function.
+  std::function<void(size_t)> on_new_response_callback_{nullptr};
+  // Declare client_handle_ after callback
   std::shared_ptr<rcl_client_t> client_handle_;
 
   std::atomic<bool> in_use_by_wait_set_{false};
-
-  std::recursive_mutex callback_mutex_;
-  std::function<void(size_t)> on_new_response_callback_{nullptr};
 };
 
 template<typename ServiceT>
@@ -404,15 +428,6 @@ public:
     : detail::FutureAndRequestId<std::future<SharedResponse>>
   {
     using detail::FutureAndRequestId<std::future<SharedResponse>>::FutureAndRequestId;
-
-    /// Deprecated, use `.future.share()` instead.
-    /**
-     * Allow implicit conversions to `std::shared_future` by value.
-     * \deprecated
-     */
-    [[deprecated(
-      "FutureAndRequestId: use .future.share() instead of an implicit conversion")]]
-    operator SharedFuture() {return this->future.share();}
 
     // delegate future like methods in the std::future impl_
 
@@ -459,22 +474,20 @@ public:
    * \param[in] node_base NodeBaseInterface pointer that is used in part of the setup.
    * \param[in] node_graph The node graph interface of the corresponding node.
    * \param[in] service_name Name of the topic to publish to.
-   * \param[in] client_options options for the subscription.
+   * \param[in] client_options options for the client.
    */
   Client(
     rclcpp::node_interfaces::NodeBaseInterface * node_base,
-    rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph,
+    const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr & node_graph,
     const std::string & service_name,
     rcl_client_options_t & client_options)
-  : ClientBase(node_base, node_graph)
+  : ClientBase(node_base, node_graph),
+    srv_type_support_handle_(rosidl_typesupport_cpp::get_service_type_support_handle<ServiceT>())
   {
-    using rosidl_typesupport_cpp::get_service_type_support_handle;
-    auto service_type_support_handle =
-      get_service_type_support_handle<ServiceT>();
     rcl_ret_t ret = rcl_client_init(
       this->get_client_handle().get(),
       this->get_rcl_node_handle(),
-      service_type_support_handle,
+      srv_type_support_handle_,
       service_name.c_str(),
       &client_options);
     if (ret != RCL_RET_OK) {
@@ -544,8 +557,8 @@ public:
    */
   void
   handle_response(
-    std::shared_ptr<rmw_request_id_t> request_header,
-    std::shared_ptr<void> response) override
+    const std::shared_ptr<rmw_request_id_t> & request_header,
+    const std::shared_ptr<void> & response) override
   {
     std::optional<CallbackInfoVariant>
     optional_pending_request = this->get_and_erase_pending_request(request_header->sequence_number);
@@ -554,7 +567,7 @@ public:
     }
     auto & value = *optional_pending_request;
     auto typed_response = std::static_pointer_cast<typename ServiceT::Response>(
-      std::move(response));
+      response);
     if (std::holds_alternative<Promise>(value)) {
       auto & promise = std::get<Promise>(value);
       promise.set_value(std::move(typed_response));
@@ -605,7 +618,7 @@ public:
    * \return a FutureAndRequestId instance.
    */
   FutureAndRequestId
-  async_send_request(SharedRequest request)
+  async_send_request(const SharedRequest & request)
   {
     Promise promise;
     auto future = promise.get_future();
@@ -640,7 +653,7 @@ public:
     >::type * = nullptr
   >
   SharedFutureAndRequestId
-  async_send_request(SharedRequest request, CallbackT && cb)
+  async_send_request(const SharedRequest & request, CallbackT && cb)
   {
     Promise promise;
     auto shared_future = promise.get_future().share();
@@ -671,7 +684,7 @@ public:
     >::type * = nullptr
   >
   SharedFutureWithRequestAndRequestId
-  async_send_request(SharedRequest request, CallbackT && cb)
+  async_send_request(const SharedRequest & request, CallbackT && cb)
   {
     PromiseWithRequest promise;
     auto shared_future = promise.get_future().share();
@@ -765,19 +778,41 @@ public:
     std::chrono::time_point<std::chrono::system_clock> time_point,
     std::vector<int64_t, AllocatorT> * pruned_requests = nullptr)
   {
-    std::lock_guard guard(pending_requests_mutex_);
-    auto old_size = pending_requests_.size();
-    for (auto it = pending_requests_.begin(), last = pending_requests_.end(); it != last; ) {
-      if (it->second.first < time_point) {
-        if (pruned_requests) {
-          pruned_requests->push_back(it->first);
-        }
-        it = pending_requests_.erase(it);
-      } else {
-        ++it;
-      }
+    return detail::prune_requests_older_than_impl(
+      pending_requests_,
+      pending_requests_mutex_,
+      time_point,
+      pruned_requests);
+  }
+
+  /// Configure client introspection.
+  /**
+   * \param[in] clock clock to use to generate introspection timestamps
+   * \param[in] qos_service_event_pub QoS settings to use when creating the introspection publisher
+   * \param[in] introspection_state the state to set introspection to
+   *
+   * \throws anything rclcpp::exceptions::throw_from_rcl_error can throw if
+   *   it failed to configure introspection.
+   */
+  void
+  configure_introspection(
+    const Clock::SharedPtr & clock, const QoS & qos_service_event_pub,
+    rcl_service_introspection_state_t introspection_state)
+  {
+    rcl_publisher_options_t pub_opts = rcl_publisher_get_default_options();
+    pub_opts.qos = qos_service_event_pub.get_rmw_qos_profile();
+
+    rcl_ret_t ret = rcl_client_configure_service_introspection(
+      client_handle_.get(),
+      node_handle_.get(),
+      clock->get_clock_handle(),
+      srv_type_support_handle_,
+      pub_opts,
+      introspection_state);
+
+    if (RCL_RET_OK != ret) {
+      rclcpp::exceptions::throw_from_rcl_error(ret, "failed to configure client introspection");
     }
-    return old_size - pending_requests_.size();
   }
 
 protected:
@@ -830,6 +865,9 @@ protected:
       CallbackInfoVariant>>
   pending_requests_;
   std::mutex pending_requests_mutex_;
+
+private:
+  const rosidl_service_type_support_t * srv_type_support_handle_;
 };
 
 }  // namespace rclcpp

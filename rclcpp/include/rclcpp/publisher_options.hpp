@@ -24,9 +24,10 @@
 
 #include "rclcpp/allocator/allocator_common.hpp"
 #include "rclcpp/detail/rmw_implementation_specific_publisher_payload.hpp"
+#include "rclcpp/intra_process_buffer_type.hpp"
 #include "rclcpp/intra_process_setting.hpp"
 #include "rclcpp/qos.hpp"
-#include "rclcpp/qos_event.hpp"
+#include "rclcpp/event_handler.hpp"
 #include "rclcpp/qos_overriding_options.hpp"
 
 namespace rclcpp
@@ -39,6 +40,9 @@ struct PublisherOptionsBase
 {
   /// Setting to explicitly set intraprocess communications.
   IntraProcessSetting use_intra_process_comm = IntraProcessSetting::NodeDefault;
+
+  /// Setting the data-type stored in the intraprocess buffer
+  IntraProcessBufferType intra_process_buffer_type = IntraProcessBufferType::SharedPtr;
 
   /// Callbacks for various events related to publishers.
   PublisherEventCallbacks event_callbacks;
@@ -119,11 +123,20 @@ private:
   rcl_allocator_t
   get_rcl_allocator() const
   {
-    if (!plain_allocator_storage_) {
-      plain_allocator_storage_ =
-        std::make_shared<PlainAllocator>(*this->get_allocator());
+    if constexpr (std::is_same_v<Allocator, std::allocator<void>>) {
+      return rcl_get_default_allocator();
+    } else {
+      if constexpr (rclcpp::allocator::has_get_rcl_allocator_v<Allocator>) {
+        return get_allocator()->get_rcl_allocator();
+      } else {
+        if (!plain_allocator_storage_) {
+          plain_allocator_storage_ =
+            std::make_shared<PlainAllocator>(*this->get_allocator());
+        }
+
+        return rclcpp::allocator::get_rcl_allocator<char>(*plain_allocator_storage_);
+      }
     }
-    return rclcpp::allocator::get_rcl_allocator<char>(*plain_allocator_storage_);
   }
 
   // This is a temporal workaround, to make sure that get_allocator()

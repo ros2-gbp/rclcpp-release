@@ -31,10 +31,12 @@ using rclcpp::CallbackGroupType;
 
 CallbackGroup::CallbackGroup(
   CallbackGroupType group_type,
+  const rclcpp::Context::WeakPtr & context,
   bool automatically_add_to_executor_with_node)
 : type_(group_type), associated_with_executor_(false),
   can_be_taken_from_(true),
-  automatically_add_to_executor_with_node_(automatically_add_to_executor_with_node)
+  automatically_add_to_executor_with_node_(automatically_add_to_executor_with_node),
+  context_(context)
 {}
 
 CallbackGroup::~CallbackGroup()
@@ -54,12 +56,24 @@ CallbackGroup::type() const
   return type_;
 }
 
+size_t
+CallbackGroup::size() const
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  return
+    subscription_ptrs_.size() +
+    service_ptrs_.size() +
+    client_ptrs_.size() +
+    timer_ptrs_.size() +
+    waitable_ptrs_.size();
+}
+
 void CallbackGroup::collect_all_ptrs(
-  std::function<void(const rclcpp::SubscriptionBase::SharedPtr &)> sub_func,
-  std::function<void(const rclcpp::ServiceBase::SharedPtr &)> service_func,
-  std::function<void(const rclcpp::ClientBase::SharedPtr &)> client_func,
-  std::function<void(const rclcpp::TimerBase::SharedPtr &)> timer_func,
-  std::function<void(const rclcpp::Waitable::SharedPtr &)> waitable_func) const
+  const std::function<void(const rclcpp::SubscriptionBase::SharedPtr &)> & sub_func,
+  const std::function<void(const rclcpp::ServiceBase::SharedPtr &)> & service_func,
+  const std::function<void(const rclcpp::ClientBase::SharedPtr &)> & client_func,
+  const std::function<void(const rclcpp::TimerBase::SharedPtr &)> & timer_func,
+  const std::function<void(const rclcpp::Waitable::SharedPtr &)> & waitable_func) const
 {
   std::lock_guard<std::mutex> lock(mutex_);
 
@@ -112,21 +126,17 @@ CallbackGroup::automatically_add_to_executor_with_node() const
 }
 
 rclcpp::GuardCondition::SharedPtr
-CallbackGroup::get_notify_guard_condition(const rclcpp::Context::SharedPtr context_ptr)
+CallbackGroup::get_notify_guard_condition()
 {
   std::lock_guard<std::recursive_mutex> lock(notify_guard_condition_mutex_);
-  if (notify_guard_condition_ && context_ptr != notify_guard_condition_->get_context()) {
-    if (associated_with_executor_) {
-      trigger_notify_guard_condition();
+  rclcpp::Context::SharedPtr context_ptr = context_.lock();
+  if (context_ptr && context_ptr->is_valid()) {
+    if (!notify_guard_condition_) {
+      notify_guard_condition_ = std::make_shared<rclcpp::GuardCondition>(context_ptr);
     }
-    notify_guard_condition_ = nullptr;
+    return notify_guard_condition_;
   }
-
-  if (!notify_guard_condition_) {
-    notify_guard_condition_ = std::make_shared<rclcpp::GuardCondition>(context_ptr);
-  }
-
-  return notify_guard_condition_;
+  return nullptr;
 }
 
 void
@@ -140,7 +150,7 @@ CallbackGroup::trigger_notify_guard_condition()
 
 void
 CallbackGroup::add_subscription(
-  const rclcpp::SubscriptionBase::SharedPtr subscription_ptr)
+  const rclcpp::SubscriptionBase::SharedPtr & subscription_ptr)
 {
   std::lock_guard<std::mutex> lock(mutex_);
   subscription_ptrs_.push_back(subscription_ptr);
@@ -148,12 +158,12 @@ CallbackGroup::add_subscription(
     std::remove_if(
       subscription_ptrs_.begin(),
       subscription_ptrs_.end(),
-      [](rclcpp::SubscriptionBase::WeakPtr x) {return x.expired();}),
+      [](const rclcpp::SubscriptionBase::WeakPtr & x) {return x.expired();}),
     subscription_ptrs_.end());
 }
 
 void
-CallbackGroup::add_timer(const rclcpp::TimerBase::SharedPtr timer_ptr)
+CallbackGroup::add_timer(const rclcpp::TimerBase::SharedPtr & timer_ptr)
 {
   std::lock_guard<std::mutex> lock(mutex_);
   timer_ptrs_.push_back(timer_ptr);
@@ -161,12 +171,12 @@ CallbackGroup::add_timer(const rclcpp::TimerBase::SharedPtr timer_ptr)
     std::remove_if(
       timer_ptrs_.begin(),
       timer_ptrs_.end(),
-      [](rclcpp::TimerBase::WeakPtr x) {return x.expired();}),
+      [](const rclcpp::TimerBase::WeakPtr & x) {return x.expired();}),
     timer_ptrs_.end());
 }
 
 void
-CallbackGroup::add_service(const rclcpp::ServiceBase::SharedPtr service_ptr)
+CallbackGroup::add_service(const rclcpp::ServiceBase::SharedPtr & service_ptr)
 {
   std::lock_guard<std::mutex> lock(mutex_);
   service_ptrs_.push_back(service_ptr);
@@ -174,12 +184,12 @@ CallbackGroup::add_service(const rclcpp::ServiceBase::SharedPtr service_ptr)
     std::remove_if(
       service_ptrs_.begin(),
       service_ptrs_.end(),
-      [](rclcpp::ServiceBase::WeakPtr x) {return x.expired();}),
+      [](const rclcpp::ServiceBase::WeakPtr & x) {return x.expired();}),
     service_ptrs_.end());
 }
 
 void
-CallbackGroup::add_client(const rclcpp::ClientBase::SharedPtr client_ptr)
+CallbackGroup::add_client(const rclcpp::ClientBase::SharedPtr & client_ptr)
 {
   std::lock_guard<std::mutex> lock(mutex_);
   client_ptrs_.push_back(client_ptr);
@@ -187,12 +197,12 @@ CallbackGroup::add_client(const rclcpp::ClientBase::SharedPtr client_ptr)
     std::remove_if(
       client_ptrs_.begin(),
       client_ptrs_.end(),
-      [](rclcpp::ClientBase::WeakPtr x) {return x.expired();}),
+      [](const rclcpp::ClientBase::WeakPtr & x) {return x.expired();}),
     client_ptrs_.end());
 }
 
 void
-CallbackGroup::add_waitable(const rclcpp::Waitable::SharedPtr waitable_ptr)
+CallbackGroup::add_waitable(const rclcpp::Waitable::SharedPtr & waitable_ptr)
 {
   std::lock_guard<std::mutex> lock(mutex_);
   waitable_ptrs_.push_back(waitable_ptr);
@@ -200,12 +210,12 @@ CallbackGroup::add_waitable(const rclcpp::Waitable::SharedPtr waitable_ptr)
     std::remove_if(
       waitable_ptrs_.begin(),
       waitable_ptrs_.end(),
-      [](rclcpp::Waitable::WeakPtr x) {return x.expired();}),
+      [](const rclcpp::Waitable::WeakPtr & x) {return x.expired();}),
     waitable_ptrs_.end());
 }
 
 void
-CallbackGroup::remove_waitable(const rclcpp::Waitable::SharedPtr waitable_ptr) noexcept
+CallbackGroup::remove_waitable(const rclcpp::Waitable::SharedPtr & waitable_ptr) noexcept
 {
   std::lock_guard<std::mutex> lock(mutex_);
   for (auto iter = waitable_ptrs_.begin(); iter != waitable_ptrs_.end(); ++iter) {

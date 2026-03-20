@@ -26,7 +26,7 @@
 #include "rclcpp/intra_process_buffer_type.hpp"
 #include "rclcpp/intra_process_setting.hpp"
 #include "rclcpp/qos.hpp"
-#include "rclcpp/qos_event.hpp"
+#include "rclcpp/event_handler.hpp"
 #include "rclcpp/qos_overriding_options.hpp"
 #include "rclcpp/subscription_content_filter_options.hpp"
 #include "rclcpp/topic_statistics_state.hpp"
@@ -77,6 +77,11 @@ struct SubscriptionOptionsBase
     // Topic statistics publication period in ms. Defaults to one second.
     // Only values greater than zero are allowed.
     std::chrono::milliseconds publish_period{std::chrono::seconds(1)};
+
+    // An optional QoS which can provide topic_statistics with a stable QoS separate from
+    // the subscription's current QoS settings which could be unstable.
+    // Explicitly set the enough depth to avoid missing the statistics messages.
+    rclcpp::QoS qos = SystemDefaultsQoS().keep_last(10);
   };
 
   TopicStatisticsOptions topic_stats_options;
@@ -110,7 +115,6 @@ struct SubscriptionOptionsWithAllocator : public SubscriptionOptionsBase
    * \param qos QoS profile for subcription.
    * \return rcl_subscription_options_t structure based on the rclcpp::QoS
    */
-  template<typename MessageT>
   rcl_subscription_options_t
   to_rcl_subscription_options(const rclcpp::QoS & qos) const
   {
@@ -163,11 +167,20 @@ private:
   rcl_allocator_t
   get_rcl_allocator() const
   {
-    if (!plain_allocator_storage_) {
-      plain_allocator_storage_ =
-        std::make_shared<PlainAllocator>(*this->get_allocator());
+    if constexpr (std::is_same_v<Allocator, std::allocator<void>>) {
+      return rcl_get_default_allocator();
+    } else {
+      if constexpr (rclcpp::allocator::has_get_rcl_allocator_v<Allocator>) {
+        return get_allocator()->get_rcl_allocator();
+      } else {
+        if (!plain_allocator_storage_) {
+          plain_allocator_storage_ =
+            std::make_shared<PlainAllocator>(*this->get_allocator());
+        }
+
+        return rclcpp::allocator::get_rcl_allocator<char>(*plain_allocator_storage_);
+      }
     }
-    return rclcpp::allocator::get_rcl_allocator<char>(*plain_allocator_storage_);
   }
 
   // This is a temporal workaround, to make sure that get_allocator()
