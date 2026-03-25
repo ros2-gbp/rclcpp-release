@@ -101,8 +101,7 @@ public:
     const std::string & action_name,
     const rosidl_action_type_support_t * type_support,
     const rcl_action_client_options_t & client_options)
-  : context_(node_base->get_context()),
-    node_graph_(node_graph),
+  : node_graph_(node_graph),
     node_handle(node_base->get_shared_rcl_node_handle()),
     action_type_support_(type_support),
     logger(node_logging->get_logger().get_child("rclcpp_action")),
@@ -615,6 +614,10 @@ ClientBase::set_on_ready_callback(
           user_data);
         break;
       }
+
+    default:
+      throw std::runtime_error("ClientBase::set_on_ready_callback: Unknown entity type.");
+      break;
   }
 
   if (RCL_RET_OK != ret) {

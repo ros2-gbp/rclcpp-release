@@ -24,8 +24,6 @@
 
 #include "action_msgs/msg/goal_status.hpp"
 
-#include "rclcpp/logging.hpp"
-
 #include "rclcpp_action/visibility_control.hpp"
 #include "rclcpp_action/types.hpp"
 
@@ -105,18 +103,10 @@ protected:
   _execute();
 
   /// Transition the goal to canceled state if it never reached a terminal state.
-  /// Returns true if transitioned to canceled, else false.
   /// \internal
   RCLCPP_ACTION_PUBLIC
   bool
   try_canceling() noexcept;
-
-  /// Transition the goal to aborted state if it never reached a terminal state.
-  /// Returns true if transitioned to aborted, else false.
-  /// \internal
-  RCLCPP_ACTION_PUBLIC
-  bool
-  try_aborting() noexcept;
 
   // End API for communication between ServerGoalHandleBase and ServerGoalHandle<>
   // -----------------------------------------------------------------------------
@@ -253,22 +243,11 @@ public:
 
   virtual ~ServerGoalHandle()
   {
-    try {
-      // Abort goal if handle was allowed to destruct without reaching a terminal state
-      if (try_aborting()) {
-        auto null_result = std::make_shared<typename ActionT::Impl::GetResultService::Response>();
-        null_result->status = action_msgs::msg::GoalStatus::STATUS_ABORTED;
-        on_terminal_state_(uuid_, null_result);
-      } else if (try_canceling()) {
-        // Cancel goal if handle was allowed to destruct without reaching a terminal state
-        auto null_result = std::make_shared<typename ActionT::Impl::GetResultService::Response>();
-        null_result->status = action_msgs::msg::GoalStatus::STATUS_CANCELED;
-        on_terminal_state_(uuid_, null_result);
-      }
-    } catch (const std::exception & ex) {
-      RCLCPP_DEBUG(
-        rclcpp::get_logger("rclcpp_action"),
-        "Failed to abort/cancel goal handler in destructor: %s", ex.what());
+    // Cancel goal if handle was allowed to destruct without reaching a terminal state
+    if (try_canceling()) {
+      auto null_result = std::make_shared<typename ActionT::Impl::GetResultService::Response>();
+      null_result->status = action_msgs::msg::GoalStatus::STATUS_CANCELED;
+      on_terminal_state_(uuid_, null_result);
     }
   }
 

@@ -22,7 +22,6 @@
 #include <mutex>
 #include <sstream>
 #include <string>
-#include <utility>
 
 #include "rcl/error_handling.h"
 #include "rcl/event_callback.h"
@@ -55,7 +54,7 @@ public:
   RCLCPP_SMART_PTR_DEFINITIONS_NOT_COPYABLE(ServiceBase)
 
   RCLCPP_PUBLIC
-  explicit ServiceBase(const std::shared_ptr<rcl_node_t> & node_handle);
+  explicit ServiceBase(std::shared_ptr<rcl_node_t> node_handle);
 
   RCLCPP_PUBLIC
   virtual ~ServiceBase() = default;
@@ -114,8 +113,8 @@ public:
   virtual
   void
   handle_request(
-    const std::shared_ptr<rmw_request_id_t> & request_header,
-    const std::shared_ptr<void> & request) = 0;
+    std::shared_ptr<rmw_request_id_t> request_header,
+    std::shared_ptr<void> request) = 0;
 
   /// Exchange the "in use by wait set" state for this service.
   /**
@@ -191,7 +190,7 @@ public:
    * \param[in] callback functor to be called when a new request is received
    */
   void
-  set_on_new_request_callback(const std::function<void(size_t)> & callback)
+  set_on_new_request_callback(std::function<void(size_t)> callback)
   {
     if (!callback) {
       throw std::invalid_argument(
@@ -287,7 +286,6 @@ class Service
   public std::enable_shared_from_this<Service<ServiceT>>
 {
 public:
-  using ServiceType = ServiceT;
   using CallbackType = std::function<
     void (
       const std::shared_ptr<typename ServiceT::Request>,
@@ -374,10 +372,10 @@ public:
    * \param[in] any_callback User defined callback to call when a client request is received.
    */
   Service(
-    const std::shared_ptr<rcl_node_t> & node_handle,
-    const std::shared_ptr<rcl_service_t> & service_handle,
+    std::shared_ptr<rcl_node_t> node_handle,
+    std::shared_ptr<rcl_service_t> service_handle,
     AnyServiceCallback<ServiceT> any_callback)
-  : ServiceBase(node_handle), any_callback_(std::move(any_callback)),
+  : ServiceBase(node_handle), any_callback_(any_callback),
     srv_type_support_handle_(rosidl_typesupport_cpp::get_service_type_support_handle<ServiceT>())
   {
     // check if service handle was initialized
@@ -409,10 +407,10 @@ public:
    * \param[in] any_callback User defined callback to call when a client request is received.
    */
   Service(
-    const std::shared_ptr<rcl_node_t> & node_handle,
+    std::shared_ptr<rcl_node_t> node_handle,
     rcl_service_t * service_handle,
     AnyServiceCallback<ServiceT> any_callback)
-  : ServiceBase(node_handle), any_callback_(std::move(any_callback)),
+  : ServiceBase(node_handle), any_callback_(any_callback),
     srv_type_support_handle_(rosidl_typesupport_cpp::get_service_type_support_handle<ServiceT>())
   {
     // check if service handle was initialized
@@ -473,8 +471,8 @@ public:
 
   void
   handle_request(
-    const std::shared_ptr<rmw_request_id_t> & request_header,
-    const std::shared_ptr<void> & request) override
+    std::shared_ptr<rmw_request_id_t> request_header,
+    std::shared_ptr<void> request) override
   {
     auto typed_request = std::static_pointer_cast<typename ServiceT::Request>(request);
     auto response = any_callback_.dispatch(this->shared_from_this(), request_header, typed_request);
@@ -512,7 +510,7 @@ public:
    */
   void
   configure_introspection(
-    const Clock::SharedPtr & clock, const QoS & qos_service_event_pub,
+    Clock::SharedPtr clock, const QoS & qos_service_event_pub,
     rcl_service_introspection_state_t introspection_state)
   {
     rcl_publisher_options_t pub_opts = rcl_publisher_get_default_options();
