@@ -2,6 +2,14 @@
 Changelog for package rclcpp
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+16.0.19 (2026-03-25)
+--------------------
+* Remove duplicate test cases in TestAnySubscriptionCallback::is_serialized_message_callback (backport `#3104 <https://github.com/ros2/rclcpp/issues/3104>`_) (`#3108 <https://github.com/ros2/rclcpp/issues/3108>`_)
+* keep the event alive throught the assertion, preveiting the race. (`#3099 <https://github.com/ros2/rclcpp/issues/3099>`_) (`#3101 <https://github.com/ros2/rclcpp/issues/3101>`_)
+* fix: Use default rcl allocator if allocator is std::allocator (`#3069 <https://github.com/ros2/rclcpp/issues/3069>`_) (`#3072 <https://github.com/ros2/rclcpp/issues/3072>`_)
+* fix: Various data races in test cases (`#3057 <https://github.com/ros2/rclcpp/issues/3057>`_) (`#3063 <https://github.com/ros2/rclcpp/issues/3063>`_)
+* Contributors: mergify[bot]
+
 16.0.18 (2026-02-09)
 --------------------
 * print warning message on owner node if the parameter operation fails. (backport `#3037 <https://github.com/ros2/rclcpp/issues/3037>`_) (`#3040 <https://github.com/ros2/rclcpp/issues/3040>`_)
