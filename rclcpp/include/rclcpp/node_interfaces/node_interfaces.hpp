@@ -30,7 +30,6 @@
   rclcpp::node_interfaces::NodeTimeSourceInterface, \
   rclcpp::node_interfaces::NodeTimersInterface, \
   rclcpp::node_interfaces::NodeTopicsInterface, \
-  rclcpp::node_interfaces::NodeTypeDescriptionsInterface, \
   rclcpp::node_interfaces::NodeWaitablesInterface
 
 
@@ -119,7 +118,6 @@ public:
    *   - rclcpp::node_interfaces::NodeTimeSourceInterface
    *   - rclcpp::node_interfaces::NodeTimersInterface
    *   - rclcpp::node_interfaces::NodeTopicsInterface
-   *   - rclcpp::node_interfaces::NodeTypeDescriptionsInterface
    *   - rclcpp::node_interfaces::NodeWaitablesInterface
    *
    * Or you use custom interfaces as long as you make a template specialization
@@ -127,9 +125,7 @@ public:
    * the RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT macro.
    *
    * Usage example:
-   *   ```cpp
-   *   RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(rclcpp::node_interfaces::NodeBaseInterface, base)
-   *   ```
+   *   ```RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(rclcpp::node_interfaces::NodeBaseInterface, base)```
    *
    * If you choose not to use the helper macro, then you can specialize the
    * template yourself, but you must:
@@ -151,9 +147,16 @@ public:
   : NodeInterfacesSupportsT(node)
   {}
 
-  // Create a NodeInterfaces object with no bound interfaces
-  NodeInterfaces()
-  : NodeInterfacesSupportsT()
+  /// NodeT::SharedPtr Constructor
+  template<typename NodeT>
+  NodeInterfaces(std::shared_ptr<NodeT> node)  // NOLINT(runtime/explicit)
+  : NodeInterfaces(
+      [&]() -> NodeT & {
+        if (!node) {
+          throw std::invalid_argument("given node pointer is nullptr");
+        }
+        return *node;
+      }())
   {}
 
   explicit NodeInterfaces(std::shared_ptr<InterfaceTs>... args)

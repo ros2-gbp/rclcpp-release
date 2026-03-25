@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "rcpputils/find_and_replace.hpp"
-#include "rcpputils/scope_exit.hpp"
 #include "rclcpp/parameter_map.hpp"
 
 using rclcpp::exceptions::InvalidParametersException;
@@ -25,11 +24,10 @@ using rclcpp::exceptions::InvalidParameterValueException;
 using rclcpp::ParameterMap;
 using rclcpp::ParameterValue;
 
-static bool is_node_name_matched(const std::string & node_name, const char * node_fqn)
+ParameterMap
+rclcpp::parameter_map_from(const rcl_params_t * const c_params)
 {
-  // Update the regular expression ["/*" -> "(/\\w+)" and "/**" -> "(/\\w+)*"]
-  std::string regex = rcpputils::find_and_replace(node_name, "/*", "(/\\w+)");
-  return std::regex_match(node_fqn, std::regex(regex));
+  return parameter_map_from(c_params, nullptr);
 }
 
 ParameterMap
@@ -60,7 +58,9 @@ rclcpp::parameter_map_from(const rcl_params_t * const c_params, const char * nod
     }
 
     if (node_fqn) {
-      if (!is_node_name_matched(node_name, node_fqn)) {
+      // Update the regular expression ["/*" -> "(/\\w+)" and "/**" -> "(/\\w+)*"]
+      std::string regex = rcpputils::find_and_replace(node_name, "/*", "(/\\w+)");
+      if (!std::regex_match(node_fqn, std::regex(regex))) {
         // No need to parse the items because the user just care about node_fqn
         continue;
       }
@@ -86,8 +86,8 @@ rclcpp::parameter_map_from(const rcl_params_t * const c_params, const char * nod
         value = parameter_value_from(c_param_value);
       } catch (const InvalidParameterValueException & e) {
         throw InvalidParameterValueException(
-          std::string("parameter_value_from failed for parameter '") +
-          c_param_name + "': " + e.what());
+                std::string("parameter_value_from failed for parameter '") +
+                c_param_name + "': " + e.what());
       }
       params_node.emplace_back(c_param_name, value);
     }
@@ -156,31 +156,13 @@ rclcpp::parameter_value_from(const rcl_variant_t * const c_param_value)
 }
 
 ParameterMap
-rclcpp::parameter_map_from_yaml_file(const std::string & yaml_filename, const char * node_fqn)
+rclcpp::parameter_map_from_yaml_file(const std::string & yaml_filename)
 {
   rcutils_allocator_t allocator = rcutils_get_default_allocator();
   rcl_params_t * rcl_parameters = rcl_yaml_node_struct_init(allocator);
-  RCPPUTILS_SCOPE_EXIT(rcl_yaml_node_struct_fini(rcl_parameters); );
   const char * path = yaml_filename.c_str();
   if (!rcl_parse_yaml_file(path, rcl_parameters)) {
     rclcpp::exceptions::throw_from_rcl_error(RCL_RET_ERROR);
   }
-
-  return rclcpp::parameter_map_from(rcl_parameters, node_fqn);
-}
-
-std::vector<rclcpp::Parameter>
-rclcpp::parameters_from_map(const ParameterMap & parameter_map, const char * node_fqn)
-{
-  std::vector<rclcpp::Parameter> parameters;
-  std::string node_name_old;
-  for (auto & [node_name, node_parameters] : parameter_map) {
-    if (node_fqn && !is_node_name_matched(node_name, node_fqn)) {
-      // No need to parse the items because the user just care about node_fqn
-      continue;
-    }
-    parameters.insert(parameters.end(), node_parameters.begin(), node_parameters.end());
-  }
-
-  return parameters;
+  return rclcpp::parameter_map_from(rcl_parameters);
 }

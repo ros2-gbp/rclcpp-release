@@ -23,11 +23,9 @@
 #include "rcl/graph.h"
 #include "rcl/node.h"
 #include "rcl/wait.h"
-
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/node_interfaces/node_graph_interface.hpp"
-#include "rclcpp/qos.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/logging.hpp"
 
@@ -65,6 +63,13 @@ ClientBase::ClientBase(
       }
       delete client;
     });
+}
+
+ClientBase::~ClientBase()
+{
+  clear_on_new_response_callback();
+  // Make sure the client handle is destructed as early as possible and before the node handle
+  client_handle_.reset();
 }
 
 bool
@@ -125,6 +130,7 @@ bool
 ClientBase::wait_for_service_nanoseconds(std::chrono::nanoseconds timeout)
 {
   auto start = std::chrono::steady_clock::now();
+  // make an event to reuse, rather than create a new one each time
   auto node_ptr = node_graph_.lock();
   if (!node_ptr) {
     throw InvalidNodeError();
@@ -137,7 +143,6 @@ ClientBase::wait_for_service_nanoseconds(std::chrono::nanoseconds timeout)
     // check was non-blocking, return immediately
     return false;
   }
-  // make an event to reuse, rather than create a new one each time
   auto event = node_ptr->get_graph_event();
   // update the time even on the first loop to account for time spent in the first call
   // to this->server_is_ready()
@@ -243,6 +248,7 @@ ClientBase::set_on_new_response_callback(rcl_event_callback_t callback, const vo
     user_data);
 
   if (RCL_RET_OK != ret) {
+    using rclcpp::exceptions::throw_from_rcl_error;
     throw_from_rcl_error(ret, "failed to set the on new response callback for client");
   }
 }

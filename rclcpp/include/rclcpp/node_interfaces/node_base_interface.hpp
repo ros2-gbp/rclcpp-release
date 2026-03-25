@@ -15,10 +15,10 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_BASE_INTERFACE_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_BASE_INTERFACE_HPP_
 
-#include <atomic>
-#include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <vector>
 
 #include "rcl/node.h"
 
@@ -148,32 +148,12 @@ public:
   /**
    * For example, this should be notified when a publisher is added or removed.
    *
-   * \return the GuardCondition if it is valid, else throw runtime error
+   * \return the GuardCondition if it is valid, else thow runtime error
    */
   RCLCPP_PUBLIC
   virtual
   rclcpp::GuardCondition &
   get_notify_guard_condition() = 0;
-
-  /// Return a guard condition that should be notified when the internal node state changes.
-  /**
-   * For example, this should be notified when a publisher is added or removed.
-   *
-   * \return the GuardCondition if it is valid, else nullptr
-   */
-  RCLCPP_PUBLIC
-  virtual
-  rclcpp::GuardCondition::SharedPtr
-  get_shared_notify_guard_condition() = 0;
-
-  /// Trigger the guard condition that notifies of internal node state changes.
-  /**
-   * For example, this should be notified when a publisher is added or removed.
-   */
-  RCLCPP_PUBLIC
-  virtual
-  void
-  trigger_notify_guard_condition() = 0;
 
   /// Return the default preference for using intra process communication.
   RCLCPP_PUBLIC

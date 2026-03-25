@@ -153,7 +153,6 @@ public:
             throw std::runtime_error("subscription already associated with a wait set");
           }
           this->storage_add_subscription(std::move(local_subscription));
-          if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
         }
         if (mask.include_events) {
           for (auto key_event_pair : inner_subscription->get_event_handlers()) {
@@ -165,7 +164,6 @@ public:
               throw std::runtime_error("subscription event already associated with a wait set");
             }
             this->storage_add_waitable(std::move(event), std::move(local_subscription));
-            if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
           }
         }
         if (mask.include_intra_process_waitable) {
@@ -182,7 +180,6 @@ public:
             this->storage_add_waitable(
               std::move(inner_subscription->get_intra_process_waitable()),
               std::move(local_subscription));
-            if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
           }
         }
       });
@@ -227,7 +224,6 @@ public:
           auto local_subscription = inner_subscription;
           local_subscription->exchange_in_use_by_wait_set_state(local_subscription.get(), false);
           this->storage_remove_subscription(std::move(local_subscription));
-          if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
         }
         if (mask.include_events) {
           for (auto key_event_pair : inner_subscription->get_event_handlers()) {
@@ -235,7 +231,6 @@ public:
             auto local_subscription = inner_subscription;
             local_subscription->exchange_in_use_by_wait_set_state(event.get(), false);
             this->storage_remove_waitable(std::move(event));
-            if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
           }
         }
         if (mask.include_intra_process_waitable) {
@@ -244,7 +239,6 @@ public:
             // This is the case when intra process is enabled for the subscription.
             inner_subscription->exchange_in_use_by_wait_set_state(local_waitable.get(), false);
             this->storage_remove_waitable(std::move(local_waitable));
-            if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
           }
         }
       });
@@ -295,7 +289,6 @@ public:
         // fixed sized storage policies.
         // It will throw if the guard condition has already been added.
         this->storage_add_guard_condition(std::move(inner_guard_condition));
-        if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
       });
   }
 
@@ -333,7 +326,6 @@ public:
         // fixed sized storage policies.
         // It will throw if the guard condition is not in the wait set.
         this->storage_remove_guard_condition(std::move(inner_guard_condition));
-        if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
       });
   }
 
@@ -365,7 +357,6 @@ public:
         // fixed sized storage policies.
         // It will throw if the timer has already been added.
         this->storage_add_timer(std::move(inner_timer));
-        if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
       });
   }
 
@@ -393,7 +384,6 @@ public:
         // fixed sized storage policies.
         // It will throw if the timer is not in the wait set.
         this->storage_remove_timer(std::move(inner_timer));
-        if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
       });
   }
 
@@ -425,7 +415,6 @@ public:
         // fixed sized storage policies.
         // It will throw if the client has already been added.
         this->storage_add_client(std::move(inner_client));
-        if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
       });
   }
 
@@ -453,7 +442,6 @@ public:
         // fixed sized storage policies.
         // It will throw if the client is not in the wait set.
         this->storage_remove_client(std::move(inner_client));
-        if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
       });
   }
 
@@ -485,7 +473,6 @@ public:
         // fixed sized storage policies.
         // It will throw if the service has already been added.
         this->storage_add_service(std::move(inner_service));
-        if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
       });
   }
 
@@ -513,7 +500,6 @@ public:
         // fixed sized storage policies.
         // It will throw if the service is not in the wait set.
         this->storage_remove_service(std::move(inner_service));
-        if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
       });
   }
 
@@ -530,7 +516,7 @@ public:
    * the waitable to be removed, but it will cause the associated entity pointer
    * to be nullptr when introspecting this waitable after waiting.
    *
-   * Note that rclcpp::EventHandlerBase is just a special case of
+   * Note that rclcpp::QOSEventHandlerBase are just a special case of
    * rclcpp::Waitable and can be added with this function.
    *
    * \param[in] waitable Waitable to be added.
@@ -565,7 +551,6 @@ public:
         // fixed sized storage policies.
         // It will throw if the waitable has already been added.
         this->storage_add_waitable(std::move(inner_waitable), std::move(associated_entity));
-        if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
       });
   }
 
@@ -593,7 +578,6 @@ public:
         // fixed sized storage policies.
         // It will throw if the waitable is not in the wait set.
         this->storage_remove_waitable(std::move(inner_waitable));
-        if (this->wait_result_holding_) {this->wait_result_dirty_ = true;}
       });
   }
 
@@ -731,9 +715,10 @@ private:
       throw std::runtime_error("wait_result_acquire() called while already holding");
     }
     wait_result_holding_ = true;
-    wait_result_dirty_ = false;
     // this method comes from the SynchronizationPolicy
     this->sync_wait_result_acquire();
+    // this method comes from the StoragePolicy
+    this->storage_acquire_ownerships();
   }
 
   /// Called by the WaitResult's destructor to release resources.
@@ -749,13 +734,13 @@ private:
       throw std::runtime_error("wait_result_release() called while not holding");
     }
     wait_result_holding_ = false;
-    wait_result_dirty_ = false;
+    // this method comes from the StoragePolicy
+    this->storage_release_ownerships();
     // this method comes from the SynchronizationPolicy
     this->sync_wait_result_release();
   }
 
   bool wait_result_holding_ = false;
-  bool wait_result_dirty_ = false;
 };
 
 }  // namespace rclcpp

@@ -44,7 +44,6 @@ enum class ReliabilityPolicy
   BestEffort = RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT,
   Reliable = RMW_QOS_POLICY_RELIABILITY_RELIABLE,
   SystemDefault = RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT,
-  BestAvailable = RMW_QOS_POLICY_RELIABILITY_BEST_AVAILABLE,
   Unknown = RMW_QOS_POLICY_RELIABILITY_UNKNOWN,
 };
 
@@ -53,7 +52,6 @@ enum class DurabilityPolicy
   Volatile = RMW_QOS_POLICY_DURABILITY_VOLATILE,
   TransientLocal = RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL,
   SystemDefault = RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT,
-  BestAvailable = RMW_QOS_POLICY_DURABILITY_BEST_AVAILABLE,
   Unknown = RMW_QOS_POLICY_DURABILITY_UNKNOWN,
 };
 
@@ -62,7 +60,6 @@ enum class LivelinessPolicy
   Automatic = RMW_QOS_POLICY_LIVELINESS_AUTOMATIC,
   ManualByTopic = RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_TOPIC,
   SystemDefault = RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
-  BestAvailable = RMW_QOS_POLICY_LIVELINESS_BEST_AVAILABLE,
   Unknown = RMW_QOS_POLICY_LIVELINESS_UNKNOWN,
 };
 
@@ -80,9 +77,7 @@ struct RCLCPP_PUBLIC QoSInitialization
   size_t depth;
 
   /// Constructor which takes both a history policy and a depth (even if it would be unused).
-  QoSInitialization(
-    rmw_qos_history_policy_t history_policy_arg, size_t depth_arg,
-    bool print_depth_warning = true);
+  QoSInitialization(rmw_qos_history_policy_t history_policy_arg, size_t depth_arg);
 
   /// Create a QoSInitialization from an existing rmw_qos_profile_t, using its history and depth.
   static
@@ -99,7 +94,7 @@ struct RCLCPP_PUBLIC KeepAll : public rclcpp::QoSInitialization
 /// Use to initialize the QoS with the keep_last history setting and the given depth.
 struct RCLCPP_PUBLIC KeepLast : public rclcpp::QoSInitialization
 {
-  explicit KeepLast(size_t depth, bool print_depth_warning = true);
+  explicit KeepLast(size_t depth);
 };
 
 /// Encapsulation of Quality of Service settings.
@@ -185,10 +180,6 @@ public:
   QoS &
   best_effort();
 
-  /// Set the reliability setting to best available.
-  QoS &
-  reliability_best_available();
-
   /// Set the durability setting.
   QoS &
   durability(rmw_qos_durability_policy_t durability);
@@ -207,10 +198,6 @@ public:
   /// Set the durability setting to transient local.
   QoS &
   transient_local();
-
-  /// Set the durability setting to best available.
-  QoS &
-  durability_best_available();
 
   /// Set the deadline setting.
   QoS &
@@ -498,36 +485,6 @@ public:
   SystemDefaultsQoS(
     const QoSInitialization & qos_initialization = (
       QoSInitialization::from_rmw(rmw_qos_profile_system_default)
-  ));
-};
-
-/**
- * Best available QoS class
- *
- * Match majority of endpoints currently available while maintaining the highest level of service.
- * Policies are chosen at the time of creating a subscription or publisher.
- * The middleware is not expected to update policies after creating a subscription or publisher,
- * even if one or more policies are incompatible with newly discovered endpoints.
- * Therefore, this profile should be used with care since non-deterministic behavior can occur due
- * to races with discovery.
- *
- *    - History: Keep last,
- *    - Depth: 10,
- *    - Reliability: Best available,
- *    - Durability: Best available,
- *    - Deadline: Best available,
- *    - Lifespan: Default,
- *    - Liveliness: Best available,
- *    - Liveliness lease duration: Best available,
- *    - avoid ros namespace conventions: false
- */
-class RCLCPP_PUBLIC BestAvailableQoS : public QoS
-{
-public:
-  explicit
-  BestAvailableQoS(
-    const QoSInitialization & qos_initialization = (
-      QoSInitialization::from_rmw(rmw_qos_profile_best_available)
   ));
 };
 
