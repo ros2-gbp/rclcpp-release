@@ -135,28 +135,15 @@ void
 PublisherBase::bind_event_callbacks(
   const PublisherEventCallbacks & event_callbacks, bool use_default_callbacks)
 {
-  try {
-    if (event_callbacks.deadline_callback) {
-      this->add_event_handler(
-        event_callbacks.deadline_callback,
-        RCL_PUBLISHER_OFFERED_DEADLINE_MISSED);
-    }
-  } catch (const UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for deadline; not supported");
+  if (event_callbacks.deadline_callback) {
+    this->add_event_handler(
+      event_callbacks.deadline_callback,
+      RCL_PUBLISHER_OFFERED_DEADLINE_MISSED);
   }
-
-  try {
-    if (event_callbacks.liveliness_callback) {
-      this->add_event_handler(
-        event_callbacks.liveliness_callback,
-        RCL_PUBLISHER_LIVELINESS_LOST);
-    }
-  } catch (const UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for liveliness; not supported");
+  if (event_callbacks.liveliness_callback) {
+    this->add_event_handler(
+      event_callbacks.liveliness_callback,
+      RCL_PUBLISHER_LIVELINESS_LOST);
   }
 
   QOSOfferedIncompatibleQoSCallbackType incompatible_qos_cb;
@@ -173,9 +160,9 @@ PublisherBase::bind_event_callbacks(
       this->add_event_handler(incompatible_qos_cb, RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS);
     }
   } catch (const UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
+    RCLCPP_DEBUG(
       rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for incompatible qos; not supported");
+      "Failed to add event handler for incompatible qos; wrong callback type");
   }
 
   IncompatibleTypeCallbackType incompatible_type_cb;
@@ -192,21 +179,14 @@ PublisherBase::bind_event_callbacks(
       this->add_event_handler(incompatible_type_cb, RCL_PUBLISHER_INCOMPATIBLE_TYPE);
     }
   } catch (UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
+    RCLCPP_DEBUG(
       rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for incompatible type; not supported");
+      "Failed to add event handler for incompatible type; wrong callback type");
   }
-
-  try {
-    if (event_callbacks.matched_callback) {
-      this->add_event_handler(
-        event_callbacks.matched_callback,
-        RCL_PUBLISHER_MATCHED);
-    }
-  } catch (const UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for matched; not supported");
+  if (event_callbacks.matched_callback) {
+    this->add_event_handler(
+      event_callbacks.matched_callback,
+      RCL_PUBLISHER_MATCHED);
   }
 }
 
@@ -367,8 +347,10 @@ PublisherBase::default_incompatible_qos_callback(
 
 void
 PublisherBase::default_incompatible_type_callback(
-  [[maybe_unused]] rclcpp::IncompatibleTypeInfo & event) const
+  rclcpp::IncompatibleTypeInfo & event) const
 {
+  (void)event;
+
   RCLCPP_WARN(
     rclcpp::get_logger(rcl_node_get_logger_name(rcl_node_handle_.get())),
     "Incompatible type on topic '%s', no messages will be sent to it.", get_topic_name());

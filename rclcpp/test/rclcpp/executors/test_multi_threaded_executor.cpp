@@ -32,11 +32,6 @@ protected:
   {
     rclcpp::init(0, nullptr);
   }
-
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
-  }
 };
 
 constexpr std::chrono::milliseconds PERIOD_MS = 1000ms;

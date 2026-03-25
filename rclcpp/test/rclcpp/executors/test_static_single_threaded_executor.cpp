@@ -20,13 +20,12 @@
 #include <stdexcept>
 
 #include "rclcpp/exceptions.hpp"
-#include "rclcpp/executors.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/executors.hpp"
 
 #include "test_msgs/srv/empty.hpp"
 
-#include "./executor_types.hpp"
 #include "../../mocking_utils/patch.hpp"
 #include "../../utils/rclcpp_gtest_macros.hpp"
 
@@ -47,15 +46,7 @@ public:
 };
 
 TEST_F(TestStaticSingleThreadedExecutor, add_callback_group_trigger_guard_failed) {
-#ifdef __clang__
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
-  DeprecatedStaticSingleThreadedExecutor executor;
-#ifdef __clang__
-# pragma clang diagnostic pop
-#endif
+  rclcpp::executors::StaticSingleThreadedExecutor executor;
   auto node = std::make_shared<rclcpp::Node>("node", "ns");
   rclcpp::CallbackGroup::SharedPtr cb_group = node->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -65,20 +56,12 @@ TEST_F(TestStaticSingleThreadedExecutor, add_callback_group_trigger_guard_failed
       "lib:rclcpp", rcl_trigger_guard_condition, RCL_RET_ERROR);
     RCLCPP_EXPECT_THROW_EQ(
       executor.add_callback_group(cb_group, node->get_node_base_interface(), true),
-      std::runtime_error("Failed to handle entities update on callback group add: error not set"));
+      std::runtime_error("Failed to trigger guard condition on callback group add: error not set"));
   }
 }
 
 TEST_F(TestStaticSingleThreadedExecutor, add_node_trigger_guard_failed) {
-#ifdef __clang__
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
-  DeprecatedStaticSingleThreadedExecutor executor;
-#ifdef __clang__
-# pragma clang diagnostic pop
-#endif
+  rclcpp::executors::StaticSingleThreadedExecutor executor;
   auto node = std::make_shared<rclcpp::Node>("node", "ns");
 
   {
@@ -86,20 +69,12 @@ TEST_F(TestStaticSingleThreadedExecutor, add_node_trigger_guard_failed) {
       "lib:rclcpp", rcl_trigger_guard_condition, RCL_RET_ERROR);
     RCLCPP_EXPECT_THROW_EQ(
       executor.add_node(node),
-      std::runtime_error("Failed to handle entities update on node add: error not set"));
+      std::runtime_error("Failed to trigger guard condition on node add: error not set"));
   }
 }
 
 TEST_F(TestStaticSingleThreadedExecutor, remove_callback_group_trigger_guard_failed) {
-#ifdef __clang__
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
-  DeprecatedStaticSingleThreadedExecutor executor;
-#ifdef __clang__
-# pragma clang diagnostic pop
-#endif
+  rclcpp::executors::StaticSingleThreadedExecutor executor;
   auto node = std::make_shared<rclcpp::Node>("node", "ns");
   rclcpp::CallbackGroup::SharedPtr cb_group = node->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -112,20 +87,12 @@ TEST_F(TestStaticSingleThreadedExecutor, remove_callback_group_trigger_guard_fai
     RCLCPP_EXPECT_THROW_EQ(
       executor.remove_callback_group(cb_group, true),
       std::runtime_error(
-        "Failed to handle entities update on callback group remove: error not set"));
+        "Failed to trigger guard condition on callback group remove: error not set"));
   }
 }
 
 TEST_F(TestStaticSingleThreadedExecutor, remove_node_failed) {
-#ifdef __clang__
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
-  DeprecatedStaticSingleThreadedExecutor executor;
-#ifdef __clang__
-# pragma clang diagnostic pop
-#endif
+  rclcpp::executors::StaticSingleThreadedExecutor executor;
   auto node = std::make_shared<rclcpp::Node>("node", "ns");
 
   {
@@ -138,15 +105,7 @@ TEST_F(TestStaticSingleThreadedExecutor, remove_node_failed) {
 }
 
 TEST_F(TestStaticSingleThreadedExecutor, remove_node_trigger_guard_failed) {
-#ifdef __clang__
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
-  DeprecatedStaticSingleThreadedExecutor executor;
-#ifdef __clang__
-# pragma clang diagnostic pop
-#endif
+  rclcpp::executors::StaticSingleThreadedExecutor executor;
   auto node = std::make_shared<rclcpp::Node>("node", "ns");
 
   executor.add_node(node);
@@ -156,20 +115,12 @@ TEST_F(TestStaticSingleThreadedExecutor, remove_node_trigger_guard_failed) {
       "lib:rclcpp", rcl_trigger_guard_condition, RCL_RET_ERROR);
     RCLCPP_EXPECT_THROW_EQ(
       executor.remove_node(node, true),
-      std::runtime_error("Failed to handle entities update on node remove: error not set"));
+      std::runtime_error("Failed to trigger guard condition on node remove: error not set"));
   }
 }
 
 TEST_F(TestStaticSingleThreadedExecutor, execute_service) {
-#ifdef __clang__
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
-  DeprecatedStaticSingleThreadedExecutor executor;
-#ifdef __clang__
-# pragma clang diagnostic pop
-#endif
+  rclcpp::executors::StaticSingleThreadedExecutor executor;
   auto node = std::make_shared<rclcpp::Node>("node", "ns");
   executor.add_node(node);
 

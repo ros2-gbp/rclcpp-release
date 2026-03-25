@@ -184,8 +184,9 @@ class ClientTypeNames
 {
 public:
   template<typename T>
-  static std::string GetName([[maybe_unused]] int idx)
+  static std::string GetName(int idx)
   {
+    (void)idx;
     if (std::is_same_v<T, rclcpp::Client<test_msgs::srv::Empty>>) {
       return "Client";
     }

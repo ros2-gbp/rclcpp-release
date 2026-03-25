@@ -88,18 +88,21 @@ struct TypeAdapter<int, rclcpp::msg::String>
 
   static void
   convert_to_ros_message(
-    [[maybe_unused]] const custom_type & source,
-    [[maybe_unused]] ros_message_type & destination)
+    const custom_type & source,
+    ros_message_type & destination)
   {
+    (void) source;
+    (void) destination;
     throw std::runtime_error("This should not happen");
   }
 
   static void
   convert_to_custom(
-    [[maybe_unused]] const ros_message_type & source,
-    [[maybe_unused]] custom_type & destination)
+    const ros_message_type & source,
+    custom_type & destination)
   {
-    // This function is intentionally left empty.
+    (void) source;
+    (void) destination;
   }
 };
 
@@ -162,9 +165,9 @@ TEST_F(TestPublisher, conversion_exception_is_passed_up) {
     options.use_intra_process_comms(is_intra_process);
 
     auto callback =
-      []([[maybe_unused]] const rclcpp::msg::String::ConstSharedPtr msg) -> void
+      [](const rclcpp::msg::String::ConstSharedPtr msg) -> void
       {
-        // This function is intentionally left empty.
+        (void)msg;
       };
 
     auto node = std::make_shared<rclcpp::Node>("my_node", "/ns", options);

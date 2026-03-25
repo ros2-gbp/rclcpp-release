@@ -31,10 +31,11 @@ namespace detail
 
 std::vector<std::string>
 get_unparsed_ros_arguments(
-  [[maybe_unused]] int argc, char const * const * argv,
+  int argc, char const * const * argv,
   rcl_arguments_t * arguments,
   rcl_allocator_t allocator)
 {
+  (void)argc;
   std::vector<std::string> unparsed_ros_arguments;
   int unparsed_ros_args_count = rcl_arguments_get_count_unparsed_ros(arguments);
   if (unparsed_ros_args_count > 0) {

@@ -40,7 +40,6 @@
 #include "rclcpp/create_generic_subscription.hpp"
 #include "rclcpp/create_publisher.hpp"
 #include "rclcpp/create_service.hpp"
-#include "rclcpp/create_generic_service.hpp"
 #include "rclcpp/create_subscription.hpp"
 #include "rclcpp/create_timer.hpp"
 #include "rclcpp/detail/resolve_enable_topic_statistics.hpp"
@@ -155,6 +154,22 @@ Node::create_client(
     group);
 }
 
+template<typename ServiceT>
+typename Client<ServiceT>::SharedPtr
+Node::create_client(
+  const std::string & service_name,
+  const rmw_qos_profile_t & qos_profile,
+  rclcpp::CallbackGroup::SharedPtr group)
+{
+  return rclcpp::create_client<ServiceT>(
+    node_base_,
+    node_graph_,
+    node_services_,
+    extend_name_with_sub_namespace(service_name, this->get_sub_namespace()),
+    qos_profile,
+    group);
+}
+
 template<typename ServiceT, typename CallbackT>
 typename rclcpp::Service<ServiceT>::SharedPtr
 Node::create_service(
@@ -172,22 +187,20 @@ Node::create_service(
     group);
 }
 
-template<typename CallbackT>
-typename rclcpp::GenericService::SharedPtr
-Node::create_generic_service(
+template<typename ServiceT, typename CallbackT>
+typename rclcpp::Service<ServiceT>::SharedPtr
+Node::create_service(
   const std::string & service_name,
-  const std::string & service_type,
   CallbackT && callback,
-  const rclcpp::QoS & qos,
+  const rmw_qos_profile_t & qos_profile,
   rclcpp::CallbackGroup::SharedPtr group)
 {
-  return rclcpp::create_generic_service<CallbackT>(
+  return rclcpp::create_service<ServiceT, CallbackT>(
     node_base_,
     node_services_,
     extend_name_with_sub_namespace(service_name, this->get_sub_namespace()),
-    service_type,
     std::forward<CallbackT>(callback),
-    qos,
+    qos_profile,
     group);
 }
 
@@ -323,9 +336,11 @@ template<typename ParameterT>
 bool
 Node::get_parameter(const std::string & name, ParameterT & parameter) const
 {
+  std::string sub_name = extend_name_with_sub_namespace(name, this->get_sub_namespace());
+
   rclcpp::Parameter parameter_variant;
 
-  bool result = get_parameter(name, parameter_variant);
+  bool result = get_parameter(sub_name, parameter_variant);
   if (result) {
     parameter = static_cast<ParameterT>(parameter_variant.get_value<ParameterT>());
   }
@@ -340,7 +355,9 @@ Node::get_parameter_or(
   ParameterT & parameter,
   const ParameterT & alternative_value) const
 {
-  bool got_parameter = get_parameter(name, parameter);
+  std::string sub_name = extend_name_with_sub_namespace(name, this->get_sub_namespace());
+
+  bool got_parameter = get_parameter(sub_name, parameter);
   if (!got_parameter) {
     parameter = alternative_value;
   }

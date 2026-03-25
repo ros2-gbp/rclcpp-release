@@ -20,6 +20,7 @@
 #include "rclcpp/create_subscription.hpp"
 #include "rclcpp/node.hpp"
 #include "test_msgs/msg/empty.hpp"
+#include "test_msgs/msg/empty.h"
 
 using namespace std::chrono_literals;
 

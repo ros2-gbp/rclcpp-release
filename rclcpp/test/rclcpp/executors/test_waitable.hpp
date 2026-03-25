@@ -18,7 +18,6 @@
 #include <atomic>
 #include <functional>
 #include <memory>
-#include <vector>
 
 #include "rclcpp/waitable.hpp"
 #include "rclcpp/guard_condition.hpp"
@@ -64,11 +63,6 @@ public:
 
   size_t
   get_is_ready_call_count() const;
-
-  std::vector<std::shared_ptr<rclcpp::TimerBase>> get_timers() const override
-  {
-    return {};
-  }
 
 private:
   std::atomic<size_t> trigger_count_ = 0;

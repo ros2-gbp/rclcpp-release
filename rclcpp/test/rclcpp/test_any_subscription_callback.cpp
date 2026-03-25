@@ -21,6 +21,7 @@
 
 #include "rclcpp/any_subscription_callback.hpp"
 #include "test_msgs/msg/empty.hpp"
+#include "test_msgs/msg/empty.h"
 
 // Type adapter to be used in tests.
 struct MyEmpty {};
