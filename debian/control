@@ -1,0 +1,12 @@
+Source: ros-humble-rclcpp-action
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-humble-action-msgs, ros-humble-ament-cmake, ros-humble-ament-cmake-gtest <!nocheck>, ros-humble-ament-cmake-ros, ros-humble-ament-lint-auto <!nocheck>, ros-humble-ament-lint-common <!nocheck>, ros-humble-mimick-vendor <!nocheck>, ros-humble-performance-test-fixture <!nocheck>, ros-humble-rcl-action, ros-humble-rclcpp, ros-humble-rcpputils, ros-humble-rosidl-runtime-c, ros-humble-test-msgs <!nocheck>, ros-humble-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-humble-rclcpp-action
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-humble-action-msgs, ros-humble-ament-cmake, ros-humble-rcl-action, ros-humble-rclcpp, ros-humble-rcpputils, ros-humble-rosidl-runtime-c, ros-humble-ros-workspace
+Description: Adds action APIs for C++.
