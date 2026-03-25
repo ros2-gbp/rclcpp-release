@@ -2,6 +2,12 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+16.0.19 (2026-03-25)
+--------------------
+* Avoid unecessary creation of MultiThreadedExecutor (`#3090 <https://github.com/ros2/rclcpp/issues/3090>`_) (`#3096 <https://github.com/ros2/rclcpp/issues/3096>`_)
+* Fix component registering in subdirectories (`#3064 <https://github.com/ros2/rclcpp/issues/3064>`_) (`#3076 <https://github.com/ros2/rclcpp/issues/3076>`_)
+* Contributors: mergify[bot]
+
 16.0.18 (2026-02-09)
 --------------------
 
