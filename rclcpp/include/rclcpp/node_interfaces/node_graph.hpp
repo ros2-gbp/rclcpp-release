@@ -15,7 +15,9 @@
 #ifndef RCLCPP__NODE_INTERFACES__NODE_GRAPH_HPP_
 #define RCLCPP__NODE_INTERFACES__NODE_GRAPH_HPP_
 
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -31,6 +33,7 @@
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/node_interfaces/node_graph_interface.hpp"
 #include "rclcpp/visibility_control.hpp"
+#include "rmw/service_endpoint_info_array.h"
 #include "rmw/topic_endpoint_info_array.h"
 
 namespace rclcpp
@@ -112,6 +115,14 @@ public:
   count_subscribers(const std::string & topic_name) const override;
 
   RCLCPP_PUBLIC
+  size_t
+  count_clients(const std::string & service_name) const override;
+
+  RCLCPP_PUBLIC
+  size_t
+  count_services(const std::string & service_name) const override;
+
+  RCLCPP_PUBLIC
   const rcl_guard_condition_t *
   get_graph_guard_condition() const override;
 
@@ -149,14 +160,24 @@ public:
     const std::string & topic_name,
     bool no_mangle = false) const override;
 
+  RCLCPP_PUBLIC
+  std::vector<rclcpp::ServiceEndpointInfo>
+  get_clients_info_by_service(
+    const std::string & service_name,
+    bool no_mangle = false) const override;
+
+  RCLCPP_PUBLIC
+  std::vector<rclcpp::ServiceEndpointInfo>
+  get_servers_info_by_service(
+    const std::string & service_name,
+    bool no_mangle = false) const override;
+
 private:
   RCLCPP_DISABLE_COPY(NodeGraph)
 
   /// Handle to the NodeBaseInterface given in the constructor.
   rclcpp::node_interfaces::NodeBaseInterface * node_base_;
 
-  /// Graph Listener which waits on graph changes for the node and is shared across nodes.
-  std::shared_ptr<rclcpp::graph_listener::GraphListener> graph_listener_;
   /// Whether or not this node needs to be added to the graph listener.
   std::atomic_bool should_add_to_graph_listener_;
 

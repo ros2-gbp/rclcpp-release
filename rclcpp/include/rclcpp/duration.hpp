@@ -18,6 +18,7 @@
 #include <chrono>
 
 #include "builtin_interfaces/msg/duration.hpp"
+#include "builtin_interfaces/msg/time.hpp"
 #include "rcl/time.h"
 #include "rclcpp/visibility_control.hpp"
 
@@ -92,8 +93,12 @@ public:
   Duration
   operator+(const rclcpp::Duration & rhs) const;
 
+  Duration & operator+=(const rclcpp::Duration & rhs);
+
   Duration
   operator-(const rclcpp::Duration & rhs) const;
+
+  Duration & operator-=(const rclcpp::Duration & rhs);
 
   /// Get the maximum representable value.
   /**
@@ -105,6 +110,9 @@ public:
 
   Duration
   operator*(double scale) const;
+
+  Duration &
+  operator*=(double scale);
 
   /// Get duration in nanosecods
   /**
@@ -150,6 +158,14 @@ private:
 
   Duration() = default;
 };
+
+RCLCPP_PUBLIC
+builtin_interfaces::msg::Time
+operator+(const builtin_interfaces::msg::Time & lhs, const rclcpp::Duration & rhs);
+
+RCLCPP_PUBLIC
+builtin_interfaces::msg::Time
+operator-(const builtin_interfaces::msg::Time & lhs, const rclcpp::Duration & rhs);
 
 }  // namespace rclcpp
 

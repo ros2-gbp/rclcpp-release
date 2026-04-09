@@ -61,9 +61,8 @@ public:
     return static_cast<T *>(std::malloc(size * sizeof(T)));
   }
 
-  void deallocate(T * ptr, size_t size)
+  void deallocate(T * ptr, [[maybe_unused]] size_t size)
   {
-    (void)size;
     if (!ptr) {
       return;
     }
@@ -76,6 +75,11 @@ public:
   {
     typedef MyAllocator<U> other;
   };
+
+  rcl_allocator_t get_rcl_allocator()
+  {
+    return rcl_get_default_allocator();
+  }
 };
 
 // Explicit specialization for void
@@ -103,6 +107,11 @@ public:
   {
     typedef MyAllocator<U> other;
   };
+
+  rcl_allocator_t get_rcl_allocator()
+  {
+    return rcl_get_default_allocator();
+  }
 };
 
 template<typename T, typename U>

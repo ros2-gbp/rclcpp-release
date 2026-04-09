@@ -20,7 +20,7 @@
 
 #include "rclcpp/executors/multi_threaded_executor.hpp"
 #include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/executors/static_single_threaded_executor.hpp"
+#include "rclcpp/experimental/executors/events_executor/events_executor.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/visibility_control.hpp"
@@ -28,25 +28,95 @@
 namespace rclcpp
 {
 
-/// Create a default single-threaded executor and execute any immediately available work.
-/** \param[in] node_ptr Shared pointer to the node to spin. */
+/**
+ * @brief Create a default single-threaded executor and execute all available work exhaustively.
+ * @param node_ptr Shared pointer to the base interface of the node to spin.
+ * @param max_duration max duration to spin
+ *
+ * This method is deprecated because it can lead to very bad performance if used in a loop:
+ * each call will create a new executor and register the node, which is an expensive operation.
+ * It's recommended to always manually instantiate an executor and call the methods with
+ * the same name on it.
+ * For example:
+ *     SingleThreadedExecutor executor;
+ *     executor.add_node(node_ptr);
+ *     executor.spin_all(max_duration);
+ * If you are using a non-default context, this should be passed to the executor's constructor.
+ */
+[[deprecated("use SingleThreadedExecutor::spin_all instead")]]
 RCLCPP_PUBLIC
 void
-spin_some(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr);
+spin_all(
+  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
+  std::chrono::nanoseconds max_duration);
 
+/**
+ * @brief Create a default single-threaded executor and execute all available work exhaustively.
+ * @param node_ptr Shared pointer to the node to spin.
+ * @param max_duration max duration to spin
+ *
+ * This method is deprecated because it can lead to very bad performance if used in a loop:
+ * each call will create a new executor and register the node, which is an expensive operation.
+ * It's recommended to always manually instantiate an executor and call the methods with
+ * the same name on it.
+ * For example:
+ *     SingleThreadedExecutor executor;
+ *     executor.add_node(node_ptr);
+ *     executor.spin_all(max_duration);
+ * If you are using a non-default context, this should be passed to the executor's constructor.
+ */
+[[deprecated("use SingleThreadedExecutor::spin_all instead")]]
 RCLCPP_PUBLIC
 void
-spin_some(rclcpp::Node::SharedPtr node_ptr);
+spin_all(const rclcpp::Node::SharedPtr & node_ptr, std::chrono::nanoseconds max_duration);
+
+/**
+ * @brief Create a default single-threaded executor and execute any immediately available work.
+ * @param node_ptr Shared pointer to the base interface of the node to spin.
+ *
+ * This method is deprecated because it can lead to very bad performance if used in a loop:
+ * each call will create a new executor and register the node, which is an expensive operation.
+ * It's recommended to always manually instantiate an executor and call the methods with
+ * the same name on it.
+ * For example:
+ *     SingleThreadedExecutor executor;
+ *     executor.add_node(node_ptr);
+ *     executor.spin_some();
+ * If you are using a non-default context, this should be passed to the executor's constructor.
+ */
+[[deprecated("use SingleThreadedExecutor::spin_some instead")]]
+RCLCPP_PUBLIC
+void
+spin_some(const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr);
+
+/**
+ * @brief Create a default single-threaded executor and execute any immediately available work.
+ * @param node_ptr Shared pointer to the node to spin.
+ *
+ * This method is deprecated because it can lead to very bad performance if used in a loop:
+ * each call will create a new executor and register the node, which is an expensive operation.
+ * It's recommended to always manually instantiate an executor and call the methods with
+ * the same name on it.
+ * For example:
+ *     SingleThreadedExecutor executor;
+ *     executor.add_node(node_ptr);
+ *     executor.spin_some();
+ * If you are using a non-default context, this should be passed to the executor's constructor.
+ */
+[[deprecated("use SingleThreadedExecutor::spin_some instead")]]
+RCLCPP_PUBLIC
+void
+spin_some(const rclcpp::Node::SharedPtr & node_ptr);
 
 /// Create a default single-threaded executor and spin the specified node.
 /** \param[in] node_ptr Shared pointer to the node to spin. */
 RCLCPP_PUBLIC
 void
-spin(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr);
+spin(const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr);
 
 RCLCPP_PUBLIC
 void
-spin(rclcpp::Node::SharedPtr node_ptr);
+spin(const rclcpp::Node::SharedPtr & node_ptr);
 
 namespace executors
 {
@@ -70,7 +140,7 @@ template<typename FutureT, typename TimeRepT = int64_t, typename TimeT = std::mi
 rclcpp::FutureReturnCode
 spin_node_until_future_complete(
   rclcpp::Executor & executor,
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
   const FutureT & future,
   std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
 {
@@ -87,7 +157,7 @@ template<typename NodeT = rclcpp::Node, typename FutureT, typename TimeRepT = in
 rclcpp::FutureReturnCode
 spin_node_until_future_complete(
   rclcpp::Executor & executor,
-  std::shared_ptr<NodeT> node_ptr,
+  const std::shared_ptr<NodeT> & node_ptr,
   const FutureT & future,
   std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
 {
@@ -103,7 +173,7 @@ spin_node_until_future_complete(
 template<typename FutureT, typename TimeRepT = int64_t, typename TimeT = std::milli>
 rclcpp::FutureReturnCode
 spin_until_future_complete(
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
   const FutureT & future,
   std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
 {
@@ -117,7 +187,7 @@ template<typename NodeT = rclcpp::Node, typename FutureT, typename TimeRepT = in
   typename TimeT = std::milli>
 rclcpp::FutureReturnCode
 spin_until_future_complete(
-  std::shared_ptr<NodeT> node_ptr,
+  const std::shared_ptr<NodeT> & node_ptr,
   const FutureT & future,
   std::chrono::duration<TimeRepT, TimeT> timeout = std::chrono::duration<TimeRepT, TimeT>(-1))
 {

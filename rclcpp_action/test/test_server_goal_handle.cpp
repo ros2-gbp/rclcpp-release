@@ -44,6 +44,8 @@ public:
 
   bool try_cancel() {return try_canceling();}
 
+  bool try_abort() {return try_aborting();}
+
   void cancel_goal() {_cancel_goal();}
 };
 
@@ -132,6 +134,20 @@ TEST_F(TestServerGoalHandle, abort) {
   EXPECT_THROW(handle_->abort(result), rclcpp::exceptions::RCLError);
 }
 
+TEST_F(TestServerGoalHandle, try_abort) {
+  handle_->execute();
+  test_msgs::action::Fibonacci::Result::SharedPtr result =
+    std::make_shared<test_msgs::action::Fibonacci::Result>();
+  EXPECT_TRUE(handle_->try_abort());
+  EXPECT_FALSE(handle_->is_canceling());
+  EXPECT_FALSE(handle_->is_active());
+  EXPECT_FALSE(handle_->is_executing());
+
+  auto mock = mocking_utils::patch_and_return(
+    "lib:rclcpp_action", rcl_action_update_goal_state, RCL_RET_ERROR);
+  EXPECT_THROW(handle_->abort(result), rclcpp::exceptions::RCLError);
+}
+
 TEST_F(TestServerGoalHandle, succeed) {
   handle_->execute();
   test_msgs::action::Fibonacci::Result::SharedPtr result =
@@ -156,6 +172,28 @@ TEST_F(TestServerGoalHandle, execute) {
   auto mock = mocking_utils::patch_and_return(
     "lib:rclcpp_action", rcl_action_update_goal_state, RCL_RET_ERROR);
   EXPECT_THROW(handle_->execute(), rclcpp::exceptions::RCLError);
+}
+
+TEST_F(TestServerGoalHandle, publish_feedback_not_executing) {
+  // Goal is in accepted (not executing) state, publish_feedback should warn and ignore
+  auto feedback = std::make_shared<test_msgs::action::Fibonacci::Feedback>();
+  EXPECT_NO_THROW(handle_->publish_feedback(feedback));
+}
+
+TEST_F(TestServerGoalHandle, publish_feedback_executing) {
+  // Goal is in executing state, publish_feedback should succeed
+  handle_->execute();
+  auto feedback = std::make_shared<test_msgs::action::Fibonacci::Feedback>();
+  EXPECT_NO_THROW(handle_->publish_feedback(feedback));
+}
+
+TEST_F(TestServerGoalHandle, publish_feedback_after_succeed) {
+  // Goal reached terminal state, publish_feedback should warn and ignore
+  handle_->execute();
+  auto result = std::make_shared<test_msgs::action::Fibonacci::Result>();
+  handle_->succeed(result);
+  auto feedback = std::make_shared<test_msgs::action::Fibonacci::Feedback>();
+  EXPECT_NO_THROW(handle_->publish_feedback(feedback));
 }
 
 TEST_F(TestServerGoalHandle, rcl_action_goal_handle_get_status_error) {
