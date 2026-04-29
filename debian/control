@@ -1,0 +1,12 @@
+Source: ros-lyrical-rclcpp-components
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-lyrical-ament-cmake-google-benchmark <!nocheck>, ros-lyrical-ament-cmake-gtest <!nocheck>, ros-lyrical-ament-cmake-ros, ros-lyrical-ament-index-cpp, ros-lyrical-ament-lint-auto <!nocheck>, ros-lyrical-ament-lint-common <!nocheck>, ros-lyrical-class-loader, ros-lyrical-composition-interfaces, ros-lyrical-rcl-interfaces, ros-lyrical-rclcpp, ros-lyrical-rcpputils, ros-lyrical-rmw, ros-lyrical-ros-workspace
+Homepage: https://index.ros.org/p/rclcpp_components/#lyrical
+Standards-Version: 3.9.2
+
+Package: ros-lyrical-rclcpp-components
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-lyrical-ament-index-cpp, ros-lyrical-class-loader, ros-lyrical-composition-interfaces, ros-lyrical-rcl-interfaces, ros-lyrical-rclcpp, ros-lyrical-rcpputils, ros-lyrical-rmw, ros-lyrical-ros-workspace
+Description: Package containing tools for dynamically loadable components
