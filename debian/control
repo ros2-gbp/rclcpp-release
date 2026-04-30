@@ -1,0 +1,12 @@
+Source: ros-lyrical-rclcpp
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), python3-dev, python3-empy, ros-lyrical-ament-cmake-gen-version-h, ros-lyrical-ament-cmake-google-benchmark <!nocheck>, ros-lyrical-ament-cmake-gtest <!nocheck>, ros-lyrical-ament-cmake-ros, ros-lyrical-ament-cmake-ros <!nocheck>, ros-lyrical-ament-cmake-ros-core, ros-lyrical-ament-index-cpp, ros-lyrical-ament-lint-auto <!nocheck>, ros-lyrical-ament-lint-common <!nocheck>, ros-lyrical-builtin-interfaces, ros-lyrical-libstatistics-collector, ros-lyrical-mimick-vendor <!nocheck>, ros-lyrical-performance-test-fixture <!nocheck>, ros-lyrical-rcl, ros-lyrical-rcl-interfaces, ros-lyrical-rcl-logging-interface, ros-lyrical-rcl-yaml-param-parser, ros-lyrical-rcpputils, ros-lyrical-rcutils, ros-lyrical-rmw, ros-lyrical-rmw <!nocheck>, ros-lyrical-rmw-implementation-cmake <!nocheck>, ros-lyrical-rosgraph-msgs, ros-lyrical-rosidl-default-generators <!nocheck>, ros-lyrical-rosidl-dynamic-typesupport, ros-lyrical-rosidl-runtime-c, ros-lyrical-rosidl-runtime-cpp, ros-lyrical-rosidl-typesupport-c, ros-lyrical-rosidl-typesupport-cpp, ros-lyrical-statistics-msgs, ros-lyrical-test-msgs <!nocheck>, ros-lyrical-tracetools, ros-lyrical-ros-workspace
+Homepage: https://index.ros.org/p/rclcpp/#lyrical
+Standards-Version: 3.9.2
+
+Package: ros-lyrical-rclcpp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-lyrical-ament-index-cpp, ros-lyrical-builtin-interfaces, ros-lyrical-libstatistics-collector, ros-lyrical-rcl, ros-lyrical-rcl-interfaces, ros-lyrical-rcl-logging-interface, ros-lyrical-rcl-yaml-param-parser, ros-lyrical-rcpputils, ros-lyrical-rcutils, ros-lyrical-rmw, ros-lyrical-rosgraph-msgs, ros-lyrical-rosidl-dynamic-typesupport, ros-lyrical-rosidl-runtime-c, ros-lyrical-rosidl-runtime-cpp, ros-lyrical-rosidl-typesupport-c, ros-lyrical-rosidl-typesupport-cpp, ros-lyrical-statistics-msgs, ros-lyrical-tracetools, ros-lyrical-ros-workspace
+Description: The ROS client library in C++.
