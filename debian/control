@@ -1,0 +1,12 @@
+Source: ros-lyrical-rclcpp-action
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-lyrical-action-msgs, ros-lyrical-ament-cmake-gtest <!nocheck>, ros-lyrical-ament-cmake-ros, ros-lyrical-ament-lint-auto <!nocheck>, ros-lyrical-ament-lint-common <!nocheck>, ros-lyrical-mimick-vendor <!nocheck>, ros-lyrical-performance-test-fixture <!nocheck>, ros-lyrical-rcl, ros-lyrical-rcl-action, ros-lyrical-rclcpp, ros-lyrical-rcpputils, ros-lyrical-rosidl-runtime-c, ros-lyrical-test-msgs <!nocheck>, ros-lyrical-ros-workspace
+Homepage: https://index.ros.org/p/rclcpp_action/#lyrical
+Standards-Version: 3.9.2
+
+Package: ros-lyrical-rclcpp-action
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-lyrical-action-msgs, ros-lyrical-rcl, ros-lyrical-rcl-action, ros-lyrical-rclcpp, ros-lyrical-rcpputils, ros-lyrical-rosidl-runtime-c, ros-lyrical-ros-workspace
+Description: Adds action APIs for C++.
