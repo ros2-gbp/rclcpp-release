@@ -3,6 +3,9 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+32.0.0 (2026-04-30)
+-------------------
+
 31.0.2 (2026-04-09)
 -------------------
 * publish_feedback should effect only on executing state. (`#3118 <https://github.com/ros2/rclcpp/issues/3118>`_)
