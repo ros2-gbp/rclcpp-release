@@ -1,4 +1,4 @@
-// Copyright 2025 Open Source Robotics Foundation, Inc.Add commentMore actions
+// Copyright 2025 Open Source Robotics Foundation, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -10,7 +10,7 @@
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
-// limitations under the License.Add commentMore actions
+// limitations under the License.
 
 #include <memory>
 
@@ -21,6 +21,10 @@
 
 int main(int argc, char * argv[])
 {
+  RCUTILS_LOG_WARN_NAMED("component_container_event",
+    "This executable is deprecated and will be removed in M-turtle.\n"
+    "Use 'component_container --executor-type events-cbg' instead.");
+
   /// Component container with an events executor.
   rclcpp::init(argc, argv);
   auto exec = std::make_shared<rclcpp::experimental::executors::EventsExecutor>();
