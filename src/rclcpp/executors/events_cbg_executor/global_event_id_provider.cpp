@@ -1,4 +1,4 @@
-// Copyright 2015 Open Source Robotics Foundation, Inc.
+// Copyright 2024 Cellumation GmbH.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RCLCPP__MEMORY_STRATEGIES_HPP_
-#define RCLCPP__MEMORY_STRATEGIES_HPP_
-
-#include "rclcpp/memory_strategy.hpp"
-#include "rclcpp/visibility_control.hpp"
+#include "global_event_id_provider.hpp"
 
 namespace rclcpp
 {
-namespace memory_strategies
+namespace executors
 {
-
-/// Create a MemoryStrategy sharedPtr
-/**
- * \return a MemoryStrategy sharedPtr
- */
-RCLCPP_PUBLIC
-memory_strategy::MemoryStrategy::SharedPtr
-create_default_strategy();
-
-}  // namespace memory_strategies
+namespace cbg_executor
+{
+std::atomic<uint64_t> GlobalEventIdProvider::last_event_id = 1;
+}  // namespace cbg_executor
+}  // namespace executors
 }  // namespace rclcpp
-
-#endif  // RCLCPP__MEMORY_STRATEGIES_HPP_
