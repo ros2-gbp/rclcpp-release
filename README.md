@@ -1,3 +1,30 @@
+## rclcpp (rolling) - 33.0.0-1
+
+The packages in the `rclcpp` repository were released into the `rolling` distro by running `/usr/local/google/home/sloretz/projects/lyrical/env3/bin/bloom-release -r rolling -t rolling rclcpp` on `Thu, 07 May 2026 23:12:38 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_components`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `31.0.3-2`
+- old version: `31.0.3-2`
+- new version: `33.0.0-1`
+
+Versions of tools used:
+
+- bloom version: `0.14.3`
+- catkin_pkg version: `1.1.0`
+- rosdep version: `0.26.0`
+- rosdistro version: `1.0.1`
+- vcstools version: `0.1.42`
+
+
 ## rclcpp (lyrical) - 32.0.0-1
 
 The packages in the `rclcpp` repository were released into the `lyrical` distro by running `/usr/bin/bloom-release --rosdistro lyrical rclcpp` on `Thu, 30 Apr 2026 15:57:28 -0000`
