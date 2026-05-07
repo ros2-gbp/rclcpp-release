@@ -374,10 +374,10 @@ tracks:
     - git-bloom-generate -y rosdynrpm --prefix release/:{ros_distro} :{ros_distro}
       -i :{release_inc} --require-os fedora rhel
     devel_branch: rolling
-    last_version: 31.0.3
+    last_version: 33.0.0
     name: rclcpp
     patches: null
-    release_inc: '2'
+    release_inc: '1'
     release_repo_url: https://github.com/ros2-gbp/rclcpp-release.git
     release_tag: :{version}
     ros_distro: rolling
