@@ -1,0 +1,12 @@
+Source: ros-jazzy-rclcpp-action
+Section: misc
+Priority: optional
+Maintainer: Ivan Paunovic <ivanpauno@ekumenlabs.com>
+Build-Depends: debhelper (>= 9.0.0), ros-jazzy-action-msgs, ros-jazzy-ament-cmake, ros-jazzy-ament-cmake-gtest <!nocheck>, ros-jazzy-ament-cmake-ros, ros-jazzy-ament-lint-auto <!nocheck>, ros-jazzy-ament-lint-common <!nocheck>, ros-jazzy-mimick-vendor <!nocheck>, ros-jazzy-performance-test-fixture <!nocheck>, ros-jazzy-rcl, ros-jazzy-rcl-action, ros-jazzy-rclcpp, ros-jazzy-rcpputils, ros-jazzy-rosidl-runtime-c, ros-jazzy-test-msgs <!nocheck>, ros-jazzy-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-jazzy-rclcpp-action
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-jazzy-action-msgs, ros-jazzy-ament-cmake, ros-jazzy-rcl, ros-jazzy-rcl-action, ros-jazzy-rclcpp, ros-jazzy-rcpputils, ros-jazzy-rosidl-runtime-c, ros-jazzy-ros-workspace
+Description: Adds action APIs for C++.
