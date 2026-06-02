@@ -17,6 +17,7 @@
 #include <chrono>
 #include <string>
 #include <memory>
+#include <thread>
 
 #include "rmw/impl/cpp/demangle.hpp"
 
@@ -149,7 +150,7 @@ TimerBase::exchange_in_use_by_wait_set_state(bool in_use_state)
 }
 
 void
-TimerBase::set_on_reset_callback(const std::function<void(size_t)> & callback)
+TimerBase::set_on_reset_callback(std::function<void(size_t)> callback)
 {
   if (!callback) {
     throw std::invalid_argument(
@@ -207,6 +208,7 @@ TimerBase::clear_on_reset_callback()
     on_reset_callback_ = nullptr;
   }
 }
+
 void
 TimerBase::set_on_reset_callback(rcl_event_callback_t callback, const void * user_data)
 {
@@ -215,9 +217,4 @@ TimerBase::set_on_reset_callback(rcl_event_callback_t callback, const void * use
   if (ret != RCL_RET_OK) {
     rclcpp::exceptions::throw_from_rcl_error(ret, "Failed to set timer on reset callback");
   }
-}
-
-const rclcpp::Clock::SharedPtr & TimerBase::get_clock() const
-{
-  return clock_;
 }

@@ -19,7 +19,6 @@
 #include <memory>
 #include <mutex>
 #include <set>
-#include <vector>
 
 #include "rclcpp/guard_condition.hpp"
 #include "rclcpp/waitable.hpp"
@@ -42,10 +41,7 @@ public:
    *   of this waitable has signaled the wait_set.
    */
   RCLCPP_PUBLIC
-  explicit ExecutorNotifyWaitable(
-    const std::function<void(void)> & on_execute_callback = {},
-    const rclcpp::Context::SharedPtr & context =
-    rclcpp::contexts::get_global_default_context());
+  explicit ExecutorNotifyWaitable(std::function<void(void)> on_execute_callback = {});
 
   // Destructor
   RCLCPP_PUBLIC
@@ -116,7 +112,7 @@ public:
    */
   RCLCPP_PUBLIC
   void
-  add_guard_condition(const rclcpp::GuardCondition::WeakPtr & guard_condition);
+  add_guard_condition(rclcpp::GuardCondition::WeakPtr guard_condition);
 
   /// Unset any callback registered via set_on_ready_callback.
   /**
@@ -126,21 +122,13 @@ public:
   void
   clear_on_ready_callback() override;
 
-  /// Set a new callback to be called whenever this waitable is executed.
-  /**
-   * \param[in] on_execute_callback The new callback
-   */
-  RCLCPP_PUBLIC
-  void
-  set_execute_callback(std::function<void(void)> on_execute_callback);
-
   /// Remove a guard condition from being waited on.
   /**
    * \param[in] weak_guard_condition The guard condition to remove.
    */
   RCLCPP_PUBLIC
   void
-  remove_guard_condition(const rclcpp::GuardCondition::WeakPtr & weak_guard_condition);
+  remove_guard_condition(rclcpp::GuardCondition::WeakPtr weak_guard_condition);
 
   /// Get the number of ready guard_conditions
   /**
@@ -150,37 +138,17 @@ public:
   size_t
   get_number_of_ready_guard_conditions() override;
 
-  /// Returns the number of used Timers
-  /**
-   * Will always return an empty vector.
-   */
-  RCLCPP_PUBLIC
-  std::vector<std::shared_ptr<rclcpp::TimerBase>>
-  get_timers() const override;
-
 private:
   /// Callback to run when waitable executes
   std::function<void(void)> execute_callback_;
 
-  /// Mutex to procetect the guard conditions
   std::mutex guard_condition_mutex_;
-  /// Mutex to protect the execute callback
-  std::mutex execute_mutex_;
 
   std::function<void(size_t)> on_ready_callback_;
 
   /// The collection of guard conditions to be waited on.
-  std::set<rclcpp::GuardCondition::SharedPtr> notify_guard_conditions_;
-
-  /// The indixes were our guard conditions were stored in the
-  /// rcl waitset
-  std::vector<size_t> idxs_of_added_guard_condition_;
-
-  /// set to true, if we got a pending trigger
-  bool needs_processing = false;
-
-  /// A guard condition needed to generate wakeups
-  rclcpp::GuardCondition::SharedPtr guard_condition_;
+  std::set<rclcpp::GuardCondition::WeakPtr,
+    std::owner_less<rclcpp::GuardCondition::WeakPtr>> notify_guard_conditions_;
 };
 
 }  // namespace executors

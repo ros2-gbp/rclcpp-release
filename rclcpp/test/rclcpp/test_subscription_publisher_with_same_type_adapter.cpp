@@ -57,17 +57,21 @@ struct TypeAdapter<std::string, rclcpp::msg::String>
 
   static void
   convert_to_ros_message(
-    [[maybe_unused]] const custom_type & source,
-    [[maybe_unused]] ros_message_type & destination)
+    const custom_type & source,
+    ros_message_type & destination)
   {
+    (void) source;
+    (void) destination;
     throw std::runtime_error("This should not happen");
   }
 
   static void
   convert_to_custom(
-    [[maybe_unused]] const ros_message_type & source,
-    [[maybe_unused]] custom_type & destination)
+    const ros_message_type & source,
+    custom_type & destination)
   {
+    (void) source;
+    (void) destination;
     throw std::runtime_error("This should not happen");
   }
 };
@@ -212,7 +216,7 @@ TEST_F(
     bool is_received = false;
     auto callback =
       [message_data, &is_received](
-      std::shared_ptr<const std::string> msg) -> void {
+      std::shared_ptr<std::string> msg) -> void {
         is_received = true;
         EXPECT_STREQ(message_data.c_str(), (*msg).c_str());
       };
@@ -230,7 +234,7 @@ TEST_F(
     bool is_received = false;
     auto callback =
       [message_data, &is_received](
-      std::shared_ptr<const std::string> msg,
+      std::shared_ptr<std::string> msg,
       const rclcpp::MessageInfo & message_info) -> void {
         is_received = true;
         EXPECT_STREQ(message_data.c_str(), (*msg).c_str());
@@ -422,7 +426,7 @@ TEST_F(
     bool is_received = false;
     auto callback =
       [message_data, &is_received](
-      std::shared_ptr<const std::string> msg) -> void {
+      std::shared_ptr<std::string> msg) -> void {
         is_received = true;
         EXPECT_STREQ(message_data.c_str(), (*msg).c_str());
       };
@@ -440,7 +444,7 @@ TEST_F(
     bool is_received = false;
     auto callback =
       [message_data, &is_received](
-      std::shared_ptr<const std::string> msg,
+      std::shared_ptr<std::string> msg,
       const rclcpp::MessageInfo & message_info) -> void {
         is_received = true;
         EXPECT_STREQ(message_data.c_str(), (*msg).c_str());
@@ -637,7 +641,7 @@ TEST_F(
     bool is_received = false;
     auto callback =
       [message_data, &is_received](
-      std::shared_ptr<const double> msg) -> void {
+      std::shared_ptr<double> msg) -> void {
         is_received = true;
         ASSERT_EQ(message_data, *msg);
       };
@@ -656,7 +660,7 @@ TEST_F(
     bool is_received = false;
     auto callback =
       [message_data, &is_received](
-      std::shared_ptr<const double> msg,
+      std::shared_ptr<double> msg,
       const rclcpp::MessageInfo & message_info) -> void {
         is_received = true;
         ASSERT_EQ(message_data, *msg);
@@ -862,7 +866,7 @@ TEST_F(
     bool is_received = false;
     auto callback =
       [message_data, &is_received](
-      std::shared_ptr<const double> msg) -> void {
+      std::shared_ptr<double> msg) -> void {
         is_received = true;
         ASSERT_EQ(message_data, *msg);
       };
@@ -882,7 +886,7 @@ TEST_F(
     bool is_received = false;
     auto callback =
       [message_data, &is_received](
-      std::shared_ptr<const double> msg,
+      std::shared_ptr<double> msg,
       const rclcpp::MessageInfo & message_info) -> void {
         is_received = true;
         ASSERT_EQ(message_data, *msg);

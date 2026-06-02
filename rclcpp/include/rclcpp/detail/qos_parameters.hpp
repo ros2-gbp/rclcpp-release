@@ -97,9 +97,6 @@ declare_parameter_or_get(
   rcl_interfaces::msg::ParameterDescriptor descriptor)
 {
   try {
-    // enable parameter modification to make it possible
-    // to declare QoS override parameters during parameter callbacks.
-    parameters_interface.enable_parameter_modification();
     return parameters_interface.declare_parameter(
       param_name, param_value, descriptor);
   } catch (const rclcpp::exceptions::ParameterAlreadyDeclaredException &) {
@@ -270,8 +267,8 @@ apply_qos_override(
       RCLCPP_DETAIL_APPLY_QOS_OVERRIDE_FROM_PARAMETER_STRING(
         reliability, RELIABILITY, value, qos);
       break;
-    case QosPolicyKind::Invalid:
-      throw std::invalid_argument{"invalid QosPolicyKind"};
+    default:
+      throw std::invalid_argument{"unknown QosPolicyKind"};
   }
 }
 
@@ -332,11 +329,9 @@ get_default_qos_param_value(rclcpp::QosPolicyKind kind, const rclcpp::QoS & qos)
       return ParameterValue(
         check_if_stringified_policy_is_null(
           rmw_qos_reliability_policy_to_str(rmw_qos.reliability), kind));
-    case QosPolicyKind::Invalid:
-      throw std::invalid_argument{"invalid QoS policy kind"};
+    default:
+      throw std::invalid_argument{"unknown QoS policy kind"};
   }
-
-  return ParameterValue();
 }
 
 }  // namespace detail

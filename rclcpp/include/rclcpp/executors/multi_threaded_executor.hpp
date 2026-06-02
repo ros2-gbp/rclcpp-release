@@ -24,6 +24,7 @@
 
 #include "rclcpp/executor.hpp"
 #include "rclcpp/macros.hpp"
+#include "rclcpp/memory_strategies.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp

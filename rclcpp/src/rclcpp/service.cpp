@@ -15,6 +15,7 @@
 #include "rclcpp/service.hpp"
 
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -27,7 +28,7 @@
 
 using rclcpp::ServiceBase;
 
-ServiceBase::ServiceBase(const std::shared_ptr<rcl_node_t> & node_handle)
+ServiceBase::ServiceBase(std::shared_ptr<rcl_node_t> node_handle)
 : node_handle_(node_handle),
   node_logger_(rclcpp::get_node_logger(node_handle_.get()))
 {}

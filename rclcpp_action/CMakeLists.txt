@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.5)
 
 project(rclcpp_action)
 
@@ -23,7 +23,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 add_library(${PROJECT_NAME}
-  src/client_base.cpp
+  src/client.cpp
   src/create_generic_client.cpp
   src/generic_client.cpp
   src/generic_client_goal_handle.cpp
@@ -37,7 +37,7 @@ target_include_directories(${PROJECT_NAME}
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
 target_link_libraries(${PROJECT_NAME} PUBLIC
-  action_msgs::action_msgs
+  ${action_msgs_TARGETS}
   rcl::rcl
   rcl_action::rcl_action
   rclcpp::rclcpp
@@ -83,7 +83,6 @@ if(BUILD_TESTING)
   add_subdirectory(test/benchmark)
 
   ament_add_gtest(test_client test/test_client.cpp TIMEOUT 180)
-  ament_add_test_label(test_client mimick)
   if(TARGET test_client)
     target_link_libraries(test_client
       ${PROJECT_NAME}
@@ -92,7 +91,7 @@ if(BUILD_TESTING)
       rcl_action::rcl_action
       rclcpp::rclcpp
       rcutils::rcutils
-      test_msgs::test_msgs
+      ${test_msgs_TARGETS}
     )
   endif()
 
@@ -106,31 +105,29 @@ if(BUILD_TESTING)
       rcl_action::rcl_action
       rclcpp::rclcpp
       rcutils::rcutils
-      test_msgs::test_msgs
+      ${test_msgs_TARGETS}
     )
   endif()
 
   ament_add_gtest(test_server test/test_server.cpp TIMEOUT 180)
-  ament_add_test_label(test_server mimick)
   if(TARGET test_server)
     target_link_libraries(test_server
       ${PROJECT_NAME}
       mimick
       rcl_action::rcl_action
       rclcpp::rclcpp
-      test_msgs::test_msgs
+      ${test_msgs_TARGETS}
     )
   endif()
 
   ament_add_gtest(test_server_goal_handle test/test_server_goal_handle.cpp)
-  ament_add_test_label(test_server_goal_handle mimick)
   if(TARGET test_server_goal_handle)
     target_link_libraries(test_server_goal_handle
       ${PROJECT_NAME}
-      action_msgs::action_msgs
+      ${action_msgs_TARGETS}
       mimick
       rclcpp::rclcpp
-      test_msgs::test_msgs
+      ${test_msgs_TARGETS}
     )
   endif()
 
@@ -138,7 +135,7 @@ if(BUILD_TESTING)
   if(TARGET test_traits)
     target_link_libraries(test_traits
       ${PROJECT_NAME}
-      test_msgs::test_msgs
+      ${test_msgs_TARGETS}
     )
   endif()
 
@@ -146,14 +143,9 @@ if(BUILD_TESTING)
   if(TARGET test_types)
     target_link_libraries(test_types
       ${PROJECT_NAME}
-      test_msgs::test_msgs
+      ${test_msgs_TARGETS}
     )
   endif()
 endif()
 
 ament_package()
-
-if(TEST cppcheck)
-  # must set the property after ament_package()
-  set_tests_properties(cppcheck PROPERTIES TIMEOUT 600)
-endif()

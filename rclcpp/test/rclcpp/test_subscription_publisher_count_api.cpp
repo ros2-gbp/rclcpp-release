@@ -108,9 +108,9 @@ public:
   }
 
 protected:
-  static void OnMessage([[maybe_unused]] test_msgs::msg::Empty::ConstSharedPtr msg)
+  static void OnMessage(test_msgs::msg::Empty::ConstSharedPtr msg)
   {
-    // This function is intentionally left empty.
+    (void)msg;
   }
 
   std::chrono::milliseconds offset{2000};

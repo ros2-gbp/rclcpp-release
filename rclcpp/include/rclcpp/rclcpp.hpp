@@ -68,20 +68,18 @@
  *
  * - Executors (responsible for execution of callbacks through a blocking spin):
  *   - rclcpp::spin()
+ *   - rclcpp::spin_some()
+ *   - rclcpp::spin_until_future_complete()
  *   - rclcpp::executors::SingleThreadedExecutor
  *   - rclcpp::executors::SingleThreadedExecutor::add_node()
  *   - rclcpp::executors::SingleThreadedExecutor::spin()
  *   - rclcpp::executors::MultiThreadedExecutor
  *   - rclcpp::executors::MultiThreadedExecutor::add_node()
  *   - rclcpp::executors::MultiThreadedExecutor::spin()
- *   - rclcpp::executors::EventsCBGExecutor
- *   - rclcpp::executors::EventsCBGExecutor::add_node()
- *   - rclcpp::executors::EventsCBGExecutor::spin()
  *   - rclcpp/executor.hpp
  *   - rclcpp/executors.hpp
  *   - rclcpp/executors/single_threaded_executor.hpp
  *   - rclcpp/executors/multi_threaded_executor.hpp
- *   - rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp
  * - CallbackGroups (mechanism for enforcing concurrency rules for callbacks):
  *   - rclcpp::Node::create_callback_group()
  *   - rclcpp::CallbackGroup
@@ -179,7 +177,6 @@
 #include "rclcpp/parameter_event_handler.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/parameter_service.hpp"
-#include "rclcpp/parameter_descriptor_wrapper.hpp"
 #include "rclcpp/rate.hpp"
 #include "rclcpp/time.hpp"
 #include "rclcpp/utilities.hpp"

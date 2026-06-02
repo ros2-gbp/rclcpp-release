@@ -158,42 +158,46 @@ remove_ros_arguments(int argc, char const * const * argv)
 }
 
 bool
-ok(const Context::SharedPtr & context)
+ok(Context::SharedPtr context)
 {
-  if(!context) {
-    return ok(rclcpp::contexts::get_global_default_context());
+  using rclcpp::contexts::get_global_default_context;
+  if (nullptr == context) {
+    context = get_global_default_context();
   }
-
   return context->is_valid();
 }
 
 bool
-shutdown(const Context::SharedPtr & context, const std::string & reason)
+shutdown(Context::SharedPtr context, const std::string & reason)
 {
-  if(!context) {
-    return shutdown(rclcpp::contexts::get_global_default_context(), reason);
+  using rclcpp::contexts::get_global_default_context;
+  auto default_context = get_global_default_context();
+  if (nullptr == context) {
+    context = default_context;
   }
   bool ret = context->shutdown(reason);
-  if (context == rclcpp::contexts::get_global_default_context()) {
+  if (context == default_context) {
     uninstall_signal_handlers();
   }
   return ret;
 }
 
 void
-on_shutdown(const std::function<void()> & callback, const Context::SharedPtr & context)
+on_shutdown(std::function<void()> callback, Context::SharedPtr context)
 {
-  if(!context) {
-    return on_shutdown(callback, rclcpp::contexts::get_global_default_context());
+  using rclcpp::contexts::get_global_default_context;
+  if (nullptr == context) {
+    context = get_global_default_context();
   }
   context->on_shutdown(callback);
 }
 
 bool
-sleep_for(const std::chrono::nanoseconds & nanoseconds, const Context::SharedPtr & context)
+sleep_for(const std::chrono::nanoseconds & nanoseconds, Context::SharedPtr context)
 {
-  if (!context) {
-    return sleep_for(nanoseconds, rclcpp::contexts::get_global_default_context());
+  using rclcpp::contexts::get_global_default_context;
+  if (nullptr == context) {
+    context = get_global_default_context();
   }
   return context->sleep_for(nanoseconds);
 }

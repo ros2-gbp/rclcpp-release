@@ -85,21 +85,6 @@ public:
   RCLCPP_PUBLIC
   virtual ~PublisherBase();
 
-  /// Check if a publisher event type is supported by the active RMW implementation.
-  /**
-   * This API allows application code to introspect at runtime whether a
-   * particular publisher event type is supported by the currently loaded
-   * RMW implementation, enabling portable code that adapts gracefully
-   * when switching between RMW implementations.
-   *
-   * \param[in] event_type the publisher event type to check
-   * \return `true` if the event type is supported, `false` otherwise
-   */
-  RCLCPP_PUBLIC
-  static
-  bool
-  event_type_is_supported(const rcl_publisher_event_type_t event_type);
-
   /// Add event handlers for passed in event_callbacks.
   RCLCPP_PUBLIC
   void
@@ -225,7 +210,7 @@ public:
   void
   setup_intra_process(
     uint64_t intra_process_publisher_id,
-    const IntraProcessManagerSharedPtr & ipm);
+    IntraProcessManagerSharedPtr ipm);
 
   /// Get network flow endpoints
   /**
@@ -315,7 +300,7 @@ public:
    */
   void
   set_on_new_qos_event_callback(
-    const std::function<void(size_t)> & callback,
+    std::function<void(size_t)> callback,
     rcl_publisher_event_type_t event_type)
   {
     if (event_handlers_.count(event_type) == 0) {
@@ -334,7 +319,7 @@ public:
     // The on_ready_callback signature has an extra `int` argument used to disambiguate between
     // possible different entities within a generic waitable.
     // We hide that detail to users of this method.
-    std::function<void(size_t, int)> new_callback = [callback] (size_t nr, int) {callback(nr);};
+    std::function<void(size_t, int)> new_callback = std::bind(callback, std::placeholders::_1);
     event_handlers_[event_type]->set_on_ready_callback(new_callback);
   }
 
