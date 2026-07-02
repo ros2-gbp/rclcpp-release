@@ -300,7 +300,7 @@ tracks:
     - git-bloom-generate -y rosdynrpm --prefix release/:{ros_distro} :{ros_distro}
       -i :{release_inc} --require-os fedora rhel
     devel_branch: lyrical
-    last_version: 32.0.0
+    last_version: 32.0.1
     name: rclcpp
     patches: null
     release_inc: '1'
