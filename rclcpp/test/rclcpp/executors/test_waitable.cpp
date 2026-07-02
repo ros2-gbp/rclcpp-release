@@ -17,6 +17,7 @@
 #include <functional>
 #include <memory>
 #include <thread>
+#include <utility>
 
 #include "rclcpp/detail/add_guard_condition_to_rcl_wait_set.hpp"
 #include "rclcpp/waitable.hpp"
@@ -65,9 +66,8 @@ TestWaitable::take_data()
 }
 
 std::shared_ptr<void>
-TestWaitable::take_data_by_entity_id(size_t id)
+TestWaitable::take_data_by_entity_id([[maybe_unused]] size_t id)
 {
-  (void) id;
   return nullptr;
 }
 
@@ -89,7 +89,7 @@ TestWaitable::execute(const std::shared_ptr<void> &)
 void
 TestWaitable::set_on_execute_callback(std::function<void()> on_execute_callback)
 {
-  on_execute_callback_ = on_execute_callback;
+  on_execute_callback_ = std::move(on_execute_callback);
 }
 
 void

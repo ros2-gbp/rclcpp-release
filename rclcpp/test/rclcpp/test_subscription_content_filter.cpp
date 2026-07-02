@@ -30,14 +30,7 @@
 
 #include "test_msgs/msg/basic_types.hpp"
 
-#ifdef RMW_IMPLEMENTATION
-# define CLASSNAME_(NAME, SUFFIX) NAME ## __ ## SUFFIX
-# define CLASSNAME(NAME, SUFFIX) CLASSNAME_(NAME, SUFFIX)
-#else
-# define CLASSNAME(NAME, SUFFIX) NAME
-#endif
-
-class CLASSNAME (TestContentFilterSubscription, RMW_IMPLEMENTATION) : public ::testing::Test
+class TestContentFilterSubscription : public ::testing::Test
 {
 public:
   static void SetUpTestCase()
@@ -76,11 +69,13 @@ public:
   {
     using clock = std::chrono::system_clock;
     auto start = clock::now();
+    rclcpp::executors::SingleThreadedExecutor executor;
+    executor.add_node(node);
     while (!condition()) {
       if ((clock::now() - start) > timeout) {
         return false;
       }
-      rclcpp::spin_some(node);
+      executor.spin_some();
     }
     return true;
   }
@@ -113,7 +108,23 @@ bool operator==(const test_msgs::msg::BasicTypes & m1, const test_msgs::msg::Bas
          m1.uint64_value == m2.uint64_value;
 }
 
-TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), is_cft_enabled) {
+TEST_F(TestContentFilterSubscription, is_cft_supported)
+{
+  {
+    auto mock = mocking_utils::patch_and_return(
+      "lib:rclcpp", rcl_subscription_is_cft_supported, false);
+    EXPECT_FALSE(sub->is_cft_supported());
+  }
+
+  {
+    auto mock = mocking_utils::patch_and_return(
+      "lib:rclcpp", rcl_subscription_is_cft_supported, true);
+    EXPECT_TRUE(sub->is_cft_supported());
+  }
+}
+
+TEST_F(TestContentFilterSubscription, is_cft_enabled)
+{
   {
     auto mock = mocking_utils::patch_and_return(
       "lib:rclcpp", rcl_subscription_is_cft_enabled, false);
@@ -127,7 +138,8 @@ TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), is_cft_enab
   }
 }
 
-TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), get_content_filter_error) {
+TEST_F(TestContentFilterSubscription, get_content_filter_error)
+{
   auto mock = mocking_utils::patch_and_return(
     "lib:rclcpp", rcl_subscription_get_content_filter, RCL_RET_ERROR);
 
@@ -137,7 +149,8 @@ TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), get_content
     rclcpp::exceptions::RCLError);
 }
 
-TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), set_content_filter_error) {
+TEST_F(TestContentFilterSubscription, set_content_filter_error)
+{
   auto mock = mocking_utils::patch_and_return(
     "lib:rclcpp", rcl_subscription_set_content_filter, RCL_RET_ERROR);
 
@@ -148,7 +161,8 @@ TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), set_content
     rclcpp::exceptions::RCLError);
 }
 
-TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), get_content_filter) {
+TEST_F(TestContentFilterSubscription, get_content_filter)
+{
   rclcpp::ContentFilterOptions options;
 
   if (sub->is_cft_enabled()) {
@@ -164,8 +178,9 @@ TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), get_content
   }
 }
 
-TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), set_content_filter) {
-  if (sub->is_cft_enabled()) {
+TEST_F(TestContentFilterSubscription, set_content_filter)
+{
+  if (sub->is_cft_supported()) {
     EXPECT_NO_THROW(
       sub->set_content_filter(filter_expression_init, expression_parameters_2));
   } else {
@@ -175,7 +190,15 @@ TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), set_content
   }
 }
 
-TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), content_filter_get_begin) {
+TEST_F(TestContentFilterSubscription, content_filter_get_begin)
+{
+  std::string rmw_implementation_str = std::string(rmw_get_implementation_identifier());
+
+  // Run test only if rmw implementation supports content filter, otherwise skip it.
+  if (!sub->is_cft_supported()) {
+    GTEST_SKIP() << rmw_implementation_str << " doesn't support content filter";
+  }
+
   using namespace std::chrono_literals;
   {
     test_msgs::msg::BasicTypes msg;
@@ -200,24 +223,29 @@ TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), content_fil
     EXPECT_TRUE(receive);
     EXPECT_EQ(original_message, output_message);
 
-    if (sub->is_cft_enabled()) {
-      EXPECT_NO_THROW(
-        sub->set_content_filter(filter_expression_init, expression_parameters_2));
-      // waiting to allow for filter propagation
-      std::this_thread::sleep_for(std::chrono::seconds(10));
+    EXPECT_NO_THROW(
+      sub->set_content_filter(filter_expression_init, expression_parameters_2));
+    // waiting to allow for filter propagation
+    std::this_thread::sleep_for(std::chrono::seconds(10));
 
-      test_msgs::msg::BasicTypes original_message;
-      original_message.int32_value = 3;
-      pub->publish(original_message);
+    test_msgs::msg::BasicTypes message_to_be_filtered;
+    message_to_be_filtered.int32_value = original_message.int32_value;
+    pub->publish(message_to_be_filtered);
 
-      test_msgs::msg::BasicTypes output_message;
-      bool receive = wait_for_message(output_message, sub, context, 10s);
-      EXPECT_FALSE(receive);
-    }
+    test_msgs::msg::BasicTypes output_message2;
+    receive = wait_for_message(output_message2, sub, context, 10s);
+    EXPECT_FALSE(receive);
   }
 }
 
-TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), content_filter_get_later) {
+TEST_F(TestContentFilterSubscription, content_filter_get_later)
+{
+  std::string rmw_implementation_str = std::string(rmw_get_implementation_identifier());
+  // Run test only if rmw implementation supports content filter, otherwise skip it.
+  if (!sub->is_cft_supported()) {
+    GTEST_SKIP() << rmw_implementation_str << " doesn't support content filter";
+  }
+
   using namespace std::chrono_literals;
   {
     test_msgs::msg::BasicTypes msg;
@@ -239,32 +267,32 @@ TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), content_fil
 
     test_msgs::msg::BasicTypes output_message;
     bool receive = wait_for_message(output_message, sub, context, 10s);
-    if (sub->is_cft_enabled()) {
-      EXPECT_FALSE(receive);
-    } else {
-      EXPECT_TRUE(receive);
-      EXPECT_EQ(original_message, output_message);
-    }
+    EXPECT_FALSE(receive);
 
-    if (sub->is_cft_enabled()) {
-      EXPECT_NO_THROW(
-        sub->set_content_filter(filter_expression_init, expression_parameters_2));
-      // waiting to allow for filter propagation
-      std::this_thread::sleep_for(std::chrono::seconds(10));
+    EXPECT_NO_THROW(
+      sub->set_content_filter(filter_expression_init, expression_parameters_2));
+    // waiting to allow for filter propagation
+    std::this_thread::sleep_for(std::chrono::seconds(10));
 
-      test_msgs::msg::BasicTypes original_message;
-      original_message.int32_value = 4;
-      pub->publish(original_message);
+    test_msgs::msg::BasicTypes matching_message;
+    matching_message.int32_value = original_message.int32_value;
+    pub->publish(matching_message);
 
-      test_msgs::msg::BasicTypes output_message;
-      bool receive = wait_for_message(output_message, sub, context, 10s);
-      EXPECT_TRUE(receive);
-      EXPECT_EQ(original_message, output_message);
-    }
+    test_msgs::msg::BasicTypes output_message2;
+    receive = wait_for_message(output_message2, sub, context, 10s);
+    EXPECT_TRUE(receive);
+    EXPECT_EQ(matching_message, output_message2);
   }
 }
 
-TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), content_filter_reset) {
+TEST_F(TestContentFilterSubscription, content_filter_reset)
+{
+  std::string rmw_implementation_str = std::string(rmw_get_implementation_identifier());
+  // Run test only if rmw implementation supports content filter, otherwise skip it.
+  if (!sub->is_cft_supported()) {
+    GTEST_SKIP() << rmw_implementation_str << " doesn't support content filter";
+  }
+
   using namespace std::chrono_literals;
   {
     test_msgs::msg::BasicTypes msg;
@@ -286,36 +314,25 @@ TEST_F(CLASSNAME(TestContentFilterSubscription, RMW_IMPLEMENTATION), content_fil
 
     test_msgs::msg::BasicTypes output_message;
     bool receive = wait_for_message(output_message, sub, context, 10s);
-    if (sub->is_cft_enabled()) {
-      EXPECT_FALSE(receive);
-    } else {
-      EXPECT_TRUE(receive);
-      EXPECT_EQ(original_message, output_message);
-    }
+    EXPECT_FALSE(receive);
 
-    if (sub->is_cft_enabled()) {
-      EXPECT_NO_THROW(
-        sub->set_content_filter(""));
-      // waiting to allow for filter propagation
-      std::this_thread::sleep_for(std::chrono::seconds(10));
+    EXPECT_NO_THROW(sub->set_content_filter(""));
+    // waiting to allow for filter propagation
+    std::this_thread::sleep_for(std::chrono::seconds(10));
 
-      test_msgs::msg::BasicTypes original_message;
-      original_message.int32_value = 4;
-      pub->publish(original_message);
+    test_msgs::msg::BasicTypes unfiltered_message;
+    unfiltered_message.int32_value = original_message.int32_value;
+    pub->publish(unfiltered_message);
 
-      test_msgs::msg::BasicTypes output_message;
-      bool receive = wait_for_message(output_message, sub, context, 10s);
-      EXPECT_TRUE(receive);
-      EXPECT_EQ(original_message, output_message);
-    }
+    test_msgs::msg::BasicTypes output_message2;
+    receive = wait_for_message(output_message2, sub, context, 10s);
+    EXPECT_TRUE(receive);
+    EXPECT_EQ(unfiltered_message, output_message2);
   }
 }
 
-TEST_F(
-  CLASSNAME(
-    TestContentFilterSubscription,
-    RMW_IMPLEMENTATION), create_two_content_filters_with_same_topic_name_and_destroy) {
-
+TEST_F(TestContentFilterSubscription, create_two_content_filters_with_same_topic_name_and_destroy)
+{
   // Create another content filter
   auto options = rclcpp::SubscriptionOptions();
 

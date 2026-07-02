@@ -19,6 +19,7 @@
 #include <string>
 
 #include "rclcpp/experimental/executors/events_executor/events_executor.hpp"
+#include "rclcpp/node.hpp"
 
 #include "test_msgs/srv/empty.hpp"
 #include "test_msgs/msg/empty.hpp"
@@ -48,9 +49,8 @@ TEST_F(TestEventsExecutor, run_pub_sub)
   bool msg_received = false;
   auto subscription = node->create_subscription<test_msgs::msg::Empty>(
     "topic", rclcpp::SensorDataQoS(),
-    [&msg_received](test_msgs::msg::Empty::ConstSharedPtr msg)
+    [&msg_received]([[maybe_unused]] test_msgs::msg::Empty::ConstSharedPtr msg)
     {
-      (void)msg;
       msg_received = true;
     });
 
@@ -115,8 +115,8 @@ TEST_F(TestEventsExecutor, run_clients_servers)
   auto request = std::make_shared<test_msgs::srv::Empty::Request>();
   client->async_send_request(
     request,
-    [&response_received](rclcpp::Client<test_msgs::srv::Empty>::SharedFuture result_future) {
-      (void)result_future;
+    [&response_received]([[maybe_unused]] rclcpp::Client<test_msgs::srv::Empty>::SharedFuture
+    result_future){
       response_received = true;
     });
 
@@ -479,14 +479,196 @@ TEST_F(TestEventsExecutor, test_default_incompatible_qos_callbacks)
   const auto timeout = std::chrono::seconds(10);
   ex.spin_until_future_complete(log_msgs_future, timeout);
 
-  EXPECT_EQ(
-    "New subscription discovered on topic '/test_topic', requesting incompatible QoS. "
-    "No messages will be sent to it. Last incompatible policy: DURABILITY_QOS_POLICY",
-    pub_log_msg);
-  EXPECT_EQ(
-    "New publisher discovered on topic '/test_topic', offering incompatible QoS. "
-    "No messages will be sent to it. Last incompatible policy: DURABILITY_QOS_POLICY",
-    sub_log_msg);
+  rclcpp::QoSCheckCompatibleResult qos_compatible = rclcpp::qos_check_compatible(
+    publisher->get_actual_qos(), subscription->get_actual_qos());
+  if (qos_compatible.compatibility == rclcpp::QoSCompatibility::Error) {
+    EXPECT_EQ(
+      "New subscription discovered on topic '/test_topic', requesting incompatible QoS. "
+      "No messages will be sent to it. Last incompatible policy: DURABILITY_QOS_POLICY",
+      pub_log_msg);
+    EXPECT_EQ(
+      "New publisher discovered on topic '/test_topic', offering incompatible QoS. "
+      "No messages will be sent to it. Last incompatible policy: DURABILITY_QOS_POLICY",
+      sub_log_msg);
+  } else {
+    EXPECT_EQ("", pub_log_msg);
+    EXPECT_EQ("", sub_log_msg);
+  }
 
   rcutils_logging_set_output_handler(original_output_handler);
+}
+
+class TestWaitableWithTimer : public rclcpp::Waitable
+{
+  static constexpr int TimerCallbackType = 0;
+
+public:
+  explicit TestWaitableWithTimer(const rclcpp::Context::SharedPtr & context)
+  {
+    auto timer_callback = [this] () {
+        timer_ready = true;
+        if (ready_callback) {
+        // inform executor that the waitable is ready to process a timer event
+          ready_callback(1, TimerCallbackType);
+        }
+      };
+    timer =
+      std::make_shared<rclcpp::WallTimer<decltype (timer_callback)>>(std::chrono::milliseconds(10),
+      std::move(timer_callback), context);
+  }
+
+  void
+  add_to_wait_set(rcl_wait_set_t & /*wait_set*/) override {}
+
+  bool
+  is_ready(const rcl_wait_set_t & /*wait_set*/) override
+  {
+    return false;
+  }
+
+  std::shared_ptr<void>
+  take_data() override
+  {
+    return std::shared_ptr<void>(nullptr);
+  }
+
+  std::shared_ptr<void>
+  take_data_by_entity_id(size_t id) override
+  {
+    if (id != TimerCallbackType) {
+      throw std::runtime_error("Internal error, got wrong ID for take data");
+    }
+    return nullptr;
+  }
+
+  void
+  execute(const std::shared_ptr<void> &) override
+  {
+    if (timer_ready) {
+      timer_triggered_waitable_and_waitable_was_executed = true;
+    }
+  }
+
+  void
+  set_on_ready_callback(std::function<void(size_t, int)> callback) override
+  {
+    ready_callback = callback;
+  }
+
+  void
+  clear_on_ready_callback() override
+  {
+    ready_callback = std::function<void(size_t, int)>();
+  }
+
+  size_t
+  get_number_of_ready_guard_conditions() override
+  {
+    return 0;
+  }
+
+  std::vector<std::shared_ptr<rclcpp::TimerBase>> get_timers() const override
+  {
+    return {timer};
+  }
+
+  bool timerTriggeredWaitable() const
+  {
+    return timer_triggered_waitable_and_waitable_was_executed;
+  }
+
+private:
+  std::atomic_bool timer_triggered_waitable_and_waitable_was_executed = false;
+  std::atomic_bool timer_ready = false;
+  rclcpp::TimerBase::SharedPtr timer;
+  std::function<void(size_t, int)> ready_callback;
+};
+
+TEST_F(TestEventsExecutor, waitable_with_timer)
+{
+  auto node = std::make_shared<rclcpp::Node>("node");
+
+  auto waitable =
+    std::make_shared<TestWaitableWithTimer>(rclcpp::contexts::get_global_default_context());
+
+  EventsExecutor executor;
+  executor.add_node(node);
+
+  node->get_node_waitables_interface()->add_waitable(waitable,
+    node->get_node_base_interface()->get_default_callback_group());
+
+  std::thread spinner([&executor]() {executor.spin();});
+
+  size_t cnt = 0;
+  while (!waitable->timerTriggeredWaitable()) {
+    std::this_thread::sleep_for(10ms);
+    cnt++;
+
+    // This should terminate after ~20 ms, so a timeout of 500ms should be plenty
+    EXPECT_LT(cnt, 51);
+    if (cnt > 50) {
+      // timeout case
+      break;
+    }
+  }
+  executor.cancel();
+  spinner.join();
+
+  EXPECT_TRUE(waitable->timerTriggeredWaitable());
+}
+
+// Regression test for https://github.com/ros2/rmw_cyclonedds/pull/584
+// EventsExecutor must receive transient-local cached messages
+// when the subscriber uses KEEP_ALL history.
+//
+// Bug: rmw_cyclonedds reports depth=0 for KEEP_ALL, and
+// rmw_subscription_set_on_new_message_callback clips unread_count to depth
+// via std::min(unread_count, 0) == 0, causing the executor to never take the
+// cached message.
+//
+// This test publishes before the subscriber exists (transient-local caching),
+// then subscribes with KEEP_ALL + transient-local via EventsExecutor and
+// verifies the cached message is delivered.
+TEST_F(TestEventsExecutor, keep_all_transient_local_receives_cached_message)
+{
+  // Publisher node: transient-local, reliable, depth=1 (standard /tf_static pattern)
+  auto pub_node = std::make_shared<rclcpp::Node>("pub_node");
+  rclcpp::QoS pub_qos(1);
+  pub_qos.transient_local().reliable();
+  auto publisher = pub_node->create_publisher<test_msgs::msg::Empty>("tl_test_topic", pub_qos);
+
+  // Publish BEFORE subscriber exists — DDS caches this for late joiners
+  publisher->publish(test_msgs::msg::Empty{});
+  std::this_thread::sleep_for(500ms);
+
+  // Subscriber node: KEEP_ALL + transient-local (what rosbag2 adapt_request_to_offers produces)
+  auto sub_node = std::make_shared<rclcpp::Node>("sub_node");
+  rclcpp::QoS sub_qos(rclcpp::KeepAll{});
+  sub_qos.transient_local().reliable();
+
+  std::atomic<int> received{0};
+  auto subscription = sub_node->create_subscription<test_msgs::msg::Empty>(
+    "tl_test_topic", sub_qos,
+    [&received](test_msgs::msg::Empty::ConstSharedPtr) {
+      received.fetch_add(1);
+    });
+
+  EventsExecutor executor;
+  executor.add_node(sub_node);
+
+  auto start = std::chrono::steady_clock::now();
+  while (received.load() == 0 &&
+    (std::chrono::steady_clock::now() - start) < 5s)
+  {
+    executor.spin_some(100ms);
+  }
+  executor.remove_node(sub_node);
+
+  // With the rmw fix, the cached message must be received.
+  // Without the fix, received == 0 because the callback fires with 0 events.
+  EXPECT_GE(received.load(), 1)
+    << "EventsExecutor did not receive the transient-local cached message "
+       "with KEEP_ALL QoS. This indicates a regression in "
+       "rmw_subscription_set_on_new_message_callback where unread_count "
+       "is incorrectly clipped to depth=0 for KEEP_ALL history.";
 }

@@ -59,11 +59,11 @@ public:
 
   NodeTypeDescriptionsImpl(
     rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base,
-    rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr node_logging,
-    rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters,
-    rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services)
+    const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr & node_logging,
+    const rclcpp::node_interfaces::NodeParametersInterface::SharedPtr & node_parameters,
+    const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr & node_services)
   : logger_(node_logging->get_logger()),
-    node_base_(node_base)
+    node_base_(std::move(node_base))
   {
     rclcpp::ParameterValue enable_param;
     const std::string enable_param_name = "start_type_description_service";
@@ -92,7 +92,7 @@ public:
     }
 
     if (enable_param.get<bool>()) {
-      auto * rcl_node = node_base->get_rcl_node_handle();
+      auto * rcl_node = node_base_->get_rcl_node_handle();
       std::shared_ptr<rcl_service_t> rcl_srv(
         new rcl_service_t,
         [rcl_node, logger = this->logger_](rcl_service_t * service)
@@ -113,6 +113,7 @@ public:
         RCLCPP_ERROR(
           logger_, "Failed to initialize ~/get_type_description service: %s",
           rcl_get_error_string().str);
+        rcl_reset_error();
         throw std::runtime_error(
                 "Failed to initialize ~/get_type_description service.");
       }
@@ -120,9 +121,9 @@ public:
       rclcpp::AnyServiceCallback<ServiceT> cb;
       cb.set(
         [this](
-          std::shared_ptr<rmw_request_id_t> header,
-          std::shared_ptr<ServiceT::Request> request,
-          std::shared_ptr<ServiceT::Response> response
+          const std::shared_ptr<rmw_request_id_t> & header,
+          const std::shared_ptr<ServiceT::Request> & request,
+          const std::shared_ptr<ServiceT::Response> & response
         ) {
           rcl_node_type_description_service_handle_request(
             node_base_->get_rcl_node_handle(),
@@ -143,10 +144,10 @@ public:
 };
 
 NodeTypeDescriptions::NodeTypeDescriptions(
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base,
-  rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr node_logging,
-  rclcpp::node_interfaces::NodeParametersInterface::SharedPtr node_parameters,
-  rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services)
+  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_base,
+  const rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr & node_logging,
+  const rclcpp::node_interfaces::NodeParametersInterface::SharedPtr & node_parameters,
+  const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr & node_services)
 : impl_(new NodeTypeDescriptionsImpl(
       node_base,
       node_logging,

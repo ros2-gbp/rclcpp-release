@@ -29,7 +29,6 @@
 #include "rclcpp/experimental/subscription_intra_process_base.hpp"
 #include "rclcpp/experimental/ros_message_intra_process_buffer.hpp"
 #include "rclcpp/qos.hpp"
-#include "rclcpp/type_support_decl.hpp"
 #include "rclcpp/detail/add_guard_condition_to_rcl_wait_set.hpp"
 
 #include "tracetools/tracetools.h"
@@ -110,9 +109,8 @@ public:
   }
 
   bool
-  is_ready(const rcl_wait_set_t & wait_set) override
+  is_ready([[maybe_unused]] const rcl_wait_set_t & wait_set) override
   {
-    (void) wait_set;
     return buffer_->has_data();
   }
 

@@ -15,6 +15,7 @@
 #ifndef RCLCPP__LOGGER_HPP_
 #define RCLCPP__LOGGER_HPP_
 
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <utility>
@@ -23,7 +24,6 @@
 
 #include "rcl/node.h"
 #include "rcutils/logging.h"
-#include "rcpputils/filesystem_helper.hpp"
 
 /**
  * \def RCLCPP_LOGGING_ENABLED
@@ -86,8 +86,8 @@ get_node_logger(const rcl_node_t * node);
  * \throws rclcpp::exceptions::RCLError if an unexpected error occurs.
  */
 RCLCPP_PUBLIC
-rcpputils::fs::path
-get_logging_directory();
+std::filesystem::path
+get_log_directory();
 
 class Logger
 {

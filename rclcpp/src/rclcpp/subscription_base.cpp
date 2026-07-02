@@ -15,13 +15,16 @@
 #include "rclcpp/subscription_base.hpp"
 
 #include <cstdio>
+#include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "rcpputils/scope_exit.hpp"
 
+#include "rclcpp/detail/cpp_callback_trampoline.hpp"
 #include "rclcpp/dynamic_typesupport/dynamic_message.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/expand_topic_or_service_name.hpp"
@@ -30,7 +33,9 @@
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/event_handler.hpp"
 
+#include "rcl/event.h"
 #include "rmw/error_handling.h"
+#include "rmw/impl/cpp/demangle.hpp"
 #include "rmw/rmw.h"
 
 #include "rosidl_dynamic_typesupport/types.h"
@@ -108,20 +113,38 @@ SubscriptionBase::~SubscriptionBase()
   ipm->remove_subscription(intra_process_subscription_id_);
 }
 
+bool
+SubscriptionBase::event_type_is_supported(const rcl_subscription_event_type_t event_type)
+{
+  return rcl_subscription_event_type_is_supported(event_type);
+}
+
 void
 SubscriptionBase::bind_event_callbacks(
   const SubscriptionEventCallbacks & event_callbacks, bool use_default_callbacks)
 {
-  if (event_callbacks.deadline_callback) {
-    this->add_event_handler(
-      event_callbacks.deadline_callback,
-      RCL_SUBSCRIPTION_REQUESTED_DEADLINE_MISSED);
+  try {
+    if (event_callbacks.deadline_callback) {
+      this->add_event_handler(
+        event_callbacks.deadline_callback,
+        RCL_SUBSCRIPTION_REQUESTED_DEADLINE_MISSED);
+    }
+  } catch (const UnsupportedEventTypeException & /*exc*/) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for deadline; not supported");
   }
 
-  if (event_callbacks.liveliness_callback) {
-    this->add_event_handler(
-      event_callbacks.liveliness_callback,
-      RCL_SUBSCRIPTION_LIVELINESS_CHANGED);
+  try {
+    if (event_callbacks.liveliness_callback) {
+      this->add_event_handler(
+        event_callbacks.liveliness_callback,
+        RCL_SUBSCRIPTION_LIVELINESS_CHANGED);
+    }
+  } catch (const UnsupportedEventTypeException & /*exc*/) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for liveliness; not supported");
   }
 
   QOSRequestedIncompatibleQoSCallbackType incompatible_qos_cb;
@@ -139,7 +162,9 @@ SubscriptionBase::bind_event_callbacks(
       this->add_event_handler(incompatible_qos_cb, RCL_SUBSCRIPTION_REQUESTED_INCOMPATIBLE_QOS);
     }
   } catch (const UnsupportedEventTypeException & /*exc*/) {
-    // pass
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for incompatible qos; not supported");
   }
 
   IncompatibleTypeCallbackType incompatible_type_cb;
@@ -156,18 +181,33 @@ SubscriptionBase::bind_event_callbacks(
       this->add_event_handler(incompatible_type_cb, RCL_SUBSCRIPTION_INCOMPATIBLE_TYPE);
     }
   } catch (UnsupportedEventTypeException & /*exc*/) {
-    // pass
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for incompatible type; not supported");
   }
 
-  if (event_callbacks.message_lost_callback) {
-    this->add_event_handler(
-      event_callbacks.message_lost_callback,
-      RCL_SUBSCRIPTION_MESSAGE_LOST);
+  try {
+    if (event_callbacks.message_lost_callback) {
+      this->add_event_handler(
+        event_callbacks.message_lost_callback,
+        RCL_SUBSCRIPTION_MESSAGE_LOST);
+    }
+  } catch (const UnsupportedEventTypeException & /*exc*/) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for message lost; not supported");
   }
-  if (event_callbacks.matched_callback) {
-    this->add_event_handler(
-      event_callbacks.matched_callback,
-      RCL_SUBSCRIPTION_MATCHED);
+
+  try {
+    if (event_callbacks.matched_callback) {
+      this->add_event_handler(
+        event_callbacks.matched_callback,
+        RCL_SUBSCRIPTION_MATCHED);
+    }
+  } catch (const UnsupportedEventTypeException & /*exc*/) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for matched; not supported");
   }
 }
 
@@ -294,7 +334,7 @@ SubscriptionBase::setup_intra_process(
   IntraProcessManagerWeakPtr weak_ipm)
 {
   intra_process_subscription_id_ = intra_process_subscription_id;
-  weak_ipm_ = weak_ipm;
+  weak_ipm_ = std::move(weak_ipm);
   use_intra_process_ = true;
 }
 
@@ -352,10 +392,8 @@ SubscriptionBase::default_incompatible_qos_callback(
 
 void
 SubscriptionBase::default_incompatible_type_callback(
-  rclcpp::IncompatibleTypeInfo & event) const
+  [[maybe_unused]] rclcpp::IncompatibleTypeInfo & event) const
 {
-  (void)event;
-
   RCLCPP_WARN(
     rclcpp::get_logger(rcl_node_get_logger_name(node_handle_.get())),
     "Incompatible type on topic '%s', no messages will be sent to it.", get_topic_name());
@@ -422,11 +460,11 @@ SubscriptionBase::get_network_flow_endpoints() const
   }
 
   std::vector<rclcpp::NetworkFlowEndpoint> network_flow_endpoint_vector;
+  network_flow_endpoint_vector.reserve(network_flow_endpoint_array.size);
   for (size_t i = 0; i < network_flow_endpoint_array.size; ++i) {
-    network_flow_endpoint_vector.push_back(
-      rclcpp::NetworkFlowEndpoint(
+    network_flow_endpoint_vector.emplace_back(
         network_flow_endpoint_array.
-        network_flow_endpoint[i]));
+      network_flow_endpoint[i]);
   }
 
   ret = rcl_network_flow_endpoint_array_fini(&network_flow_endpoint_array);
@@ -451,6 +489,12 @@ SubscriptionBase::set_on_new_message_callback(
     using rclcpp::exceptions::throw_from_rcl_error;
     throw_from_rcl_error(ret, "failed to set the on new message callback for subscription");
   }
+}
+
+bool
+SubscriptionBase::is_cft_supported() const
+{
+  return rcl_subscription_is_cft_supported(subscription_handle_.get());
 }
 
 bool
@@ -549,4 +593,161 @@ SubscriptionBase::take_dynamic_message(
 {
   throw std::runtime_error("Unimplemented");
   return false;
+}
+
+void
+SubscriptionBase::disable_callbacks()
+{
+  // Temporary remove the on_new_message_callback_ to prevent it from being called
+  std::lock_guard<std::recursive_mutex> lock(on_new_message_callback_mutex_);
+  if (on_new_message_callback_) {
+    set_on_new_message_callback(nullptr, nullptr);
+  }
+}
+
+void
+SubscriptionBase::enable_callbacks()
+{
+  // Set callback again if it was previously removed in disable_callbacks()
+  std::lock_guard<std::recursive_mutex> lock(on_new_message_callback_mutex_);
+  if (on_new_message_callback_) {
+    set_on_new_message_callback(
+      rclcpp::detail::cpp_callback_trampoline<
+        decltype(on_new_message_callback_), const void *, size_t>,
+      static_cast<const void *>(&on_new_message_callback_));
+  }
+}
+
+void
+SubscriptionBase::set_on_new_message_callback(const std::function<void(size_t)> & callback)
+{
+  if (!callback) {
+    throw std::invalid_argument(
+            "The callback passed to set_on_new_message_callback "
+            "is not callable.");
+  }
+
+  auto new_callback =
+    [callback, this](size_t number_of_messages) {
+      try {
+        callback(number_of_messages);
+      } catch (const std::exception & exception) {
+        RCLCPP_ERROR_STREAM(
+          node_logger_,
+          "rclcpp::SubscriptionBase@" << this <<
+            " caught " << rmw::impl::cpp::demangle(exception) <<
+            " exception in user-provided callback for the 'on new message' callback: " <<
+            exception.what());
+      } catch (...) {
+        RCLCPP_ERROR_STREAM(
+          node_logger_,
+          "rclcpp::SubscriptionBase@" << this <<
+            " caught unhandled exception in user-provided callback " <<
+            "for the 'on new message' callback");
+      }
+    };
+
+  std::lock_guard<std::recursive_mutex> lock(on_new_message_callback_mutex_);
+
+  // Set it temporarily to the new callback, while we replace the old one.
+  // This two-step setting, prevents a gap where the old std::function has
+  // been replaced but the middleware hasn't been told about the new one yet.
+  set_on_new_message_callback(
+    rclcpp::detail::cpp_callback_trampoline<decltype(new_callback), const void *, size_t>,
+    static_cast<const void *>(&new_callback));
+
+  // Store the std::function to keep it in scope, also overwrites the existing one.
+  on_new_message_callback_ = new_callback;
+
+  // Set it again, now using the permanent storage.
+  set_on_new_message_callback(
+    rclcpp::detail::cpp_callback_trampoline<
+      decltype(on_new_message_callback_), const void *, size_t>,
+    static_cast<const void *>(&on_new_message_callback_));
+}
+
+void
+SubscriptionBase::clear_on_new_message_callback()
+{
+  std::lock_guard<std::recursive_mutex> lock(on_new_message_callback_mutex_);
+
+  if (on_new_message_callback_) {
+    set_on_new_message_callback(nullptr, nullptr);
+    on_new_message_callback_ = nullptr;
+  }
+}
+
+void
+SubscriptionBase::set_on_new_intra_process_message_callback(
+  const std::function<void(size_t)> & callback)
+{
+  if (!use_intra_process_) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Calling set_on_new_intra_process_message_callback for subscription with IPC disabled");
+    return;
+  }
+
+  if (!callback) {
+    throw std::invalid_argument(
+            "The callback passed to set_on_new_intra_process_message_callback "
+            "is not callable.");
+  }
+
+  // The on_ready_callback signature has an extra `int` argument used to disambiguate between
+  // possible different entities within a generic waitable.
+  // We hide that detail to users of this method.
+  std::function<void(size_t, int)> new_callback = [callback] (size_t nr, int) {callback(nr);};
+  subscription_intra_process_->set_on_ready_callback(new_callback);
+}
+
+void
+SubscriptionBase::clear_on_new_intra_process_message_callback()
+{
+  if (!use_intra_process_) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Calling clear_on_new_intra_process_message_callback for subscription with IPC disabled");
+    return;
+  }
+
+  subscription_intra_process_->clear_on_ready_callback();
+}
+
+void
+SubscriptionBase::set_on_new_qos_event_callback(
+  const std::function<void(size_t)> & callback,
+  rcl_subscription_event_type_t event_type)
+{
+  if (event_handlers_.count(event_type) == 0) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Calling set_on_new_qos_event_callback for non registered subscription event_type");
+    return;
+  }
+
+  if (!callback) {
+    throw std::invalid_argument(
+            "The callback passed to set_on_new_qos_event_callback "
+            "is not callable.");
+  }
+
+  // The on_ready_callback signature has an extra `int` argument used to disambiguate between
+  // possible different entities within a generic waitable.
+  // We hide that detail to users of this method.
+  std::function<void(size_t, int)> new_callback = [callback] (size_t nr, int) {callback(nr);};
+  event_handlers_[event_type]->set_on_ready_callback(new_callback);
+}
+
+void
+SubscriptionBase::clear_on_new_qos_event_callback(rcl_subscription_event_type_t event_type)
+{
+  if (event_handlers_.count(event_type) == 0) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Calling clear_on_new_qos_event_callback for non registered event_type");
+    return;
+  }
+
+  event_handlers_[event_type]->clear_on_ready_callback();
 }

@@ -16,7 +16,6 @@
 
 #include <condition_variable>
 #include <memory>
-#include <thread>
 
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/utilities.hpp"
@@ -60,8 +59,8 @@ JumpHandler::JumpHandler(
   pre_callback_t pre_callback,
   post_callback_t post_callback,
   const rcl_jump_threshold_t & threshold)
-: pre_callback(pre_callback),
-  post_callback(post_callback),
+: pre_callback(std::move(pre_callback)),
+  post_callback(std::move(post_callback)),
   notice_threshold(threshold)
 {}
 
@@ -83,20 +82,10 @@ Clock::now() const
   return now;
 }
 
-void
-Clock::cancel_sleep_or_wait()
-{
-  {
-    std::unique_lock lock(impl_->wait_mutex_);
-    impl_->stop_sleeping_ = true;
-  }
-  impl_->cv_.notify_one();
-}
-
 bool
 Clock::sleep_until(
-  Time until,
-  Context::SharedPtr context)
+  const Time & until,
+  const Context::SharedPtr & context)
 {
   if (!context || !context->is_valid()) {
     throw std::runtime_error("context cannot be slept with because it's invalid");
@@ -118,7 +107,7 @@ Clock::sleep_until(
     });
   // No longer need the shutdown callback when this function exits
   auto callback_remover = rcpputils::scope_exit(
-    [&context, &shutdown_cb_handle]() {
+    [context, &shutdown_cb_handle]() {
       context->remove_on_shutdown_callback(shutdown_cb_handle);
     });
 
@@ -204,7 +193,7 @@ Clock::sleep_until(
 }
 
 bool
-Clock::sleep_for(Duration rel_time, Context::SharedPtr context)
+Clock::sleep_for(const Duration & rel_time, const Context::SharedPtr & context)
 {
   return sleep_until(now() + rel_time, context);
 }
@@ -219,7 +208,7 @@ Clock::started()
 }
 
 bool
-Clock::wait_until_started(Context::SharedPtr context)
+Clock::wait_until_started(const Context::SharedPtr & context)
 {
   if (!context || !context->is_valid()) {
     throw std::runtime_error("context cannot be slept with because it's invalid");
@@ -239,7 +228,7 @@ Clock::wait_until_started(Context::SharedPtr context)
 bool
 Clock::wait_until_started(
   const Duration & timeout,
-  Context::SharedPtr context,
+  const Context::SharedPtr & context,
   const Duration & wait_tick_ns)
 {
   if (!context || !context->is_valid()) {
@@ -328,8 +317,8 @@ Clock::on_time_jump(
 
 JumpHandler::SharedPtr
 Clock::create_jump_callback(
-  JumpHandler::pre_callback_t pre_callback,
-  JumpHandler::post_callback_t post_callback,
+  const JumpHandler::pre_callback_t & pre_callback,
+  const JumpHandler::post_callback_t & post_callback,
   const rcl_jump_threshold_t & threshold)
 {
   // Allocate a new jump handler
@@ -526,7 +515,7 @@ class ClockConditionalVariable::Impl
   ClockWaiter::UniquePtr clock_;
 
 public:
-  Impl(const rclcpp::Clock::SharedPtr & clock, rclcpp::Context::SharedPtr context)
+  Impl(const rclcpp::Clock::SharedPtr & clock, const rclcpp::Context::SharedPtr & context)
   :context_(context),
     clock_(std::make_unique<ClockWaiter>(clock))
   {
@@ -551,7 +540,7 @@ public:
 
   bool
   wait_until(
-    std::unique_lock<std::mutex> & lock, rclcpp::Time until,
+    std::unique_lock<std::mutex> & lock, const rclcpp::Time & until,
     const std::function<bool ()> & pred)
   {
     if(lock.mutex() != &pred_mutex_) {
@@ -581,7 +570,7 @@ public:
 
 ClockConditionalVariable::ClockConditionalVariable(
   const rclcpp::Clock::SharedPtr & clock,
-  rclcpp::Context::SharedPtr context)
+  const rclcpp::Context::SharedPtr & context)
 :impl_(std::make_unique<Impl>(clock, context))
 {
 }
@@ -596,7 +585,7 @@ ClockConditionalVariable::notify_one()
 
 bool
 ClockConditionalVariable::wait_until(
-  std::unique_lock<std::mutex> & lock, rclcpp::Time until,
+  std::unique_lock<std::mutex> & lock, const rclcpp::Time & until,
   const std::function<bool ()> & pred)
 {
   return impl_->wait_until(lock, until, pred);

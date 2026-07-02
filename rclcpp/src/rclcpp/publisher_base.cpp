@@ -17,14 +17,16 @@
 #include <rmw/error_handling.h>
 #include <rmw/rmw.h>
 
-#include <iostream>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "rcl/event.h"
 #include "rcutils/logging_macros.h"
 #include "rmw/impl/cpp/demangle.hpp"
 
@@ -131,19 +133,38 @@ PublisherBase::get_topic_name() const
   return rcl_publisher_get_topic_name(publisher_handle_.get());
 }
 
+bool
+PublisherBase::event_type_is_supported(const rcl_publisher_event_type_t event_type)
+{
+  return rcl_publisher_event_type_is_supported(event_type);
+}
+
 void
 PublisherBase::bind_event_callbacks(
   const PublisherEventCallbacks & event_callbacks, bool use_default_callbacks)
 {
-  if (event_callbacks.deadline_callback) {
-    this->add_event_handler(
-      event_callbacks.deadline_callback,
-      RCL_PUBLISHER_OFFERED_DEADLINE_MISSED);
+  try {
+    if (event_callbacks.deadline_callback) {
+      this->add_event_handler(
+        event_callbacks.deadline_callback,
+        RCL_PUBLISHER_OFFERED_DEADLINE_MISSED);
+    }
+  } catch (const UnsupportedEventTypeException & /*exc*/) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for deadline; not supported");
   }
-  if (event_callbacks.liveliness_callback) {
-    this->add_event_handler(
-      event_callbacks.liveliness_callback,
-      RCL_PUBLISHER_LIVELINESS_LOST);
+
+  try {
+    if (event_callbacks.liveliness_callback) {
+      this->add_event_handler(
+        event_callbacks.liveliness_callback,
+        RCL_PUBLISHER_LIVELINESS_LOST);
+    }
+  } catch (const UnsupportedEventTypeException & /*exc*/) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for liveliness; not supported");
   }
 
   QOSOfferedIncompatibleQoSCallbackType incompatible_qos_cb;
@@ -160,9 +181,9 @@ PublisherBase::bind_event_callbacks(
       this->add_event_handler(incompatible_qos_cb, RCL_PUBLISHER_OFFERED_INCOMPATIBLE_QOS);
     }
   } catch (const UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_DEBUG(
+    RCLCPP_WARN(
       rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for incompatible qos; wrong callback type");
+      "Failed to add event handler for incompatible qos; not supported");
   }
 
   IncompatibleTypeCallbackType incompatible_type_cb;
@@ -179,14 +200,21 @@ PublisherBase::bind_event_callbacks(
       this->add_event_handler(incompatible_type_cb, RCL_PUBLISHER_INCOMPATIBLE_TYPE);
     }
   } catch (UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_DEBUG(
+    RCLCPP_WARN(
       rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for incompatible type; wrong callback type");
+      "Failed to add event handler for incompatible type; not supported");
   }
-  if (event_callbacks.matched_callback) {
-    this->add_event_handler(
-      event_callbacks.matched_callback,
-      RCL_PUBLISHER_MATCHED);
+
+  try {
+    if (event_callbacks.matched_callback) {
+      this->add_event_handler(
+        event_callbacks.matched_callback,
+        RCL_PUBLISHER_MATCHED);
+    }
+  } catch (const UnsupportedEventTypeException & /*exc*/) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Failed to add event handler for matched; not supported");
   }
 }
 
@@ -324,7 +352,7 @@ PublisherBase::operator==(const rmw_gid_t * gid) const
 void
 PublisherBase::setup_intra_process(
   uint64_t intra_process_publisher_id,
-  IntraProcessManagerSharedPtr ipm)
+  const IntraProcessManagerSharedPtr & ipm)
 {
   intra_process_publisher_id_ = intra_process_publisher_id;
   weak_ipm_ = ipm;
@@ -347,10 +375,8 @@ PublisherBase::default_incompatible_qos_callback(
 
 void
 PublisherBase::default_incompatible_type_callback(
-  rclcpp::IncompatibleTypeInfo & event) const
+  [[maybe_unused]] rclcpp::IncompatibleTypeInfo & event) const
 {
-  (void)event;
-
   RCLCPP_WARN(
     rclcpp::get_logger(rcl_node_get_logger_name(rcl_node_handle_.get())),
     "Incompatible type on topic '%s', no messages will be sent to it.", get_topic_name());
@@ -378,10 +404,10 @@ std::vector<rclcpp::NetworkFlowEndpoint> PublisherBase::get_network_flow_endpoin
   }
 
   std::vector<rclcpp::NetworkFlowEndpoint> network_flow_endpoint_vector;
+  network_flow_endpoint_vector.reserve(network_flow_endpoint_array.size);
   for (size_t i = 0; i < network_flow_endpoint_array.size; ++i) {
-    network_flow_endpoint_vector.push_back(
-      rclcpp::NetworkFlowEndpoint(
-        network_flow_endpoint_array.network_flow_endpoint[i]));
+    network_flow_endpoint_vector.emplace_back(
+        network_flow_endpoint_array.network_flow_endpoint[i]);
   }
 
   ret = rcl_network_flow_endpoint_array_fini(&network_flow_endpoint_array);
@@ -409,4 +435,42 @@ size_t PublisherBase::lowest_available_ipm_capacity() const
   }
 
   return ipm->lowest_available_capacity(intra_process_publisher_id_);
+}
+
+void
+PublisherBase::set_on_new_qos_event_callback(
+  const std::function<void(size_t)> & callback,
+  rcl_publisher_event_type_t event_type)
+{
+  if (event_handlers_.count(event_type) == 0) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Calling set_on_new_qos_event_callback for non registered publisher event_type");
+    return;
+  }
+
+  if (!callback) {
+    throw std::invalid_argument(
+            "The callback passed to set_on_new_qos_event_callback "
+            "is not callable.");
+  }
+
+  // The on_ready_callback signature has an extra `int` argument used to disambiguate between
+  // possible different entities within a generic waitable.
+  // We hide that detail to users of this method.
+  std::function<void(size_t, int)> new_callback = [callback] (size_t nr, int) {callback(nr);};
+  event_handlers_[event_type]->set_on_ready_callback(new_callback);
+}
+
+void
+PublisherBase::clear_on_new_qos_event_callback(rcl_publisher_event_type_t event_type)
+{
+  if (event_handlers_.count(event_type) == 0) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Calling clear_on_new_qos_event_callback for non registered event_type");
+    return;
+  }
+
+  event_handlers_[event_type]->clear_on_ready_callback();
 }

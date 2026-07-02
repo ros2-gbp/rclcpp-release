@@ -24,7 +24,6 @@
 #include "rcl_interfaces/srv/list_parameters.hpp"
 #include "rcl_interfaces/srv/set_parameters.hpp"
 #include "rcl_interfaces/srv/set_parameters_atomically.hpp"
-#include "rclcpp/executors.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/parameter.hpp"
@@ -40,24 +39,10 @@ class ParameterService
 public:
   RCLCPP_SMART_PTR_DEFINITIONS(ParameterService)
 
-  [[deprecated("use rclcpp::QoS instead of rmw_qos_profile_t")]]
   RCLCPP_PUBLIC
   ParameterService(
-    const std::shared_ptr<node_interfaces::NodeBaseInterface> node_base,
-    const std::shared_ptr<node_interfaces::NodeServicesInterface> node_services,
-    rclcpp::node_interfaces::NodeParametersInterface * node_params,
-    const rmw_qos_profile_t & qos_profile)
-  : ParameterService(
-      node_base,
-      node_services,
-      node_params,
-      rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(qos_profile)))
-  {}
-
-  RCLCPP_PUBLIC
-  ParameterService(
-    const std::shared_ptr<node_interfaces::NodeBaseInterface> node_base,
-    const std::shared_ptr<node_interfaces::NodeServicesInterface> node_services,
+    const std::shared_ptr<node_interfaces::NodeBaseInterface> & node_base,
+    const std::shared_ptr<node_interfaces::NodeServicesInterface> & node_services,
     rclcpp::node_interfaces::NodeParametersInterface * node_params,
     const rclcpp::QoS & qos_profile = rclcpp::ParametersQoS());
 

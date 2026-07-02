@@ -14,12 +14,16 @@
 
 #include <memory>
 
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/executors/multi_threaded_executor.hpp"
+#include "rclcpp/utilities.hpp"
 
 #include "rclcpp_components/component_manager.hpp"
 
 int main(int argc, char * argv[])
 {
+  RCUTILS_LOG_WARN_NAMED("component_container_mt",
+    "This executable is deprecated and will be removed in M-turtle.\n"
+    "Use 'component_container --executor-type multi-threaded' instead.");
   /// Component container with a multi-threaded executor.
   rclcpp::init(argc, argv);
 
@@ -35,4 +39,8 @@ int main(int argc, char * argv[])
   node->set_executor(exec);
   exec->add_node(node);
   exec->spin();
+
+  rclcpp::shutdown();
+
+  return 0;
 }

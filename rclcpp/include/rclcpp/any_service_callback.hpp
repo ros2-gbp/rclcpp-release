@@ -23,7 +23,6 @@
 #include <utility>
 
 #include "rclcpp/function_traits.hpp"
-#include "rclcpp/visibility_control.hpp"
 #include "rmw/types.h"
 #include "tracetools/tracetools.h"
 #include "tracetools/utils.hpp"
@@ -165,11 +164,13 @@ public:
     if (std::holds_alternative<SharedPtrDeferResponseCallback>(callback_)) {
       const auto & cb = std::get<SharedPtrDeferResponseCallback>(callback_);
       cb(request_header, std::move(request));
+      TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
       return nullptr;
     }
     if (std::holds_alternative<SharedPtrDeferResponseCallbackWithServiceHandle>(callback_)) {
       const auto & cb = std::get<SharedPtrDeferResponseCallbackWithServiceHandle>(callback_);
       cb(service_handle, request_header, std::move(request));
+      TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
       return nullptr;
     }
     // auto response = allocate_shared<typename ServiceT::Response, Allocator>();

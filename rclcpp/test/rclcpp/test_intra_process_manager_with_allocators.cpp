@@ -25,7 +25,6 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/allocator/allocator_common.hpp"
-#include "rclcpp/strategies/allocator_memory_strategy.hpp"
 
 // For demonstration purposes only, not necessary for allocator_traits
 static uint32_t num_allocs = 0;
@@ -61,9 +60,8 @@ public:
     return static_cast<T *>(std::malloc(size * sizeof(T)));
   }
 
-  void deallocate(T * ptr, size_t size)
+  void deallocate(T * ptr, [[maybe_unused]] size_t size)
   {
-    (void)size;
     if (!ptr) {
       return;
     }
@@ -76,6 +74,11 @@ public:
   {
     typedef MyAllocator<U> other;
   };
+
+  rcl_allocator_t get_rcl_allocator()
+  {
+    return rcl_get_default_allocator();
+  }
 };
 
 // Explicit specialization for void
@@ -103,6 +106,11 @@ public:
   {
     typedef MyAllocator<U> other;
   };
+
+  rcl_allocator_t get_rcl_allocator()
+  {
+    return rcl_get_default_allocator();
+  }
 };
 
 template<typename T, typename U>
@@ -209,16 +217,11 @@ do_custom_allocator_test(
     msg_mem_strat);
 
   // executor memory strategy
-  using rclcpp::memory_strategies::allocator_memory_strategy::AllocatorMemoryStrategy;
   auto shared_memory_strategy_allocator = std::make_shared<MemoryStrategyAllocatorT>(
     memory_strategy_allocator);
-  std::shared_ptr<rclcpp::memory_strategy::MemoryStrategy> memory_strategy =
-    std::make_shared<AllocatorMemoryStrategy<MemoryStrategyAllocatorT>>(
-    shared_memory_strategy_allocator);
 
   // executor
   rclcpp::ExecutorOptions options;
-  options.memory_strategy = memory_strategy;
   options.context = context;
   rclcpp::executors::SingleThreadedExecutor executor(options);
 

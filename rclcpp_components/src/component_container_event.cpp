@@ -14,27 +14,25 @@
 
 #include <memory>
 
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/utilities.hpp"
+#include "rclcpp/experimental/executors/events_executor/events_executor.hpp"
 
 #include "rclcpp_components/component_manager.hpp"
 
 int main(int argc, char * argv[])
 {
-  /// Component container with an events callback-group executor.
-  rclcpp::init(argc, argv);
+  RCUTILS_LOG_WARN_NAMED("component_container_event",
+    "This executable is deprecated and will be removed in M-turtle.\n"
+    "Use 'component_container --executor-type events-cbg' instead.");
 
-  rclcpp::executors::EventsCBGExecutor::SharedPtr exec = nullptr;
-  const auto node = std::make_shared<rclcpp_components::ComponentManager>();
-  if (node->has_parameter("thread_num")) {
-    const auto thread_num = node->get_parameter("thread_num").as_int();
-    exec = std::make_shared<rclcpp::executors::EventsCBGExecutor>(
-      rclcpp::ExecutorOptions{}, thread_num);
-  } else {
-    exec = std::make_shared<rclcpp::executors::EventsCBGExecutor>();
-  }
-  node->set_executor(exec);
+  /// Component container with an events executor.
+  rclcpp::init(argc, argv);
+  auto exec = std::make_shared<rclcpp::experimental::executors::EventsExecutor>();
+  auto node = std::make_shared<rclcpp_components::ComponentManager>(exec);
   exec->add_node(node);
   exec->spin();
 
   rclcpp::shutdown();
+
+  return 0;
 }

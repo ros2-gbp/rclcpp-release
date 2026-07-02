@@ -19,6 +19,10 @@
 #include <memory>
 #include <utility>
 
+#include <rcpputils/compile_warnings.hpp>
+
+// can be removed after the lyrical release
+RCPPUTILS_DEPRECATION_WARNING_OFF_START
 #include "rclcpp/strategies/allocator_memory_strategy.hpp"
 #include "rclcpp/memory_strategy.hpp"
 #include "test_msgs/msg/empty.hpp"
@@ -40,6 +44,16 @@ public:
 
   std::shared_ptr<void> take_data() override {return nullptr;}
   void execute(const std::shared_ptr<void> &) override {}
+
+  void set_on_ready_callback(std::function<void(size_t, int)>) override {}
+  void clear_on_ready_callback() override {}
+
+  std::shared_ptr<void> take_data_by_entity_id(size_t) override {return nullptr;}
+
+  std::vector<std::shared_ptr<rclcpp::TimerBase>> get_timers() const override
+  {
+    return {};
+  }
 };
 
 class TestMemoryStrategy : public ::testing::Test
@@ -119,6 +133,8 @@ TEST_F(TestMemoryStrategy, get_subscription_by_handle) {
     EXPECT_EQ(
       nullptr,
       memory_strategy()->get_subscription_by_handle(subscription_handle, weak_groups_to_nodes));
+    // Clear all handles to cleanup when node is destroyed
+    memory_strategy()->clear_handles();
   }  // Node goes out of scope
   EXPECT_EQ(
     nullptr,
@@ -171,6 +187,8 @@ TEST_F(TestMemoryStrategy, get_service_by_handle) {
     EXPECT_EQ(
       nullptr,
       memory_strategy()->get_service_by_handle(service_handle, weak_groups_to_nodes));
+    // Clear all handles to cleanup when node is destroyed
+    memory_strategy()->clear_handles();
   }  // Node goes out of scope
   EXPECT_EQ(
     nullptr,
@@ -218,6 +236,11 @@ TEST_F(TestMemoryStrategy, get_client_by_handle) {
     EXPECT_EQ(
       nullptr,
       memory_strategy()->get_client_by_handle(client_handle, weak_groups_to_nodes));
+    // Clear all handles to cleanup when node is destroyed
+    memory_strategy()->clear_handles();
+    // reset client handle before node destruction, otherwise it tries to access node
+    // via weak_ptr in its deleter
+    client_handle.reset();
   }  // Node goes out of scope
   EXPECT_EQ(
     nullptr,
@@ -266,6 +289,8 @@ TEST_F(TestMemoryStrategy, get_timer_by_handle) {
     EXPECT_EQ(
       nullptr,
       memory_strategy()->get_timer_by_handle(timer_handle, weak_groups_to_nodes));
+    // Clear all handles to cleanup when node is destroyed
+    memory_strategy()->clear_handles();
   }  // Node goes out of scope
   EXPECT_EQ(
     nullptr,
@@ -365,6 +390,8 @@ TEST_F(TestMemoryStrategy, get_group_by_subscription) {
     EXPECT_EQ(
       callback_group,
       memory_strategy()->get_group_by_subscription(subscription, weak_groups_to_nodes));
+    // Clear all handles to cleanup when node is destroyed
+    memory_strategy()->clear_handles();
   }  // Node goes out of scope
   // NodeBase(SubscriptionBase->rcl_node_t->NodeBase) is still alive.
   EXPECT_EQ(
@@ -410,6 +437,8 @@ TEST_F(TestMemoryStrategy, get_group_by_service) {
     EXPECT_EQ(
       nullptr,
       memory_strategy()->get_group_by_service(service, weak_groups_to_nodes));
+    // Clear all handles to cleanup when node is destroyed
+    memory_strategy()->clear_handles();
   }  // Node goes out of scope
   EXPECT_EQ(
     nullptr,
@@ -449,6 +478,8 @@ TEST_F(TestMemoryStrategy, get_group_by_client) {
     EXPECT_EQ(
       nullptr,
       memory_strategy()->get_group_by_client(client, weak_groups_to_nodes));
+    // Clear all handles to cleanup when node is destroyed
+    memory_strategy()->clear_handles();
   }  // Node goes out of scope
   EXPECT_EQ(
     nullptr,
@@ -488,6 +519,8 @@ TEST_F(TestMemoryStrategy, get_group_by_timer) {
     EXPECT_EQ(
       nullptr,
       memory_strategy()->get_group_by_timer(timer, weak_groups_to_nodes));
+    // Clear all handles to cleanup when node is destroyed
+    memory_strategy()->clear_handles();
   }  // Node goes out of scope
   EXPECT_EQ(
     nullptr,
@@ -526,8 +559,11 @@ TEST_F(TestMemoryStrategy, get_group_by_waitable) {
     EXPECT_EQ(
       nullptr,
       memory_strategy()->get_group_by_waitable(waitable, weak_groups_to_nodes));
+    // Clear all handles to cleanup when node is destroyed
+    memory_strategy()->clear_handles();
   }  // Node goes out of scope
   EXPECT_EQ(
     nullptr,
     memory_strategy()->get_group_by_waitable(waitable, weak_groups_to_nodes));
 }
+RCPPUTILS_DEPRECATION_WARNING_OFF_STOP

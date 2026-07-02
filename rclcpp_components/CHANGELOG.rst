@@ -2,88 +2,127 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-28.1.21 (2026-06-12)
---------------------
+33.0.2 (2026-07-02)
+-------------------
+* Call rclcpp::shutdown() in the component containers (`#3158 <https://github.com/ros2/rclcpp/issues/3158>`_)
+* Contributors: Hugal31
 
-28.1.20 (2026-06-09)
---------------------
-* Add Callback Group Events Executor (Jazzy Backport) (`#3163 <https://github.com/ros2/rclcpp/issues/3163>`_)
-  * initial backport commit
-  * remove C++20 features (designated initializers)
-  * update executor tests
-  * add component_container_events_cbg
-  * change to use shared_ptr by value
-  * explicit type
-  * remove fix non-applicable to jazzy
-  * lint
-  ---------
-  Co-authored-by: Skyler Medeiros <skye@polymathrobotics.com>
+33.0.1 (2026-05-22)
+-------------------
+
+33.0.0 (2026-05-07)
+-------------------
+* Cleanups headers and fix wording (`#3138 <https://github.com/ros2/rclcpp/issues/3138>`_)
+* Contributors: Alejandro Hernández Cordero
+
+32.0.0 (2026-04-30)
+-------------------
+* Refactor component containers + Add option for CBG Executor (`#3134 <https://github.com/ros2/rclcpp/issues/3134>`_)
 * Contributors: Skyler Medeiros
 
-28.1.19 (2026-06-02)
---------------------
+31.0.2 (2026-04-09)
+-------------------
+* feat: Add per-node log level support via NodeOptions (`#3092 <https://github.com/ros2/rclcpp/issues/3092>`_)
+* Contributors: Peng Wang
 
-28.1.18 (2026-03-25)
---------------------
-* Avoid unecessary creation of MultiThreadedExecutor (`#3090 <https://github.com/ros2/rclcpp/issues/3090>`_) (`#3095 <https://github.com/ros2/rclcpp/issues/3095>`_)
-* Fix component registering in subdirectories (`#3064 <https://github.com/ros2/rclcpp/issues/3064>`_) (`#3075 <https://github.com/ros2/rclcpp/issues/3075>`_)
-* Contributors: mergify[bot]
+31.0.1 (2026-03-24)
+-------------------
+* Use new ROSIDL aggregate CMake target (`#3105 <https://github.com/ros2/rclcpp/issues/3105>`_)
+* Contributors: Emerson Knapp
 
-28.1.17 (2026-02-09)
---------------------
+31.0.0 (2026-03-20)
+-------------------
+* Avoid unecessary creation of MultiThreadedExecutor (`#3090 <https://github.com/ros2/rclcpp/issues/3090>`_)
+* Fix component registering in subdirectories (`#3064 <https://github.com/ros2/rclcpp/issues/3064>`_)
+* Contributors: pum1k, solo
 
-28.1.16 (2026-01-21)
---------------------
+30.1.5 (2026-02-09)
+-------------------
+* Add library dependency to node executable in rclcpp_components_register_node (`#3047 <https://github.com/ros2/rclcpp/issues/3047>`_)
+* Contributors: YuJin Hong
 
-28.1.15 (2025-12-23)
---------------------
+30.1.4 (2025-12-23)
+-------------------
+* Updated deprecated ament_index_cpp API (`#3011 <https://github.com/ros2/rclcpp/issues/3011>`_)
+* Contributors: Alejandro Hernández Cordero
 
-28.1.14 (2025-11-18)
---------------------
-* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_) (`#2990 <https://github.com/ros2/rclcpp/issues/2990>`_)
-* Contributors: mergify[bot]
+30.1.3 (2025-11-18)
+-------------------
+* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_)
+* Contributors: Tim Clephas
 
-28.1.13 (2025-10-21)
---------------------
-
-28.1.12 (2025-09-11)
---------------------
-
-28.1.11 (2025-08-06)
---------------------
-
-28.1.10 (2025-06-23)
---------------------
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2856 <https://github.com/ros2/rclcpp/issues/2856>`_)
-* Contributors: mergify[bot]
-
-28.1.9 (2025-04-23)
+30.1.2 (2025-10-21)
 -------------------
 
-28.1.8 (2025-04-02)
+30.1.1 (2025-09-11)
+-------------------
+* Cleanup the dependencies in rclcpp_components. (`#2918 <https://github.com/ros2/rclcpp/issues/2918>`_)
+* Contributors: Chris Lalancette
+
+30.1.0 (2025-07-29)
+-------------------
+* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_)
+* Contributors: mosfet80
+
+30.0.0 (2025-07-01)
+-------------------
+* NEW PR: Add component_container for EventsExecutor (`#2885 <https://github.com/ros2/rclcpp/issues/2885>`_)
+* make sure that plugin arg includes the double colon. (`#2878 <https://github.com/ros2/rclcpp/issues/2878>`_)
+* Contributors: Mihir Rao, Tomoya Fujita
+
+29.6.1 (2025-06-23)
+-------------------
+* set thread names by node in component container isolated (`#2871 <https://github.com/ros2/rclcpp/issues/2871>`_)
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
+* Contributors: Adam Aposhian, Alejandro Hernández Cordero
+
+29.6.0 (2025-04-25)
 -------------------
 
-28.1.7 (2025-03-26)
--------------------
-* add NO_UNDEFINED_SYMBOLS to rclcpp_components_register_node cmake macro (`#2746 <https://github.com/ros2/rclcpp/issues/2746>`_)
-* Contributors: Jonas Otto
-
-28.1.6 (2024-12-18)
+29.5.0 (2025-04-18)
 -------------------
 
-28.1.5 (2024-09-19)
+29.4.0 (2025-04-04)
+-------------------
+* Removed trailing whitespace from the codebase. (`#2791 <https://github.com/ros2/rclcpp/issues/2791>`_)
+* add NO_UNDEFINED_SYMBOLS to rclcpp_components_register_node cmake macro (`#2746 <https://github.com/ros2/rclcpp/issues/2746>`_) (`#2764 <https://github.com/ros2/rclcpp/issues/2764>`_)
+* use maybe_unused attribute for the portability. (`#2758 <https://github.com/ros2/rclcpp/issues/2758>`_)
+* ComponentManager should just ignore unknown extra argument in the bas… (`#2723 <https://github.com/ros2/rclcpp/issues/2723>`_)
+* Contributors: Leander Stephen D'Souza, Tomoya Fujita, Jonas Otto
+
+29.3.0 (2024-12-20)
+-------------------
+* Add parsing for rest of obvious boolean extra arguments and throw for unsupported ones (`#2685 <https://github.com/ros2/rclcpp/issues/2685>`_)
+* Contributors: rcp1
+
+29.2.0 (2024-11-25)
 -------------------
 
-28.1.4 (2024-09-06)
+29.1.0 (2024-11-20)
 -------------------
 
-28.1.3 (2024-06-27)
+29.0.0 (2024-10-03)
+-------------------
+* Shutdown the context before context's destructor is invoked in tests (`#2633 <https://github.com/ros2/rclcpp/issues/2633>`_)
+* Fix typo in rclcpp_components benchmark_components (`#2602 <https://github.com/ros2/rclcpp/issues/2602>`_)
+* Contributors: Alejandro Hernández Cordero, Christophe Bedard
+
+28.3.3 (2024-07-29)
 -------------------
 
-28.1.2 (2024-05-13)
+28.3.2 (2024-07-24)
+-------------------
+* Updated rcpputils path API (`#2579 <https://github.com/ros2/rclcpp/issues/2579>`_)
+* remove deprecated APIs from component_manager.hpp (`#2585 <https://github.com/ros2/rclcpp/issues/2585>`_)
+* Contributors: Alberto Soragna, Alejandro Hernández Cordero
+
+28.3.1 (2024-06-25)
 -------------------
 
-28.1.1 (2024-04-24)
+28.3.0 (2024-06-17)
+-------------------
+
+28.2.0 (2024-04-26)
 -------------------
 
 28.1.0 (2024-04-16)

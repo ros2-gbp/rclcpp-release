@@ -5,6 +5,7 @@ project(rclcpp)
 find_package(Threads REQUIRED)
 
 find_package(ament_cmake_ros REQUIRED)
+find_package(ament_cmake_ros_core REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(libstatistics_collector REQUIRED)
@@ -24,12 +25,6 @@ find_package(rosidl_typesupport_cpp REQUIRED)
 find_package(statistics_msgs REQUIRED)
 find_package(tracetools REQUIRED)
 
-# TODO(wjwwood): remove this when gtest can build on its own, when using target_compile_features()
-# Default to C++17
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   # About -Wno-sign-conversion: With Clang, -Wconversion implies -Wsign-conversion. There are a number of
   # implicit sign conversions in rclcpp and gtest.cc, see https://ci.ros2.org/job/ci_osx/9265/.
@@ -73,13 +68,13 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/executors/executor_notify_waitable.cpp
   src/rclcpp/executors/multi_threaded_executor.cpp
   src/rclcpp/executors/single_threaded_executor.cpp
-  src/rclcpp/executors/static_single_threaded_executor.cpp
   src/rclcpp/expand_topic_or_service_name.cpp
   src/rclcpp/experimental/executors/events_executor/events_executor.cpp
   src/rclcpp/experimental/timers_manager.cpp
   src/rclcpp/future_return_code.cpp
   src/rclcpp/generic_client.cpp
   src/rclcpp/generic_publisher.cpp
+  src/rclcpp/generic_service.cpp
   src/rclcpp/generic_subscription.cpp
   src/rclcpp/graph_listener.cpp
   src/rclcpp/guard_condition.cpp
@@ -87,7 +82,6 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/intra_process_manager.cpp
   src/rclcpp/logger.cpp
   src/rclcpp/logging_mutex.cpp
-  src/rclcpp/memory_strategies.cpp
   src/rclcpp/memory_strategy.cpp
   src/rclcpp/message_info.cpp
   src/rclcpp/network_flow_endpoint.cpp
@@ -106,6 +100,7 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/node_options.cpp
   src/rclcpp/parameter.cpp
   src/rclcpp/parameter_client.cpp
+  src/rclcpp/parameter_descriptor_wrapper.cpp
   src/rclcpp/parameter_event_handler.cpp
   src/rclcpp/parameter_events_filter.cpp
   src/rclcpp/parameter_map.cpp
@@ -148,27 +143,6 @@ cmake_policy(SET CMP0094 NEW)
 set(Python3_FIND_UNVERSIONED_NAMES FIRST)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-
-# "watch" template for changes
-configure_file(
-  "resource/logging.hpp.em"
-  "logging.hpp.em.watch"
-  COPYONLY
-)
-# generate header with logging macros
-set(python_code_logging
-  "import em"
-  "em.invoke(['-o', 'include/rclcpp/logging.hpp', '${CMAKE_CURRENT_SOURCE_DIR}/resource/logging.hpp.em'])")
-string(REPLACE ";" "$<SEMICOLON>" python_code_logging "${python_code_logging}")
-add_custom_command(OUTPUT include/rclcpp/logging.hpp
-  COMMAND ${CMAKE_COMMAND} -E make_directory "include/rclcpp"
-  COMMAND Python3::Interpreter ARGS -c "${python_code_logging}"
-  DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/logging.hpp.em.watch"
-  COMMENT "Expanding logging.hpp.em"
-  VERBATIM
-)
-list(APPEND ${PROJECT_NAME}_SRCS
-  include/rclcpp/logging.hpp)
 
 file(GLOB interface_files "include/rclcpp/node_interfaces/node_*_interface.hpp")
 foreach(interface_file ${interface_files})
@@ -216,7 +190,6 @@ foreach(interface_file ${interface_files})
 endforeach()
 
 add_library(${PROJECT_NAME} ${${PROJECT_NAME}_SRCS})
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 # TODO(wjwwood): address all deprecation warnings and then remove this
 if(WIN32)
   target_compile_definitions(${PROJECT_NAME} PUBLIC "_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS")
@@ -226,22 +199,25 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
 target_link_libraries(${PROJECT_NAME} PUBLIC
-  ${builtin_interfaces_TARGETS}
+  builtin_interfaces::builtin_interfaces
   libstatistics_collector::libstatistics_collector
   rcl::rcl
-  ${rcl_interfaces_TARGETS}
+  rcl_interfaces::rcl_interfaces
   rcl_yaml_param_parser::rcl_yaml_param_parser
   rcpputils::rcpputils
   rcutils::rcutils
   rmw::rmw
-  ${rosgraph_msgs_TARGETS}
+  rosgraph_msgs::rosgraph_msgs
   rosidl_dynamic_typesupport::rosidl_dynamic_typesupport
   rosidl_runtime_c::rosidl_runtime_c
   rosidl_runtime_cpp::rosidl_runtime_cpp
   rosidl_typesupport_cpp::rosidl_typesupport_cpp
-  ${statistics_msgs_TARGETS}
+  statistics_msgs::statistics_msgs
   tracetools::tracetools
   ${CMAKE_THREAD_LIBS_INIT}
+  # Note we link public on purpose, as we want to export
+  # the used C++ version as minimum to all consuming packages
+  ament_cmake_ros_core::ament_ros_defaults
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

@@ -89,46 +89,6 @@ public:
    * added to the executor in either case.
    *
    * \param[in] group_type The type of the callback group.
-   * \param[in] automatically_add_to_executor_with_node A boolean that
-   *   determines whether a callback group is automatically added to an executor
-   *   with the node with which it is associated.
-   */
-  [[deprecated("Use CallbackGroup constructor with context function argument")]]
-  RCLCPP_PUBLIC
-  explicit CallbackGroup(
-    CallbackGroupType group_type,
-    bool automatically_add_to_executor_with_node = true);
-
-  /// Constructor for CallbackGroup.
-  /**
-   * Callback Groups have a type, either 'Mutually Exclusive' or 'Reentrant'
-   * and when creating one the type must be specified.
-   *
-   * Callbacks in Reentrant Callback Groups must be able to:
-   *   - run at the same time as themselves (reentrant)
-   *   - run at the same time as other callbacks in their group
-   *   - run at the same time as other callbacks in other groups
-   *
-   * Callbacks in Mutually Exclusive Callback Groups:
-   *   - will not be run multiple times simultaneously (non-reentrant)
-   *   - will not be run at the same time as other callbacks in their group
-   *   - but must run at the same time as callbacks in other groups
-   *
-   * Additionally, callback groups have a property which determines whether or
-   * not they are added to an executor with their associated node automatically.
-   * When creating a callback group the automatically_add_to_executor_with_node
-   * argument determines this behavior, and if true it will cause the newly
-   * created callback group to be added to an executor with the node when the
-   * Executor::add_node method is used.
-   * If false, this callback group will not be added automatically and would
-   * have to be added to an executor manually using the
-   * Executor::add_callback_group method.
-   *
-   * Whether the node was added to the executor before creating the callback
-   * group, or after, is irrelevant; the callback group will be automatically
-   * added to the executor in either case.
-   *
-   * \param[in] group_type The type of the callback group.
    * \param[in] context A weak pointer to the context associated with this callback group.
    * \param[in] automatically_add_to_executor_with_node A boolean that
    *   determines whether a callback group is automatically added to an executor
@@ -137,7 +97,7 @@ public:
   RCLCPP_PUBLIC
   explicit CallbackGroup(
     CallbackGroupType group_type,
-    rclcpp::Context::WeakPtr context,
+    const rclcpp::Context::WeakPtr & context,
     bool automatically_add_to_executor_with_node = true);
 
   /// Default destructor.
@@ -146,35 +106,35 @@ public:
 
   template<typename Function>
   rclcpp::SubscriptionBase::SharedPtr
-  find_subscription_ptrs_if(Function func) const
+  find_subscription_ptrs_if(const Function & func) const
   {
     return _find_ptrs_if_impl<rclcpp::SubscriptionBase, Function>(func, subscription_ptrs_);
   }
 
   template<typename Function>
   rclcpp::TimerBase::SharedPtr
-  find_timer_ptrs_if(Function func) const
+  find_timer_ptrs_if(const Function & func) const
   {
     return _find_ptrs_if_impl<rclcpp::TimerBase, Function>(func, timer_ptrs_);
   }
 
   template<typename Function>
   rclcpp::ServiceBase::SharedPtr
-  find_service_ptrs_if(Function func) const
+  find_service_ptrs_if(const Function & func) const
   {
     return _find_ptrs_if_impl<rclcpp::ServiceBase, Function>(func, service_ptrs_);
   }
 
   template<typename Function>
   rclcpp::ClientBase::SharedPtr
-  find_client_ptrs_if(Function func) const
+  find_client_ptrs_if(const Function & func) const
   {
     return _find_ptrs_if_impl<rclcpp::ClientBase, Function>(func, client_ptrs_);
   }
 
   template<typename Function>
   rclcpp::Waitable::SharedPtr
-  find_waitable_ptrs_if(Function func) const
+  find_waitable_ptrs_if(const Function & func) const
   {
     return _find_ptrs_if_impl<rclcpp::Waitable, Function>(func, waitable_ptrs_);
   }
@@ -219,11 +179,11 @@ public:
   RCLCPP_PUBLIC
   void
   collect_all_ptrs(
-    std::function<void(const rclcpp::SubscriptionBase::SharedPtr &)> sub_func,
-    std::function<void(const rclcpp::ServiceBase::SharedPtr &)> service_func,
-    std::function<void(const rclcpp::ClientBase::SharedPtr &)> client_func,
-    std::function<void(const rclcpp::TimerBase::SharedPtr &)> timer_func,
-    std::function<void(const rclcpp::Waitable::SharedPtr &)> waitable_func) const;
+    const std::function<void(const rclcpp::SubscriptionBase::SharedPtr &)> & sub_func,
+    const std::function<void(const rclcpp::ServiceBase::SharedPtr &)> & service_func,
+    const std::function<void(const rclcpp::ClientBase::SharedPtr &)> & client_func,
+    const std::function<void(const rclcpp::TimerBase::SharedPtr &)> & timer_func,
+    const std::function<void(const rclcpp::Waitable::SharedPtr &)> & waitable_func) const;
 
   /// Return a reference to the 'associated with executor' atomic boolean.
   /**
@@ -268,31 +228,31 @@ protected:
 
   RCLCPP_PUBLIC
   void
-  add_publisher(const rclcpp::PublisherBase::SharedPtr publisher_ptr);
+  add_publisher(const rclcpp::PublisherBase::SharedPtr & publisher_ptr);
 
   RCLCPP_PUBLIC
   void
-  add_subscription(const rclcpp::SubscriptionBase::SharedPtr subscription_ptr);
+  add_subscription(const rclcpp::SubscriptionBase::SharedPtr & subscription_ptr);
 
   RCLCPP_PUBLIC
   void
-  add_timer(const rclcpp::TimerBase::SharedPtr timer_ptr);
+  add_timer(const rclcpp::TimerBase::SharedPtr & timer_ptr);
 
   RCLCPP_PUBLIC
   void
-  add_service(const rclcpp::ServiceBase::SharedPtr service_ptr);
+  add_service(const rclcpp::ServiceBase::SharedPtr & service_ptr);
 
   RCLCPP_PUBLIC
   void
-  add_client(const rclcpp::ClientBase::SharedPtr client_ptr);
+  add_client(const rclcpp::ClientBase::SharedPtr & client_ptr);
 
   RCLCPP_PUBLIC
   void
-  add_waitable(const rclcpp::Waitable::SharedPtr waitable_ptr);
+  add_waitable(const rclcpp::Waitable::SharedPtr & waitable_ptr);
 
   RCLCPP_PUBLIC
   void
-  remove_waitable(const rclcpp::Waitable::SharedPtr waitable_ptr) noexcept;
+  remove_waitable(const rclcpp::Waitable::SharedPtr & waitable_ptr) noexcept;
 
   CallbackGroupType type_;
   // Mutex to protect the subsequent vectors of pointers.
@@ -314,7 +274,7 @@ protected:
 private:
   template<typename TypeT, typename Function>
   typename TypeT::SharedPtr _find_ptrs_if_impl(
-    Function func, const std::vector<typename TypeT::WeakPtr> & vect_ptrs) const
+    const Function & func, const std::vector<typename TypeT::WeakPtr> & vect_ptrs) const
   {
     std::lock_guard<std::mutex> lock(mutex_);
     for (auto & weak_ptr : vect_ptrs) {

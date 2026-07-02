@@ -16,12 +16,20 @@
 #include <vector>
 #include <string>
 
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/executors/single_threaded_executor.hpp"
+#include "rclcpp/executors/multi_threaded_executor.hpp"
 #include "rclcpp/utilities.hpp"
+
 #include "rclcpp_components/component_manager_isolated.hpp"
 
 int main(int argc, char * argv[])
 {
+  RCUTILS_LOG_WARN_NAMED("component_container_isolated",
+    "This executable is deprecated and will be removed in M-turtle.\n"
+    "Use 'component_container --executor-type single-threaded --isolated' instead.\n"
+    "For a multi-threaded isolated setup,"
+    " use 'component_container --executor-type multi-threaded --isolated'.");
+
   /// Component container with dedicated single-threaded executors for each components.
   rclcpp::init(argc, argv);
   // parse arguments
@@ -46,4 +54,6 @@ int main(int argc, char * argv[])
   }
   exec->add_node(node);
   exec->spin();
+
+  return 0;
 }
