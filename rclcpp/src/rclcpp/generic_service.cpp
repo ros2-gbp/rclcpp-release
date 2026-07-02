@@ -14,9 +14,6 @@
 
 #include "rclcpp/generic_service.hpp"
 
-#include "rclcpp/exceptions.hpp"
-#include "rclcpp/logging.hpp"
-
 namespace rclcpp
 {
 GenericService::GenericService(

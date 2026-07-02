@@ -24,6 +24,7 @@
 
 #include "rcl/node.h"
 #include "rcutils/logging.h"
+#include "rcpputils/filesystem_helper.hpp"
 
 /**
  * \def RCLCPP_LOGGING_ENABLED

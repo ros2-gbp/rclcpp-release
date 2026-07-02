@@ -18,7 +18,6 @@
 #include <string>
 
 #include "rclcpp/rate.hpp"
-#include "rclcpp/utilities.hpp"
 
 #include "../utils/rclcpp_gtest_macros.hpp"
 
