@@ -17,28 +17,14 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
-#include <stdexcept>
-#include <sstream>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 
 #include "ament_index_cpp/get_resource.hpp"
-
 #include "class_loader/class_loader.hpp"
-
-#include "rclcpp/node_options.hpp"
-#include "rclcpp/qos.hpp"
-
-#include "rclcpp_components/node_factory.hpp"
-
-#include "rcl_interfaces/msg/parameter_descriptor.hpp"
-#include "rcl_interfaces/msg/integer_range.hpp"
-
+#include "rcpputils/filesystem_helper.hpp"
 #include "rcpputils/split.hpp"
-
-#include "rmw/types.h"
 
 using namespace std::placeholders;
 
@@ -93,13 +79,17 @@ std::vector<ComponentManager::ComponentResource>
 ComponentManager::get_component_resources(
   const std::string & package_name, const std::string & resource_index) const
 {
-  auto result = ament_index_cpp::get_resource(resource_index, package_name);
-  if (result.resourcePath == std::nullopt) {
+  std::string content;
+  std::string base_path;
+  if (
+    !ament_index_cpp::get_resource(
+      resource_index, package_name, content, &base_path))
+  {
     throw ComponentManagerException("Could not find requested resource in ament index");
   }
 
   std::vector<ComponentResource> resources;
-  std::vector<std::string> lines = rcpputils::split(result.contents, '\n', true);
+  std::vector<std::string> lines = rcpputils::split(content, '\n', true);
   for (const auto & line : lines) {
     std::vector<std::string> parts = rcpputils::split(line, ';');
     if (parts.size() != 2) {
@@ -108,7 +98,7 @@ ComponentManager::get_component_resources(
 
     std::filesystem::path library_path = parts[1];
     if (!library_path.is_absolute()) {
-      library_path = (result.resourcePath.value() / library_path);
+      library_path = (base_path / library_path);
     }
     resources.push_back({parts[0], library_path.string()});
   }
@@ -176,20 +166,6 @@ ComponentManager::create_node_options(const std::shared_ptr<LoadNode::Request> r
     .use_global_arguments(false)
     .parameter_overrides(parameters)
     .arguments(remap_rules);
-
-  if (request->log_level != static_cast<uint8_t>(rclcpp::Logger::Level::Unset)) {
-    if (request->log_level != static_cast<uint8_t>(rclcpp::Logger::Level::Debug) &&
-      request->log_level != static_cast<uint8_t>(rclcpp::Logger::Level::Info) &&
-      request->log_level != static_cast<uint8_t>(rclcpp::Logger::Level::Warn) &&
-      request->log_level != static_cast<uint8_t>(rclcpp::Logger::Level::Error) &&
-      request->log_level != static_cast<uint8_t>(rclcpp::Logger::Level::Fatal))
-    {
-      throw ComponentManagerException(
-        "Invalid log_level value: " + std::to_string(request->log_level) +
-        ". Valid values are DEBUG (10), INFO (20), WARN (30), ERROR (40), FATAL (50).");
-    }
-    options.log_level(static_cast<rclcpp::Logger::Level>(request->log_level));
-  }
 
   for (const auto & a : request->extra_arguments) {
     const rclcpp::Parameter extra_argument = rclcpp::Parameter::from_parameter_msg(a);

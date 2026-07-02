@@ -164,18 +164,6 @@ public:
         ROSMessageT,
         AllocatorT>;
 
-      // Build a type-erased stats handler to avoid a circular include chain
-      // via publisher.hpp and callback_group.hpp
-      typename SubscriptionIntraProcessT::StatsHandlerFn stats_handler = nullptr;
-      if (subscription_topic_statistics) {
-        stats_handler =
-          [subscription_topic_statistics](
-          const rmw_message_info_t & info, const rclcpp::Time & time)
-          {
-            subscription_topic_statistics->handle_message(info, time);
-          };
-      }
-
       // First create a SubscriptionIntraProcess which will be given to the intra-process manager.
       auto context = node_base->get_context();
       subscription_intra_process_ = std::make_shared<SubscriptionIntraProcessT>(
@@ -184,8 +172,7 @@ public:
         context,
         this->get_topic_name(),  // important to get like this, as it has the fully-qualified name
         qos_profile,
-        resolve_intra_process_buffer_type(options_.intra_process_buffer_type, callback),
-        std::move(stats_handler));
+        resolve_intra_process_buffer_type(options_.intra_process_buffer_type, callback));
       TRACETOOLS_TRACEPOINT(
         rclcpp_subscription_init,
         static_cast<const void *>(get_subscription_handle().get()),
@@ -290,50 +277,6 @@ public:
   create_serialized_message() override
   {
     return message_memory_strategy_->borrow_serialized_message();
-  }
-
-  /// Disable callbacks from being called
-  /**
-    * This method will block, until any subscription's callbacks provided during construction
-    * currently being executed are finished.
-    * \note This method also temporary removes the on new message callback and all
-    * on new event callbacks from the rmw layer to prevent them from being called. However, this
-    * method will not block and wait until the currently executing on_new_[message]event callbacks
-    * are finished.
-    */
-  void
-  disable_callbacks() override
-  {
-    SubscriptionBase::disable_callbacks();
-    any_callback_.disable();
-    if (subscription_intra_process_) {
-      subscription_intra_process_->disable_callbacks();
-    }
-    for (const auto & [_, event_ptr] : event_handlers_) {
-      if (event_ptr) {
-        event_ptr->disable();
-      }
-    }
-  }
-
-  /// Enable the callbacks to be called
-  /**
-    * This method is thread safe, and provides a safe way to atomically enable the callbacks
-    * in a multithreaded environment.
-    */
-  void
-  enable_callbacks() override
-  {
-    SubscriptionBase::enable_callbacks();
-    any_callback_.enable();
-    if (subscription_intra_process_) {
-      subscription_intra_process_->enable_callbacks();
-    }
-    for (const auto & [_, event_ptr] : event_handlers_) {
-      if (event_ptr) {
-        event_ptr->enable();
-      }
-    }
   }
 
   void

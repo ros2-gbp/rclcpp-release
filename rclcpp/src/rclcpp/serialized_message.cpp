@@ -70,12 +70,12 @@ SerializedMessage::SerializedMessage(const rcl_serialized_message_t & other)
   copy_rcl_message(other, serialized_message_);
 }
 
-SerializedMessage::SerializedMessage(SerializedMessage && other) noexcept
+SerializedMessage::SerializedMessage(SerializedMessage && other)
 : serialized_message_(
     std::exchange(other.serialized_message_, rmw_get_zero_initialized_serialized_message()))
 {}
 
-SerializedMessage::SerializedMessage(rcl_serialized_message_t && other) noexcept
+SerializedMessage::SerializedMessage(rcl_serialized_message_t && other)
 : serialized_message_(
     std::exchange(other, rmw_get_zero_initialized_serialized_message()))
 {}
@@ -98,7 +98,7 @@ SerializedMessage & SerializedMessage::operator=(const rcl_serialized_message_t 
   return *this;
 }
 
-SerializedMessage & SerializedMessage::operator=(SerializedMessage && other) noexcept
+SerializedMessage & SerializedMessage::operator=(SerializedMessage && other)
 {
   if (this != &other) {
     if (nullptr != serialized_message_.buffer) {
@@ -116,7 +116,7 @@ SerializedMessage & SerializedMessage::operator=(SerializedMessage && other) noe
   return *this;
 }
 
-SerializedMessage & SerializedMessage::operator=(rcl_serialized_message_t && other) noexcept
+SerializedMessage & SerializedMessage::operator=(rcl_serialized_message_t && other)
 {
   if (&serialized_message_ != &other) {
     if (nullptr != serialized_message_.buffer) {

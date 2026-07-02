@@ -117,8 +117,8 @@ public:
   RCLCPP_PUBLIC
   bool
   sleep_until(
-    const Time & until,
-    const Context::SharedPtr & context = contexts::get_global_default_context());
+    Time until,
+    Context::SharedPtr context = contexts::get_global_default_context());
 
   /**
    * Sleep for a specified Duration.
@@ -141,8 +141,8 @@ public:
   RCLCPP_PUBLIC
   bool
   sleep_for(
-    const Duration & rel_time,
-    const Context::SharedPtr & context = contexts::get_global_default_context());
+    Duration rel_time,
+    Context::SharedPtr context = contexts::get_global_default_context());
 
   /**
    * Check if the clock is started.
@@ -168,7 +168,7 @@ public:
    */
   RCLCPP_PUBLIC
   bool
-  wait_until_started(const Context::SharedPtr & context = contexts::get_global_default_context());
+  wait_until_started(Context::SharedPtr context = contexts::get_global_default_context());
 
   /**
    * Wait for clock to start, with timeout.
@@ -186,7 +186,7 @@ public:
   bool
   wait_until_started(
     const rclcpp::Duration & timeout,
-    const Context::SharedPtr & context = contexts::get_global_default_context(),
+    Context::SharedPtr context = contexts::get_global_default_context(),
     const rclcpp::Duration & wait_tick_ns = rclcpp::Duration(0, static_cast<uint32_t>(1e7)));
 
   /**
@@ -199,6 +199,21 @@ public:
   RCLCPP_PUBLIC
   bool
   ros_time_is_active();
+
+  /**
+   * Deprecated. This API is broken, as there is no way to get a deep
+   * copy of a clock. Therefore one can experience spurious wakeups triggered
+   * by some other instance of a clock.
+   *
+   * Cancels an ongoing or future sleep operation of one thread.
+   *
+   * This function can be used by one thread, to wakeup another thread that is
+   * blocked using any of the sleep_ or wait_ methods of this class.
+   */
+  [[deprecated("Use ClockConditionalVariable")]]
+  RCLCPP_PUBLIC
+  void
+  cancel_sleep_or_wait();
 
   /// Return the rcl_clock_t clock handle
   RCLCPP_PUBLIC
@@ -238,8 +253,8 @@ public:
   RCLCPP_PUBLIC
   JumpHandler::SharedPtr
   create_jump_callback(
-    const JumpHandler::pre_callback_t & pre_callback,
-    const JumpHandler::post_callback_t & post_callback,
+    JumpHandler::pre_callback_t pre_callback,
+    JumpHandler::post_callback_t post_callback,
     const rcl_jump_threshold_t & threshold);
 
 private:
@@ -327,7 +342,7 @@ public:
   RCLCPP_PUBLIC
   ClockConditionalVariable(
     const rclcpp::Clock::SharedPtr & clock,
-    const rclcpp::Context::SharedPtr & context = rclcpp::contexts::get_global_default_context());
+    rclcpp::Context::SharedPtr context = rclcpp::contexts::get_global_default_context());
   RCLCPP_PUBLIC
   ~ClockConditionalVariable();
 
@@ -347,7 +362,7 @@ public:
   RCLCPP_PUBLIC
   bool
   wait_until(
-    std::unique_lock<std::mutex> & lock, const rclcpp::Time & until,
+    std::unique_lock<std::mutex> & lock, rclcpp::Time until,
     const std::function<bool ()> & pred);
 
   /**
