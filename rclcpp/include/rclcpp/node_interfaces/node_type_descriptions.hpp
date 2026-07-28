@@ -22,7 +22,6 @@
 #include "rclcpp/node_interfaces/node_logging_interface.hpp"
 #include "rclcpp/node_interfaces/node_parameters_interface.hpp"
 #include "rclcpp/node_interfaces/node_services_interface.hpp"
-#include "rclcpp/node_interfaces/node_topics_interface.hpp"
 #include "rclcpp/node_interfaces/node_type_descriptions_interface.hpp"
 #include "rclcpp/visibility_control.hpp"
 
@@ -39,10 +38,10 @@ public:
 
   RCLCPP_PUBLIC
   explicit NodeTypeDescriptions(
-    NodeBaseInterface::SharedPtr node_base,
-    NodeLoggingInterface::SharedPtr node_logging,
-    NodeParametersInterface::SharedPtr node_parameters,
-    NodeServicesInterface::SharedPtr node_services);
+    const NodeBaseInterface::SharedPtr & node_base,
+    const NodeLoggingInterface::SharedPtr & node_logging,
+    const NodeParametersInterface::SharedPtr & node_parameters,
+    const NodeServicesInterface::SharedPtr & node_services);
 
   RCLCPP_PUBLIC
   virtual

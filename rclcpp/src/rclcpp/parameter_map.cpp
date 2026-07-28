@@ -18,6 +18,7 @@
 
 #include "rcpputils/find_and_replace.hpp"
 #include "rcpputils/scope_exit.hpp"
+#include "rcl_yaml_param_parser/parser.h"
 #include "rclcpp/parameter_map.hpp"
 
 using rclcpp::exceptions::InvalidParametersException;
@@ -152,7 +153,9 @@ rclcpp::parameter_value_from(const rcl_variant_t * const c_param_value)
     return ParameterValue(strings);
   }
 
-  throw InvalidParameterValueException("No parameter value set");
+  throw InvalidParameterValueException(
+        "Invalid parameter value: rcl parameter structure"
+        "Contains no value");
 }
 
 ParameterMap

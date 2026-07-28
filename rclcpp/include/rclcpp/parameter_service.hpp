@@ -24,7 +24,6 @@
 #include "rcl_interfaces/srv/list_parameters.hpp"
 #include "rcl_interfaces/srv/set_parameters.hpp"
 #include "rcl_interfaces/srv/set_parameters_atomically.hpp"
-#include "rclcpp/executors.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/parameter.hpp"
@@ -42,8 +41,8 @@ public:
 
   RCLCPP_PUBLIC
   ParameterService(
-    const std::shared_ptr<node_interfaces::NodeBaseInterface> node_base,
-    const std::shared_ptr<node_interfaces::NodeServicesInterface> node_services,
+    const std::shared_ptr<node_interfaces::NodeBaseInterface> & node_base,
+    const std::shared_ptr<node_interfaces::NodeServicesInterface> & node_services,
     rclcpp::node_interfaces::NodeParametersInterface * node_params,
     const rclcpp::QoS & qos_profile = rclcpp::ParametersQoS());
 

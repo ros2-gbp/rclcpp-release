@@ -14,27 +14,31 @@
 
 #include <memory>
 
-#include "rclcpp/rclcpp.hpp"
+#include "rcpputils/compile_warnings.hpp"
+#include "rclcpp/utilities.hpp"
+#include "rclcpp/experimental/executors/events_executor/events_executor.hpp"
 
 #include "rclcpp_components/component_manager.hpp"
 
 int main(int argc, char * argv[])
 {
-  /// Component container with an events callback-group executor.
+  RCUTILS_LOG_WARN_NAMED("component_container_event",
+    "This executable is deprecated and will be removed in M-turtle.\n"
+    "Use 'component_container --executor-type events-cbg' instead.");
+
+  /// Component container with an events executor.
   rclcpp::init(argc, argv);
 
-  rclcpp::executors::EventsCBGExecutor::SharedPtr exec = nullptr;
-  const auto node = std::make_shared<rclcpp_components::ComponentManager>();
-  if (node->has_parameter("thread_num")) {
-    const auto thread_num = node->get_parameter("thread_num").as_int();
-    exec = std::make_shared<rclcpp::executors::EventsCBGExecutor>(
-      rclcpp::ExecutorOptions{}, thread_num);
-  } else {
-    exec = std::make_shared<rclcpp::executors::EventsCBGExecutor>();
-  }
-  node->set_executor(exec);
+  // Disable deprecation warnings while maintaining the EventsExecutor
+  RCPPUTILS_DEPRECATION_WARNING_OFF_START
+  auto exec = std::make_shared<rclcpp::experimental::executors::EventsExecutor>();
+  RCPPUTILS_DEPRECATION_WARNING_OFF_STOP
+
+  auto node = std::make_shared<rclcpp_components::ComponentManager>(exec);
   exec->add_node(node);
   exec->spin();
 
   rclcpp::shutdown();
+
+  return 0;
 }

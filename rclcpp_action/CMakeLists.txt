@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(rclcpp_action)
 
 find_package(ament_cmake_ros REQUIRED)
+find_package(ament_cmake_ros_core REQUIRED)
 find_package(action_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rcl REQUIRED)
@@ -10,11 +11,6 @@ find_package(rcl_action REQUIRED)
 find_package(rcpputils REQUIRED)
 find_package(rosidl_runtime_c REQUIRED)
 
-# Default to C++17
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(
     -Wall -Wextra -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual
@@ -37,11 +33,14 @@ target_include_directories(${PROJECT_NAME}
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
 target_link_libraries(${PROJECT_NAME} PUBLIC
-  ${action_msgs_TARGETS}
+  action_msgs::action_msgs
   rcl::rcl
   rcl_action::rcl_action
   rclcpp::rclcpp
   rosidl_runtime_c::rosidl_runtime_c
+  # Note we link public on purpose, as we want to export
+  # the used C++ version as minimum to all consuming packages
+  ament_cmake_ros_core::ament_ros_defaults
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE
   rcpputils::rcpputils
@@ -92,7 +91,7 @@ if(BUILD_TESTING)
       rcl_action::rcl_action
       rclcpp::rclcpp
       rcutils::rcutils
-      ${test_msgs_TARGETS}
+      test_msgs::test_msgs
     )
   endif()
 
@@ -106,7 +105,7 @@ if(BUILD_TESTING)
       rcl_action::rcl_action
       rclcpp::rclcpp
       rcutils::rcutils
-      ${test_msgs_TARGETS}
+      test_msgs::test_msgs
     )
   endif()
 
@@ -118,7 +117,7 @@ if(BUILD_TESTING)
       mimick
       rcl_action::rcl_action
       rclcpp::rclcpp
-      ${test_msgs_TARGETS}
+      test_msgs::test_msgs
     )
   endif()
 
@@ -127,10 +126,10 @@ if(BUILD_TESTING)
   if(TARGET test_server_goal_handle)
     target_link_libraries(test_server_goal_handle
       ${PROJECT_NAME}
-      ${action_msgs_TARGETS}
+      action_msgs::action_msgs
       mimick
       rclcpp::rclcpp
-      ${test_msgs_TARGETS}
+      test_msgs::test_msgs
     )
   endif()
 
@@ -138,7 +137,7 @@ if(BUILD_TESTING)
   if(TARGET test_traits)
     target_link_libraries(test_traits
       ${PROJECT_NAME}
-      ${test_msgs_TARGETS}
+      test_msgs::test_msgs
     )
   endif()
 
@@ -146,7 +145,7 @@ if(BUILD_TESTING)
   if(TARGET test_types)
     target_link_libraries(test_types
       ${PROJECT_NAME}
-      ${test_msgs_TARGETS}
+      test_msgs::test_msgs
     )
   endif()
 endif()

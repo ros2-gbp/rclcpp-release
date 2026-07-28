@@ -18,16 +18,20 @@
 #include <utility>
 #include <vector>
 
+#include "rcpputils/compile_warnings.hpp"
 #include "rcpputils/scope_exit.hpp"
 
 using namespace std::chrono_literals;
 
+// Disable deprecation warnings while maintaining the EventsExecutor
+RCPPUTILS_DEPRECATION_WARNING_OFF_START
+
 using rclcpp::experimental::executors::EventsExecutor;
 
 EventsExecutor::EventsExecutor(
+  const rclcpp::ExecutorOptions & options,
   rclcpp::experimental::executors::EventsQueue::UniquePtr events_queue,
-  bool execute_timers_separate_thread,
-  const rclcpp::ExecutorOptions & options)
+  bool execute_timers_separate_thread)
 : rclcpp::Executor(options)
 {
   // Get ownership of the queue used to store events.
@@ -454,3 +458,5 @@ EventsExecutor::add_notify_waitable_to_collection(
     {this->notify_waitable_, weak_group_ptr}
   });
 }
+
+RCPPUTILS_DEPRECATION_WARNING_OFF_STOP

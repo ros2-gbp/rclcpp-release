@@ -101,7 +101,8 @@ public:
     const std::string & action_name,
     const rosidl_action_type_support_t * type_support,
     const rcl_action_client_options_t & client_options)
-  : node_graph_(node_graph),
+  : context_(node_base->get_context()),
+    node_graph_(node_graph),
     node_handle(node_base->get_shared_rcl_node_handle()),
     action_type_support_(type_support),
     logger(node_logging->get_logger().get_child("rclcpp_action")),
@@ -180,6 +181,7 @@ public:
   std::map<int64_t, ResponseCallback> pending_cancel_responses;
   std::recursive_mutex cancel_requests_mutex;
 
+  std::mutex goal_id_rng_mutex;
   std::independent_bits_engine<
     std::mt19937, 8, unsigned int> random_bytes_generator;
 };
@@ -190,8 +192,10 @@ ClientBase::ClientBase(
   rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr node_logging,
   const std::string & action_name,
   const rosidl_action_type_support_t * type_support,
-  const rcl_action_client_options_t & client_options)
-: pimpl_(new ClientBaseImpl(
+  const rcl_action_client_options_t & client_options,
+  bool enable_feedback_msg_optimization)
+: enable_feedback_msg_optimization_(enable_feedback_msg_optimization),
+  pimpl_(new ClientBaseImpl(
       node_base, node_graph, node_logging, action_name, type_support, client_options))
 {
 }
@@ -477,6 +481,7 @@ GoalUUID
 ClientBase::generate_goal_id()
 {
   GoalUUID goal_id;
+  std::lock_guard<std::mutex> lock(pimpl_->goal_id_rng_mutex);
   // TODO(hidmic): Do something better than this for UUID generation.
   // std::generate(
   //   goal_id.uuid.begin(), goal_id.uuid.end(),
@@ -614,10 +619,6 @@ ClientBase::set_on_ready_callback(
           user_data);
         break;
       }
-
-    default:
-      throw std::runtime_error("ClientBase::set_on_ready_callback: Unknown entity type.");
-      break;
   }
 
   if (RCL_RET_OK != ret) {
@@ -830,4 +831,23 @@ ClientBase::configure_introspection(
   }
 }
 
+bool
+ClientBase::configure_feedback_subscription_filter_add_goal_id(
+  const GoalUUID & goal_id)
+{
+  const rcl_ret_t ret = rcl_action_client_configure_feedback_subscription_filter_add_goal_id(
+    pimpl_->client_handle.get(), goal_id.data(), goal_id.size());
+
+  return ret == RCL_RET_OK;
+}
+
+bool
+ClientBase::configure_feedback_subscription_filter_remove_goal_id(
+  const GoalUUID & goal_id)
+{
+  const rcl_ret_t ret = rcl_action_client_configure_feedback_subscription_filter_remove_goal_id(
+    pimpl_->client_handle.get(), goal_id.data(), goal_id.size());
+
+  return ret == RCL_RET_OK;
+}
 }  // namespace rclcpp_action
