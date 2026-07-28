@@ -152,9 +152,7 @@ rclcpp::parameter_value_from(const rcl_variant_t * const c_param_value)
     return ParameterValue(strings);
   }
 
-  throw InvalidParameterValueException(
-        "Invalid parameter value: rcl parameter structure"
-        "Contains no value");
+  throw InvalidParameterValueException("No parameter value set");
 }
 
 ParameterMap

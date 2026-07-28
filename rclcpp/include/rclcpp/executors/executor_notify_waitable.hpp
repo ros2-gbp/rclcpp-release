@@ -43,8 +43,7 @@ public:
    */
   RCLCPP_PUBLIC
   explicit ExecutorNotifyWaitable(
-    const std::function<void(void)> & on_execute_callback = {},
-    const rclcpp::Context::SharedPtr & context =
+    std::function<void(void)> on_execute_callback = {}, const rclcpp::Context::SharedPtr & context =
     rclcpp::contexts::get_global_default_context());
 
   // Destructor
@@ -116,7 +115,7 @@ public:
    */
   RCLCPP_PUBLIC
   void
-  add_guard_condition(const rclcpp::GuardCondition::WeakPtr & guard_condition);
+  add_guard_condition(rclcpp::GuardCondition::WeakPtr guard_condition);
 
   /// Unset any callback registered via set_on_ready_callback.
   /**
@@ -140,7 +139,7 @@ public:
    */
   RCLCPP_PUBLIC
   void
-  remove_guard_condition(const rclcpp::GuardCondition::WeakPtr & weak_guard_condition);
+  remove_guard_condition(rclcpp::GuardCondition::WeakPtr weak_guard_condition);
 
   /// Get the number of ready guard_conditions
   /**

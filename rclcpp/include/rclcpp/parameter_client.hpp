@@ -64,13 +64,13 @@ public:
    */
   RCLCPP_PUBLIC
   AsyncParametersClient(
-    const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_base_interface,
-    const rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr & node_topics_interface,
-    const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr & node_graph_interface,
-    const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr & node_services_interface,
+    const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_interface,
+    const rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_interface,
+    const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_interface,
+    const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services_interface,
     const std::string & remote_node_name = "",
     const rclcpp::QoS & qos_profile = rclcpp::ParametersQoS(),
-    const rclcpp::CallbackGroup::SharedPtr & group = nullptr);
+    rclcpp::CallbackGroup::SharedPtr group = nullptr);
 
   /**
    * \param[in] node The async parameters client will be added to this node.
@@ -80,10 +80,10 @@ public:
    */
   template<typename NodeT>
   explicit AsyncParametersClient(
-    const std::shared_ptr<NodeT> & node,
+    const std::shared_ptr<NodeT> node,
     const std::string & remote_node_name = "",
     const rclcpp::QoS & qos_profile = rclcpp::ParametersQoS(),
-    const rclcpp::CallbackGroup::SharedPtr & group = nullptr)
+    rclcpp::CallbackGroup::SharedPtr group = nullptr)
   : AsyncParametersClient(
       node->get_node_base_interface(),
       node->get_node_topics_interface(),
@@ -105,7 +105,7 @@ public:
     NodeT * node,
     const std::string & remote_node_name = "",
     const rclcpp::QoS & qos_profile = rclcpp::ParametersQoS(),
-    const rclcpp::CallbackGroup::SharedPtr & group = nullptr)
+    rclcpp::CallbackGroup::SharedPtr group = nullptr)
   : AsyncParametersClient(
       node->get_node_base_interface(),
       node->get_node_topics_interface(),
@@ -120,41 +120,41 @@ public:
   std::shared_future<std::vector<rclcpp::Parameter>>
   get_parameters(
     const std::vector<std::string> & names,
-    const std::function<
+    std::function<
       void(std::shared_future<std::vector<rclcpp::Parameter>>)
-    > & callback = nullptr);
+    > callback = nullptr);
 
   RCLCPP_PUBLIC
   std::shared_future<std::vector<rcl_interfaces::msg::ParameterDescriptor>>
   describe_parameters(
     const std::vector<std::string> & names,
-    const std::function<
+    std::function<
       void(std::shared_future<std::vector<rcl_interfaces::msg::ParameterDescriptor>>)
-    > & callback = nullptr);
+    > callback = nullptr);
 
   RCLCPP_PUBLIC
   std::shared_future<std::vector<rclcpp::ParameterType>>
   get_parameter_types(
     const std::vector<std::string> & names,
-    const std::function<
+    std::function<
       void(std::shared_future<std::vector<rclcpp::ParameterType>>)
-    > & callback = nullptr);
+    > callback = nullptr);
 
   RCLCPP_PUBLIC
   std::shared_future<std::vector<rcl_interfaces::msg::SetParametersResult>>
   set_parameters(
     const std::vector<rclcpp::Parameter> & parameters,
-    const std::function<
+    std::function<
       void(std::shared_future<std::vector<rcl_interfaces::msg::SetParametersResult>>)
-    > & callback = nullptr);
+    > callback = nullptr);
 
   RCLCPP_PUBLIC
   std::shared_future<rcl_interfaces::msg::SetParametersResult>
   set_parameters_atomically(
     const std::vector<rclcpp::Parameter> & parameters,
-    const std::function<
+    std::function<
       void(std::shared_future<rcl_interfaces::msg::SetParametersResult>)
-    > & callback = nullptr);
+    > callback = nullptr);
 
   /// Delete several parameters at once.
   /**
@@ -200,9 +200,9 @@ public:
   list_parameters(
     const std::vector<std::string> & prefixes,
     uint64_t depth,
-    const std::function<
+    std::function<
       void(std::shared_future<rcl_interfaces::msg::ListParametersResult>)
-    > & callback = nullptr);
+    > callback = nullptr);
 
   template<
     typename CallbackT,
@@ -304,7 +304,7 @@ public:
 
   template<typename NodeT>
   explicit SyncParametersClient(
-    const std::shared_ptr<NodeT> & node,
+    std::shared_ptr<NodeT> node,
     const std::string & remote_node_name = "",
     const rclcpp::QoS & qos_profile = rclcpp::ParametersQoS())
   : SyncParametersClient(
@@ -316,8 +316,8 @@ public:
 
   template<typename NodeT>
   SyncParametersClient(
-    const rclcpp::Executor::SharedPtr & executor,
-    const std::shared_ptr<NodeT> & node,
+    rclcpp::Executor::SharedPtr executor,
+    std::shared_ptr<NodeT> node,
     const std::string & remote_node_name = "",
     const rclcpp::QoS & qos_profile = rclcpp::ParametersQoS())
   : SyncParametersClient(
@@ -344,7 +344,7 @@ public:
 
   template<typename NodeT>
   SyncParametersClient(
-    const rclcpp::Executor::SharedPtr & executor,
+    rclcpp::Executor::SharedPtr executor,
     NodeT * node,
     const std::string & remote_node_name = "",
     const rclcpp::QoS & qos_profile = rclcpp::ParametersQoS())
@@ -360,11 +360,11 @@ public:
 
   RCLCPP_PUBLIC
   SyncParametersClient(
-    const rclcpp::Executor::SharedPtr & executor,
-    const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_base_interface,
-    const rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr & node_topics_interface,
-    const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr & node_graph_interface,
-    const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr & node_services_interface,
+    rclcpp::Executor::SharedPtr executor,
+    const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base_interface,
+    const rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_interface,
+    const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph_interface,
+    const rclcpp::node_interfaces::NodeServicesInterface::SharedPtr node_services_interface,
     const std::string & remote_node_name = "",
     const rclcpp::QoS & qos_profile = rclcpp::ParametersQoS())
   : executor_(executor), node_base_interface_(node_base_interface)
