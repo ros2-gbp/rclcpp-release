@@ -1,4 +1,4 @@
-// Copyright 2025 Open Source Robotics Foundation, Inc.
+// Copyright 2025 Open Source Robotics Foundation, Inc.Add commentMore actions
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -10,11 +10,10 @@
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
-// limitations under the License.
+// limitations under the License.Add commentMore actions
 
 #include <memory>
 
-#include "rcpputils/compile_warnings.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/experimental/executors/events_executor/events_executor.hpp"
 
@@ -28,12 +27,7 @@ int main(int argc, char * argv[])
 
   /// Component container with an events executor.
   rclcpp::init(argc, argv);
-
-  // Disable deprecation warnings while maintaining the EventsExecutor
-  RCPPUTILS_DEPRECATION_WARNING_OFF_START
   auto exec = std::make_shared<rclcpp::experimental::executors::EventsExecutor>();
-  RCPPUTILS_DEPRECATION_WARNING_OFF_STOP
-
   auto node = std::make_shared<rclcpp_components::ComponentManager>(exec);
   exec->add_node(node);
   exec->spin();

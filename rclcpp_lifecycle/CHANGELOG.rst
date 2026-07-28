@@ -2,23 +2,11 @@
 Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-33.0.3 (2026-07-28)
--------------------
-* use C++ 20 in default. (`#3187 <https://github.com/ros2/rclcpp/issues/3187>`_)
-* Contributors: Tomoya Fujita
-
-33.0.2 (2026-07-02)
--------------------
-* Optimize header include (`#3179 <https://github.com/ros2/rclcpp/issues/3179>`_)
-* Contributors: Alejandro Hernández Cordero
-
-33.0.1 (2026-05-22)
+32.0.2 (2026-07-28)
 -------------------
 
-33.0.0 (2026-05-07)
+32.0.1 (2026-07-02)
 -------------------
-* Cleanups headers and fix wording (`#3138 <https://github.com/ros2/rclcpp/issues/3138>`_)
-* Contributors: Alejandro Hernández Cordero
 
 32.0.0 (2026-04-30)
 -------------------
