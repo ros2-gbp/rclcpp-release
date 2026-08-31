@@ -16,6 +16,7 @@
 
 #include <chrono>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -25,7 +26,6 @@
 #include "rclcpp/memory_strategy.hpp"
 #include "rclcpp/executors/single_threaded_executor.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "rclcpp/strategies/allocator_memory_strategy.hpp"
 
 #include "test_msgs/msg/empty.hpp"
 

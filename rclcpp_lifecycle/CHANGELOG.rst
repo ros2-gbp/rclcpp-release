@@ -2,44 +2,87 @@
 Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+33.1.0 (2026-08-31)
+-------------------
+* cleanup headers (`#3238 <https://github.com/ros2/rclcpp/issues/3238>`_)
+* Add wait_for_message API that relies on node interfaces (`#3230 <https://github.com/ros2/rclcpp/issues/3230>`_)
+* Support generic subscription callbacks in LifecycleNode (`#3227 <https://github.com/ros2/rclcpp/issues/3227>`_)
+* clarify difference between faliure and error : issue-3086 (`#3215 <https://github.com/ros2/rclcpp/issues/3215>`_)
+* Contributors: Aditya Jindal, Alejandro Hernández Cordero, Maurice Alexander Purnawan, yadunund
 
-29.5.10 (2026-07-28)
---------------------
+33.0.3 (2026-07-28)
+-------------------
+* use C++ 20 in default. (`#3187 <https://github.com/ros2/rclcpp/issues/3187>`_)
+* Contributors: Tomoya Fujita
 
-29.5.9 (2026-07-02)
+33.0.2 (2026-07-02)
+-------------------
+* Optimize header include (`#3179 <https://github.com/ros2/rclcpp/issues/3179>`_)
+* Contributors: Alejandro Hernández Cordero
+
+33.0.1 (2026-05-22)
 -------------------
 
-29.5.8 (2026-03-25)
+33.0.0 (2026-05-07)
+-------------------
+* Cleanups headers and fix wording (`#3138 <https://github.com/ros2/rclcpp/issues/3138>`_)
+* Contributors: Alejandro Hernández Cordero
+
+32.0.0 (2026-04-30)
 -------------------
 
-29.5.7 (2026-02-09)
+31.0.2 (2026-04-09)
 -------------------
 
-29.5.6 (2025-12-23)
+31.0.1 (2026-03-24)
+-------------------
+* Use new ROSIDL aggregate CMake target (`#3105 <https://github.com/ros2/rclcpp/issues/3105>`_)
+* Contributors: Emerson Knapp
+
+31.0.0 (2026-03-20)
 -------------------
 
-29.5.5 (2025-11-18)
+30.1.5 (2026-02-09)
 -------------------
-* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_) (`#2989 <https://github.com/ros2/rclcpp/issues/2989>`_)
-* Add get_parameter_or overload returning value or alternative (`#2973 <https://github.com/ros2/rclcpp/issues/2973>`_) (`#2976 <https://github.com/ros2/rclcpp/issues/2976>`_)
-* Contributors: mergify[bot]
+* Compatiblity with 'Populate Transitions' `ros2/rcl#1269 <https://github.com/ros2/rcl/issues/1269>`_ (`#2967 <https://github.com/ros2/rclcpp/issues/2967>`_)
+* Contributors: Jasper van Brakel
 
-29.5.4 (2025-10-21)
--------------------
-
-29.5.3 (2025-09-11)
--------------------
-* Clearer warning message, the old one lacked information and was perhaps misleading (`#2927 <https://github.com/ros2/rclcpp/issues/2927>`_) (`#2931 <https://github.com/ros2/rclcpp/issues/2931>`_)
-* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_) (`#2915 <https://github.com/ros2/rclcpp/issues/2915>`_)
-* Contributors: mergify[bot]
-
-29.5.2 (2025-07-07)
+30.1.4 (2025-12-23)
 -------------------
 
-29.5.1 (2025-06-23)
+30.1.3 (2025-11-18)
 -------------------
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2855 <https://github.com/ros2/rclcpp/issues/2855>`_)
-* Contributors: mergify[bot]
+* add : get clients, servers info (`#2569 <https://github.com/ros2/rclcpp/issues/2569>`_)
+* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_)
+* Add get_parameter_or overload returning value or alternative (`#2973 <https://github.com/ros2/rclcpp/issues/2973>`_)
+* Contributors: Minju, Lee, Tim Clephas, Zheng Qu
+
+30.1.2 (2025-10-21)
+-------------------
+
+30.1.1 (2025-09-11)
+-------------------
+* deprecate rclcpp::spin_some and rclcpp::spin_all (`#2848 <https://github.com/ros2/rclcpp/issues/2848>`_)
+* Clearer warning message, the old one lacked information and was perhaps misleading (`#2927 <https://github.com/ros2/rclcpp/issues/2927>`_)
+* Contributors: Alberto Soragna, Peter Mitrano (AR)
+
+30.1.0 (2025-07-29)
+-------------------
+* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_)
+  cmake version < then 3.10 is deprecated
+* Contributors: mosfet80
+
+30.0.0 (2025-07-01)
+-------------------
+
+29.6.1 (2025-06-23)
+-------------------
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
+* introduce rcl_lifecycle_get_transition_label_by_id(). (`#2827 <https://github.com/ros2/rclcpp/issues/2827>`_)
+* Contributors: Alejandro Hernández Cordero, Tomoya Fujita
+
+29.6.0 (2025-04-25)
+-------------------
 
 29.5.0 (2025-04-18)
 -------------------

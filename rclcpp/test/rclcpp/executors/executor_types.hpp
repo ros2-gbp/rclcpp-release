@@ -20,44 +20,22 @@
 #include <string>
 #include <type_traits>
 
+#include "rcpputils/compile_warnings.hpp"
+
 #include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
 #include "rclcpp/experimental/executors/events_executor/events_executor.hpp"
 #include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/executors/static_single_threaded_executor.hpp"
 #include "rclcpp/executors/multi_threaded_executor.hpp"
 
-// suppress deprecated StaticSingleThreadedExecutor warning
-// we define an alias that explicitly indicates that this class is deprecated, while avoiding
-// polluting a lot of files the gcc pragmas
-#if !defined(_WIN32)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else  // !defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-using DeprecatedStaticSingleThreadedExecutor = rclcpp::executors::StaticSingleThreadedExecutor;
-// remove warning suppression
-#if !defined(_WIN32)
-# pragma GCC diagnostic pop
-#else  // !defined(_WIN32)
-# pragma warning(pop)
-#endif
+// Disable deprecation warnings while maintaining the EventsExecutor
+RCPPUTILS_DEPRECATION_WARNING_OFF_START
 
-#ifdef __clang__
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
 using ExecutorTypes =
   ::testing::Types<
   rclcpp::executors::SingleThreadedExecutor,
   rclcpp::executors::MultiThreadedExecutor,
-  DeprecatedStaticSingleThreadedExecutor,
   rclcpp::executors::EventsCBGExecutor,
   rclcpp::experimental::executors::EventsExecutor>;
-#ifdef __clang__
-# pragma clang diagnostic pop
-#endif
 
 class ExecutorTypeNames
 {
@@ -65,29 +43,19 @@ public:
   template<typename T>
   static std::string GetName([[maybe_unused]] int idx)
   {
-    if (std::is_same<T, rclcpp::executors::SingleThreadedExecutor>()) {
+    if constexpr (std::is_same<T, rclcpp::executors::SingleThreadedExecutor>()) {
       return "SingleThreadedExecutor";
     }
 
-    if (std::is_same<T, rclcpp::executors::MultiThreadedExecutor>()) {
+    if constexpr(std::is_same<T, rclcpp::executors::MultiThreadedExecutor>()) {
       return "MultiThreadedExecutor";
     }
-#ifdef __clang__
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    if (std::is_same<T, DeprecatedStaticSingleThreadedExecutor>()) {
-      return "StaticSingleThreadedExecutor";
-    }
-#ifdef __clang__
-# pragma clang diagnostic pop
-#endif
 
-    if (std::is_same<T, rclcpp::executors::EventsCBGExecutor>()) {
+    if constexpr(std::is_same<T, rclcpp::executors::EventsCBGExecutor>()) {
       return "EventsCBGExecutor";
     }
 
-    if (std::is_same<T, rclcpp::experimental::executors::EventsExecutor>()) {
+    if constexpr(std::is_same<T, rclcpp::experimental::executors::EventsExecutor>()) {
       return "EventsExecutor";
     }
 
@@ -95,13 +63,13 @@ public:
   }
 };
 
-// StaticSingleThreadedExecutor is not included in these tests for now, due to:
-// https://github.com/ros2/rclcpp/issues/1219
 using StandardExecutors =
   ::testing::Types<
   rclcpp::executors::SingleThreadedExecutor,
   rclcpp::executors::MultiThreadedExecutor,
   rclcpp::executors::EventsCBGExecutor,
   rclcpp::experimental::executors::EventsExecutor>;
+
+RCPPUTILS_DEPRECATION_WARNING_OFF_STOP
 
 #endif  // RCLCPP__EXECUTORS__EXECUTOR_TYPES_HPP_

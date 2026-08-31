@@ -324,12 +324,14 @@ public:
   /**
    * \sa rclcpp::Node::create_generic_subscription
    */
-  template<typename AllocatorT = std::allocator<void>>
+  template<
+    typename CallbackT,
+    typename AllocatorT = std::allocator<void>>
   std::shared_ptr<rclcpp::GenericSubscription> create_generic_subscription(
     const std::string & topic_name,
     const std::string & topic_type,
     const rclcpp::QoS & qos,
-    std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
+    CallbackT && callback,
     const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options = (
       rclcpp::SubscriptionOptionsWithAllocator<AllocatorT>()
     )
@@ -702,6 +704,22 @@ public:
   RCLCPP_LIFECYCLE_PUBLIC
   std::vector<rclcpp::TopicEndpointInfo>
   get_subscriptions_info_by_topic(const std::string & topic_name, bool no_mangle = false) const;
+
+  /// Return the service endpoint information about clients on a given service.
+  /**
+   * \sa rclcpp::Node::get_clients_info_by_service
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  std::vector<rclcpp::ServiceEndpointInfo>
+  get_clients_info_by_service(const std::string & service_name, bool no_mangle = false) const;
+
+  /// Return the service endpoint information about server on a given service.
+  /**
+   * \sa rclcpp::Node::get_servers_info_by_service
+   */
+  RCLCPP_LIFECYCLE_PUBLIC
+  std::vector<rclcpp::ServiceEndpointInfo>
+  get_servers_info_by_service(const std::string & service_name, bool no_mangle = false) const;
 
   /// Return a graph event, which will be set anytime a graph change occurs.
   /* The graph Event object is a loan which must be returned.

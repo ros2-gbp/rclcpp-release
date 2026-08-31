@@ -27,7 +27,6 @@
 #include "rclcpp/experimental/executors/events_executor/events_queue.hpp"
 #include "rclcpp/experimental/executors/events_executor/simple_events_queue.hpp"
 #include "rclcpp/experimental/timers_manager.hpp"
-#include "rclcpp/node.hpp"
 
 namespace rclcpp
 {
@@ -57,24 +56,28 @@ namespace executors
  * executor.spin();
  * executor.remove_node(node);
  */
-class EventsExecutor : public rclcpp::Executor
+class
+[[deprecated(
+    "rclcpp::experimental::executors::EventsExecutor is deprecated and will be removed in "
+    "m-turtle. use rclcpp::executors::EventsCBGExecutor in single-threaded mode instead")]]
+EventsExecutor : public rclcpp::Executor
 {
 public:
   RCLCPP_SMART_PTR_DEFINITIONS(EventsExecutor)
 
   /// Default constructor. See the default constructor for Executor.
   /**
+   * \param[in] options Options used to configure the executor.
    * \param[in] events_queue The queue used to store events.
    * \param[in] execute_timers_separate_thread If true, timers are executed in a separate
    * thread. If false, timers are executed in the same thread as all other entities.
-   * \param[in] options Options used to configure the executor.
    */
   RCLCPP_PUBLIC
   EventsExecutor(
+    const rclcpp::ExecutorOptions & options = rclcpp::ExecutorOptions(),
     rclcpp::experimental::executors::EventsQueue::UniquePtr events_queue = std::make_unique<
       rclcpp::experimental::executors::SimpleEventsQueue>(),
-    bool execute_timers_separate_thread = false,
-    const rclcpp::ExecutorOptions & options = rclcpp::ExecutorOptions());
+    bool execute_timers_separate_thread = false);
 
   /// Default destructor.
   RCLCPP_PUBLIC

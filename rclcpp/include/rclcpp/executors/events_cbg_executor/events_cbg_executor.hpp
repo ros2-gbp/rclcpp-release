@@ -22,6 +22,7 @@
 
 #include "rclcpp/executor.hpp"
 #include "rclcpp/macros.hpp"
+#include "rclcpp/utilities.hpp"
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
@@ -66,8 +67,8 @@ public:
   RCLCPP_PUBLIC
   void
   add_callback_group(
-    rclcpp::CallbackGroup::SharedPtr group_ptr,
-    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+    const rclcpp::CallbackGroup::SharedPtr & group_ptr,
+    const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
     bool notify = true) override;
 
   RCLCPP_PUBLIC
@@ -85,13 +86,13 @@ public:
   RCLCPP_PUBLIC
   void
   remove_callback_group(
-    rclcpp::CallbackGroup::SharedPtr group_ptr,
+    const rclcpp::CallbackGroup::SharedPtr & group_ptr,
     bool notify = true) override;
 
   RCLCPP_PUBLIC
   void
   add_node(
-    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+    const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
     bool notify = true) override;
 
   /// Convenience function which takes Node and forwards NodeBaseInterface.
@@ -100,12 +101,12 @@ public:
    */
   RCLCPP_PUBLIC
   void
-  add_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify = true) override;
+  add_node(const std::shared_ptr<rclcpp::Node> & node_ptr, bool notify = true) override;
 
   RCLCPP_PUBLIC
   void
   remove_node(
-    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+    const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
     bool notify = true) override;
 
   /// Convenience function which takes Node and forwards NodeBaseInterface.
@@ -114,7 +115,7 @@ public:
    */
   RCLCPP_PUBLIC
   void
-  remove_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify = true) override;
+  remove_node(const std::shared_ptr<rclcpp::Node> & node_ptr, bool notify = true) override;
 
   // add a callback group to the executor, not bound to any node
   void add_callback_group_only(const rclcpp::CallbackGroup::SharedPtr & group_ptr);
@@ -139,6 +140,7 @@ public:
   void
   spin(const std::function<void(const std::exception &)> & exception_handler);
 
+  RCLCPP_PUBLIC
   void
   spin_once(std::chrono::nanoseconds timeout = std::chrono::nanoseconds(-1)) override;
 
@@ -149,6 +151,7 @@ public:
   /**
    * @return true if work was available and executed
    */
+  RCLCPP_PUBLIC
   bool collect_and_execute_ready_events(
     std::chrono::nanoseconds max_duration,
     bool recollect_if_no_work_available);
@@ -203,8 +206,13 @@ public:
     if (spinning.exchange(true)) {
       throw std::runtime_error("spin_until_future_complete() called while already spinning");
     }
-    RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
-    while (rclcpp::ok(this->context_) && spinning.load()) {
+    RCPPUTILS_SCOPE_EXIT(
+      this->spinning.store(false);
+      this->cancel_requested_.store(false); );
+    if (cancel_requested_.load()) {
+      return FutureReturnCode::INTERRUPTED;
+    }
+    while (rclcpp::ok(this->context_) && !cancel_requested_.load()) {
       // Do one item of work.
       spin_once_internal(timeout_left);
 
@@ -241,6 +249,7 @@ protected:
   void
   run(size_t this_thread_number, bool block_initially);
 
+  RCLCPP_PUBLIC
   void
   run(
     size_t this_thread_number,
@@ -312,7 +321,12 @@ private:
 
   std::atomic_bool needs_callback_group_resync = false;
 
-  /// Spinning state, used to prevent multi threaded calls to spin and to cancel blocking spins.
+  /// Spinning state, used to prevent multi threaded calls to spin.
+  /**
+   * This flag is only set and cleared by the spin functions themselves, so it
+   * stays true until a spin actually returns, even after cancel() was called.
+   * Cancellation is signaled via cancel_requested_ (inherited from Executor).
+   */
   std::atomic_bool spinning;
 
   /// set if we are shutting down.

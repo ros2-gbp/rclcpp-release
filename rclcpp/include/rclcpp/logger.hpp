@@ -15,7 +15,6 @@
 #ifndef RCLCPP__LOGGER_HPP_
 #define RCLCPP__LOGGER_HPP_
 
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <utility>
@@ -24,7 +23,6 @@
 
 #include "rcl/node.h"
 #include "rcutils/logging.h"
-#include "rcpputils/filesystem_helper.hpp"
 
 /**
  * \def RCLCPP_LOGGING_ENABLED
@@ -77,46 +75,6 @@ get_logger(const std::string & name);
 RCLCPP_PUBLIC
 Logger
 get_node_logger(const rcl_node_t * node);
-
-// TODO(ahcorde): Remove deprecated class on the next release (in Rolling after Kilted).
-#if !defined(_WIN32)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#else  // !defined(_WIN32)
-# pragma warning(push)
-# pragma warning(disable: 4996)
-#endif
-/// Get the current logging directory.
-/**
- * For more details of how the logging directory is determined,
- * see rcl_logging_get_logging_directory().
- *
- * \returns the logging directory being used.
- * \throws rclcpp::exceptions::RCLError if an unexpected error occurs.
- */
-[[deprecated("use rclcpp::get_log_directory instead of rclcpp::get_logging_directory")]]
-RCLCPP_PUBLIC
-rcpputils::fs::path
-get_logging_directory();
-
-// remove warning suppression
-#if !defined(_WIN32)
-# pragma GCC diagnostic pop
-#else  // !defined(_WIN32)
-# pragma warning(pop)
-#endif
-
-/// Get the current logging directory.
-/**
- * For more details of how the logging directory is determined,
- * see rcl_logging_get_logging_directory().
- *
- * \returns the logging directory being used.
- * \throws rclcpp::exceptions::RCLError if an unexpected error occurs.
- */
-RCLCPP_PUBLIC
-std::filesystem::path
-get_log_directory();
 
 class Logger
 {

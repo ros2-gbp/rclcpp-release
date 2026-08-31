@@ -68,8 +68,6 @@
  *
  * - Executors (responsible for execution of callbacks through a blocking spin):
  *   - rclcpp::spin()
- *   - rclcpp::spin_some()
- *   - rclcpp::spin_until_future_complete()
  *   - rclcpp::executors::SingleThreadedExecutor
  *   - rclcpp::executors::SingleThreadedExecutor::add_node()
  *   - rclcpp::executors::SingleThreadedExecutor::spin()
@@ -117,6 +115,9 @@
  *   - rclcpp::Logger
  *   - rclcpp/logger.hpp
  *   - rclcpp::Node::get_logger()
+ * - Logging directory:
+ *   - rclcpp::get_log_directory()
+ *   - rclcpp/log_directory.hpp
  *
  * Finally, there are many internal API's and utilities:
  *
@@ -181,6 +182,7 @@
 #include "rclcpp/parameter_event_handler.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/parameter_service.hpp"
+#include "rclcpp/parameter_descriptor_wrapper.hpp"
 #include "rclcpp/rate.hpp"
 #include "rclcpp/time.hpp"
 #include "rclcpp/utilities.hpp"

@@ -17,14 +17,16 @@
 #include <rmw/error_handling.h>
 #include <rmw/rmw.h>
 
-#include <iostream>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "rcl/event.h"
 #include "rcutils/logging_macros.h"
 #include "rmw/impl/cpp/demangle.hpp"
 
@@ -129,6 +131,12 @@ const char *
 PublisherBase::get_topic_name() const
 {
   return rcl_publisher_get_topic_name(publisher_handle_.get());
+}
+
+bool
+PublisherBase::event_type_is_supported(const rcl_publisher_event_type_t event_type)
+{
+  return rcl_publisher_event_type_is_supported(event_type);
 }
 
 void
@@ -344,7 +352,7 @@ PublisherBase::operator==(const rmw_gid_t * gid) const
 void
 PublisherBase::setup_intra_process(
   uint64_t intra_process_publisher_id,
-  IntraProcessManagerSharedPtr ipm)
+  const IntraProcessManagerSharedPtr & ipm)
 {
   intra_process_publisher_id_ = intra_process_publisher_id;
   weak_ipm_ = ipm;
@@ -396,10 +404,10 @@ std::vector<rclcpp::NetworkFlowEndpoint> PublisherBase::get_network_flow_endpoin
   }
 
   std::vector<rclcpp::NetworkFlowEndpoint> network_flow_endpoint_vector;
+  network_flow_endpoint_vector.reserve(network_flow_endpoint_array.size);
   for (size_t i = 0; i < network_flow_endpoint_array.size; ++i) {
-    network_flow_endpoint_vector.push_back(
-      rclcpp::NetworkFlowEndpoint(
-        network_flow_endpoint_array.network_flow_endpoint[i]));
+    network_flow_endpoint_vector.emplace_back(
+        network_flow_endpoint_array.network_flow_endpoint[i]);
   }
 
   ret = rcl_network_flow_endpoint_array_fini(&network_flow_endpoint_array);
@@ -427,4 +435,42 @@ size_t PublisherBase::lowest_available_ipm_capacity() const
   }
 
   return ipm->lowest_available_capacity(intra_process_publisher_id_);
+}
+
+void
+PublisherBase::set_on_new_qos_event_callback(
+  const std::function<void(size_t)> & callback,
+  rcl_publisher_event_type_t event_type)
+{
+  if (event_handlers_.count(event_type) == 0) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Calling set_on_new_qos_event_callback for non registered publisher event_type");
+    return;
+  }
+
+  if (!callback) {
+    throw std::invalid_argument(
+            "The callback passed to set_on_new_qos_event_callback "
+            "is not callable.");
+  }
+
+  // The on_ready_callback signature has an extra `int` argument used to disambiguate between
+  // possible different entities within a generic waitable.
+  // We hide that detail to users of this method.
+  std::function<void(size_t, int)> new_callback = [callback] (size_t nr, int) {callback(nr);};
+  event_handlers_[event_type]->set_on_ready_callback(new_callback);
+}
+
+void
+PublisherBase::clear_on_new_qos_event_callback(rcl_publisher_event_type_t event_type)
+{
+  if (event_handlers_.count(event_type) == 0) {
+    RCLCPP_WARN(
+      rclcpp::get_logger("rclcpp"),
+      "Calling clear_on_new_qos_event_callback for non registered event_type");
+    return;
+  }
+
+  event_handlers_[event_type]->clear_on_ready_callback();
 }

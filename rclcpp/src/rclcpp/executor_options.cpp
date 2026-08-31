@@ -14,6 +14,8 @@
 
 #include "rclcpp/executor_options.hpp"
 
+#include "rclcpp/contexts/default_context.hpp"
+
 using rclcpp::ExecutorOptions;
 
 namespace rclcpp
@@ -24,8 +26,7 @@ class ExecutorOptionsImplementation {};
 }  // namespace rclcpp
 
 ExecutorOptions::ExecutorOptions()
-: memory_strategy(rclcpp::memory_strategies::create_default_strategy()),
-  context(rclcpp::contexts::get_global_default_context()),
+: context(rclcpp::contexts::get_global_default_context()),
   max_conditions(0),
   impl_(nullptr)
 {}
@@ -44,7 +45,6 @@ ExecutorOptions & ExecutorOptions::operator=(const ExecutorOptions & other)
     return *this;
   }
 
-  this->memory_strategy = other.memory_strategy;
   this->context = other.context;
   this->max_conditions = other.max_conditions;
   if (nullptr != other.impl_) {

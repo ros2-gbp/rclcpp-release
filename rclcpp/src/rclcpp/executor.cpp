@@ -18,6 +18,7 @@
 #include <iterator>
 #include <memory>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -52,6 +53,8 @@ class rclcpp::ExecutorImplementation {};
 
 Executor::Executor(const std::shared_ptr<rclcpp::Context> & context)
 : spinning(false),
+  cancel_requested_(false),
+  context_(context),
   entities_need_rebuild_(true),
   collector_(nullptr),
   wait_set_({}, {}, {}, {}, {}, {}, context)
@@ -60,6 +63,7 @@ Executor::Executor(const std::shared_ptr<rclcpp::Context> & context)
 
 Executor::Executor(const rclcpp::ExecutorOptions & options)
 : spinning(false),
+  cancel_requested_(false),
   interrupt_guard_condition_(std::make_shared<rclcpp::GuardCondition>(options.context)),
   shutdown_guard_condition_(std::make_shared<rclcpp::GuardCondition>(options.context)),
   context_(options.context),
@@ -97,29 +101,29 @@ Executor::~Executor()
   notify_waitable_->remove_guard_condition(shutdown_guard_condition_);
   current_collection_.timers.update(
     {}, {},
-    [this](auto timer) {wait_set_.remove_timer(timer);});
+    [this](auto timer) {wait_set_.remove_timer(std::move(timer));});
 
   current_collection_.subscriptions.update(
     {}, {},
     [this](auto subscription) {
-      wait_set_.remove_subscription(subscription, kDefaultSubscriptionMask);
+      wait_set_.remove_subscription(std::move(subscription), kDefaultSubscriptionMask);
     });
 
   current_collection_.clients.update(
     {}, {},
-    [this](auto client) {wait_set_.remove_client(client);});
+    [this](auto client) {wait_set_.remove_client(std::move(client));});
 
   current_collection_.services.update(
     {}, {},
-    [this](auto service) {wait_set_.remove_service(service);});
+    [this](auto service) {wait_set_.remove_service(std::move(service));});
 
   current_collection_.guard_conditions.update(
     {}, {},
-    [this](auto guard_condition) {wait_set_.remove_guard_condition(guard_condition);});
+    [this](auto guard_condition) {wait_set_.remove_guard_condition(std::move(guard_condition));});
 
   current_collection_.waitables.update(
     {}, {},
-    [this](auto waitable) {wait_set_.remove_waitable(waitable);});
+    [this](auto waitable) {wait_set_.remove_waitable(std::move(waitable));});
 
   // Remove shutdown callback handle registered to Context
   if (!context_->remove_on_shutdown_callback(shutdown_callback_handle_)) {
@@ -168,8 +172,8 @@ Executor::get_automatically_added_callback_groups_from_nodes()
 
 void
 Executor::add_callback_group(
-  rclcpp::CallbackGroup::SharedPtr group_ptr,
-  [[maybe_unused]] rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+  const rclcpp::CallbackGroup::SharedPtr & group_ptr,
+  [[maybe_unused]] const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
   bool notify)
 {
   this->collector_.add_callback_group(group_ptr);
@@ -184,8 +188,15 @@ Executor::add_callback_group(
 }
 
 void
-Executor::add_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr, bool notify)
+Executor::add_node(
+  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
+  bool notify)
 {
+  if (node_ptr->get_context() != context_) {
+    throw std::runtime_error(
+      "add_node() called with a node with a different context from this executor");
+  }
+
   this->collector_.add_node(node_ptr);
 
   try {
@@ -199,7 +210,7 @@ Executor::add_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_pt
 
 void
 Executor::remove_callback_group(
-  rclcpp::CallbackGroup::SharedPtr group_ptr,
+  const rclcpp::CallbackGroup::SharedPtr & group_ptr,
   bool notify)
 {
   this->collector_.remove_callback_group(group_ptr);
@@ -214,13 +225,15 @@ Executor::remove_callback_group(
 }
 
 void
-Executor::add_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify)
+Executor::add_node(const std::shared_ptr<rclcpp::Node> & node_ptr, bool notify)
 {
   this->add_node(node_ptr->get_node_base_interface(), notify);
 }
 
 void
-Executor::remove_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr, bool notify)
+Executor::remove_node(
+  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
+  bool notify)
 {
   this->collector_.remove_node(node_ptr);
 
@@ -234,14 +247,14 @@ Executor::remove_node(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node
 }
 
 void
-Executor::remove_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify)
+Executor::remove_node(const std::shared_ptr<rclcpp::Node> & node_ptr, bool notify)
 {
   this->remove_node(node_ptr->get_node_base_interface(), notify);
 }
 
 void
 Executor::spin_node_once_nanoseconds(
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node,
+  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node,
   std::chrono::nanoseconds timeout)
 {
   this->add_node(node, false);
@@ -276,8 +289,14 @@ Executor::spin_until_future_complete_impl(
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin_until_future_complete() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(wait_result_.reset();this->spinning.store(false););
-  while (rclcpp::ok(this->context_) && spinning.load()) {
+  RCPPUTILS_SCOPE_EXIT(
+    wait_result_.reset();
+    this->spinning.store(false);
+    this->cancel_requested_.store(false););
+  if (cancel_requested_.load()) {
+    return FutureReturnCode::INTERRUPTED;
+  }
+  while (rclcpp::ok(this->context_) && !cancel_requested_.load()) {
     // Do one item of work.
     spin_once_impl(timeout_left);
 
@@ -304,7 +323,7 @@ Executor::spin_until_future_complete_impl(
 }
 
 void
-Executor::spin_node_some(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node)
+Executor::spin_node_some(const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node)
 {
   this->add_node(node, false);
   spin_some();
@@ -312,7 +331,7 @@ Executor::spin_node_some(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr n
 }
 
 void
-Executor::spin_node_some(std::shared_ptr<rclcpp::Node> node)
+Executor::spin_node_some(const std::shared_ptr<rclcpp::Node> & node)
 {
   this->spin_node_some(node->get_node_base_interface());
 }
@@ -324,7 +343,7 @@ void Executor::spin_some(std::chrono::nanoseconds max_duration)
 
 void
 Executor::spin_node_all(
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node,
+  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node,
   std::chrono::nanoseconds max_duration)
 {
   this->add_node(node, false);
@@ -333,7 +352,9 @@ Executor::spin_node_all(
 }
 
 void
-Executor::spin_node_all(std::shared_ptr<rclcpp::Node> node, std::chrono::nanoseconds max_duration)
+Executor::spin_node_all(
+  const std::shared_ptr<rclcpp::Node> & node,
+  std::chrono::nanoseconds max_duration)
 {
   this->spin_node_all(node->get_node_base_interface(), max_duration);
 }
@@ -365,7 +386,13 @@ Executor::spin_some_impl(std::chrono::nanoseconds max_duration, bool exhaustive)
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin_some() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(wait_result_.reset();this->spinning.store(false););
+  RCPPUTILS_SCOPE_EXIT(
+    wait_result_.reset();
+    this->spinning.store(false);
+    this->cancel_requested_.store(false););
+  if (cancel_requested_.load()) {
+    return;
+  }
 
   // clear the wait result and wait for work without blocking to collect the work
   // for the first time
@@ -383,7 +410,7 @@ Executor::spin_some_impl(std::chrono::nanoseconds max_duration, bool exhaustive)
 
   // The logic of this while loop is as follows:
   //
-  // - while not shutdown, and spinning (not canceled), and not max duration reached...
+  // - while not shutdown, and not canceled, and not max duration reached...
   // - try to get an executable item to execute, and execute it if available
   // - otherwise, reset the wait result, and ...
   // - if there was no work available just after waiting, break the loop unconditionally
@@ -397,7 +424,7 @@ Executor::spin_some_impl(std::chrono::nanoseconds max_duration, bool exhaustive)
   // See also:
   //   https://github.com/ros2/rclcpp/issues/2508
   //   https://github.com/ros2/rclcpp/pull/2517
-  while (rclcpp::ok(context_) && spinning.load() && max_duration_not_elapsed()) {
+  while (rclcpp::ok(context_) && !cancel_requested_.load() && max_duration_not_elapsed()) {
     AnyExecutable any_exec;
     if (get_next_ready_executable(any_exec)) {
       execute_any_executable(any_exec);
@@ -447,14 +474,24 @@ Executor::spin_once(std::chrono::nanoseconds timeout)
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin_once() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(wait_result_.reset();this->spinning.store(false););
+  RCPPUTILS_SCOPE_EXIT(
+    wait_result_.reset();
+    this->spinning.store(false);
+    this->cancel_requested_.store(false););
+  if (cancel_requested_.load()) {
+    return;
+  }
   spin_once_impl(timeout);
 }
 
 void
 Executor::cancel()
 {
-  spinning.store(false);
+  // Only request the cancellation; the spinning flag is owned by the spin
+  // functions and is cleared when they actually return.  This keeps
+  // is_spinning() true until the executor has really stopped, and a cancel
+  // issued before a spin is "held" until the next spin consumes it.
+  cancel_requested_.store(true);
   try {
     interrupt_guard_condition_->trigger();
   } catch (const rclcpp::exceptions::RCLError & ex) {
@@ -466,7 +503,7 @@ Executor::cancel()
 void
 Executor::execute_any_executable(AnyExecutable & any_exec)
 {
-  if (!spinning.load()) {
+  if (cancel_requested_.load()) {
     return;
   }
 
@@ -539,7 +576,7 @@ take_and_do_error_handling(
 }
 
 void
-Executor::execute_subscription(rclcpp::SubscriptionBase::SharedPtr subscription)
+Executor::execute_subscription(const rclcpp::SubscriptionBase::SharedPtr & subscription)
 {
   using rclcpp::dynamic_typesupport::DynamicMessage;
 
@@ -567,6 +604,7 @@ Executor::execute_subscription(rclcpp::SubscriptionBase::SharedPtr subscription)
                 &loaned_msg,
                 &message_info.get_rmw_message_info(),
                 nullptr);
+              TRACETOOLS_TRACEPOINT(rclcpp_take, static_cast<const void *>(loaned_msg));
               if (RCL_RET_SUBSCRIPTION_TAKE_FAILED == ret) {
                 return false;
               } else if (RCL_RET_OK != ret) {
@@ -633,7 +671,7 @@ Executor::execute_subscription(rclcpp::SubscriptionBase::SharedPtr subscription)
         throw std::runtime_error("Unimplemented");
       }
 
-    default:
+    case rclcpp::DeliveredMessageKind::INVALID:
       {
         throw std::runtime_error("Delivered message kind is not supported");
       }
@@ -641,13 +679,15 @@ Executor::execute_subscription(rclcpp::SubscriptionBase::SharedPtr subscription)
 }
 
 void
-Executor::execute_timer(rclcpp::TimerBase::SharedPtr timer, const std::shared_ptr<void> & data_ptr)
+Executor::execute_timer(
+  const rclcpp::TimerBase::SharedPtr & timer,
+  const std::shared_ptr<void> & data_ptr)
 {
   timer->execute_callback(data_ptr);
 }
 
 void
-Executor::execute_service(rclcpp::ServiceBase::SharedPtr service)
+Executor::execute_service(const rclcpp::ServiceBase::SharedPtr & service)
 {
   auto request_header = service->create_request_header();
   std::shared_ptr<void> request = service->create_request();
@@ -659,7 +699,7 @@ Executor::execute_service(rclcpp::ServiceBase::SharedPtr service)
 }
 
 void
-Executor::execute_client(rclcpp::ClientBase::SharedPtr client)
+Executor::execute_client(const rclcpp::ClientBase::SharedPtr & client)
 {
   auto request_header = client->create_request_header();
   std::shared_ptr<void> response = client->create_response();
@@ -701,37 +741,37 @@ Executor::collect_entities()
   // from the wait set as necessary.
   current_collection_.timers.update(
     collection.timers,
-    [this](auto timer) {wait_set_.add_timer(timer);},
-    [this](auto timer) {wait_set_.remove_timer(timer);});
+    [this](auto timer) {wait_set_.add_timer(std::move(timer));},
+    [this](auto timer) {wait_set_.remove_timer(std::move(timer));});
 
   current_collection_.subscriptions.update(
     collection.subscriptions,
     [this](auto subscription) {
-      wait_set_.add_subscription(subscription, kDefaultSubscriptionMask);
+      wait_set_.add_subscription(std::move(subscription), kDefaultSubscriptionMask);
     },
     [this](auto subscription) {
-      wait_set_.remove_subscription(subscription, kDefaultSubscriptionMask);
+      wait_set_.remove_subscription(std::move(subscription), kDefaultSubscriptionMask);
     });
 
   current_collection_.clients.update(
     collection.clients,
-    [this](auto client) {wait_set_.add_client(client);},
-    [this](auto client) {wait_set_.remove_client(client);});
+    [this](auto client) {wait_set_.add_client(std::move(client));},
+    [this](auto client) {wait_set_.remove_client(std::move(client));});
 
   current_collection_.services.update(
     collection.services,
-    [this](auto service) {wait_set_.add_service(service);},
-    [this](auto service) {wait_set_.remove_service(service);});
+    [this](auto service) {wait_set_.add_service(std::move(service));},
+    [this](auto service) {wait_set_.remove_service(std::move(service));});
 
   current_collection_.guard_conditions.update(
     collection.guard_conditions,
-    [this](auto guard_condition) {wait_set_.add_guard_condition(guard_condition);},
-    [this](auto guard_condition) {wait_set_.remove_guard_condition(guard_condition);});
+    [this](auto guard_condition) {wait_set_.add_guard_condition(std::move(guard_condition));},
+    [this](auto guard_condition) {wait_set_.remove_guard_condition(std::move(guard_condition));});
 
   current_collection_.waitables.update(
     collection.waitables,
-    [this](auto waitable) {wait_set_.add_waitable(waitable);},
-    [this](auto waitable) {wait_set_.remove_waitable(waitable);});
+    [this](auto waitable) {wait_set_.add_waitable(std::move(waitable));},
+    [this](auto waitable) {wait_set_.remove_waitable(std::move(waitable));});
 
   // In the case that an entity already has an expired weak pointer
   // before being removed from the waitset, additionally prune the waitset.
@@ -904,7 +944,7 @@ Executor::get_next_executable(AnyExecutable & any_executable, std::chrono::nanos
   if (!success) {
     // Wait for subscriptions or timers to work on
     wait_for_work(timeout);
-    if (!spinning.load()) {
+    if (cancel_requested_.load()) {
       return false;
     }
     // Try again

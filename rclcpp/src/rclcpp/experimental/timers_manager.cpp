@@ -21,6 +21,7 @@
 #include <memory>
 #include <stdexcept>
 
+#include "rclcpp/utilities.hpp"
 #include "rcpputils/scope_exit.hpp"
 
 using rclcpp::experimental::TimersManager;
@@ -29,7 +30,7 @@ TimersManager::TimersManager(
   std::shared_ptr<rclcpp::Context> context,
   std::function<void(const rclcpp::TimerBase *, const std::shared_ptr<void> &)> on_ready_callback)
 : on_ready_callback_(on_ready_callback),
-  context_(context)
+  context_(std::move(context))
 {
 }
 
@@ -42,7 +43,7 @@ TimersManager::~TimersManager()
   this->stop();
 }
 
-void TimersManager::add_timer(rclcpp::TimerBase::SharedPtr timer)
+void TimersManager::add_timer(const rclcpp::TimerBase::SharedPtr & timer)
 {
   if (!timer) {
     throw std::invalid_argument("TimersManager::add_timer() trying to add nullptr timer");
@@ -311,7 +312,7 @@ void TimersManager::clear()
   timers_cv_.notify_one();
 }
 
-void TimersManager::remove_timer(TimerPtr timer)
+void TimersManager::remove_timer(const TimerPtr & timer)
 {
   bool removed = false;
   {

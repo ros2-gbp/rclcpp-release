@@ -15,6 +15,7 @@
 #ifndef RCLCPP__CONTEXT_HPP_
 #define RCLCPP__CONTEXT_HPP_
 
+#include <atomic>
 #include <condition_variable>
 #include <functional>
 #include <memory>
@@ -23,7 +24,6 @@
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 #include <stdexcept>
@@ -37,6 +37,10 @@
 
 namespace rclcpp
 {
+namespace graph_listener
+{
+class GraphListener;
+}  // namespace graph_listener
 
 /// Thrown when init is called on an already initialized context.
 class ContextAlreadyInitialized : public std::runtime_error
@@ -225,7 +229,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   OnShutdownCallback
-  on_shutdown(OnShutdownCallback callback);
+  on_shutdown(const OnShutdownCallback & callback);
 
   /// Add a on_shutdown callback to be called when shutdown is called for this context.
   /**
@@ -249,7 +253,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   OnShutdownCallbackHandle
-  add_on_shutdown_callback(OnShutdownCallback callback);
+  add_on_shutdown_callback(const OnShutdownCallback & callback);
 
   /// Remove an registered on_shutdown callbacks.
   /**
@@ -276,7 +280,7 @@ public:
   RCLCPP_PUBLIC
   virtual
   PreShutdownCallbackHandle
-  add_pre_shutdown_callback(PreShutdownCallback callback);
+  add_pre_shutdown_callback(const PreShutdownCallback & callback);
 
   /// Remove an registered pre_shutdown callback.
   /**
@@ -308,6 +312,10 @@ public:
   RCLCPP_PUBLIC
   std::shared_ptr<rcl_context_t>
   get_rcl_context();
+
+  RCLCPP_PUBLIC
+  std::shared_ptr<rclcpp::graph_listener::GraphListener>
+  get_graph_listener();
 
   /// Sleep for a given period of time or until shutdown() is called.
   /**
@@ -371,6 +379,7 @@ private:
   std::shared_ptr<rcl_context_t> rcl_context_;
   rclcpp::InitOptions init_options_;
   std::string shutdown_reason_;
+  std::atomic<bool> is_shutting_down_{false};
 
   // Keep shared ownership of the global logging mutex.
   std::shared_ptr<std::recursive_mutex> logging_mutex_;
@@ -381,15 +390,18 @@ private:
   std::recursive_mutex sub_contexts_mutex_;
 
   std::vector<std::shared_ptr<OnShutdownCallback>> on_shutdown_callbacks_;
-  mutable std::mutex on_shutdown_callbacks_mutex_;
+  mutable std::recursive_mutex on_shutdown_callbacks_mutex_;
 
   std::vector<std::shared_ptr<PreShutdownCallback>> pre_shutdown_callbacks_;
-  mutable std::mutex pre_shutdown_callbacks_mutex_;
+  mutable std::recursive_mutex pre_shutdown_callbacks_mutex_;
 
   /// Condition variable for timed sleep (see sleep_for).
   std::condition_variable interrupt_condition_variable_;
   /// Mutex for protecting the global condition variable.
   std::mutex interrupt_mutex_;
+
+  /// Graph Listener which waits on graph changes for the node and is shared across nodes.
+  std::shared_ptr<rclcpp::graph_listener::GraphListener> graph_listener_;
 
   /// Keep shared ownership of global vector of weak contexts
   std::shared_ptr<WeakContextsWrapper> weak_contexts_;
@@ -406,7 +418,7 @@ private:
   RCLCPP_LOCAL
   ShutdownCallbackHandle
   add_shutdown_callback(
-    ShutdownCallback callback);
+    const ShutdownCallback & callback);
 
   template<ShutdownType shutdown_type>
   RCLCPP_LOCAL

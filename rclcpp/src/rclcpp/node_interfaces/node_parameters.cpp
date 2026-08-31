@@ -180,6 +180,9 @@ RCLCPP_LOCAL
 bool
 __are_doubles_equal(double x, double y, double ulp = 100.0)
 {
+  if (!std::isfinite(x) || !std::isfinite(y)) {
+    return x == y;
+  }
   return std::abs(x - y) <= std::numeric_limits<double>::epsilon() * std::abs(x + y) * ulp;
 }
 
@@ -192,58 +195,158 @@ format_range_reason(const std::string & name, const char * range_type)
   return ss.str();
 }
 
+static
+std::string
+format_range_type_reason(
+  const std::string & name,
+  const char * range_type,
+  rclcpp::ParameterType parameter_type)
+{
+  std::ostringstream ss;
+  ss << "Parameter {" << name << "} of type {" << rclcpp::to_string(parameter_type) <<
+    "} cannot use " << range_type << " range constraints.";
+  return ss.str();
+}
+
+RCLCPP_LOCAL
+rcl_interfaces::msg::SetParametersResult
+__check_parameter_type_supports_range(
+  const rcl_interfaces::msg::ParameterDescriptor & descriptor,
+  rclcpp::ParameterType parameter_type)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+
+  if (parameter_type == rclcpp::PARAMETER_NOT_SET) {
+    return result;
+  }
+
+  if (
+    !descriptor.integer_range.empty() &&
+    parameter_type != rclcpp::PARAMETER_INTEGER &&
+    parameter_type != rclcpp::PARAMETER_INTEGER_ARRAY)
+  {
+    result.successful = false;
+    result.reason = format_range_type_reason(descriptor.name, "integer", parameter_type);
+    return result;
+  }
+
+  if (
+    !descriptor.floating_point_range.empty() &&
+    parameter_type != rclcpp::PARAMETER_DOUBLE &&
+    parameter_type != rclcpp::PARAMETER_DOUBLE_ARRAY)
+  {
+    result.successful = false;
+    result.reason = format_range_type_reason(descriptor.name, "floating point", parameter_type);
+  }
+
+  return result;
+}
+
+RCLCPP_LOCAL
+rcl_interfaces::msg::SetParametersResult
+__check_integer_range(
+  const rcl_interfaces::msg::ParameterDescriptor & descriptor,
+  const int64_t value)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  auto integer_range = descriptor.integer_range.at(0);
+  if (value == integer_range.from_value || value == integer_range.to_value) {
+    return result;
+  }
+  if ((value < integer_range.from_value) || (value > integer_range.to_value)) {
+    result.successful = false;
+    result.reason = format_range_reason(descriptor.name, "integer");
+    return result;
+  }
+  if (integer_range.step == 0) {
+    return result;
+  }
+  if (((value - integer_range.from_value) % integer_range.step) == 0) {
+    return result;
+  }
+  result.successful = false;
+  result.reason = format_range_reason(descriptor.name, "integer");
+  return result;
+}
+
+RCLCPP_LOCAL
+rcl_interfaces::msg::SetParametersResult
+__check_double_range(
+  const rcl_interfaces::msg::ParameterDescriptor & descriptor,
+  const double value)
+{
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  auto fp_range = descriptor.floating_point_range.at(0);
+  if (__are_doubles_equal(value, fp_range.from_value) || __are_doubles_equal(value,
+    fp_range.to_value))
+  {
+    return result;
+  }
+  if (!(value >= fp_range.from_value && value <= fp_range.to_value)) {
+    result.successful = false;
+    result.reason = format_range_reason(descriptor.name, "floating point");
+    return result;
+  }
+  if (fp_range.step == 0.0) {
+    return result;
+  }
+  double rounded_div = std::round((value - fp_range.from_value) / fp_range.step);
+  if (__are_doubles_equal(value, fp_range.from_value + rounded_div * fp_range.step)) {
+    return result;
+  }
+  result.successful = false;
+  result.reason = format_range_reason(descriptor.name, "floating point");
+  return result;
+}
+
 RCLCPP_LOCAL
 rcl_interfaces::msg::SetParametersResult
 __check_parameter_value_in_range(
   const rcl_interfaces::msg::ParameterDescriptor & descriptor,
   const rclcpp::ParameterValue & value)
 {
-  rcl_interfaces::msg::SetParametersResult result;
-  result.successful = true;
+  auto result = __check_parameter_type_supports_range(descriptor, value.get_type());
+  if (!result.successful) {
+    return result;
+  }
+
   if (!descriptor.integer_range.empty() && value.get_type() == rclcpp::PARAMETER_INTEGER) {
-    int64_t v = value.get<int64_t>();
-    auto integer_range = descriptor.integer_range.at(0);
-    if (v == integer_range.from_value || v == integer_range.to_value) {
-      return result;
+    result = __check_integer_range(descriptor, value.get<int64_t>());
+    return result;
+  }
+
+  if (!descriptor.integer_range.empty() && value.get_type() == rclcpp::PARAMETER_INTEGER_ARRAY) {
+    std::vector<int64_t> val_array = value.get<std::vector<int64_t>>();
+    for (const int64_t & val : val_array) {
+      result = __check_integer_range(descriptor, val);
+      if (!result.successful) {
+        return result;
+      }
     }
-    if ((v < integer_range.from_value) || (v > integer_range.to_value)) {
-      result.successful = false;
-      result.reason = format_range_reason(descriptor.name, "integer");
-      return result;
-    }
-    if (integer_range.step == 0) {
-      return result;
-    }
-    if (((v - integer_range.from_value) % integer_range.step) == 0) {
-      return result;
-    }
-    result.successful = false;
-    result.reason = format_range_reason(descriptor.name, "integer");
     return result;
   }
 
   if (!descriptor.floating_point_range.empty() && value.get_type() == rclcpp::PARAMETER_DOUBLE) {
-    double v = value.get<double>();
-    auto fp_range = descriptor.floating_point_range.at(0);
-    if (__are_doubles_equal(v, fp_range.from_value) || __are_doubles_equal(v, fp_range.to_value)) {
-      return result;
-    }
-    if ((v < fp_range.from_value) || (v > fp_range.to_value)) {
-      result.successful = false;
-      result.reason = format_range_reason(descriptor.name, "floating point");
-      return result;
-    }
-    if (fp_range.step == 0.0) {
-      return result;
-    }
-    double rounded_div = std::round((v - fp_range.from_value) / fp_range.step);
-    if (__are_doubles_equal(v, fp_range.from_value + rounded_div * fp_range.step)) {
-      return result;
-    }
-    result.successful = false;
-    result.reason = format_range_reason(descriptor.name, "floating point");
+    result = __check_double_range(descriptor, value.get<double>());
     return result;
   }
+
+  if (!descriptor.floating_point_range.empty() &&
+    value.get_type() == rclcpp::PARAMETER_DOUBLE_ARRAY)
+  {
+    std::vector<double> val_array = value.get<std::vector<double>>();
+    for (const double & val : val_array) {
+      result = __check_double_range(descriptor, val);
+      if (!result.successful) {
+        return result;
+      }
+    }
+    return result;
+  }
+
   return result;
 }
 
@@ -456,6 +559,17 @@ __declare_parameter_common(
 
   // If there is no initial value, then skip initialization
   if (initial_value->get_type() == rclcpp::PARAMETER_NOT_SET) {
+    rcl_interfaces::msg::SetParametersResult result;
+    if (!parameter_descriptor.dynamic_typing) {
+      auto descriptor = parameter_descriptor;
+      descriptor.name = name;
+      result = __check_parameter_type_supports_range(
+        descriptor, static_cast<rclcpp::ParameterType>(descriptor.type));
+      if (!result.successful) {
+        return result;
+      }
+    }
+
     // Add declared parameters to storage (without a value)
     parameter_infos[name].descriptor.name = name;
     if (parameter_descriptor.dynamic_typing) {
@@ -464,7 +578,6 @@ __declare_parameter_common(
       parameter_infos[name].descriptor.type = parameter_descriptor.type;
     }
     parameters_out[name] = parameter_infos.at(name);
-    rcl_interfaces::msg::SetParametersResult result;
     result.successful = true;
     return result;
   }

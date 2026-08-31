@@ -18,7 +18,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <functional>
-#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -34,7 +33,6 @@
 
 #include "rcl_interfaces/msg/list_parameters_result.hpp"
 #include "rcl_interfaces/msg/parameter_descriptor.hpp"
-#include "rcl_interfaces/msg/parameter_event.hpp"
 #include "rcl_interfaces/msg/set_parameters_result.hpp"
 
 #include "rclcpp/callback_group.hpp"
@@ -68,7 +66,6 @@
 #include "rclcpp/service.hpp"
 #include "rclcpp/subscription.hpp"
 #include "rclcpp/subscription_options.hpp"
-#include "rclcpp/subscription_traits.hpp"
 #include "rclcpp/time.hpp"
 #include "rclcpp/timer.hpp"
 #include "rclcpp/visibility_control.hpp"
@@ -242,7 +239,7 @@ public:
   create_wall_timer(
     std::chrono::duration<DurationRepT, DurationT> period,
     CallbackT callback,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr,
+    const rclcpp::CallbackGroup::SharedPtr & group = nullptr,
     bool autostart = true);
 
   /// Create a timer that uses the node clock to drive the callback.
@@ -256,7 +253,7 @@ public:
   create_timer(
     std::chrono::duration<DurationRepT, DurationT> period,
     CallbackT callback,
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+    const rclcpp::CallbackGroup::SharedPtr & group = nullptr);
 
   /// Create and return a Client.
   /**
@@ -270,7 +267,7 @@ public:
   create_client(
     const std::string & service_name,
     const rclcpp::QoS & qos = rclcpp::ServicesQoS(),
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+    const rclcpp::CallbackGroup::SharedPtr & group = nullptr);
 
   /// Create and return a Service.
   /**
@@ -286,7 +283,7 @@ public:
     const std::string & service_name,
     CallbackT && callback,
     const rclcpp::QoS & qos = rclcpp::ServicesQoS(),
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+    const rclcpp::CallbackGroup::SharedPtr & group = nullptr);
 
   /// Create and return a GenericClient.
   /**
@@ -302,7 +299,7 @@ public:
     const std::string & service_name,
     const std::string & service_type,
     const rclcpp::QoS & qos = rclcpp::ServicesQoS(),
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+    const rclcpp::CallbackGroup::SharedPtr & group = nullptr);
 
   /// Create and return a GenericService.
   /**
@@ -320,7 +317,7 @@ public:
     const std::string & service_type,
     CallbackT && callback,
     const rclcpp::QoS & qos = rclcpp::ServicesQoS(),
-    rclcpp::CallbackGroup::SharedPtr group = nullptr);
+    const rclcpp::CallbackGroup::SharedPtr & group = nullptr);
 
   /// Create and return a GenericPublisher.
   /**
@@ -1388,6 +1385,66 @@ public:
   std::vector<rclcpp::TopicEndpointInfo>
   get_subscriptions_info_by_topic(const std::string & topic_name, bool no_mangle = false) const;
 
+  /// Return the service endpoint information about clients on a given service.
+  /**
+   * The returned parameter is a list of service endpoint information, where each item will contain
+   * the node name, node namespace, service type, endpoint type, endpoint count,
+   * service endpoint's GIDs, and its QoS profiles.
+   *
+   * When the `no_mangle` parameter is `true`, the provided `service_name` should be a valid service
+   * name for the middleware (useful when combining ROS with native middleware apps).
+   * When the `no_mangle` parameter is `false`, the provided `service_name` should follow
+   * ROS service name conventions. In DDS-based RMWs, services are implemented as topics with mangled
+   * names (e.g., `rq/my_serviceRequest` and `rp/my_serviceReply`), so `no_mangle = true` is not
+   * supported and will result in an error. Use `get_publishers_info_by_topic` or
+   * `get_subscriptions_info_by_topic` for unmangled topic queries in such cases. Other RMWs
+   * (e.g., Zenoh) may support `no_mangle = true` if they natively handle services without topic-based
+   *
+   * 'service_name` may be a relative, private, or fully qualified service name.
+   * A relative or private service will be expanded using this node's namespace and name.
+   * The queried `service_name` is not remapped.
+   *
+   * \param[in] service_name the actual service name used; it will not be automatically remapped.
+   * \param[in] no_mangle if `true`, `service_name` needs to be a valid middleware service name,
+   *   otherwise it should be a valid ROS service name. Defaults to `false`.
+   * \return a list of SeviceEndpointInfo representing all the clients on this service.
+   * \throws InvalidServiceNameError if the given service_name is invalid.
+   * \throws std::runtime_error if internal error happens.
+   */
+  RCLCPP_PUBLIC
+  std::vector<rclcpp::ServiceEndpointInfo>
+  get_clients_info_by_service(const std::string & service_name, bool no_mangle = false) const;
+
+  /// Return the service endpoint information about servers on a given service.
+  /**
+   * The returned parameter is a list of service endpoint information, where each item will contain
+   * the node name, node namespace, service type, endpoint type, endpoint count,
+   * service endpoint's GIDs, and its QoS profiles.
+   *
+   * When the `no_mangle` parameter is `true`, the provided `service_name` should be a valid service
+   * name for the middleware (useful when combining ROS with native middleware apps).
+   * When the `no_mangle` parameter is `false`, the provided `service_name` should follow
+   * ROS service name conventions. In DDS-based RMWs, services are implemented as topics with mangled
+   * names (e.g., `rq/my_serviceRequest` and `rp/my_serviceReply`), so `no_mangle = true` is not
+   * supported and will result in an error. Use `rcl_get_publishers_info_by_topic` or
+   * `rcl_get_subscriptions_info_by_topic` for unmangled topic queries in such cases. Other RMWs
+   * (e.g., Zenoh) may support `no_mangle = true` if they natively handle services without topic-based
+   *
+   * 'service_name` may be a relative, private, or fully qualified service name.
+   * A relative or private service will be expanded using this node's namespace and name.
+   * The queried `service_name` is not remapped.
+   *
+   * \param[in] service_name the actual service name used; it will not be automatically remapped.
+   * \param[in] no_mangle if `true`, `service_name` needs to be a valid middleware service name,
+   *   otherwise it should be a valid ROS service name. Defaults to `false`.
+   * \return a list of SeviceEndpointInfo representing all the servers on this service.
+   * \throws InvalidServiceNameError if the given service_name is invalid.
+   * \throws std::runtime_error if internal error happens.
+   */
+  RCLCPP_PUBLIC
+  std::vector<rclcpp::ServiceEndpointInfo>
+  get_servers_info_by_service(const std::string & service_name, bool no_mangle = false) const;
+
   /// Return a graph event, which will be set anytime a graph change occurs.
   /* The graph Event object is a loan which must be returned.
    * The Event object is scoped and therefore to return the loan just let it go
@@ -1411,7 +1468,7 @@ public:
   RCLCPP_PUBLIC
   void
   wait_for_graph_change(
-    rclcpp::Event::SharedPtr event,
+    const rclcpp::Event::SharedPtr & event,
     std::chrono::nanoseconds timeout);
 
   /// Get a clock as a non-const shared pointer which is managed by the node.

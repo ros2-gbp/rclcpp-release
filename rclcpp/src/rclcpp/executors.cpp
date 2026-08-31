@@ -13,10 +13,11 @@
 // limitations under the License.
 
 #include "rclcpp/executors.hpp"
+#include "rcpputils/compile_warnings.hpp"
 
 void
 rclcpp::spin_all(
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
+  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
   std::chrono::nanoseconds max_duration)
 {
   rclcpp::ExecutorOptions options;
@@ -26,13 +27,7 @@ rclcpp::spin_all(
 }
 
 void
-rclcpp::spin_all(rclcpp::Node::SharedPtr node_ptr, std::chrono::nanoseconds max_duration)
-{
-  rclcpp::spin_all(node_ptr->get_node_base_interface(), max_duration);
-}
-
-void
-rclcpp::spin_some(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr)
+rclcpp::spin_some(const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr)
 {
   rclcpp::ExecutorOptions options;
   options.context = node_ptr->get_context();
@@ -41,13 +36,7 @@ rclcpp::spin_some(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr
 }
 
 void
-rclcpp::spin_some(rclcpp::Node::SharedPtr node_ptr)
-{
-  rclcpp::spin_some(node_ptr->get_node_base_interface());
-}
-
-void
-rclcpp::spin(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr)
+rclcpp::spin(const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr)
 {
   rclcpp::ExecutorOptions options;
   options.context = node_ptr->get_context();
@@ -58,7 +47,23 @@ rclcpp::spin(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr)
 }
 
 void
-rclcpp::spin(rclcpp::Node::SharedPtr node_ptr)
+rclcpp::spin(const rclcpp::Node::SharedPtr & node_ptr)
 {
   rclcpp::spin(node_ptr->get_node_base_interface());
+}
+
+void
+rclcpp::spin_all(const rclcpp::Node::SharedPtr & node_ptr, std::chrono::nanoseconds max_duration)
+{
+  RCPPUTILS_DEPRECATION_WARNING_OFF_START
+  rclcpp::spin_all(node_ptr->get_node_base_interface(), max_duration);
+  RCPPUTILS_DEPRECATION_WARNING_OFF_STOP
+}
+
+void
+rclcpp::spin_some(const rclcpp::Node::SharedPtr & node_ptr)
+{
+  RCPPUTILS_DEPRECATION_WARNING_OFF_START
+  rclcpp::spin_some(node_ptr->get_node_base_interface());
+  RCPPUTILS_DEPRECATION_WARNING_OFF_STOP
 }

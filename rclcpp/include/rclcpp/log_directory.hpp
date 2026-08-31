@@ -1,4 +1,4 @@
-// Copyright 2015 Open Source Robotics Foundation, Inc.
+// Copyright 2017 Open Source Robotics Foundation, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,26 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RCLCPP__MEMORY_STRATEGIES_HPP_
-#define RCLCPP__MEMORY_STRATEGIES_HPP_
+#ifndef RCLCPP__LOG_DIRECTORY_HPP_
+#define RCLCPP__LOG_DIRECTORY_HPP_
 
-#include "rclcpp/memory_strategy.hpp"
+#include <filesystem>
+
 #include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
 {
-namespace memory_strategies
-{
 
-/// Create a MemoryStrategy sharedPtr
+/// Get the current logging directory.
 /**
- * \return a MemoryStrategy sharedPtr
+ * For more details of how the logging directory is determined,
+ * see rcl_logging_get_logging_directory().
+ *
+ * \returns the logging directory being used.
+ * \throws rclcpp::exceptions::RCLError if an unexpected error occurs.
  */
 RCLCPP_PUBLIC
-memory_strategy::MemoryStrategy::SharedPtr
-create_default_strategy();
+std::filesystem::path
+get_log_directory();
 
-}  // namespace memory_strategies
 }  // namespace rclcpp
 
-#endif  // RCLCPP__MEMORY_STRATEGIES_HPP_
+#endif  // RCLCPP__LOG_DIRECTORY_HPP_

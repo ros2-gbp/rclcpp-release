@@ -23,6 +23,7 @@
 #include "rcl/node_options.h"
 #include "rclcpp/context.hpp"
 #include "rclcpp/contexts/default_context.hpp"
+#include "rclcpp/logger.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/publisher_options.hpp"
 #include "rclcpp/qos.hpp"
@@ -52,6 +53,7 @@ public:
    *   - clock_qos = rclcpp::ClockQoS()
    *   - use_clock_thread = true
    *   - enable_logger_service = false
+   *   - log_level = rclcpp::Logger::Level::Unset
    *   - rosout_qos = rclcpp::RosoutQoS()
    *   - parameter_event_qos = rclcpp::ParameterEventQoS
    *     - with history setting and depth from rmw_qos_profile_parameter_events
@@ -100,7 +102,7 @@ public:
   /// Set the context, return this for parameter idiom.
   RCLCPP_PUBLIC
   NodeOptions &
-  context(rclcpp::Context::SharedPtr context);
+  context(const rclcpp::Context::SharedPtr & context);
 
   /// Return a reference to the list of arguments for the node.
   RCLCPP_PUBLIC
@@ -259,6 +261,22 @@ public:
   RCLCPP_PUBLIC
   NodeOptions &
   enable_logger_service(bool enable_log_service);
+
+  /// Return the log_level option.
+  RCLCPP_PUBLIC
+  rclcpp::Logger::Level
+  log_level() const;
+
+  /// Set the log_level option, return this for logger idiom.
+  /**
+   * This allows to set the initial log level for this node, makes it different
+   * from global context.
+   *
+   * \param[in] log_level A rclcpp::Logger::Level value.
+   */
+  RCLCPP_PUBLIC
+  NodeOptions &
+  log_level(rclcpp::Logger::Level log_level);
 
   /// Return the start_parameter_event_publisher flag.
   RCLCPP_PUBLIC
@@ -450,6 +468,8 @@ private:
   bool use_clock_thread_ {true};
 
   bool enable_logger_service_ {false};
+
+  rclcpp::Logger::Level log_level_ {rclcpp::Logger::Level::Unset};
 
   rclcpp::QoS parameter_event_qos_ = rclcpp::ParameterEventsQoS(
     rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_parameter_events)
