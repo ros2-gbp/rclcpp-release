@@ -51,18 +51,13 @@ public:
     return test_waitable_result;
   }
 
-  std::shared_ptr<void> take_data() override {return nullptr;}
-  void execute(const std::shared_ptr<void> &) override {}
-
-  void set_on_ready_callback(std::function<void(size_t, int)>) override {}
-  void clear_on_ready_callback() override {}
-
-  std::shared_ptr<void> take_data_by_entity_id(size_t) override {return nullptr;}
-
-  std::vector<std::shared_ptr<rclcpp::TimerBase>> get_timers() const override
+  std::shared_ptr<void>
+  take_data() override
   {
-    return {};
+    return nullptr;
   }
+
+  void execute(const std::shared_ptr<void> &) override {}
 };
 
 struct RclWaitSetSizes
@@ -540,8 +535,8 @@ TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_bad_arguments) {
     });
   allocator_memory_strategy()->collect_entities(weak_groups_to_nodes);
   EXPECT_FALSE(allocator_memory_strategy()->add_handles_to_wait_set(nullptr));
-  // The error message is collected and already reset.
-  EXPECT_FALSE(rcl_error_is_set());
+  EXPECT_TRUE(rcl_error_is_set());
+  rcl_reset_error();
 }
 
 TEST_F(TestAllocatorMemoryStrategy, add_handles_to_wait_set_subscription) {

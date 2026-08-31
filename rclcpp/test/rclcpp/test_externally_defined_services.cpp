@@ -34,11 +34,6 @@ protected:
   {
     rclcpp::init(0, nullptr);
   }
-
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
-  }
 };
 
 void

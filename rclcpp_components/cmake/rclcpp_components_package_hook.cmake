@@ -29,3 +29,4 @@ foreach(resource_index ${_rclcpp_components_package_resource_indices})
   ament_index_register_resource(
     ${resource_index} CONTENT "${_rclcpp_components_nodes}")
 endforeach()
+
