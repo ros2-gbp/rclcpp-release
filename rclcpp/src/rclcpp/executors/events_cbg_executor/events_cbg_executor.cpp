@@ -279,9 +279,9 @@ void EventsCBGExecutor::sync_callback_groups()
         }
       }
 
-      CallbackGroupData new_entry{.callback_group = cbg,
-        .registered_entities = std::make_unique<cbg_executor::RegisteredEntityCache>(*scheduler,
-        *timer_manager, cbg), .origin = origin};
+      CallbackGroupData new_entry{cbg,
+        std::make_unique<cbg_executor::RegisteredEntityCache>(*scheduler,
+        *timer_manager, cbg), origin};
       new_entry.registered_entities->regenerate_events();
       next_group_data.push_back(std::move(new_entry) );
     };
@@ -532,8 +532,8 @@ void EventsCBGExecutor::spin(
 
 void
 EventsCBGExecutor::add_callback_group(
-  const rclcpp::CallbackGroup::SharedPtr & group_ptr,
-  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & /*node_ptr*/,
+  rclcpp::CallbackGroup::SharedPtr group_ptr,
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr /*node_ptr*/,
   bool notify)
 {
   std::atomic_bool & has_executor = group_ptr->get_associated_with_executor_atomic();
@@ -661,7 +661,7 @@ const
 
 void
 EventsCBGExecutor::remove_callback_group(
-  const rclcpp::CallbackGroup::SharedPtr & group_ptr,
+  rclcpp::CallbackGroup::SharedPtr group_ptr,
   bool notify)
 {
   if (!group_ptr->get_associated_with_executor_atomic().load()) {
@@ -714,7 +714,7 @@ EventsCBGExecutor::remove_callback_group(
 
 void
 EventsCBGExecutor::add_node(
-  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
   bool /*notify*/)
 {
   // If the node already has an executor
@@ -734,14 +734,14 @@ EventsCBGExecutor::add_node(
 }
 
 void
-EventsCBGExecutor::add_node(const std::shared_ptr<rclcpp::Node> & node_ptr, bool notify)
+EventsCBGExecutor::add_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify)
 {
   add_node(node_ptr->get_node_base_interface(), notify);
 }
 
 void
 EventsCBGExecutor::remove_node(
-  const rclcpp::node_interfaces::NodeBaseInterface::SharedPtr & node_ptr,
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_ptr,
   bool notify)
 {
   std::atomic_bool & has_executor = node_ptr->get_associated_with_executor_atomic();
@@ -789,7 +789,7 @@ EventsCBGExecutor::remove_node(
 }
 
 void
-EventsCBGExecutor::remove_node(const std::shared_ptr<rclcpp::Node> & node_ptr, bool notify)
+EventsCBGExecutor::remove_node(std::shared_ptr<rclcpp::Node> node_ptr, bool notify)
 {
   remove_node(node_ptr->get_node_base_interface(), notify);
 }

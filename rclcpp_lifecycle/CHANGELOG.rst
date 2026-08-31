@@ -2,72 +2,47 @@
 Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-32.0.3 (2026-08-31)
+
+29.5.11 (2026-08-31)
+--------------------
+
+29.5.10 (2026-07-28)
+--------------------
+
+29.5.9 (2026-07-02)
 -------------------
-* Add wait_for_message overload using node interfaces (backport `#3230 <https://github.com/ros2/rclcpp/issues/3230>`_) (`#3233 <https://github.com/ros2/rclcpp/issues/3233>`_)
+
+29.5.8 (2026-03-25)
+-------------------
+
+29.5.7 (2026-02-09)
+-------------------
+
+29.5.6 (2025-12-23)
+-------------------
+
+29.5.5 (2025-11-18)
+-------------------
+* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_) (`#2989 <https://github.com/ros2/rclcpp/issues/2989>`_)
+* Add get_parameter_or overload returning value or alternative (`#2973 <https://github.com/ros2/rclcpp/issues/2973>`_) (`#2976 <https://github.com/ros2/rclcpp/issues/2976>`_)
 * Contributors: mergify[bot]
 
-32.0.2 (2026-07-28)
+29.5.4 (2025-10-21)
 -------------------
 
-32.0.1 (2026-07-02)
+29.5.3 (2025-09-11)
+-------------------
+* Clearer warning message, the old one lacked information and was perhaps misleading (`#2927 <https://github.com/ros2/rclcpp/issues/2927>`_) (`#2931 <https://github.com/ros2/rclcpp/issues/2931>`_)
+* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_) (`#2915 <https://github.com/ros2/rclcpp/issues/2915>`_)
+* Contributors: mergify[bot]
+
+29.5.2 (2025-07-07)
 -------------------
 
-32.0.0 (2026-04-30)
+29.5.1 (2025-06-23)
 -------------------
-
-31.0.2 (2026-04-09)
--------------------
-
-31.0.1 (2026-03-24)
--------------------
-* Use new ROSIDL aggregate CMake target (`#3105 <https://github.com/ros2/rclcpp/issues/3105>`_)
-* Contributors: Emerson Knapp
-
-31.0.0 (2026-03-20)
--------------------
-
-30.1.5 (2026-02-09)
--------------------
-* Compatiblity with 'Populate Transitions' `ros2/rcl#1269 <https://github.com/ros2/rcl/issues/1269>`_ (`#2967 <https://github.com/ros2/rclcpp/issues/2967>`_)
-* Contributors: Jasper van Brakel
-
-30.1.4 (2025-12-23)
--------------------
-
-30.1.3 (2025-11-18)
--------------------
-* add : get clients, servers info (`#2569 <https://github.com/ros2/rclcpp/issues/2569>`_)
-* Fix REP url locations (`#2987 <https://github.com/ros2/rclcpp/issues/2987>`_)
-* Add get_parameter_or overload returning value or alternative (`#2973 <https://github.com/ros2/rclcpp/issues/2973>`_)
-* Contributors: Minju, Lee, Tim Clephas, Zheng Qu
-
-30.1.2 (2025-10-21)
--------------------
-
-30.1.1 (2025-09-11)
--------------------
-* deprecate rclcpp::spin_some and rclcpp::spin_all (`#2848 <https://github.com/ros2/rclcpp/issues/2848>`_)
-* Clearer warning message, the old one lacked information and was perhaps misleading (`#2927 <https://github.com/ros2/rclcpp/issues/2927>`_)
-* Contributors: Alberto Soragna, Peter Mitrano (AR)
-
-30.1.0 (2025-07-29)
--------------------
-* fix cmake deprecation (`#2914 <https://github.com/ros2/rclcpp/issues/2914>`_)
-  cmake version < then 3.10 is deprecated
-* Contributors: mosfet80
-
-30.0.0 (2025-07-01)
--------------------
-
-29.6.1 (2025-06-23)
--------------------
-* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_)
-* introduce rcl_lifecycle_get_transition_label_by_id(). (`#2827 <https://github.com/ros2/rclcpp/issues/2827>`_)
-* Contributors: Alejandro Hernández Cordero, Tomoya Fujita
-
-29.6.0 (2025-04-25)
--------------------
+* Added missing chrono includes (`#2854 <https://github.com/ros2/rclcpp/issues/2854>`_) (`#2855 <https://github.com/ros2/rclcpp/issues/2855>`_)
+* Contributors: mergify[bot]
 
 29.5.0 (2025-04-18)
 -------------------

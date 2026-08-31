@@ -267,9 +267,9 @@ private:
       std::lock_guard l(ready_callback_groups_mutex);
       if(needs_sync) {
         needs_sync = false;
-        return ExecutableEntityWithInfo{.entity =
-            ExecutableEntity{.execute_function = sync_function, .callback_handle = nullptr},
-          .moreEntitiesReady = false};
+        return ExecutableEntityWithInfo{
+          ExecutableEntity{sync_function, nullptr},
+          false};
       }
     }
 
@@ -283,9 +283,9 @@ private:
       std::lock_guard l(ready_callback_groups_mutex);
       if(needs_sync) {
         needs_sync = false;
-        return ExecutableEntityWithInfo{.entity =
-            ExecutableEntity{.execute_function = sync_function, .callback_handle = nullptr},
-          .moreEntitiesReady = false};
+        return ExecutableEntityWithInfo{
+          ExecutableEntity{sync_function, nullptr},
+          false};
       }
     }
 

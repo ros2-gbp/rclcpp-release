@@ -212,23 +212,6 @@ public:
   std::shared_ptr<rclcpp::SerializedMessage>
   create_serialized_message() = 0;
 
-  /// Disable callbacks from being called
-  /**
-   * This function temporary removes the on_new_message_callback to prevent it from being called.
-   */
-  RCLCPP_PUBLIC
-  virtual
-  void disable_callbacks();
-
-  /// Enable the callbacks to be called
-  /**
-    * This function sets back the on_new_message_callback if it was previously removed in
-    * disable_callbacks().
-    */
-  RCLCPP_PUBLIC
-  virtual
-  void enable_callbacks();
-
   /// Check if we need to handle the message, and execute the callback if we do.
   /**
    * \param[in] message Shared pointer to the message to handle.
@@ -372,7 +355,7 @@ public:
    * \param[in] callback functor to be called when a new message is received
    */
   void
-  set_on_new_message_callback(const std::function<void(size_t)> & callback)
+  set_on_new_message_callback(std::function<void(size_t)> callback)
   {
     if (!callback) {
       throw std::invalid_argument(
@@ -400,7 +383,7 @@ public:
         }
       };
 
-    std::lock_guard<std::recursive_mutex> lock(on_new_message_callback_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(callback_mutex_);
 
     // Set it temporarily to the new callback, while we replace the old one.
     // This two-step setting, prevents a gap where the old std::function has
@@ -423,7 +406,7 @@ public:
   void
   clear_on_new_message_callback()
   {
-    std::lock_guard<std::recursive_mutex> lock(on_new_message_callback_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(callback_mutex_);
 
     if (on_new_message_callback_) {
       set_on_new_message_callback(nullptr, nullptr);
@@ -450,7 +433,7 @@ public:
    * \param[in] callback functor to be called when a new message is received
    */
   void
-  set_on_new_intra_process_message_callback(const std::function<void(size_t)> & callback)
+  set_on_new_intra_process_message_callback(std::function<void(size_t)> callback)
   {
     if (!use_intra_process_) {
       RCLCPP_WARN(
@@ -468,7 +451,7 @@ public:
     // The on_ready_callback signature has an extra `int` argument used to disambiguate between
     // possible different entities within a generic waitable.
     // We hide that detail to users of this method.
-    std::function<void(size_t, int)> new_callback = [callback] (size_t nr, int) {callback(nr);};
+    std::function<void(size_t, int)> new_callback = std::bind(callback, std::placeholders::_1);
     subscription_intra_process_->set_on_ready_callback(new_callback);
   }
 
@@ -514,7 +497,7 @@ public:
    */
   void
   set_on_new_qos_event_callback(
-    const std::function<void(size_t)> & callback,
+    std::function<void(size_t)> callback,
     rcl_subscription_event_type_t event_type)
   {
     if (event_handlers_.count(event_type) == 0) {
@@ -533,7 +516,7 @@ public:
     // The on_ready_callback signature has an extra `int` argument used to disambiguate between
     // possible different entities within a generic waitable.
     // We hide that detail to users of this method.
-    std::function<void(size_t, int)> new_callback = [callback] (size_t nr, int) {callback(nr);};
+    std::function<void(size_t, int)> new_callback = std::bind(callback, std::placeholders::_1);
     event_handlers_[event_type]->set_on_ready_callback(new_callback);
   }
 
@@ -550,15 +533,6 @@ public:
 
     event_handlers_[event_type]->clear_on_ready_callback();
   }
-
-  /// Check if content filtered topic feature of the subscription instance is supported.
-  /**
-   * \return boolean flag indicating if the content filtered topic of this subscription is
-   *   supported.
-   */
-  RCLCPP_PUBLIC
-  bool
-  is_cft_supported() const;
 
   /// Check if content filtered topic feature of the subscription instance is enabled.
   /**
@@ -672,7 +646,7 @@ protected:
 
   std::shared_ptr<rcl_node_t> node_handle_;
 
-  std::recursive_mutex on_new_message_callback_mutex_;
+  std::recursive_mutex callback_mutex_;
   // It is important to declare on_new_message_callback_ before
   // subscription_handle_, so on destruction the subscription is
   // destroyed first. Otherwise, the rmw subscription callback

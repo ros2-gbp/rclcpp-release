@@ -323,7 +323,7 @@ SubscriptionBase::setup_intra_process(
   IntraProcessManagerWeakPtr weak_ipm)
 {
   intra_process_subscription_id_ = intra_process_subscription_id;
-  weak_ipm_ = std::move(weak_ipm);
+  weak_ipm_ = weak_ipm;
   use_intra_process_ = true;
 }
 
@@ -449,11 +449,11 @@ SubscriptionBase::get_network_flow_endpoints() const
   }
 
   std::vector<rclcpp::NetworkFlowEndpoint> network_flow_endpoint_vector;
-  network_flow_endpoint_vector.reserve(network_flow_endpoint_array.size);
   for (size_t i = 0; i < network_flow_endpoint_array.size; ++i) {
-    network_flow_endpoint_vector.emplace_back(
+    network_flow_endpoint_vector.push_back(
+      rclcpp::NetworkFlowEndpoint(
         network_flow_endpoint_array.
-      network_flow_endpoint[i]);
+        network_flow_endpoint[i]));
   }
 
   ret = rcl_network_flow_endpoint_array_fini(&network_flow_endpoint_array);
@@ -478,12 +478,6 @@ SubscriptionBase::set_on_new_message_callback(
     using rclcpp::exceptions::throw_from_rcl_error;
     throw_from_rcl_error(ret, "failed to set the on new message callback for subscription");
   }
-}
-
-bool
-SubscriptionBase::is_cft_supported() const
-{
-  return rcl_subscription_is_cft_supported(subscription_handle_.get());
 }
 
 bool
@@ -582,27 +576,4 @@ SubscriptionBase::take_dynamic_message(
 {
   throw std::runtime_error("Unimplemented");
   return false;
-}
-
-void
-SubscriptionBase::disable_callbacks()
-{
-  // Temporary remove the on_new_message_callback_ to prevent it from being called
-  std::lock_guard<std::recursive_mutex> lock(on_new_message_callback_mutex_);
-  if (on_new_message_callback_) {
-    set_on_new_message_callback(nullptr, nullptr);
-  }
-}
-
-void
-SubscriptionBase::enable_callbacks()
-{
-  // Set callback again if it was previously removed in disable_callbacks()
-  std::lock_guard<std::recursive_mutex> lock(on_new_message_callback_mutex_);
-  if (on_new_message_callback_) {
-    set_on_new_message_callback(
-      rclcpp::detail::cpp_callback_trampoline<
-        decltype(on_new_message_callback_), const void *, size_t>,
-      static_cast<const void *>(&on_new_message_callback_));
-  }
 }
