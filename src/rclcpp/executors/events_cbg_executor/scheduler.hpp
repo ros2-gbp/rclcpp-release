@@ -13,6 +13,7 @@
 // limitations under the License.
 #pragma once
 
+#include <algorithm>
 #include <deque>
 #include <functional>
 #include <list>
@@ -59,8 +60,10 @@ public:
 
   struct CallbackGroupHandle
   {
-    explicit CallbackGroupHandle(CBGScheduler & scheduler)
-    : scheduler(scheduler) {}
+    explicit CallbackGroupHandle(CBGScheduler & scheduler, CallbackGroupType type)
+    : scheduler(scheduler), type(type)
+    {
+    }
 
     CallbackGroupHandle(const CallbackGroupHandle &) = delete;
     CallbackGroupHandle(CallbackGroupHandle &&) = delete;
@@ -101,7 +104,12 @@ public:
       scheduler.callback_group_ready(this, false);
     }
 
+    CallbackGroupType get_type() {return type;}
+
     bool is_ready();
+
+    // true if this cbg is inside the scheduler's queue
+    bool in_queue = false;
 
 protected:
     CBGScheduler & scheduler;
@@ -153,7 +161,9 @@ protected:
      */
     void mark_as_executing()
     {
-      not_ready = true;
+      if (type != CallbackGroupType::Reentrant) {
+        not_ready = true;
+      }
     }
 
     std::mutex ready_mutex;
@@ -164,6 +174,9 @@ private:
 
     // true, if nothing is beeing executed, and there are no pending events
     bool idle = true;
+
+    // type of the underlying callback group
+    CallbackGroupType type;
   };
 
   struct ExecutableEntity
@@ -202,8 +215,12 @@ private:
   void remove_callback_group(const CallbackGroupHandle *callback_handle)
   {
     std::lock_guard lk(ready_callback_groups_mutex);
-    ready_callback_groups.erase(std::find(ready_callback_groups.begin(),
-          ready_callback_groups.end(), callback_handle));
+
+    auto cbg_it = std::find(ready_callback_groups.begin(),
+          ready_callback_groups.end(), callback_handle);
+    if (cbg_it != ready_callback_groups.end()) {
+      ready_callback_groups.erase(cbg_it);
+    }
 
     callback_groups.remove_if([&callback_handle] (const auto & e) {
         return e.get() == callback_handle;
@@ -220,7 +237,11 @@ private:
   {
     {
       std::lock_guard l(ready_callback_groups_mutex);
-      ready_callback_groups.push_back(handle);
+
+      if (!handle->in_queue) {
+        ready_callback_groups.push_back(handle);
+        handle->in_queue = true;
+      }
     }
 
     if(callback_group_was_idle) {
