@@ -2,7 +2,7 @@
 
 The ROS client library in C++.
 
-The link to the latest rclcpp API documentation, which includes a complete list of its main components and features, can be found on the [rclcpp package info page](https://docs.ros.org/en/rolling/p/rclcpp).
+Visit the [rclcpp API documentation](http://docs.ros2.org/latest/api/rclcpp/) for a complete list of its main components and features.
 
 ## Quality Declaration
 

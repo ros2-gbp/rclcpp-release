@@ -74,31 +74,51 @@ public:
     const std::string & topic_name,
     const std::string & topic_type,
     const rclcpp::QoS & qos,
-    AnySubscriptionCallback<rclcpp::SerializedMessage, AllocatorT> callback,
+    // TODO(nnmm): Add variant for callback with message info. See issue #1604.
+    std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
     const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
   : SubscriptionBase(
       node_base,
-      *rclcpp::get_message_typesupport_handle(topic_type, "rosidl_typesupport_cpp", *ts_lib),
+      *rclcpp::get_typesupport_handle(topic_type, "rosidl_typesupport_cpp", *ts_lib),
       topic_name,
-      options.to_rcl_subscription_options(qos),
-      options.event_callbacks,
-      options.use_default_callbacks,
-      DeliveredMessageKind::SERIALIZED_MESSAGE),
-    any_callback_(callback),
+      options.template to_rcl_subscription_options<rclcpp::SerializedMessage>(qos),
+      true),
+    callback_(callback),
     ts_lib_(ts_lib)
   {
-    TRACETOOLS_TRACEPOINT(
-      rclcpp_subscription_init,
-      static_cast<const void *>(get_subscription_handle().get()),
-      static_cast<const void *>(this));
-    TRACETOOLS_TRACEPOINT(
-      rclcpp_subscription_callback_added,
-      static_cast<const void *>(this),
-      static_cast<const void *>(&any_callback_));
-
-#ifndef TRACETOOLS_DISABLED
-    any_callback_.register_callback_for_tracing();
-#endif
+    // This is unfortunately duplicated with the code in subscription.hpp.
+    // TODO(nnmm): Deduplicate by moving this into SubscriptionBase.
+    if (options.event_callbacks.deadline_callback) {
+      this->add_event_handler(
+        options.event_callbacks.deadline_callback,
+        RCL_SUBSCRIPTION_REQUESTED_DEADLINE_MISSED);
+    }
+    if (options.event_callbacks.liveliness_callback) {
+      this->add_event_handler(
+        options.event_callbacks.liveliness_callback,
+        RCL_SUBSCRIPTION_LIVELINESS_CHANGED);
+    }
+    if (options.event_callbacks.incompatible_qos_callback) {
+      this->add_event_handler(
+        options.event_callbacks.incompatible_qos_callback,
+        RCL_SUBSCRIPTION_REQUESTED_INCOMPATIBLE_QOS);
+    } else if (options.use_default_callbacks) {
+      // Register default callback when not specified
+      try {
+        this->add_event_handler(
+          [this](QOSRequestedIncompatibleQoSInfo & info) {
+            this->default_incompatible_qos_callback(info);
+          },
+          RCL_SUBSCRIPTION_REQUESTED_INCOMPATIBLE_QOS);
+      } catch (UnsupportedEventTypeException & /*exc*/) {
+        // pass
+      }
+    }
+    if (options.event_callbacks.message_lost_callback) {
+      this->add_event_handler(
+        options.event_callbacks.message_lost_callback,
+        RCL_SUBSCRIPTION_MESSAGE_LOST);
+    }
   }
 
   RCLCPP_PUBLIC
@@ -135,34 +155,10 @@ public:
   RCLCPP_PUBLIC
   void return_serialized_message(std::shared_ptr<rclcpp::SerializedMessage> & message) override;
 
-
-  // DYNAMIC TYPE ==================================================================================
-  RCLCPP_PUBLIC
-  rclcpp::dynamic_typesupport::DynamicMessageType::SharedPtr get_shared_dynamic_message_type()
-  override;
-
-  RCLCPP_PUBLIC
-  rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr get_shared_dynamic_message() override;
-
-  RCLCPP_PUBLIC
-  rclcpp::dynamic_typesupport::DynamicSerializationSupport::SharedPtr
-  get_shared_dynamic_serialization_support() override;
-
-  RCLCPP_PUBLIC
-  rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr create_dynamic_message() override;
-
-  RCLCPP_PUBLIC
-  void return_dynamic_message(
-    rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message) override;
-
-  RCLCPP_PUBLIC
-  void handle_dynamic_message(
-    const rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message,
-    const rclcpp::MessageInfo & message_info) override;
-
 private:
   RCLCPP_DISABLE_COPY(GenericSubscription)
-  AnySubscriptionCallback<rclcpp::SerializedMessage, std::allocator<void>> any_callback_;
+
+  std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback_;
   // The type support library should stay loaded, so it is stored in the GenericSubscription
   std::shared_ptr<rcpputils::SharedLibrary> ts_lib_;
 };

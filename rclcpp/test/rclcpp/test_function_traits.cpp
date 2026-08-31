@@ -393,7 +393,6 @@ TEST(TestFunctionTraits, argument_types) {
 
   auto bind_one_bool = std::bind(
     &ObjectMember::callback_one_bool, &object_member, std::placeholders::_1);
-  (void)bind_one_bool;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -403,7 +402,6 @@ TEST(TestFunctionTraits, argument_types) {
 
   auto bind_one_bool_const = std::bind(
     &ObjectMember::callback_one_bool_const, &object_member, std::placeholders::_1);
-  (void)bind_one_bool_const;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -415,7 +413,6 @@ TEST(TestFunctionTraits, argument_types) {
   auto bind_two_bools = std::bind(
     &ObjectMember::callback_two_bools, &object_member, std::placeholders::_1,
     std::placeholders::_2);
-  (void)bind_two_bools;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -432,7 +429,6 @@ TEST(TestFunctionTraits, argument_types) {
   auto bind_one_bool_one_float = std::bind(
     &ObjectMember::callback_one_bool_one_float, &object_member, std::placeholders::_1,
     std::placeholders::_2);
-  (void)bind_one_bool_one_float;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -451,7 +447,6 @@ TEST(TestFunctionTraits, argument_types) {
     >::value, "Functor accepts a float as second argument");
 
   auto bind_one_int = std::bind(func_one_int, std::placeholders::_1);
-  (void)bind_one_int;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -460,7 +455,6 @@ TEST(TestFunctionTraits, argument_types) {
     >::value, "Functor accepts an int as first argument");
 
   auto bind_two_ints = std::bind(func_two_ints, std::placeholders::_1, std::placeholders::_2);
-  (void)bind_two_ints;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -476,7 +470,6 @@ TEST(TestFunctionTraits, argument_types) {
 
   auto bind_one_int_one_char = std::bind(
     func_one_int_one_char, std::placeholders::_1, std::placeholders::_2);
-  (void)bind_one_int_one_char;  // to quiet clang
 
   static_assert(
     std::is_same<
@@ -537,21 +530,18 @@ TEST(TestFunctionTraits, check_arguments) {
       (void)one;
       return 1;
     };
-  (void)lambda_one_int;  // to quiet clang
 
   auto lambda_two_ints = [](int one, int two) {
       (void)one;
       (void)two;
       return 2;
     };
-  (void)lambda_two_ints;  // to quiet clang
 
   auto lambda_one_int_one_char = [](int one, char two) {
       (void)one;
       (void)two;
       return 3;
     };
-  (void)lambda_one_int_one_char;  // to quiet clang
 
   static_assert(
     rclcpp::function_traits::check_arguments<decltype(lambda_one_int), int>::value,
@@ -582,7 +572,6 @@ TEST(TestFunctionTraits, check_arguments) {
 
   auto bind_one_bool = std::bind(
     &ObjectMember::callback_one_bool, &object_member, std::placeholders::_1);
-  (void)bind_one_bool;  // to quiet clang
 
   // Test std::bind functions
   static_assert(
@@ -591,7 +580,6 @@ TEST(TestFunctionTraits, check_arguments) {
 
   auto bind_one_bool_const = std::bind(
     &ObjectMember::callback_one_bool_const, &object_member, std::placeholders::_1);
-  (void)bind_one_bool_const;  // to quiet clang
 
   // Test std::bind functions
   static_assert(
@@ -757,7 +745,6 @@ TEST_F(TestMember, bind_member_functor) {
   auto bind_member_functor = std::bind(
     &TestMember::MemberFunctor, this, std::placeholders::_1,
     std::placeholders::_2, std::placeholders::_3);
-  (void)bind_member_functor;  // to quiet clang
 
   static_assert(
     rclcpp::function_traits::check_arguments<decltype(bind_member_functor), int, float,
