@@ -25,7 +25,6 @@
 // can be removed after the lyrical release
 RCPPUTILS_DEPRECATION_WARNING_OFF_START
 #include "rclcpp/strategies/allocator_memory_strategy.hpp"
-#include "rclcpp/utilities.hpp"
 #include "rcpputils/scope_exit.hpp"
 #include "test_msgs/msg/empty.hpp"
 #include "test_msgs/srv/empty.hpp"

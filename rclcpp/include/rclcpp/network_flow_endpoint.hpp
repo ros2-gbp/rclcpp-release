@@ -15,8 +15,9 @@
 #ifndef RCLCPP__NETWORK_FLOW_ENDPOINT_HPP_
 #define RCLCPP__NETWORK_FLOW_ENDPOINT_HPP_
 
+#include <cstdint>
 #include <string>
-#include <iosfwd>
+#include <iostream>
 
 #include "rcl/network_flow_endpoints.h"
 

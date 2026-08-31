@@ -29,6 +29,7 @@
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/graph_listener.hpp"
+#include "rcpputils/scope_exit.hpp"
 #include "rcutils/error_handling.h"
 #include "rcutils/macros.h"
 
@@ -201,8 +202,6 @@ Context::init(
     throw rclcpp::ContextAlreadyInitialized();
   }
   this->clean_up();
-  // allow shutdown() to be called again after re-initialization
-  is_shutting_down_.store(false);
   rcl_context_t * context = new rcl_context_t;
   if (!context) {
     throw std::runtime_error("failed to allocate memory for rcl context");
@@ -318,15 +317,26 @@ Context::shutdown_reason() const
   return shutdown_reason_;
 }
 
+/// Contexts that are currently being shutdown by this thread.
+/**
+ * The init_mutex_ is recursive, so it serializes concurrent calls to
+ * shutdown() from different threads, but it cannot prevent the same thread
+ * from reentering shutdown(), e.g. when a pre_shutdown callback calls
+ * shutdown() on the same context again, directly or via rclcpp::shutdown().
+ * Such a reentrant call would run the entire shutdown sequence again,
+ * calling the pre_shutdown callbacks recursively and rcl_shutdown() twice.
+ *
+ * This state is intentionally kept out of the Context class so that the
+ * class layout does not change, keeping this fix ABI compatible.
+ * A thread_local container is sufficient because concurrent calls from
+ * other threads are already serialized by init_mutex_; the second thread
+ * observes is_valid() == false after the first call completes.
+ */
+static thread_local std::unordered_set<const Context *> g_contexts_in_shutdown;
+
 bool
 Context::shutdown(const std::string & reason)
 {
-  // Prevent double-shutdown: the signal handler thread and the main thread
-  // may both call shutdown() during Ctrl-C.  Use an atomic flag to ensure
-  // only the first call proceeds; subsequent calls return immediately.
-  if (is_shutting_down_.exchange(true)) {
-    return false;
-  }
   // prevent races
   std::lock_guard<std::recursive_mutex> init_lock(init_mutex_);
   // ensure validity
@@ -334,6 +344,12 @@ Context::shutdown(const std::string & reason)
     // if it is not valid, then it cannot be shutdown
     return false;
   }
+  // prevent reentrant calls, e.g. from a pre_shutdown callback
+  if (!g_contexts_in_shutdown.insert(this).second) {
+    // shutdown of this context is already in progress on this thread
+    return false;
+  }
+  RCPPUTILS_SCOPE_EXIT(g_contexts_in_shutdown.erase(this); );
 
   // call each pre-shutdown callback
   {
@@ -433,7 +449,7 @@ Context::add_shutdown_callback(
   const ShutdownCallback & callback)
 {
   auto callback_shared_ptr =
-    std::make_shared<rclcpp::ShutdownCallbackHandle::ShutdownCallbackType>(callback);
+    std::make_shared<ShutdownCallbackHandle::ShutdownCallbackType>(callback);
 
   static_assert(
     shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
@@ -446,7 +462,7 @@ Context::add_shutdown_callback(
     on_shutdown_callbacks_.emplace_back(callback_shared_ptr);
   }
 
-  rclcpp::ShutdownCallbackHandle callback_handle;
+  ShutdownCallbackHandle callback_handle;
   callback_handle.callback = callback_shared_ptr;
   return callback_handle;
 }

@@ -21,7 +21,6 @@
 #include <memory>
 #include <stdexcept>
 
-#include "rclcpp/utilities.hpp"
 #include "rcpputils/scope_exit.hpp"
 
 using rclcpp::experimental::TimersManager;

@@ -559,39 +559,6 @@ TEST_F(TestNode, declare_parameter_with_no_initial_values) {
   }
 }
 
-TEST_F(TestNode, parameter_range_constraints_reject_incompatible_types) {
-  auto node = std::make_shared<rclcpp::Node>("test_parameter_range_types"_unq);
-
-  rcl_interfaces::msg::ParameterDescriptor integer_range_descriptor;
-  integer_range_descriptor.integer_range.resize(1);
-  integer_range_descriptor.integer_range[0].from_value = 0;
-  integer_range_descriptor.integer_range[0].to_value = 10;
-  EXPECT_THROW(
-    node->declare_parameter("bool_with_integer_range", false, integer_range_descriptor),
-    rclcpp::exceptions::InvalidParameterValueException);
-  EXPECT_THROW(
-    node->declare_parameter(
-      "uninitialized_bool_with_integer_range",
-      rclcpp::PARAMETER_BOOL,
-      integer_range_descriptor),
-    rclcpp::exceptions::InvalidParameterValueException);
-
-  rcl_interfaces::msg::ParameterDescriptor floating_point_range_descriptor;
-  floating_point_range_descriptor.floating_point_range.resize(1);
-  floating_point_range_descriptor.floating_point_range[0].from_value = 0.0;
-  floating_point_range_descriptor.floating_point_range[0].to_value = 10.0;
-  EXPECT_THROW(
-    node->declare_parameter(
-      "integer_with_floating_point_range", 1, floating_point_range_descriptor),
-    rclcpp::exceptions::InvalidParameterValueException);
-
-  integer_range_descriptor.dynamic_typing = true;
-  node->declare_parameter("dynamic_integer_range", 1, integer_range_descriptor);
-  auto result = node->set_parameter(rclcpp::Parameter("dynamic_integer_range", false));
-  EXPECT_FALSE(result.successful);
-  EXPECT_NE(result.reason.find("cannot use integer range constraints"), std::string::npos);
-}
-
 TEST_F(TestNode, declare_parameter_with_allow_undeclared_parameters) {
   // test cases without initial values
   auto node = std::make_shared<rclcpp::Node>(
@@ -1784,27 +1751,6 @@ TEST_F(TestNode, set_parameter_undeclared_parameters_not_allowed) {
     EXPECT_EQ(node->get_parameter(name).get_value<double>(), 50.0);
     EXPECT_FALSE(node->set_parameter(rclcpp::Parameter(name, nan)).successful);
     EXPECT_EQ(node->get_parameter(name).get_value<double>(), 50.0);
-  }
-  {
-    // setting a parameter to non-finite values with floating point range descriptor
-    auto name = "parameter"_unq;
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.floating_point_range.resize(1);
-    auto & floating_point_range = descriptor.floating_point_range.at(0);
-    constexpr double inf = std::numeric_limits<double>::infinity();
-    constexpr double nan = std::numeric_limits<double>::quiet_NaN();
-    floating_point_range.from_value = 0.0;
-    floating_point_range.to_value = inf;
-    floating_point_range.step = 0.0;
-    node->declare_parameter(name, 50.0, descriptor);
-    EXPECT_EQ(node->get_parameter(name).get_value<double>(), 50.0);
-
-    EXPECT_TRUE(node->set_parameter(rclcpp::Parameter(name, inf)).successful);
-    EXPECT_EQ(node->get_parameter(name).get_value<double>(), inf);
-    EXPECT_FALSE(node->set_parameter(rclcpp::Parameter(name, -inf)).successful);
-    EXPECT_EQ(node->get_parameter(name).get_value<double>(), inf);
-    EXPECT_FALSE(node->set_parameter(rclcpp::Parameter(name, nan)).successful);
-    EXPECT_EQ(node->get_parameter(name).get_value<double>(), inf);
   }
   {
     // setting an array parameter with floating point range descriptor

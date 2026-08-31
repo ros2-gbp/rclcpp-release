@@ -3,29 +3,16 @@ Changelog for package rclcpp_action
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-33.1.0 (2026-08-31)
--------------------
-* cleanup headers (`#3238 <https://github.com/ros2/rclcpp/issues/3238>`_)
-* introduce ActionEndpointInfo from action graph. (`#3209 <https://github.com/ros2/rclcpp/issues/3209>`_)
-* Contributors: Alejandro Hernández Cordero, Tomoya Fujita
-
-33.0.3 (2026-07-28)
--------------------
-* Deprecate the experimental EventsExecutor (`#3192 <https://github.com/ros2/rclcpp/issues/3192>`_)
-* use C++ 20 in default. (`#3187 <https://github.com/ros2/rclcpp/issues/3187>`_)
-* Bugfix/rclcpp action UUID rng race condition (`#3183 <https://github.com/ros2/rclcpp/issues/3183>`_)
-* Contributors: Ivo Ivanov, Skyler Medeiros, Tomoya Fujita
-
-33.0.2 (2026-07-02)
+32.0.3 (2026-08-31)
 -------------------
 
-33.0.1 (2026-05-22)
+32.0.2 (2026-07-28)
 -------------------
+* Bugfix/rclcpp action UUID rng race condition (`#3183 <https://github.com/ros2/rclcpp/issues/3183>`_) (`#3188 <https://github.com/ros2/rclcpp/issues/3188>`_)
+* Contributors: mergify[bot]
 
-33.0.0 (2026-05-07)
+32.0.1 (2026-07-02)
 -------------------
-* Cleanups headers and fix wording (`#3138 <https://github.com/ros2/rclcpp/issues/3138>`_)
-* Contributors: Alejandro Hernández Cordero
 
 32.0.0 (2026-04-30)
 -------------------

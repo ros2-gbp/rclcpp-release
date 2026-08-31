@@ -133,7 +133,7 @@ void EventsCBGExecutor::shutdown()
   bool was_spinning = spinning;
 
   // signal all processing threads to shut down
-  cancel_requested_ = true;
+  spinning = false;
 
   if(was_spinning) {
     scheduler->release_all_worker_threads();
@@ -342,7 +342,7 @@ EventsCBGExecutor::run(size_t this_thread_number, bool block_initially)
 {
   (void) this_thread_number;
 
-  while (rclcpp::ok(this->context_) && !cancel_requested_.load() ) {
+  while (rclcpp::ok(this->context_) && spinning.load() ) {
     if(block_initially) {
       block_initially = false;
       scheduler->block_worker_thread();
@@ -373,7 +373,7 @@ EventsCBGExecutor::run(
 {
   (void) this_thread_number;
 
-  while (rclcpp::ok(this->context_) && !cancel_requested_.load() ) {
+  while (rclcpp::ok(this->context_) && spinning.load() ) {
     sync_callback_groups();
 
     auto ready_entity = scheduler->get_next_ready_entity();
@@ -395,7 +395,7 @@ EventsCBGExecutor::run(
 
 void EventsCBGExecutor::spin_once_internal(std::chrono::nanoseconds timeout)
 {
-  if (!rclcpp::ok(this->context_) || cancel_requested_.load() ) {
+  if (!rclcpp::ok(this->context_) || !spinning.load() ) {
     return;
   }
 
@@ -430,12 +430,7 @@ EventsCBGExecutor::spin_once(std::chrono::nanoseconds timeout)
   if (spinning.exchange(true) ) {
     throw std::runtime_error("spin_once() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(
-    this->spinning.store(false);
-    this->cancel_requested_.store(false););
-  if (cancel_requested_.load()) {
-    return;
-  }
+  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
 
   spin_once_internal(timeout);
 }
@@ -463,12 +458,7 @@ bool EventsCBGExecutor::collect_and_execute_ready_events(
   if (spinning.exchange(true) ) {
     throw std::runtime_error("collect_and_execute_ready_events() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(
-    this->spinning.store(false);
-    this->cancel_requested_.store(false););
-  if (cancel_requested_.load()) {
-    return false;
-  }
+  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
 
   const auto start = std::chrono::steady_clock::now();
   const auto end_time = start + max_duration;
@@ -476,7 +466,7 @@ bool EventsCBGExecutor::collect_and_execute_ready_events(
 
   bool had_work = false;
 
-  while (rclcpp::ok(this->context_) && !cancel_requested_.load() && cur_time <= end_time) {
+  while (rclcpp::ok(this->context_) && spinning && cur_time <= end_time) {
     sync_callback_groups();
 
     if (!execute_previous_ready_executables_until(end_time) ) {
@@ -501,12 +491,7 @@ EventsCBGExecutor::spin()
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(
-    this->spinning.store(false);
-    this->cancel_requested_.store(false););
-  if (cancel_requested_.load()) {
-    return;
-  }
+  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
   std::vector<std::thread> threads;
   size_t thread_id = 0;
   for ( ; thread_id < number_of_threads_ - 1; ++thread_id) {
@@ -528,12 +513,7 @@ void EventsCBGExecutor::spin(
   if (spinning.exchange(true) ) {
     throw std::runtime_error("spin() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(
-    this->spinning.store(false);
-    this->cancel_requested_.store(false););
-  if (cancel_requested_.load()) {
-    return;
-  }
+  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
   std::vector<std::thread> threads;
   size_t thread_id = 0;
   for ( ; thread_id < number_of_threads_ - 1; ++thread_id) {
@@ -582,13 +562,11 @@ EventsCBGExecutor::add_callback_group(
 void
 EventsCBGExecutor::cancel()
 {
-  // Only request the cancellation; the spinning flag is owned by the spin
-  // functions and is cleared when they actually return.  This keeps
-  // is_spinning() true until the executor has really stopped, and a cancel
-  // issued before a spin is "held" until the next spin consumes it.
-  cancel_requested_.store(true);
+  bool was_spinning = spinning;
 
-  if(spinning) {
+  spinning.store(false);
+
+  if(was_spinning) {
     scheduler->release_all_worker_threads();
   }
 

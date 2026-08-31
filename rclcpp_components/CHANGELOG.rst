@@ -2,32 +2,21 @@
 Changelog for package rclcpp_components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-33.1.0 (2026-08-31)
+32.0.3 (2026-08-31)
 -------------------
-* cleanup headers (`#3238 <https://github.com/ros2/rclcpp/issues/3238>`_)
-* rclcpp_components: Fix compilation with clang (`#3229 <https://github.com/ros2/rclcpp/issues/3229>`_)
-* Fix race condition when creating isolated component container (`#3223 <https://github.com/ros2/rclcpp/issues/3223>`_)
-* Contributors: Alejandro Hernández Cordero, Michal Sojka, Tony Najjar
+* rclcpp_components: Fix compilation with clang (`#3229 <https://github.com/ros2/rclcpp/issues/3229>`_) (`#3231 <https://github.com/ros2/rclcpp/issues/3231>`_)
+* Fix race condition when creating isolated component container (`#3223 <https://github.com/ros2/rclcpp/issues/3223>`_) (`#3228 <https://github.com/ros2/rclcpp/issues/3228>`_)
+* Contributors: mergify[bot]
 
-33.0.3 (2026-07-28)
+32.0.2 (2026-07-28)
 -------------------
-* Deprecate the experimental EventsExecutor (`#3192 <https://github.com/ros2/rclcpp/issues/3192>`_)
-* Check for association with an executor before removing nodes in ComponentManager (`#3190 <https://github.com/ros2/rclcpp/issues/3190>`_)
-* use C++ 20 in default. (`#3187 <https://github.com/ros2/rclcpp/issues/3187>`_)
-* Contributors: Skyler Medeiros, Tomoya Fujita
+* Check for association with an executor before removing nodes in ComponentManager (`#3190 <https://github.com/ros2/rclcpp/issues/3190>`_) (`#3199 <https://github.com/ros2/rclcpp/issues/3199>`_)
+* Contributors: mergify[bot]
 
-33.0.2 (2026-07-02)
+32.0.1 (2026-07-02)
 -------------------
-* Call rclcpp::shutdown() in the component containers (`#3158 <https://github.com/ros2/rclcpp/issues/3158>`_)
-* Contributors: Hugal31
-
-33.0.1 (2026-05-22)
--------------------
-
-33.0.0 (2026-05-07)
--------------------
-* Cleanups headers and fix wording (`#3138 <https://github.com/ros2/rclcpp/issues/3138>`_)
-* Contributors: Alejandro Hernández Cordero
+* Call rclcpp::shutdown() in the component containers (`#3158 <https://github.com/ros2/rclcpp/issues/3158>`_) (`#3162 <https://github.com/ros2/rclcpp/issues/3162>`_)
+* Contributors: mergify[bot]
 
 32.0.0 (2026-04-30)
 -------------------

@@ -17,6 +17,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 
 #include "rclcpp/callback_group.hpp"
 #include "rclcpp/client.hpp"

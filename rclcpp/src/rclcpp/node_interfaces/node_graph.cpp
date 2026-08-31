@@ -29,7 +29,6 @@
 #include "rclcpp/expand_topic_or_service_name.hpp"
 #include "rclcpp/graph_listener.hpp"
 #include "rclcpp/node_interfaces/node_graph_interface.hpp"
-#include "rclcpp/utilities.hpp"
 #include "rcpputils/scope_exit.hpp"
 
 using rclcpp::node_interfaces::NodeGraph;

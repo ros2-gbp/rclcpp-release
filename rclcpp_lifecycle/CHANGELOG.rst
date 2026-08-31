@@ -2,31 +2,16 @@
 Changelog for package rclcpp_lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-33.1.0 (2026-08-31)
+32.0.3 (2026-08-31)
 -------------------
-* cleanup headers (`#3238 <https://github.com/ros2/rclcpp/issues/3238>`_)
-* Add wait_for_message API that relies on node interfaces (`#3230 <https://github.com/ros2/rclcpp/issues/3230>`_)
-* Support generic subscription callbacks in LifecycleNode (`#3227 <https://github.com/ros2/rclcpp/issues/3227>`_)
-* clarify difference between faliure and error : issue-3086 (`#3215 <https://github.com/ros2/rclcpp/issues/3215>`_)
-* Contributors: Aditya Jindal, Alejandro Hernández Cordero, Maurice Alexander Purnawan, yadunund
+* Add wait_for_message overload using node interfaces (backport `#3230 <https://github.com/ros2/rclcpp/issues/3230>`_) (`#3233 <https://github.com/ros2/rclcpp/issues/3233>`_)
+* Contributors: mergify[bot]
 
-33.0.3 (2026-07-28)
--------------------
-* use C++ 20 in default. (`#3187 <https://github.com/ros2/rclcpp/issues/3187>`_)
-* Contributors: Tomoya Fujita
-
-33.0.2 (2026-07-02)
--------------------
-* Optimize header include (`#3179 <https://github.com/ros2/rclcpp/issues/3179>`_)
-* Contributors: Alejandro Hernández Cordero
-
-33.0.1 (2026-05-22)
+32.0.2 (2026-07-28)
 -------------------
 
-33.0.0 (2026-05-07)
+32.0.1 (2026-07-02)
 -------------------
-* Cleanups headers and fix wording (`#3138 <https://github.com/ros2/rclcpp/issues/3138>`_)
-* Contributors: Alejandro Hernández Cordero
 
 32.0.0 (2026-04-30)
 -------------------
