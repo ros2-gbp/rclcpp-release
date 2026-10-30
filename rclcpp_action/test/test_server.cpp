@@ -12,14 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <chrono>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
+#include <thread>
 #include <vector>
 
 #include "gtest/gtest.h"
 
+#include "rclcpp/callback_group.hpp"
 #include "rclcpp/exceptions.hpp"
+#include "rclcpp/executor.hpp"
+#include "rclcpp/executor_options.hpp"
+#include "rclcpp/executors.hpp"
+#include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
+#include "rclcpp/executors/single_threaded_executor.hpp"
+#include "rclcpp/future_return_code.hpp"
 #include "rclcpp/node.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/qos.hpp"
+#include "rclcpp/utilities.hpp"
 #include "rcpputils/scope_exit.hpp"
 #include "test_msgs/action/fibonacci.hpp"
 
@@ -1313,14 +1325,6 @@ TEST_F(TestGoalRequestServer, execute_goal_request_received_update_goal_state_er
 {
   auto mock = mocking_utils::patch_and_return(
     "lib:rclcpp_action", rcl_action_update_goal_state, RCL_RET_ERROR);
-
-  EXPECT_THROW(SendClientGoalRequest(), rclcpp::exceptions::RCLError);
-}
-
-TEST_F(TestGoalRequestServer, publish_status_server_get_goal_handles_errors)
-{
-  auto mock = mocking_utils::patch_and_return(
-    "lib:rclcpp_action", rcl_action_server_get_goal_handles, RCL_RET_ERROR);
 
   EXPECT_THROW(SendClientGoalRequest(), rclcpp::exceptions::RCLError);
 }

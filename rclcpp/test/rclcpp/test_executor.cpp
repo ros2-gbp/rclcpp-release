@@ -15,17 +15,29 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <future>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
+#include <utility>
 
 #include "rcl_interfaces/msg/parameter_event.hpp"
 
+#include "rclcpp/callback_group.hpp"
+#include "rclcpp/client.hpp"
+#include "rclcpp/contexts/default_context.hpp"
+#include "rclcpp/create_subscription.hpp"
+#include "rclcpp/exceptions.hpp"
 #include "rclcpp/executor.hpp"
-#include "rclcpp/memory_strategy.hpp"
 #include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/future_return_code.hpp"
+#include "rclcpp/memory_strategy.hpp"
+#include "rclcpp/node.hpp"
+#include "rclcpp/qos.hpp"
+#include "rclcpp/subscription.hpp"
+#include "rclcpp/utilities.hpp"
 
 #include "test_msgs/msg/empty.hpp"
 
@@ -50,6 +62,21 @@ public:
   void spin_nanoseconds(rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node)
   {
     spin_node_once_nanoseconds(node, std::chrono::milliseconds(100));
+  }
+};
+
+// Derived executor that uses the constructor which does not initialize the
+// base class functionality.
+class MinimalExecutor : public rclcpp::Executor
+{
+public:
+  MinimalExecutor()
+  : rclcpp::Executor(rclcpp::contexts::get_global_default_context())
+  {
+  }
+
+  void spin() override
+  {
   }
 };
 
@@ -104,6 +131,14 @@ TEST_F(TestExecutor, add_remove_node_thread_safe) {
   } while (future_status == std::future_status::timeout);
   EXPECT_EQ(future_status, std::future_status::ready);
   future.get();
+}
+
+TEST_F(TestExecutor, destroy_executor_without_base_functionality) {
+  EXPECT_NO_THROW(
+  {
+    auto executor = std::make_unique<MinimalExecutor>();
+    executor.reset();
+  });
 }
 
 TEST_F(TestExecutor, constructor_bad_guard_condition_init) {
