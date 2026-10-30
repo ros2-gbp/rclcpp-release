@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <functional>
 #include <memory>
 
 #include "performance_test_fixture/performance_test_fixture.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/client.hpp"
+#include "rclcpp/executors/single_threaded_executor.hpp"
+#include "rclcpp/node.hpp"
+#include "rclcpp/utilities.hpp"
 #include "test_msgs/srv/empty.hpp"
 
 using performance_test_fixture::PerformanceTest;
@@ -125,11 +129,13 @@ BENCHMARK_F(ServicePerformanceTest, async_send_response)(benchmark::State & stat
   auto service = node->create_service<test_msgs::srv::Empty>(empty_service_name, callback);
 
   reset_heap_counters();
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node->get_node_base_interface());
   for (auto _ : state) {
     (void)_;
     state.PauseTiming();
     // Clear executor queue
-    rclcpp::spin_some(node->get_node_base_interface());
+    executor.spin_some();
 
     auto request = std::make_shared<test_msgs::srv::Empty::Request>();
     auto future = empty_client->async_send_request(request);
@@ -137,7 +143,7 @@ BENCHMARK_F(ServicePerformanceTest, async_send_response)(benchmark::State & stat
     benchmark::DoNotOptimize(service);
     benchmark::ClobberMemory();
 
-    rclcpp::spin_until_future_complete(node->get_node_base_interface(), future);
+    executor.spin_until_future_complete(future);
   }
   if (callback_count == 0) {
     state.SkipWithError("Service callback was not called");

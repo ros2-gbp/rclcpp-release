@@ -19,9 +19,11 @@
 #include <string>
 #include <vector>
 
+#include "rcl/time.h"
 #include "rcl/node_options.h"
 #include "rclcpp/context.hpp"
 #include "rclcpp/contexts/default_context.hpp"
+#include "rclcpp/logger.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/publisher_options.hpp"
 #include "rclcpp/qos.hpp"
@@ -44,11 +46,13 @@ public:
    *   - use_global_arguments = true
    *   - enable_rosout = true
    *   - use_intra_process_comms = false
-   *   - enable_topic_statistics = false
    *   - start_parameter_services = true
    *   - start_parameter_event_publisher = true
+   *   - clock_type = RCL_ROS_TIME
    *   - clock_qos = rclcpp::ClockQoS()
    *   - use_clock_thread = true
+   *   - enable_logger_service = false
+   *   - log_level = rclcpp::Logger::Level::Unset
    *   - rosout_qos = rclcpp::RosoutQoS()
    *   - parameter_event_qos = rclcpp::ParameterEventQoS
    *     - with history setting and depth from rmw_qos_profile_parameter_events
@@ -97,7 +101,7 @@ public:
   /// Set the context, return this for parameter idiom.
   RCLCPP_PUBLIC
   NodeOptions &
-  context(rclcpp::Context::SharedPtr context);
+  context(const rclcpp::Context::SharedPtr & context);
 
   /// Return a reference to the list of arguments for the node.
   RCLCPP_PUBLIC
@@ -140,6 +144,14 @@ public:
   append_parameter_override(const std::string & name, const ParameterT & value)
   {
     this->parameter_overrides().emplace_back(name, rclcpp::ParameterValue(value));
+    return *this;
+  }
+
+  /// Append a single parameter override, parameter idiom style.
+  NodeOptions &
+  append_parameter_override(const rclcpp::Parameter & param)
+  {
+    this->parameter_overrides().push_back(param);
     return *this;
   }
 
@@ -195,23 +207,6 @@ public:
   NodeOptions &
   use_intra_process_comms(bool use_intra_process_comms);
 
-  /// Return the enable_topic_statistics flag.
-  RCLCPP_PUBLIC
-  bool
-  enable_topic_statistics() const;
-
-  /// Set the enable_topic_statistics flag, return this for parameter idiom.
-  /**
-   * If true, topic statistics collection and publication will be enabled
-   * for all subscriptions.
-   * This can be used to override the global topic statistics setting.
-   *
-   * Defaults to false.
-   */
-  RCLCPP_PUBLIC
-  NodeOptions &
-  enable_topic_statistics(bool enable_topic_statistics);
-
   /// Return the start_parameter_services flag.
   RCLCPP_PUBLIC
   bool
@@ -231,6 +226,40 @@ public:
   NodeOptions &
   start_parameter_services(bool start_parameter_services);
 
+  /// Return the enable_logger_service flag.
+  RCLCPP_PUBLIC
+  bool
+  enable_logger_service() const;
+
+  /// Set the enable_logger_service flag, return this for logger idiom.
+  /**
+   * If true, ROS services are created to allow external nodes to get
+   * and set logger levels of this node.
+   *
+   * If false, loggers will still be configured and set logger levels locally,
+   * but logger levels cannot be changed remotely .
+   *
+   */
+  RCLCPP_PUBLIC
+  NodeOptions &
+  enable_logger_service(bool enable_log_service);
+
+  /// Return the log_level option.
+  RCLCPP_PUBLIC
+  rclcpp::Logger::Level
+  log_level() const;
+
+  /// Set the log_level option, return this for logger idiom.
+  /**
+   * This allows to set the initial log level for this node, makes it different
+   * from global context.
+   *
+   * \param[in] log_level A rclcpp::Logger::Level value.
+   */
+  RCLCPP_PUBLIC
+  NodeOptions &
+  log_level(rclcpp::Logger::Level log_level);
+
   /// Return the start_parameter_event_publisher flag.
   RCLCPP_PUBLIC
   bool
@@ -246,6 +275,19 @@ public:
   RCLCPP_PUBLIC
   NodeOptions &
   start_parameter_event_publisher(bool start_parameter_event_publisher);
+
+  /// Return a reference to the clock type.
+  RCLCPP_PUBLIC
+  const rcl_clock_type_t &
+  clock_type() const;
+
+  /// Set the clock type.
+  /**
+   * The clock type to be used by the node.
+   */
+  RCLCPP_PUBLIC
+  NodeOptions &
+  clock_type(const rcl_clock_type_t & clock_type);
 
   /// Return a reference to the clock QoS.
   RCLCPP_PUBLIC
@@ -395,15 +437,19 @@ private:
 
   bool use_intra_process_comms_ {false};
 
-  bool enable_topic_statistics_ {false};
-
   bool start_parameter_services_ {true};
 
   bool start_parameter_event_publisher_ {true};
 
+  rcl_clock_type_t clock_type_ {RCL_ROS_TIME};
+
   rclcpp::QoS clock_qos_ = rclcpp::ClockQoS();
 
   bool use_clock_thread_ {true};
+
+  bool enable_logger_service_ {false};
+
+  rclcpp::Logger::Level log_level_ {rclcpp::Logger::Level::Unset};
 
   rclcpp::QoS parameter_event_qos_ = rclcpp::ParameterEventsQoS(
     rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_parameter_events)

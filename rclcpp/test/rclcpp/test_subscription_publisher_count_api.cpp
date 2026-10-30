@@ -14,12 +14,16 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <iostream>
-#include <string>
 #include <memory>
+#include <string>
 
+#include "rclcpp/context.hpp"
 #include "rclcpp/exceptions.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/node.hpp"
+#include "rclcpp/node_options.hpp"
+#include "rclcpp/utilities.hpp"
 
 #include "test_msgs/msg/empty.hpp"
 
@@ -108,9 +112,9 @@ public:
   }
 
 protected:
-  static void OnMessage(test_msgs::msg::Empty::ConstSharedPtr msg)
+  static void OnMessage([[maybe_unused]] test_msgs::msg::Empty::ConstSharedPtr msg)
   {
-    (void)msg;
+    // This function is intentionally left empty.
   }
 
   std::chrono::milliseconds offset{2000};

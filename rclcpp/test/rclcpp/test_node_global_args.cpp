@@ -21,7 +21,7 @@
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/node_options.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/utilities.hpp"
 
 class TestNodeWithGlobalArgs : public ::testing::Test
 {
@@ -31,6 +31,11 @@ protected:
     const char * const args[] = {"proc", "--ros-args", "-r", "__node:=global_node_name"};
     const int argc = sizeof(args) / sizeof(const char *);
     rclcpp::init(argc, args);
+  }
+
+  static void TearDownTestCase()
+  {
+    rclcpp::shutdown();
   }
 };
 

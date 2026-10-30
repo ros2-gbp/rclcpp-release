@@ -29,7 +29,6 @@
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/logging.hpp"
 #include "rclcpp/graph_listener.hpp"
-#include "rcpputils/scope_exit.hpp"
 #include "rcutils/error_handling.h"
 #include "rcutils/macros.h"
 
@@ -60,7 +59,7 @@ public:
       std::remove_if(
         weak_contexts_.begin(),
         weak_contexts_.end(),
-        [context](const Context::WeakPtr weak_context) {
+        [context](const Context::WeakPtr & weak_context) {
           auto locked_context = weak_context.lock();
           if (!locked_context) {
             // take advantage and removed expired contexts
@@ -146,7 +145,8 @@ rclcpp_logging_output_handler(
 Context::Context()
 : rcl_context_(nullptr),
   shutdown_reason_(""),
-  logging_mutex_(nullptr)
+  logging_mutex_(nullptr),
+  graph_listener_(nullptr)
 {}
 
 Context::~Context()
@@ -155,7 +155,9 @@ Context::~Context()
   // this will not prevent errors, but will maybe make them easier to reproduce
   std::lock_guard<std::recursive_mutex> lock(init_mutex_);
   try {
-    this->shutdown("context destructor was called while still not shutdown");
+    // Cannot rely on virtual dispatch in a destructor, so explicitly use the
+    // shutdown() provided by this base class.
+    Context::shutdown("context destructor was called while still not shutdown");
     // at this point it is shutdown and cannot reinit
     // clean_up will finalize the rcl context
     this->clean_up();
@@ -199,6 +201,8 @@ Context::init(
     throw rclcpp::ContextAlreadyInitialized();
   }
   this->clean_up();
+  // allow shutdown() to be called again after re-initialization
+  is_shutting_down_.store(false);
   rcl_context_t * context = new rcl_context_t;
   if (!context) {
     throw std::runtime_error("failed to allocate memory for rcl context");
@@ -211,28 +215,27 @@ Context::init(
   }
   rcl_context_.reset(context, __delete_context);
 
-  if (init_options.auto_initialize_logging()) {
-    logging_mutex_ = get_global_logging_mutex();
-    std::lock_guard<std::recursive_mutex> guard(*logging_mutex_);
-    size_t & count = get_logging_reference_count();
-    if (0u == count) {
-      ret = rcl_logging_configure_with_output_handler(
-        &rcl_context_->global_arguments,
-        rcl_init_options_get_allocator(init_options.get_rcl_init_options()),
-        rclcpp_logging_output_handler);
-      if (RCL_RET_OK != ret) {
-        rcl_context_.reset();
-        rclcpp::exceptions::throw_from_rcl_error(ret, "failed to configure logging");
-      }
-    } else {
-      RCLCPP_WARN(
-        rclcpp::get_logger("rclcpp"),
-        "logging was initialized more than once");
-    }
-    ++count;
-  }
-
   try {
+    if (init_options.auto_initialize_logging()) {
+      logging_mutex_ = get_global_logging_mutex();
+      std::lock_guard<std::recursive_mutex> guard(*logging_mutex_);
+      size_t & count = get_logging_reference_count();
+      if (0u == count) {
+        ret = rcl_logging_configure_with_output_handler(
+          &rcl_context_->global_arguments,
+          rcl_init_options_get_allocator(init_options.get_rcl_init_options()),
+          rclcpp_logging_output_handler);
+        if (RCL_RET_OK != ret) {
+          rclcpp::exceptions::throw_from_rcl_error(ret, "failed to configure logging");
+        }
+      } else {
+        RCLCPP_WARN(
+          rclcpp::get_logger("rclcpp"),
+          "logging was initialized more than once");
+      }
+      ++count;
+    }
+
     std::vector<std::string> unparsed_ros_arguments = detail::get_unparsed_ros_arguments(
       argc, argv, &(rcl_context_->global_arguments), rcl_get_default_allocator());
     if (!unparsed_ros_arguments.empty()) {
@@ -243,6 +246,24 @@ Context::init(
 
     weak_contexts_ = get_weak_contexts();
     weak_contexts_->add_context(this->shared_from_this());
+
+
+    std::lock_guard<std::recursive_mutex> lock (on_shutdown_callbacks_mutex_);
+
+    graph_listener_ = std::make_shared<graph_listener::GraphListener>(shared_from_this());
+
+    if (!graph_listener_->is_started()) {
+    // Register an on_shutdown hook to shutdown the graph listener.
+    // This is important to ensure that the wait set is finalized before
+    // destruction of static objects occurs.
+      std::weak_ptr<rclcpp::graph_listener::GraphListener> weak_graph_listener = graph_listener_;
+      on_shutdown ([weak_graph_listener]() {
+          auto shared_graph_listener = weak_graph_listener.lock();
+          if(shared_graph_listener) {
+            shared_graph_listener->shutdown(std::nothrow);
+          }
+    });
+    }
   } catch (const std::exception & e) {
     ret = rcl_shutdown(rcl_context_.get());
     rcl_context_.reset();
@@ -297,26 +318,15 @@ Context::shutdown_reason() const
   return shutdown_reason_;
 }
 
-/// Contexts that are currently being shutdown by this thread.
-/**
- * The init_mutex_ is recursive, so it serializes concurrent calls to
- * shutdown() from different threads, but it cannot prevent the same thread
- * from reentering shutdown(), e.g. when a pre_shutdown callback calls
- * shutdown() on the same context again, directly or via rclcpp::shutdown().
- * Such a reentrant call would run the entire shutdown sequence again,
- * calling the pre_shutdown callbacks recursively and rcl_shutdown() twice.
- *
- * This state is intentionally kept out of the Context class so that the
- * class layout does not change, keeping this fix ABI compatible.
- * A thread_local container is sufficient because concurrent calls from
- * other threads are already serialized by init_mutex_; the second thread
- * observes is_valid() == false after the first call completes.
- */
-static thread_local std::unordered_set<const Context *> g_contexts_in_shutdown;
-
 bool
 Context::shutdown(const std::string & reason)
 {
+  // Prevent double-shutdown: the signal handler thread and the main thread
+  // may both call shutdown() during Ctrl-C.  Use an atomic flag to ensure
+  // only the first call proceeds; subsequent calls return immediately.
+  if (is_shutting_down_.exchange(true)) {
+    return false;
+  }
   // prevent races
   std::lock_guard<std::recursive_mutex> init_lock(init_mutex_);
   // ensure validity
@@ -324,18 +334,19 @@ Context::shutdown(const std::string & reason)
     // if it is not valid, then it cannot be shutdown
     return false;
   }
-  // prevent reentrant calls, e.g. from a pre_shutdown callback
-  if (!g_contexts_in_shutdown.insert(this).second) {
-    // shutdown of this context is already in progress on this thread
-    return false;
-  }
-  RCPPUTILS_SCOPE_EXIT(g_contexts_in_shutdown.erase(this); );
 
   // call each pre-shutdown callback
   {
-    std::lock_guard<std::mutex> lock{pre_shutdown_callbacks_mutex_};
-    for (const auto & callback : pre_shutdown_callbacks_) {
-      (*callback)();
+    std::lock_guard<std::recursive_mutex> lock{pre_shutdown_callbacks_mutex_};
+    // callbacks may delete other callbacks during the execution,
+    // therefore we need to save a copy and check before execution
+    // if the next callback is still present
+    auto cpy = pre_shutdown_callbacks_;
+    for (const auto & callback : cpy) {
+      auto it = std::find(pre_shutdown_callbacks_.begin(), pre_shutdown_callbacks_.end(), callback);
+      if(it != pre_shutdown_callbacks_.end()) {
+        (*callback)();
+      }
     }
   }
 
@@ -348,9 +359,16 @@ Context::shutdown(const std::string & reason)
   shutdown_reason_ = reason;
   // call each shutdown callback
   {
-    std::lock_guard<std::mutex> lock(on_shutdown_callbacks_mutex_);
-    for (const auto & callback : on_shutdown_callbacks_) {
-      (*callback)();
+    std::lock_guard<std::recursive_mutex> lock(on_shutdown_callbacks_mutex_);
+    // callbacks may delete other callbacks during the execution,
+    // therefore we need to save a copy and check before execution
+    // if the next callback is still present
+    auto cpy = on_shutdown_callbacks_;
+    for (const auto & callback : cpy) {
+      auto it = std::find(on_shutdown_callbacks_.begin(), on_shutdown_callbacks_.end(), callback);
+      if(it != on_shutdown_callbacks_.end()) {
+        (*callback)();
+      }
     }
   }
 
@@ -378,138 +396,142 @@ Context::shutdown(const std::string & reason)
 }
 
 rclcpp::Context::OnShutdownCallback
-Context::on_shutdown(OnShutdownCallback callback)
+Context::on_shutdown(const OnShutdownCallback & callback)
 {
   add_on_shutdown_callback(callback);
   return callback;
 }
 
 rclcpp::OnShutdownCallbackHandle
-Context::add_on_shutdown_callback(OnShutdownCallback callback)
+Context::add_on_shutdown_callback(const OnShutdownCallback & callback)
 {
-  return add_shutdown_callback(ShutdownType::on_shutdown, callback);
+  return add_shutdown_callback<ShutdownType::on_shutdown>(callback);
 }
 
 bool
 Context::remove_on_shutdown_callback(const OnShutdownCallbackHandle & callback_handle)
 {
-  return remove_shutdown_callback(ShutdownType::on_shutdown, callback_handle);
+  return remove_shutdown_callback<ShutdownType::on_shutdown>(callback_handle);
 }
 
 rclcpp::PreShutdownCallbackHandle
-Context::add_pre_shutdown_callback(PreShutdownCallback callback)
+Context::add_pre_shutdown_callback(const PreShutdownCallback & callback)
 {
-  return add_shutdown_callback(ShutdownType::pre_shutdown, callback);
+  return add_shutdown_callback<ShutdownType::pre_shutdown>(callback);
 }
 
 bool
 Context::remove_pre_shutdown_callback(
   const PreShutdownCallbackHandle & callback_handle)
 {
-  return remove_shutdown_callback(ShutdownType::pre_shutdown, callback_handle);
+  return remove_shutdown_callback<ShutdownType::pre_shutdown>(callback_handle);
 }
 
+template<Context::ShutdownType shutdown_type>
 rclcpp::ShutdownCallbackHandle
 Context::add_shutdown_callback(
-  ShutdownType shutdown_type,
-  ShutdownCallback callback)
+  const ShutdownCallback & callback)
 {
   auto callback_shared_ptr =
-    std::make_shared<ShutdownCallbackHandle::ShutdownCallbackType>(callback);
+    std::make_shared<rclcpp::ShutdownCallbackHandle::ShutdownCallbackType>(callback);
 
-  switch (shutdown_type) {
-    case ShutdownType::pre_shutdown:
-      {
-        std::lock_guard<std::mutex> lock(pre_shutdown_callbacks_mutex_);
-        pre_shutdown_callbacks_.emplace(callback_shared_ptr);
-      }
-      break;
-    case ShutdownType::on_shutdown:
-      {
-        std::lock_guard<std::mutex> lock(on_shutdown_callbacks_mutex_);
-        on_shutdown_callbacks_.emplace(callback_shared_ptr);
-      }
-      break;
+  static_assert(
+    shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
+
+  if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
+    std::lock_guard<std::recursive_mutex> lock(pre_shutdown_callbacks_mutex_);
+    pre_shutdown_callbacks_.emplace_back(callback_shared_ptr);
+  } else {
+    std::lock_guard<std::recursive_mutex> lock(on_shutdown_callbacks_mutex_);
+    on_shutdown_callbacks_.emplace_back(callback_shared_ptr);
   }
 
-  ShutdownCallbackHandle callback_handle;
+  rclcpp::ShutdownCallbackHandle callback_handle;
   callback_handle.callback = callback_shared_ptr;
   return callback_handle;
 }
 
+template<Context::ShutdownType shutdown_type>
 bool
 Context::remove_shutdown_callback(
-  ShutdownType shutdown_type,
-  const ShutdownCallbackHandle & callback_handle)
+  const rclcpp::ShutdownCallbackHandle & callback_handle)
 {
-  std::mutex * mutex_ptr = nullptr;
-  std::unordered_set<
-    std::shared_ptr<ShutdownCallbackHandle::ShutdownCallbackType>> * callback_list_ptr;
-
-  switch (shutdown_type) {
-    case ShutdownType::pre_shutdown:
-      mutex_ptr = &pre_shutdown_callbacks_mutex_;
-      callback_list_ptr = &pre_shutdown_callbacks_;
-      break;
-    case ShutdownType::on_shutdown:
-      mutex_ptr = &on_shutdown_callbacks_mutex_;
-      callback_list_ptr = &on_shutdown_callbacks_;
-      break;
-  }
-
-  std::lock_guard<std::mutex> lock(*mutex_ptr);
-  auto callback_shared_ptr = callback_handle.callback.lock();
+  const auto callback_shared_ptr = callback_handle.callback.lock();
   if (callback_shared_ptr == nullptr) {
     return false;
   }
-  return callback_list_ptr->erase(callback_shared_ptr) == 1;
+
+  const auto remove_callback = [&callback_shared_ptr](auto & mutex, auto & callback_vector) {
+      const std::lock_guard<std::recursive_mutex> lock(mutex);
+      auto iter = callback_vector.begin();
+      for (; iter != callback_vector.end(); iter++) {
+        if ((*iter).get() == callback_shared_ptr.get()) {
+          break;
+        }
+      }
+      if (iter == callback_vector.end()) {
+        return false;
+      }
+      callback_vector.erase(iter);
+      return true;
+    };
+
+  static_assert(
+    shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
+
+  if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
+    return remove_callback(pre_shutdown_callbacks_mutex_, pre_shutdown_callbacks_);
+  } else {
+    return remove_callback(on_shutdown_callbacks_mutex_, on_shutdown_callbacks_);
+  }
 }
 
 std::vector<rclcpp::Context::OnShutdownCallback>
 Context::get_on_shutdown_callbacks() const
 {
-  return get_shutdown_callback(ShutdownType::on_shutdown);
+  return get_shutdown_callback<ShutdownType::on_shutdown>();
 }
 
 std::vector<rclcpp::Context::PreShutdownCallback>
 Context::get_pre_shutdown_callbacks() const
 {
-  return get_shutdown_callback(ShutdownType::pre_shutdown);
+  return get_shutdown_callback<ShutdownType::pre_shutdown>();
 }
 
+template<Context::ShutdownType shutdown_type>
 std::vector<rclcpp::Context::ShutdownCallback>
-Context::get_shutdown_callback(ShutdownType shutdown_type) const
+Context::get_shutdown_callback() const
 {
-  std::mutex * mutex_ptr = nullptr;
-  const std::unordered_set<
-    std::shared_ptr<ShutdownCallbackHandle::ShutdownCallbackType>> * callback_list_ptr;
+  const auto get_callback_vector = [](auto & mutex, auto & callback_set) {
+      const std::lock_guard<std::recursive_mutex> lock(mutex);
+      std::vector<rclcpp::Context::ShutdownCallback> callbacks;
+      callbacks.reserve(callback_set.size());
+      for (auto & callback : callback_set) {
+        callbacks.emplace_back(*callback);
+      }
+      return callbacks;
+    };
 
-  switch (shutdown_type) {
-    case ShutdownType::pre_shutdown:
-      mutex_ptr = &pre_shutdown_callbacks_mutex_;
-      callback_list_ptr = &pre_shutdown_callbacks_;
-      break;
-    case ShutdownType::on_shutdown:
-      mutex_ptr = &on_shutdown_callbacks_mutex_;
-      callback_list_ptr = &on_shutdown_callbacks_;
-      break;
+  static_assert(
+    shutdown_type == ShutdownType::pre_shutdown || shutdown_type == ShutdownType::on_shutdown);
+
+  if constexpr (shutdown_type == ShutdownType::pre_shutdown) {
+    return get_callback_vector(pre_shutdown_callbacks_mutex_, pre_shutdown_callbacks_);
+  } else {
+    return get_callback_vector(on_shutdown_callbacks_mutex_, on_shutdown_callbacks_);
   }
-
-  std::vector<rclcpp::Context::ShutdownCallback> callbacks;
-  {
-    std::lock_guard<std::mutex> lock(*mutex_ptr);
-    for (auto & iter : *callback_list_ptr) {
-      callbacks.emplace_back(*iter);
-    }
-  }
-
-  return callbacks;
 }
 
 std::shared_ptr<rcl_context_t>
 Context::get_rcl_context()
 {
   return rcl_context_;
+}
+
+std::shared_ptr<rclcpp::graph_listener::GraphListener>
+Context::get_graph_listener()
+{
+  return graph_listener_;
 }
 
 bool

@@ -15,17 +15,10 @@
 #ifndef RCLCPP__NODE_IMPL_HPP_
 #define RCLCPP__NODE_IMPL_HPP_
 
-#include <rmw/error_handling.h>
-#include <rmw/rmw.h>
-
 #include <algorithm>
 #include <chrono>
-#include <cstdlib>
-#include <iostream>
-#include <limits>
 #include <map>
 #include <memory>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -40,9 +33,9 @@
 #include "rclcpp/create_generic_subscription.hpp"
 #include "rclcpp/create_publisher.hpp"
 #include "rclcpp/create_service.hpp"
+#include "rclcpp/create_generic_service.hpp"
 #include "rclcpp/create_subscription.hpp"
 #include "rclcpp/create_timer.hpp"
-#include "rclcpp/detail/resolve_enable_topic_statistics.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/timer.hpp"
@@ -110,9 +103,27 @@ typename rclcpp::WallTimer<CallbackT>::SharedPtr
 Node::create_wall_timer(
   std::chrono::duration<DurationRepT, DurationT> period,
   CallbackT callback,
-  rclcpp::CallbackGroup::SharedPtr group)
+  const rclcpp::CallbackGroup::SharedPtr & group,
+  bool autostart)
 {
   return rclcpp::create_wall_timer(
+    period,
+    std::move(callback),
+    group,
+    this->node_base_.get(),
+    this->node_timers_.get(),
+    autostart);
+}
+
+template<typename DurationRepT, typename DurationT, typename CallbackT>
+typename rclcpp::GenericTimer<CallbackT>::SharedPtr
+Node::create_timer(
+  std::chrono::duration<DurationRepT, DurationT> period,
+  CallbackT callback,
+  const rclcpp::CallbackGroup::SharedPtr & group)
+{
+  return rclcpp::create_timer(
+    this->get_clock(),
     period,
     std::move(callback),
     group,
@@ -124,15 +135,15 @@ template<typename ServiceT>
 typename Client<ServiceT>::SharedPtr
 Node::create_client(
   const std::string & service_name,
-  const rmw_qos_profile_t & qos_profile,
-  rclcpp::CallbackGroup::SharedPtr group)
+  const rclcpp::QoS & qos,
+  const rclcpp::CallbackGroup::SharedPtr & group)
 {
   return rclcpp::create_client<ServiceT>(
     node_base_,
     node_graph_,
     node_services_,
     extend_name_with_sub_namespace(service_name, this->get_sub_namespace()),
-    qos_profile,
+    qos,
     group);
 }
 
@@ -141,15 +152,34 @@ typename rclcpp::Service<ServiceT>::SharedPtr
 Node::create_service(
   const std::string & service_name,
   CallbackT && callback,
-  const rmw_qos_profile_t & qos_profile,
-  rclcpp::CallbackGroup::SharedPtr group)
+  const rclcpp::QoS & qos,
+  const rclcpp::CallbackGroup::SharedPtr & group)
 {
   return rclcpp::create_service<ServiceT, CallbackT>(
     node_base_,
     node_services_,
     extend_name_with_sub_namespace(service_name, this->get_sub_namespace()),
     std::forward<CallbackT>(callback),
-    qos_profile,
+    qos,
+    group);
+}
+
+template<typename CallbackT>
+typename rclcpp::GenericService::SharedPtr
+Node::create_generic_service(
+  const std::string & service_name,
+  const std::string & service_type,
+  CallbackT && callback,
+  const rclcpp::QoS & qos,
+  const rclcpp::CallbackGroup::SharedPtr & group)
+{
+  return rclcpp::create_generic_service<CallbackT>(
+    node_base_,
+    node_services_,
+    extend_name_with_sub_namespace(service_name, this->get_sub_namespace()),
+    service_type,
+    std::forward<CallbackT>(callback),
+    qos,
     group);
 }
 
@@ -170,13 +200,13 @@ Node::create_generic_publisher(
   );
 }
 
-template<typename AllocatorT>
+template<typename CallbackT, typename AllocatorT>
 std::shared_ptr<rclcpp::GenericSubscription>
 Node::create_generic_subscription(
   const std::string & topic_name,
   const std::string & topic_type,
   const rclcpp::QoS & qos,
-  std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
+  CallbackT && callback,
   const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
 {
   return rclcpp::create_generic_subscription(
@@ -184,7 +214,7 @@ Node::create_generic_subscription(
     extend_name_with_sub_namespace(topic_name, this->get_sub_namespace()),
     topic_type,
     qos,
-    std::move(callback),
+    std::forward<CallbackT>(callback),
     options
   );
 }
@@ -285,11 +315,9 @@ template<typename ParameterT>
 bool
 Node::get_parameter(const std::string & name, ParameterT & parameter) const
 {
-  std::string sub_name = extend_name_with_sub_namespace(name, this->get_sub_namespace());
-
   rclcpp::Parameter parameter_variant;
 
-  bool result = get_parameter(sub_name, parameter_variant);
+  bool result = get_parameter(name, parameter_variant);
   if (result) {
     parameter = static_cast<ParameterT>(parameter_variant.get_value<ParameterT>());
   }
@@ -304,9 +332,7 @@ Node::get_parameter_or(
   ParameterT & parameter,
   const ParameterT & alternative_value) const
 {
-  std::string sub_name = extend_name_with_sub_namespace(name, this->get_sub_namespace());
-
-  bool got_parameter = get_parameter(sub_name, parameter);
+  bool got_parameter = get_parameter(name, parameter);
   if (!got_parameter) {
     parameter = alternative_value;
   }

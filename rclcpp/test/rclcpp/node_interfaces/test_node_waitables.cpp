@@ -14,13 +14,20 @@
 
 #include <gtest/gtest.h>
 
+#include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "rcl/node_options.h"
+#include "rclcpp/callback_group.hpp"
+#include "rclcpp/exceptions.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/node_interfaces/node_waitables.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/timer.hpp"
+#include "rclcpp/utilities.hpp"
+#include "rclcpp/waitable.hpp"
 
 #include "../../mocking_utils/patch.hpp"
 #include "../../utils/rclcpp_gtest_macros.hpp"
@@ -28,18 +35,20 @@
 class TestWaitable : public rclcpp::Waitable
 {
 public:
-  void add_to_wait_set(rcl_wait_set_t *) override {}
-  bool is_ready(rcl_wait_set_t *) override {return false;}
+  void add_to_wait_set(rcl_wait_set_t &) override {}
+  bool is_ready(const rcl_wait_set_t &) override {return false;}
 
-  std::shared_ptr<void>
-  take_data() override
-  {
-    return nullptr;
-  }
+  std::shared_ptr<void> take_data() override {return nullptr;}
+  void execute(const std::shared_ptr<void> &) override {}
 
-  void execute(std::shared_ptr<void> & data) override
+  void set_on_ready_callback(std::function<void(size_t, int)>) override {}
+  void clear_on_ready_callback() override {}
+
+  std::shared_ptr<void> take_data_by_entity_id(size_t) override {return nullptr;}
+
+  std::vector<std::shared_ptr<rclcpp::TimerBase>> get_timers() const override
   {
-    (void) data;
+    return {};
   }
 };
 
@@ -78,7 +87,7 @@ TEST_F(TestNodeWaitables, add_remove_waitable)
     node_waitables->add_waitable(waitable, callback_group1));
   RCLCPP_EXPECT_THROW_EQ(
     node_waitables->add_waitable(waitable, callback_group2),
-    std::runtime_error("Cannot create waitable, group not in node."));
+    rclcpp::exceptions::MissingGroupNodeException("waitable"));
   EXPECT_NO_THROW(node_waitables->remove_waitable(waitable, callback_group1));
   EXPECT_NO_THROW(node_waitables->remove_waitable(waitable, callback_group2));
 

@@ -15,13 +15,19 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "rcl/node_options.h"
+#include "rclcpp/callback_group.hpp"
+#include "rclcpp/client.hpp"
+#include "rclcpp/exceptions.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/node_interfaces/node_services.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/node_options.hpp"
+#include "rclcpp/service.hpp"
+#include "rclcpp/utilities.hpp"
 
 #include "../../mocking_utils/patch.hpp"
 #include "../../utils/rclcpp_gtest_macros.hpp"
@@ -34,7 +40,9 @@ public:
 
   std::shared_ptr<void> create_request() override {return nullptr;}
   std::shared_ptr<rmw_request_id_t> create_request_header() override {return nullptr;}
-  void handle_request(std::shared_ptr<rmw_request_id_t>, std::shared_ptr<void>) override {}
+  void handle_request(
+    const std::shared_ptr<rmw_request_id_t> &,
+    const std::shared_ptr<void> &) override {}
 };
 
 class TestClient : public rclcpp::ClientBase
@@ -46,7 +54,7 @@ public:
   std::shared_ptr<void> create_response() override {return nullptr;}
   std::shared_ptr<rmw_request_id_t> create_request_header() override {return nullptr;}
   void handle_response(
-    std::shared_ptr<rmw_request_id_t>, std::shared_ptr<void>) override {}
+    const std::shared_ptr<rmw_request_id_t> &, const std::shared_ptr<void> &) override {}
 };
 
 class TestNodeService : public ::testing::Test
@@ -92,7 +100,7 @@ TEST_F(TestNodeService, add_service)
     different_node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   RCLCPP_EXPECT_THROW_EQ(
     node_services->add_service(service, callback_group_in_different_node),
-    std::runtime_error("Cannot create service, group not in node."));
+    rclcpp::exceptions::MissingGroupNodeException("service"));
 }
 
 TEST_F(TestNodeService, add_service_rcl_trigger_guard_condition_error)
@@ -119,7 +127,7 @@ TEST_F(TestNodeService, add_client)
     different_node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   RCLCPP_EXPECT_THROW_EQ(
     node_services->add_client(client, callback_group_in_different_node),
-    std::runtime_error("Cannot create client, group not in node."));
+    rclcpp::exceptions::MissingGroupNodeException("client"));
 }
 
 TEST_F(TestNodeService, add_client_rcl_trigger_guard_condition_error)

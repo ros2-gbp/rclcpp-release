@@ -20,24 +20,26 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "rcl/event_callback.h"
 #include "rcl/subscription.h"
 
-#include "rmw/impl/cpp/demangle.hpp"
 #include "rmw/rmw.h"
 
 #include "rclcpp/any_subscription_callback.hpp"
-#include "rclcpp/detail/cpp_callback_trampoline.hpp"
+#include "rclcpp/dynamic_typesupport/dynamic_message.hpp"
+#include "rclcpp/dynamic_typesupport/dynamic_message_type.hpp"
+#include "rclcpp/dynamic_typesupport/dynamic_serialization_support.hpp"
 #include "rclcpp/experimental/intra_process_manager.hpp"
 #include "rclcpp/experimental/subscription_intra_process_base.hpp"
+#include "rclcpp/logger.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/message_info.hpp"
 #include "rclcpp/network_flow_endpoint.hpp"
 #include "rclcpp/qos.hpp"
-#include "rclcpp/qos_event.hpp"
+#include "rclcpp/event_handler.hpp"
 #include "rclcpp/serialized_message.hpp"
 #include "rclcpp/subscription_content_filter_options.hpp"
 #include "rclcpp/type_support_decl.hpp"
@@ -60,6 +62,27 @@ namespace experimental
 class IntraProcessManager;
 }  // namespace experimental
 
+/// The kind of message that the subscription delivers in its callback, used by the executor
+/**
+ * This enum needs to exist because the callback handle is not accessible to the executor's scope.
+ *
+ * "Kind" is used since what is being delivered is a category of messages, for example, there are
+ * different ROS message types that can be delivered, but they're all ROS messages.
+ *
+ * As a concrete example, all of the following callbacks will be considered ROS_MESSAGE for
+ * DeliveredMessageKind:
+ *   - void callback(const std_msgs::msg::String &)
+ *   - void callback(const std::string &)  // type adaption
+ *   - void callback(std::unique_ptr<std_msgs::msg::String>)
+ */
+enum class DeliveredMessageKind : uint8_t
+{
+  INVALID = 0,
+  ROS_MESSAGE = 1,  // The subscription delivers a ROS message to its callback
+  SERIALIZED_MESSAGE = 2,  // The subscription delivers a serialized message to its callback
+  DYNAMIC_MESSAGE = 3,  // The subscription delivers a dynamic message to its callback
+};
+
 /// Virtual base class for subscriptions. This pattern allows us to iterate over different template
 /// specializations of Subscription, among other things.
 class SubscriptionBase : public std::enable_shared_from_this<SubscriptionBase>
@@ -76,7 +99,8 @@ public:
    * \param[in] type_support_handle rosidl type support struct, for the Message type of the topic.
    * \param[in] topic_name Name of the topic to subscribe to.
    * \param[in] subscription_options Options for the subscription.
-   * \param[in] is_serialized is true if the message will be delivered still serialized
+   * \param[in] delivered_message_kind Enum flag to change how the message will be received and
+   *            delivered
    */
   RCLCPP_PUBLIC
   SubscriptionBase(
@@ -84,11 +108,34 @@ public:
     const rosidl_message_type_support_t & type_support_handle,
     const std::string & topic_name,
     const rcl_subscription_options_t & subscription_options,
-    bool is_serialized = false);
+    const SubscriptionEventCallbacks & event_callbacks,
+    bool use_default_callbacks,
+    DeliveredMessageKind delivered_message_kind = DeliveredMessageKind::ROS_MESSAGE);
 
   /// Destructor.
   RCLCPP_PUBLIC
   virtual ~SubscriptionBase();
+
+  /// Check if a subscription event type is supported by the active RMW implementation.
+  /**
+   * This API allows application code to introspect at runtime whether a
+   * particular subscription event type is supported by the currently loaded
+   * RMW implementation, enabling portable code that adapts gracefully
+   * when switching between RMW implementations.
+   *
+   * \param[in] event_type the subscription event type to check
+   * \return `true` if the event type is supported, `false` otherwise
+   */
+  RCLCPP_PUBLIC
+  static
+  bool
+  event_type_is_supported(const rcl_subscription_event_type_t event_type);
+
+  /// Add event handlers for passed in event_callbacks.
+  RCLCPP_PUBLIC
+  void
+  bind_event_callbacks(
+    const SubscriptionEventCallbacks & event_callbacks, bool use_default_callbacks);
 
   /// Get the topic that this subscription is subscribed on.
   RCLCPP_PUBLIC
@@ -107,7 +154,7 @@ public:
   /** \return The map of QoS event handlers. */
   RCLCPP_PUBLIC
   const
-  std::unordered_map<rcl_subscription_event_type_t, std::shared_ptr<rclcpp::QOSEventHandlerBase>> &
+  std::unordered_map<rcl_subscription_event_type_t, std::shared_ptr<rclcpp::EventHandlerBase>> &
   get_event_handlers() const;
 
   /// Get the actual QoS settings, after the defaults have been determined.
@@ -179,6 +226,23 @@ public:
   std::shared_ptr<rclcpp::SerializedMessage>
   create_serialized_message() = 0;
 
+  /// Disable callbacks from being called
+  /**
+   * This function temporary removes the on_new_message_callback to prevent it from being called.
+   */
+  RCLCPP_PUBLIC
+  virtual
+  void disable_callbacks();
+
+  /// Enable the callbacks to be called
+  /**
+    * This function sets back the on_new_message_callback if it was previously removed in
+    * disable_callbacks().
+    */
+  RCLCPP_PUBLIC
+  virtual
+  void enable_callbacks();
+
   /// Check if we need to handle the message, and execute the callback if we do.
   /**
    * \param[in] message Shared pointer to the message to handle.
@@ -226,6 +290,14 @@ public:
   RCLCPP_PUBLIC
   bool
   is_serialized() const;
+
+  /// Return the delivered message kind.
+  /**
+   * \return `DeliveredMessageKind`, which adjusts how messages are received and delivered.
+   */
+  RCLCPP_PUBLIC
+  DeliveredMessageKind
+  get_delivered_message_kind() const;
 
   /// Get matching publisher count.
   /** \return The number of publishers on this topic. */
@@ -313,64 +385,14 @@ public:
    *
    * \param[in] callback functor to be called when a new message is received
    */
+  RCLCPP_PUBLIC
   void
-  set_on_new_message_callback(std::function<void(size_t)> callback)
-  {
-    if (!callback) {
-      throw std::invalid_argument(
-              "The callback passed to set_on_new_message_callback "
-              "is not callable.");
-    }
-
-    auto new_callback =
-      [callback, this](size_t number_of_messages) {
-        try {
-          callback(number_of_messages);
-        } catch (const std::exception & exception) {
-          RCLCPP_ERROR_STREAM(
-            node_logger_,
-            "rclcpp::SubscriptionBase@" << this <<
-              " caught " << rmw::impl::cpp::demangle(exception) <<
-              " exception in user-provided callback for the 'on new message' callback: " <<
-              exception.what());
-        } catch (...) {
-          RCLCPP_ERROR_STREAM(
-            node_logger_,
-            "rclcpp::SubscriptionBase@" << this <<
-              " caught unhandled exception in user-provided callback " <<
-              "for the 'on new message' callback");
-        }
-      };
-
-    std::lock_guard<std::recursive_mutex> lock(callback_mutex_);
-
-    // Set it temporarily to the new callback, while we replace the old one.
-    // This two-step setting, prevents a gap where the old std::function has
-    // been replaced but the middleware hasn't been told about the new one yet.
-    set_on_new_message_callback(
-      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
-      static_cast<const void *>(&new_callback));
-
-    // Store the std::function to keep it in scope, also overwrites the existing one.
-    on_new_message_callback_ = new_callback;
-
-    // Set it again, now using the permanent storage.
-    set_on_new_message_callback(
-      rclcpp::detail::cpp_callback_trampoline<const void *, size_t>,
-      static_cast<const void *>(&on_new_message_callback_));
-  }
+  set_on_new_message_callback(const std::function<void(size_t)> & callback);
 
   /// Unset the callback registered for new messages, if any.
+  RCLCPP_PUBLIC
   void
-  clear_on_new_message_callback()
-  {
-    std::lock_guard<std::recursive_mutex> lock(callback_mutex_);
-
-    if (on_new_message_callback_) {
-      set_on_new_message_callback(nullptr, nullptr);
-      on_new_message_callback_ = nullptr;
-    }
-  }
+  clear_on_new_message_callback();
 
   /// Set a callback to be called when each new intra-process message is received.
   /**
@@ -390,42 +412,14 @@ public:
    *
    * \param[in] callback functor to be called when a new message is received
    */
+  RCLCPP_PUBLIC
   void
-  set_on_new_intra_process_message_callback(std::function<void(size_t)> callback)
-  {
-    if (!use_intra_process_) {
-      RCLCPP_WARN(
-        rclcpp::get_logger("rclcpp"),
-        "Calling set_on_new_intra_process_message_callback for subscription with IPC disabled");
-      return;
-    }
-
-    if (!callback) {
-      throw std::invalid_argument(
-              "The callback passed to set_on_new_intra_process_message_callback "
-              "is not callable.");
-    }
-
-    // The on_ready_callback signature has an extra `int` argument used to disambiguate between
-    // possible different entities within a generic waitable.
-    // We hide that detail to users of this method.
-    std::function<void(size_t, int)> new_callback = std::bind(callback, std::placeholders::_1);
-    subscription_intra_process_->set_on_ready_callback(new_callback);
-  }
+  set_on_new_intra_process_message_callback(const std::function<void(size_t)> & callback);
 
   /// Unset the callback registered for new intra-process messages, if any.
+  RCLCPP_PUBLIC
   void
-  clear_on_new_intra_process_message_callback()
-  {
-    if (!use_intra_process_) {
-      RCLCPP_WARN(
-        rclcpp::get_logger("rclcpp"),
-        "Calling clear_on_new_intra_process_message_callback for subscription with IPC disabled");
-      return;
-    }
-
-    subscription_intra_process_->clear_on_ready_callback();
-  }
+  clear_on_new_intra_process_message_callback();
 
   /// Set a callback to be called when each new qos event instance occurs.
   /**
@@ -448,49 +442,30 @@ public:
    * If you want more information available in the callback, like the qos event
    * or other information, you may use a lambda with captures or std::bind.
    *
-   * \sa rclcpp::QOSEventHandlerBase::set_on_ready_callback
+   * \sa rclcpp::EventHandlerBase::set_on_ready_callback
    *
    * \param[in] callback functor to be called when a new event occurs
    * \param[in] event_type identifier for the qos event we want to attach the callback to
    */
+  RCLCPP_PUBLIC
   void
   set_on_new_qos_event_callback(
-    std::function<void(size_t)> callback,
-    rcl_subscription_event_type_t event_type)
-  {
-    if (event_handlers_.count(event_type) == 0) {
-      RCLCPP_WARN(
-        rclcpp::get_logger("rclcpp"),
-        "Calling set_on_new_qos_event_callback for non registered subscription event_type");
-      return;
-    }
-
-    if (!callback) {
-      throw std::invalid_argument(
-              "The callback passed to set_on_new_qos_event_callback "
-              "is not callable.");
-    }
-
-    // The on_ready_callback signature has an extra `int` argument used to disambiguate between
-    // possible different entities within a generic waitable.
-    // We hide that detail to users of this method.
-    std::function<void(size_t, int)> new_callback = std::bind(callback, std::placeholders::_1);
-    event_handlers_[event_type]->set_on_ready_callback(new_callback);
-  }
+    const std::function<void(size_t)> & callback,
+    rcl_subscription_event_type_t event_type);
 
   /// Unset the callback registered for new qos events, if any.
+  RCLCPP_PUBLIC
   void
-  clear_on_new_qos_event_callback(rcl_subscription_event_type_t event_type)
-  {
-    if (event_handlers_.count(event_type) == 0) {
-      RCLCPP_WARN(
-        rclcpp::get_logger("rclcpp"),
-        "Calling clear_on_new_qos_event_callback for non registered event_type");
-      return;
-    }
+  clear_on_new_qos_event_callback(rcl_subscription_event_type_t event_type);
 
-    event_handlers_[event_type]->clear_on_ready_callback();
-  }
+  /// Check if content filtered topic feature of the subscription instance is supported.
+  /**
+   * \return boolean flag indicating if the content filtered topic of this subscription is
+   *   supported.
+   */
+  RCLCPP_PUBLIC
+  bool
+  is_cft_supported() const;
 
   /// Check if content filtered topic feature of the subscription instance is enabled.
   /**
@@ -526,6 +501,50 @@ public:
   rclcpp::ContentFilterOptions
   get_content_filter() const;
 
+  // DYNAMIC TYPE ==================================================================================
+  // TODO(methylDragon): Reorder later
+  RCLCPP_PUBLIC
+  virtual
+  rclcpp::dynamic_typesupport::DynamicMessageType::SharedPtr
+  get_shared_dynamic_message_type() = 0;
+
+  RCLCPP_PUBLIC
+  virtual
+  rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr
+  get_shared_dynamic_message() = 0;
+
+  RCLCPP_PUBLIC
+  virtual
+  rclcpp::dynamic_typesupport::DynamicSerializationSupport::SharedPtr
+  get_shared_dynamic_serialization_support() = 0;
+
+  /// Borrow a new serialized message (this clones!)
+  /** \return Shared pointer to a rclcpp::dynamic_typesupport::DynamicMessage. */
+  RCLCPP_PUBLIC
+  virtual
+  rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr
+  create_dynamic_message() = 0;
+
+  RCLCPP_PUBLIC
+  virtual
+  void
+  return_dynamic_message(rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message) = 0;
+
+  RCLCPP_PUBLIC
+  virtual
+  void
+  handle_dynamic_message(
+    const rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message,
+    const rclcpp::MessageInfo & message_info) = 0;
+
+  RCLCPP_PUBLIC
+  bool
+  take_dynamic_message(
+    rclcpp::dynamic_typesupport::DynamicMessage & message_out,
+    rclcpp::MessageInfo & message_info_out);
+
+  // ===============================================================================================
+
 protected:
   template<typename EventCallbackT>
   void
@@ -533,7 +552,7 @@ protected:
     const EventCallbackT & callback,
     const rcl_subscription_event_type_t event_type)
   {
-    auto handler = std::make_shared<QOSEventHandler<EventCallbackT,
+    auto handler = std::make_shared<EventHandler<EventCallbackT,
         std::shared_ptr<rcl_subscription_t>>>(
       callback,
       rcl_subscription_event_init,
@@ -547,6 +566,9 @@ protected:
   void default_incompatible_qos_callback(QOSRequestedIncompatibleQoSInfo & info) const;
 
   RCLCPP_PUBLIC
+  void default_incompatible_type_callback(IncompatibleTypeInfo & info) const;
+
+  RCLCPP_PUBLIC
   bool
   matches_any_intra_process_publishers(const rmw_gid_t * sender_gid) const;
 
@@ -557,31 +579,39 @@ protected:
   rclcpp::node_interfaces::NodeBaseInterface * const node_base_;
 
   std::shared_ptr<rcl_node_t> node_handle_;
+
+  std::recursive_mutex on_new_message_callback_mutex_;
+
+  // It is important to declare on_new_message_callback_ before
+  // subscription_handle_, so on destruction the subscription is
+  // destroyed first. Otherwise, the rmw subscription callback
+  // would point briefly to a destroyed function.
+  std::function<void(size_t)> on_new_message_callback_{nullptr};
+  // Declare subscription_handle_ after callback
   std::shared_ptr<rcl_subscription_t> subscription_handle_;
   std::shared_ptr<rcl_subscription_t> intra_process_subscription_handle_;
   rclcpp::Logger node_logger_;
 
   std::unordered_map<rcl_subscription_event_type_t,
-    std::shared_ptr<rclcpp::QOSEventHandlerBase>> event_handlers_;
+    std::shared_ptr<rclcpp::EventHandlerBase>> event_handlers_;
 
   bool use_intra_process_;
   IntraProcessManagerWeakPtr weak_ipm_;
   uint64_t intra_process_subscription_id_;
   std::shared_ptr<rclcpp::experimental::SubscriptionIntraProcessBase> subscription_intra_process_;
 
+  const SubscriptionEventCallbacks event_callbacks_;
+
 private:
   RCLCPP_DISABLE_COPY(SubscriptionBase)
 
   rosidl_message_type_support_t type_support_;
-  bool is_serialized_;
+  DeliveredMessageKind delivered_message_kind_;
 
   std::atomic<bool> subscription_in_use_by_wait_set_{false};
   std::atomic<bool> intra_process_subscription_waitable_in_use_by_wait_set_{false};
-  std::unordered_map<rclcpp::QOSEventHandlerBase *,
+  std::unordered_map<rclcpp::EventHandlerBase *,
     std::atomic<bool>> qos_events_in_use_by_wait_set_;
-
-  std::recursive_mutex callback_mutex_;
-  std::function<void(size_t)> on_new_message_callback_{nullptr};
 };
 
 }  // namespace rclcpp

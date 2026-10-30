@@ -94,6 +94,14 @@ public:
   int8_t
   get_status();
 
+  /// Get the goal status code as a GoalStatusCode.
+  /**
+   * \throws exceptions::InvalidGoalStatusError If the server sent a status that is not one of
+   *   the action_msgs::msg::GoalStatus values. get_status() still returns the raw value.
+   */
+  GoalStatusCode
+  get_status_code();
+
   /// Check if an action client has subscribed to feedback for the goal.
   bool
   is_feedback_aware();
@@ -163,7 +171,7 @@ private:
   ResultCallback result_callback_{nullptr};
   int8_t status_{GoalStatus::STATUS_ACCEPTED};
 
-  std::mutex handle_mutex_;
+  std::recursive_mutex handle_mutex_;
 };
 }  // namespace rclcpp_action
 

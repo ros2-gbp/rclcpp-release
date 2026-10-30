@@ -25,6 +25,7 @@
 
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "rclcpp_lifecycle/lifecycle_publisher.hpp"
+#include "rclcpp/utilities.hpp"
 
 using lifecycle_msgs::msg::State;
 using lifecycle_msgs::msg::Transition;
@@ -42,19 +43,38 @@ protected:
   }
 };
 
+/// We want to test everything for both the wall and generic timer.
+enum class TimerType
+{
+  WALL_TIMER,
+  GENERIC_TIMER,
+};
+
 class EmptyLifecycleNode : public rclcpp_lifecycle::LifecycleNode
 {
 public:
-  explicit EmptyLifecycleNode(const std::string & node_name)
+  explicit EmptyLifecycleNode(const std::string & node_name, const TimerType & timer_type)
   : rclcpp_lifecycle::LifecycleNode(node_name)
   {
     // For coverage this is being added here
-    auto timer = create_wall_timer(std::chrono::seconds(1), []() {});
-    add_timer_handle(timer);
+    switch (timer_type) {
+      case TimerType::WALL_TIMER:
+        {
+          auto timer = create_wall_timer(std::chrono::seconds(1), []() {});
+          add_timer_handle(timer);
+          break;
+        }
+      case TimerType::GENERIC_TIMER:
+        {
+          auto timer = create_timer(std::chrono::seconds(1), []() {});
+          add_timer_handle(timer);
+          break;
+        }
+    }
   }
 };
 
-class TestLifecyclePublisher : public ::testing::Test
+class TestLifecyclePublisher : public ::testing::TestWithParam<TimerType>
 {
 public:
   void SetUp()
@@ -68,8 +88,8 @@ public:
   }
 };
 
-TEST_F(TestLifecyclePublisher, publish_managed_by_node) {
-  auto node = std::make_shared<EmptyLifecycleNode>("node");
+TEST_P(TestLifecyclePublisher, publish_managed_by_node) {
+  auto node = std::make_shared<EmptyLifecycleNode>("node", GetParam());
 
   rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> options;
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<test_msgs::msg::Empty>> publisher =
@@ -98,10 +118,15 @@ TEST_F(TestLifecyclePublisher, publish_managed_by_node) {
     auto msg_ptr = std::make_unique<test_msgs::msg::Empty>();
     EXPECT_NO_THROW(publisher->publish(std::move(msg_ptr)));
   }
+  {
+    auto loaned_msg = publisher->borrow_loaned_message();
+    EXPECT_NO_THROW(publisher->publish(std::move(loaned_msg)));
+  }
   node->trigger_transition(
     rclcpp_lifecycle::Transition(Transition::TRANSITION_DEACTIVATE), ret);
   ASSERT_EQ(success, ret);
   ret = reset_key;
+  (void)ret;  // Just to make clang happy
   EXPECT_FALSE(publisher->is_activated());
   {
     auto msg_ptr = std::make_unique<test_msgs::msg::Empty>();
@@ -111,10 +136,14 @@ TEST_F(TestLifecyclePublisher, publish_managed_by_node) {
     auto msg_ptr = std::make_unique<test_msgs::msg::Empty>();
     EXPECT_NO_THROW(publisher->publish(std::move(msg_ptr)));
   }
+  {
+    auto loaned_msg = publisher->borrow_loaned_message();
+    EXPECT_NO_THROW(publisher->publish(std::move(loaned_msg)));
+  }
 }
 
-TEST_F(TestLifecyclePublisher, publish) {
-  auto node = std::make_shared<EmptyLifecycleNode>("node");
+TEST_P(TestLifecyclePublisher, publish) {
+  auto node = std::make_shared<EmptyLifecycleNode>("node", GetParam());
 
   rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> options;
   std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<test_msgs::msg::Empty>> publisher =
@@ -131,6 +160,10 @@ TEST_F(TestLifecyclePublisher, publish) {
     auto msg_ptr = std::make_unique<test_msgs::msg::Empty>();
     EXPECT_NO_THROW(publisher->publish(std::move(msg_ptr)));
   }
+  {
+    auto loaned_msg = publisher->borrow_loaned_message();
+    EXPECT_NO_THROW(publisher->publish(std::move(loaned_msg)));
+  }
   publisher->on_activate();
   EXPECT_TRUE(publisher->is_activated());
   {
@@ -141,4 +174,24 @@ TEST_F(TestLifecyclePublisher, publish) {
     auto msg_ptr = std::make_unique<test_msgs::msg::Empty>();
     EXPECT_NO_THROW(publisher->publish(std::move(msg_ptr)));
   }
+  {
+    auto loaned_msg = publisher->borrow_loaned_message();
+    EXPECT_NO_THROW(publisher->publish(std::move(loaned_msg)));
+  }
 }
+
+INSTANTIATE_TEST_SUITE_P(
+  PerTimerType, TestLifecyclePublisher,
+  ::testing::Values(TimerType::WALL_TIMER, TimerType::GENERIC_TIMER),
+  [](const ::testing::TestParamInfo<TimerType> & info) -> std::string {
+    switch (info.param) {
+      case TimerType::WALL_TIMER:
+        return std::string("wall_timer");
+      case TimerType::GENERIC_TIMER:
+        return std::string("generic_timer");
+      default:
+        break;
+    }
+    return std::string("unknown");
+  }
+);

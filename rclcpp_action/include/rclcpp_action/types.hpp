@@ -34,7 +34,19 @@ using GoalUUID = std::array<uint8_t, UUID_SIZE>;
 using GoalStatus = action_msgs::msg::GoalStatus;
 using GoalInfo = action_msgs::msg::GoalInfo;
 
-/// Convert a goal id to a human readable string.
+/// Every status a goal can have, as defined in action_msgs::msg::GoalStatus.
+enum class GoalStatusCode : int8_t
+{
+  UNKNOWN = GoalStatus::STATUS_UNKNOWN,
+  ACCEPTED = GoalStatus::STATUS_ACCEPTED,
+  EXECUTING = GoalStatus::STATUS_EXECUTING,
+  CANCELING = GoalStatus::STATUS_CANCELING,
+  SUCCEEDED = GoalStatus::STATUS_SUCCEEDED,
+  CANCELED = GoalStatus::STATUS_CANCELED,
+  ABORTED = GoalStatus::STATUS_ABORTED
+};
+
+/// Convert a goal id to a human readable RFC-4122 compliant string.
 RCLCPP_ACTION_PUBLIC
 std::string
 to_string(const GoalUUID & goal_id);
@@ -79,14 +91,13 @@ struct hash<rclcpp_action::GoalUUID>
 {
   size_t operator()(const rclcpp_action::GoalUUID & uuid) const noexcept
   {
-    // TODO(sloretz) Use someone else's hash function and cite it
-    size_t result = 0;
-    for (size_t i = 0; i < uuid.size(); ++i) {
-      for (size_t b = 0; b < sizeof(size_t); ++b) {
-        size_t part = uuid[i];
-        part <<= CHAR_BIT * b;
-        result ^= part;
-      }
+    // Using the FNV-1a hash algorithm
+    constexpr size_t FNV_prime = 1099511628211u;
+    size_t result = 14695981039346656037u;
+
+    for (const auto & byte : uuid) {
+      result ^= byte;
+      result *= FNV_prime;
     }
     return result;
   }

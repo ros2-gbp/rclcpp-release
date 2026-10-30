@@ -14,11 +14,14 @@
 
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <memory>
 
 #include "rclcpp_components/component_manager.hpp"
 
 #include "rcpputils/filesystem_helper.hpp"
+#include "rclcpp/executors/single_threaded_executor.hpp"
+#include "rclcpp/utilities.hpp"
 
 class TestComponentManager : public ::testing::Test
 {
@@ -26,6 +29,11 @@ protected:
   static void SetUpTestCase()
   {
     rclcpp::init(0, nullptr);
+  }
+
+  static void TearDownTestCase()
+  {
+    rclcpp::shutdown();
   }
 };
 
@@ -51,7 +59,7 @@ TEST_F(TestComponentManager, get_component_resources_valid)
   EXPECT_EQ("test_rclcpp_components::TestComponentBar", resources[1].first);
   EXPECT_EQ("test_rclcpp_components::TestComponentNoNode", resources[2].first);
 
-  namespace fs = rcpputils::fs;
+  namespace fs = std::filesystem;
   EXPECT_TRUE(fs::exists(fs::path(resources[0].second)));
   EXPECT_TRUE(fs::exists(fs::path(resources[1].second)));
   EXPECT_TRUE(fs::exists(fs::path(resources[2].second)));

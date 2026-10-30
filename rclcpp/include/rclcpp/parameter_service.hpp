@@ -24,10 +24,10 @@
 #include "rcl_interfaces/srv/list_parameters.hpp"
 #include "rcl_interfaces/srv/set_parameters.hpp"
 #include "rcl_interfaces/srv/set_parameters_atomically.hpp"
-#include "rclcpp/executors.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/parameter.hpp"
+#include "rclcpp/qos.hpp"
 #include "rclcpp/visibility_control.hpp"
 #include "rmw/rmw.h"
 
@@ -40,11 +40,11 @@ public:
   RCLCPP_SMART_PTR_DEFINITIONS(ParameterService)
 
   RCLCPP_PUBLIC
-  explicit ParameterService(
-    const std::shared_ptr<node_interfaces::NodeBaseInterface> node_base,
-    const std::shared_ptr<node_interfaces::NodeServicesInterface> node_services,
+  ParameterService(
+    const std::shared_ptr<node_interfaces::NodeBaseInterface> & node_base,
+    const std::shared_ptr<node_interfaces::NodeServicesInterface> & node_services,
     rclcpp::node_interfaces::NodeParametersInterface * node_params,
-    const rmw_qos_profile_t & qos_profile = rmw_qos_profile_parameters);
+    const rclcpp::QoS & qos_profile = rclcpp::ParametersQoS());
 
 private:
   rclcpp::Service<rcl_interfaces::srv::GetParameters>::SharedPtr get_parameters_service_;

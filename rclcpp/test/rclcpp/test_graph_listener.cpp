@@ -15,10 +15,16 @@
 #include <gtest/gtest.h>
 #include <memory>
 
+#include <stdexcept>
+
+#include "rclcpp/context.hpp"
 #include "rclcpp/contexts/default_context.hpp"
+#include "rclcpp/exceptions.hpp"
 #include "rclcpp/graph_listener.hpp"
+#include "rclcpp/node.hpp"
 #include "rclcpp/node_interfaces/node_graph.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/node_interfaces/node_graph_interface.hpp"
+#include "rclcpp/utilities.hpp"
 
 #include "../mocking_utils/patch.hpp"
 #include "../utils/rclcpp_gtest_macros.hpp"
@@ -43,9 +49,7 @@ public:
     node_graph_ = node_->get_node_graph_interface();
     ASSERT_NE(nullptr, node_graph_);
 
-    graph_listener_ =
-      std::make_shared<rclcpp::graph_listener::GraphListener>(
-      rclcpp::contexts::get_global_default_context());
+    graph_listener_ = rclcpp::contexts::get_global_default_context()->get_graph_listener();
   }
 
   void TearDown()

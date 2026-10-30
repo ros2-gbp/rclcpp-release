@@ -17,11 +17,17 @@
 
 #include "lifecycle_msgs/msg/transition.hpp"
 
-#include "rcl_lifecycle/rcl_lifecycle.h"
-
 #include "rclcpp_lifecycle/state.hpp"
 #include "rclcpp_lifecycle/visibility_control.h"
 #include "rclcpp/node_interfaces/detail/node_interfaces_helpers.hpp"
+
+// When windows.h is included, ERROR is defined as a macro.  So the use of it later in this file,
+// even as an enum, causes compilation errors.  Work around this by undefining the macro here,
+// and then redefining when this header is finished being included.
+#if defined(_WIN32)
+#pragma push_macro("ERROR")
+#undef ERROR
+#endif
 
 namespace rclcpp_lifecycle
 {
@@ -49,14 +55,21 @@ protected:
 public:
   enum class CallbackReturn : uint8_t
   {
+     /// The callback completed successfully and the transition can proceed.
     SUCCESS = lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_SUCCESS,
+
+    /// The callback completed normally, but the requested transition
+    /// could not be completed.
     FAILURE = lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_FAILURE,
-    ERROR = lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_ERROR
+
+    /// An error occurred during callback execution.
+    /// The node transitions to an error handling state.
+    ERROR = lifecycle_msgs::msg::Transition::TRANSITION_CALLBACK_ERROR,
   };
 
   /// Callback function for configure transition
   /*
-   * \return true by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -64,7 +77,7 @@ public:
 
   /// Callback function for cleanup transition
   /*
-   * \return true by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -72,7 +85,7 @@ public:
 
   /// Callback function for shutdown transition
   /*
-   * \return true by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -80,7 +93,7 @@ public:
 
   /// Callback function for activate transition
   /*
-   * \return true by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -88,7 +101,7 @@ public:
 
   /// Callback function for deactivate transition
   /*
-   * \return true by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -96,7 +109,7 @@ public:
 
   /// Callback function for errorneous transition
   /*
-   * \return false by default
+   * \return SUCCESS by default
    */
   RCLCPP_LIFECYCLE_PUBLIC
   virtual CallbackReturn
@@ -109,6 +122,10 @@ public:
 
 }  // namespace node_interfaces
 }  // namespace rclcpp_lifecycle
+
+#if defined(_WIN32)
+#pragma pop_macro("ERROR")
+#endif
 
 RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(
   rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface, lifecycle_node)

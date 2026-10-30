@@ -21,6 +21,7 @@
 #include <utility>
 
 #include "rcl/subscription.h"
+#include "rclcpp/any_subscription_callback.hpp"
 #include "rclcpp/generic_subscription.hpp"
 #include "rclcpp/node_interfaces/node_topics_interface.hpp"
 #include "rclcpp/qos.hpp"
@@ -45,13 +46,15 @@ namespace rclcpp
  * Not all publisher options are currently respected, the only relevant options for this
  * publisher are `event_callbacks`, `use_default_callbacks`, and `%callback_group`.
  */
-template<typename AllocatorT = std::allocator<void>>
+template<
+  typename CallbackT,
+  typename AllocatorT = std::allocator<void>>
 std::shared_ptr<GenericSubscription> create_generic_subscription(
   rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr topics_interface,
   const std::string & topic_name,
   const std::string & topic_type,
   const rclcpp::QoS & qos,
-  std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
+  CallbackT && callback,
   const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options = (
     rclcpp::SubscriptionOptionsWithAllocator<AllocatorT>()
   )
@@ -60,13 +63,20 @@ std::shared_ptr<GenericSubscription> create_generic_subscription(
   auto ts_lib = rclcpp::get_typesupport_library(
     topic_type, "rosidl_typesupport_cpp");
 
+  auto allocator = options.get_allocator();
+
+  using rclcpp::AnySubscriptionCallback;
+  AnySubscriptionCallback<rclcpp::SerializedMessage, AllocatorT>
+  any_subscription_callback(*allocator);
+  any_subscription_callback.set(std::forward<CallbackT>(callback));
+
   auto subscription = std::make_shared<GenericSubscription>(
     topics_interface->get_node_base_interface(),
     std::move(ts_lib),
     topic_name,
     topic_type,
     qos,
-    callback,
+    any_subscription_callback,
     options);
 
   topics_interface->add_subscription(subscription, options.callback_group);

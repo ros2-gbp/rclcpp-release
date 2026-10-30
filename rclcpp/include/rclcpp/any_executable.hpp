@@ -22,7 +22,7 @@
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/service.hpp"
-#include "rclcpp/subscription.hpp"
+#include "rclcpp/subscription_base.hpp"
 #include "rclcpp/timer.hpp"
 #include "rclcpp/visibility_control.hpp"
 #include "rclcpp/waitable.hpp"
@@ -45,9 +45,9 @@ struct AnyExecutable
   rclcpp::ClientBase::SharedPtr client;
   rclcpp::Waitable::SharedPtr waitable;
   // These are used to keep the scope on the containing items
-  rclcpp::CallbackGroup::SharedPtr callback_group;
-  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base;
-  std::shared_ptr<void> data;
+  rclcpp::CallbackGroup::SharedPtr callback_group {nullptr};
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr node_base {nullptr};
+  std::shared_ptr<void> data {nullptr};
 };
 
 }  // namespace rclcpp

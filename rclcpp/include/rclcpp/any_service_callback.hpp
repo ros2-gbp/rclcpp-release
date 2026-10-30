@@ -23,7 +23,6 @@
 #include <utility>
 
 #include "rclcpp/function_traits.hpp"
-#include "rclcpp/visibility_control.hpp"
 #include "rmw/types.h"
 #include "tracetools/tracetools.h"
 #include "tracetools/utils.hpp"
@@ -97,6 +96,20 @@ public:
       >::value)
     {
       callback_.template emplace<SharedPtrDeferResponseCallbackWithServiceHandle>(callback);
+    } else if constexpr (  // NOLINT
+      rclcpp::function_traits::same_arguments<
+        CallbackT,
+        ConstRefCallback
+      >::value)
+    {
+      callback_.template emplace<ConstRefCallback>(callback);
+    } else if constexpr (  // NOLINT
+      rclcpp::function_traits::same_arguments<
+        CallbackT,
+        ConstRefWithRequestHeaderCallback
+      >::value)
+    {
+      callback_.template emplace<ConstRefWithRequestHeaderCallback>(callback);
     } else {
       // the else clause is not needed, but anyways we should only be doing this instead
       // of all the above workaround ...
@@ -142,6 +155,20 @@ public:
       >::value)
     {
       callback_.template emplace<SharedPtrDeferResponseCallbackWithServiceHandle>(callback);
+    } else if constexpr (  // NOLINT
+      rclcpp::function_traits::same_arguments<
+        CallbackT,
+        ConstRefCallback
+      >::value)
+    {
+      callback_.template emplace<ConstRefCallback>(callback);
+    } else if constexpr (  // NOLINT
+      rclcpp::function_traits::same_arguments<
+        CallbackT,
+        ConstRefWithRequestHeaderCallback
+      >::value)
+    {
+      callback_.template emplace<ConstRefWithRequestHeaderCallback>(callback);
     } else {
       // the else clause is not needed, but anyways we should only be doing this instead
       // of all the above workaround ...
@@ -156,7 +183,7 @@ public:
     const std::shared_ptr<rmw_request_id_t> & request_header,
     std::shared_ptr<typename ServiceT::Request> request)
   {
-    TRACEPOINT(callback_start, static_cast<const void *>(this), false);
+    TRACETOOLS_TRACEPOINT(callback_start, static_cast<const void *>(this), false);
     if (std::holds_alternative<std::monostate>(callback_)) {
       // TODO(ivanpauno): Remove the set method, and force the users of this class
       // to pass a callback at construnciton.
@@ -165,11 +192,13 @@ public:
     if (std::holds_alternative<SharedPtrDeferResponseCallback>(callback_)) {
       const auto & cb = std::get<SharedPtrDeferResponseCallback>(callback_);
       cb(request_header, std::move(request));
+      TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
       return nullptr;
     }
     if (std::holds_alternative<SharedPtrDeferResponseCallbackWithServiceHandle>(callback_)) {
       const auto & cb = std::get<SharedPtrDeferResponseCallbackWithServiceHandle>(callback_);
       cb(service_handle, request_header, std::move(request));
+      TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
       return nullptr;
     }
     // auto response = allocate_shared<typename ServiceT::Response, Allocator>();
@@ -181,8 +210,20 @@ public:
     } else if (std::holds_alternative<SharedPtrWithRequestHeaderCallback>(callback_)) {
       const auto & cb = std::get<SharedPtrWithRequestHeaderCallback>(callback_);
       cb(request_header, std::move(request), response);
+    } else if (std::holds_alternative<ConstRefCallback>(callback_)) {
+      if (nullptr == request) {
+        throw std::runtime_error("dispatch called with a null request");
+      }
+      const auto & cb = std::get<ConstRefCallback>(callback_);
+      cb(*request, *response);
+    } else if (std::holds_alternative<ConstRefWithRequestHeaderCallback>(callback_)) {
+      if (nullptr == request_header || nullptr == request) {
+        throw std::runtime_error("dispatch called with a null request header or request");
+      }
+      const auto & cb = std::get<ConstRefWithRequestHeaderCallback>(callback_);
+      cb(*request_header, *request, *response);
     }
-    TRACEPOINT(callback_end, static_cast<const void *>(this));
+    TRACETOOLS_TRACEPOINT(callback_end, static_cast<const void *>(this));
     return response;
   }
 
@@ -191,10 +232,14 @@ public:
 #ifndef TRACETOOLS_DISABLED
     std::visit(
       [this](auto && arg) {
-        TRACEPOINT(
-          rclcpp_callback_register,
-          static_cast<const void *>(this),
-          tracetools::get_symbol(arg));
+        if (TRACETOOLS_TRACEPOINT_ENABLED(rclcpp_callback_register)) {
+          char * symbol = tracetools::get_symbol(arg);
+          TRACETOOLS_DO_TRACEPOINT(
+            rclcpp_callback_register,
+            static_cast<const void *>(this),
+            symbol);
+          std::free(symbol);
+        }
       }, callback_);
 #endif  // TRACETOOLS_DISABLED
   }
@@ -222,13 +267,28 @@ private:
       std::shared_ptr<rmw_request_id_t>,
       std::shared_ptr<typename ServiceT::Request>
     )>;
+  // The request and response are received as shared pointers and dereferenced before
+  // calling the user callback, like AnySubscriptionCallback does for `const MessageT &`.
+  using ConstRefCallback = std::function<
+    void (
+      const typename ServiceT::Request &,
+      typename ServiceT::Response &
+    )>;
+  using ConstRefWithRequestHeaderCallback = std::function<
+    void (
+      const rmw_request_id_t &,
+      const typename ServiceT::Request &,
+      typename ServiceT::Response &
+    )>;
 
   std::variant<
     std::monostate,
     SharedPtrCallback,
     SharedPtrWithRequestHeaderCallback,
     SharedPtrDeferResponseCallback,
-    SharedPtrDeferResponseCallbackWithServiceHandle> callback_;
+    SharedPtrDeferResponseCallbackWithServiceHandle,
+    ConstRefCallback,
+    ConstRefWithRequestHeaderCallback> callback_;
 };
 
 }  // namespace rclcpp

@@ -16,8 +16,12 @@
 
 #include <memory>
 
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/node.hpp"
+#include "rclcpp/publisher_base.hpp"
+#include "rclcpp/publisher_options.hpp"
+#include "rclcpp/qos.hpp"
 #include "rclcpp/type_support_decl.hpp"
+#include "rclcpp/utilities.hpp"
 #include "test_msgs/msg/empty.hpp"
 
 class TestTypeSupport : public ::testing::Test
@@ -58,10 +62,9 @@ protected:
   rclcpp::Node::SharedPtr node = std::make_shared<rclcpp::Node>("my_node", "/ns");
 };
 
-const rcl_publisher_options_t PublisherOptions()
+const rclcpp::PublisherOptionsWithAllocator<std::allocator<void>> PublisherOptions()
 {
-  return rclcpp::PublisherOptionsWithAllocator<std::allocator<void>>().template
-         to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10));
+  return rclcpp::PublisherOptionsWithAllocator<std::allocator<void>>();
 }
 
 // Auxiliary classes used to test rosidl_message_type_support_t getters
@@ -77,7 +80,8 @@ public:
       node->get_node_base_interface().get(),
       "topicTSParameterEvent",
       *ts_parameter_event,
-      PublisherOptions()) {}
+      PublisherOptions().to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10)),
+      PublisherOptions().event_callbacks, PublisherOptions().use_default_callbacks) {}
 };
 
 const rosidl_message_type_support_t * ts_set_parameter_result =
@@ -91,7 +95,8 @@ public:
       node->get_node_base_interface().get(),
       "topicTSSetParameterResult",
       *ts_set_parameter_result,
-      PublisherOptions()) {}
+      PublisherOptions().to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10)),
+      PublisherOptions().event_callbacks, PublisherOptions().use_default_callbacks) {}
 };
 
 const rosidl_message_type_support_t * ts_parameter_descriptor =
@@ -105,7 +110,8 @@ public:
       node->get_node_base_interface().get(),
       "topicTSParameterDescriptor",
       *ts_parameter_descriptor,
-      PublisherOptions()) {}
+      PublisherOptions().to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10)),
+      PublisherOptions().event_callbacks, PublisherOptions().use_default_callbacks) {}
 };
 
 const rosidl_message_type_support_t * ts_list_parameter_result =
@@ -119,7 +125,8 @@ public:
       node->get_node_base_interface().get(),
       "topicTSListParametersResult",
       *ts_list_parameter_result,
-      PublisherOptions()) {}
+      PublisherOptions().to_rcl_publisher_options<test_msgs::msg::Empty>(rclcpp::QoS(10)),
+      PublisherOptions().event_callbacks, PublisherOptions().use_default_callbacks) {}
 };
 
 /*
@@ -150,13 +157,6 @@ TEST_F(TestTypeSupport, basic_getters) {
 
 /* Testing type support getters */
 TEST_F(TestTypeSupport, test_service_ts_get_params_srv) {
-  const rosidl_service_type_support_t * ts =
-    rclcpp::type_support::get_get_parameters_srv_type_support();
-  ASSERT_NE(nullptr, ts);
-  EXPECT_TRUE(test_type_support_init_fini(ts));
-}
-
-TEST_F(TestTypeSupport, test_service_ts_get_params_srv_type) {
   const rosidl_service_type_support_t * ts =
     rclcpp::type_support::get_get_parameters_srv_type_support();
   ASSERT_NE(nullptr, ts);

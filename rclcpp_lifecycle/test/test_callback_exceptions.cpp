@@ -18,10 +18,12 @@
 #include <string>
 #include <utility>
 
+#include <stdexcept>
+
 #include "lifecycle_msgs/msg/state.hpp"
 #include "lifecycle_msgs/msg/transition.hpp"
 
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/utilities.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
 using lifecycle_msgs::msg::State;
@@ -33,6 +35,11 @@ protected:
   static void SetUpTestCase()
   {
     rclcpp::init(0, nullptr);
+  }
+
+  static void TearDownTestCase()
+  {
+    rclcpp::shutdown();
   }
 };
 

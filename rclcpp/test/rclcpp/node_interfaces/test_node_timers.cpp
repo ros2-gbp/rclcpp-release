@@ -14,13 +14,18 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 #include "rcl/node_options.h"
+#include "rclcpp/callback_group.hpp"
+#include "rclcpp/exceptions.hpp"
 #include "rclcpp/node.hpp"
 #include "rclcpp/node_interfaces/node_timers.hpp"
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/timer.hpp"
+#include "rclcpp/utilities.hpp"
 
 #include "../../mocking_utils/patch.hpp"
 #include "../../utils/rclcpp_gtest_macros.hpp"
@@ -32,8 +37,8 @@ public:
   : TimerBase(node->get_clock(), std::chrono::nanoseconds(1),
       node->get_node_base_interface()->get_context()) {}
 
-  bool call() override {return true;}
-  void execute_callback() override {}
+  std::shared_ptr<void> call() override {return nullptr;}
+  void execute_callback(const std::shared_ptr<void> &) override {}
   bool is_steady() override {return false;}
 };
 
@@ -75,7 +80,7 @@ TEST_F(TestNodeTimers, add_timer)
     different_node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   RCLCPP_EXPECT_THROW_EQ(
     node_timers->add_timer(timer, callback_group_in_different_node),
-    std::runtime_error("Cannot create timer, group not in node."));
+    rclcpp::exceptions::MissingGroupNodeException("timer"));
 }
 
 TEST_F(TestNodeTimers, add_timer_rcl_trigger_guard_condition_error)

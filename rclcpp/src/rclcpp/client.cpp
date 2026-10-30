@@ -17,15 +17,23 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <functional>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
 #include <string>
 
 #include "rcl/graph.h"
 #include "rcl/node.h"
 #include "rcl/wait.h"
+
+#include "rmw/impl/cpp/demangle.hpp"
+
+#include "rclcpp/detail/cpp_callback_trampoline.hpp"
 #include "rclcpp/exceptions.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
 #include "rclcpp/node_interfaces/node_graph_interface.hpp"
+#include "rclcpp/qos.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp/logging.hpp"
 
@@ -35,7 +43,7 @@ using rclcpp::exceptions::throw_from_rcl_error;
 
 ClientBase::ClientBase(
   rclcpp::node_interfaces::NodeBaseInterface * node_base,
-  rclcpp::node_interfaces::NodeGraphInterface::SharedPtr node_graph)
+  const rclcpp::node_interfaces::NodeGraphInterface::SharedPtr & node_graph)
 : node_graph_(node_graph),
   node_handle_(node_base->get_shared_rcl_node_handle()),
   context_(node_base->get_context()),
@@ -63,13 +71,6 @@ ClientBase::ClientBase(
       }
       delete client;
     });
-}
-
-ClientBase::~ClientBase()
-{
-  clear_on_new_response_callback();
-  // Make sure the client handle is destructed as early as possible and before the node handle
-  client_handle_.reset();
 }
 
 bool
@@ -130,7 +131,6 @@ bool
 ClientBase::wait_for_service_nanoseconds(std::chrono::nanoseconds timeout)
 {
   auto start = std::chrono::steady_clock::now();
-  // make an event to reuse, rather than create a new one each time
   auto node_ptr = node_graph_.lock();
   if (!node_ptr) {
     throw InvalidNodeError();
@@ -143,6 +143,7 @@ ClientBase::wait_for_service_nanoseconds(std::chrono::nanoseconds timeout)
     // check was non-blocking, return immediately
     return false;
   }
+  // make an event to reuse, rather than create a new one each time
   auto event = node_ptr->get_graph_event();
   // update the time even on the first loop to account for time spent in the first call
   // to this->server_is_ready()
@@ -248,7 +249,64 @@ ClientBase::set_on_new_response_callback(rcl_event_callback_t callback, const vo
     user_data);
 
   if (RCL_RET_OK != ret) {
-    using rclcpp::exceptions::throw_from_rcl_error;
     throw_from_rcl_error(ret, "failed to set the on new response callback for client");
+  }
+}
+
+void
+ClientBase::set_on_new_response_callback(const std::function<void(size_t)> & callback)
+{
+  if (!callback) {
+    throw std::invalid_argument(
+            "The callback passed to set_on_new_response_callback "
+            "is not callable.");
+  }
+
+  auto new_callback =
+    [callback, this](size_t number_of_responses) {
+      try {
+        callback(number_of_responses);
+      } catch (const std::exception & exception) {
+        RCLCPP_ERROR_STREAM(
+          node_logger_,
+          "rclcpp::ClientBase@" << this <<
+            " caught " << rmw::impl::cpp::demangle(exception) <<
+            " exception in user-provided callback for the 'on new response' callback: " <<
+            exception.what());
+      } catch (...) {
+        RCLCPP_ERROR_STREAM(
+          node_logger_,
+          "rclcpp::ClientBase@" << this <<
+            " caught unhandled exception in user-provided callback " <<
+            "for the 'on new response' callback");
+      }
+    };
+
+  std::lock_guard<std::recursive_mutex> lock(callback_mutex_);
+
+  // Set it temporarily to the new callback, while we replace the old one.
+  // This two-step setting, prevents a gap where the old std::function has
+  // been replaced but the middleware hasn't been told about the new one yet.
+  set_on_new_response_callback(
+    rclcpp::detail::cpp_callback_trampoline<decltype(new_callback), const void *, size_t>,
+    static_cast<const void *>(&new_callback));
+
+  // Store the std::function to keep it in scope, also overwrites the existing one.
+  on_new_response_callback_ = new_callback;
+
+  // Set it again, now using the permanent storage.
+  set_on_new_response_callback(
+    rclcpp::detail::cpp_callback_trampoline<
+      decltype(on_new_response_callback_), const void *, size_t>,
+    static_cast<const void *>(&on_new_response_callback_));
+}
+
+void
+ClientBase::clear_on_new_response_callback()
+{
+  std::lock_guard<std::recursive_mutex> lock(callback_mutex_);
+  if (on_new_response_callback_) {
+    set_on_new_response_callback(nullptr, nullptr);
+    on_new_response_callback_ = nullptr;
   }
 }

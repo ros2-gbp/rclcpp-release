@@ -20,7 +20,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "rclcpp/visibility_control.hpp"
 
 namespace rclcpp
 {
@@ -42,6 +41,10 @@ struct NodeInterfacesStorage
   template<typename NodeT>
   NodeInterfacesStorage(NodeT & node)  // NOLINT(runtime/explicit)
   : interfaces_(init_tuple<decltype(node), InterfaceTs ...>(node))
+  {}
+
+  NodeInterfacesStorage()
+  : interfaces_()
   {}
 
   explicit NodeInterfacesStorage(std::shared_ptr<InterfaceTs>... args)
@@ -163,6 +166,7 @@ init_tuple(NodeT & n)
  * something like that, then you'll need to create your own specialization of
  * the NodeInterfacesSupports struct without this macro.
  */
+// *INDENT-OFF*
 #define RCLCPP_NODE_INTERFACE_HELPERS_SUPPORT(NodeInterfaceType, NodeInterfaceName) \
   namespace rclcpp::node_interfaces::detail { \
   template<typename StorageClassT, typename ... RemainingInterfaceTs> \
@@ -185,7 +189,7 @@ init_tuple(NodeT & n)
     /* Perfect forwarding constructor to get arguments down to StorageClassT (eventually). */ \
     template<typename ... ArgsT> \
     explicit NodeInterfacesSupports(ArgsT && ... args) \
-      : NodeInterfacesSupports<StorageClassT, RemainingInterfaceTs ...>( \
+    : NodeInterfacesSupports<StorageClassT, RemainingInterfaceTs ...>( \
         std::forward<ArgsT>(args) ...) \
     {} \
  \
@@ -202,6 +206,7 @@ init_tuple(NodeT & n)
     } \
   }; \
   }  // namespace rclcpp::node_interfaces::detail
+// *INDENT-ON*
 
 }  // namespace detail
 }  // namespace node_interfaces
