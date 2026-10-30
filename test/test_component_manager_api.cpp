@@ -24,6 +24,11 @@
 
 #include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
 #include "rclcpp/executors/multi_threaded_executor.hpp"
+#include "rclcpp/executors/single_threaded_executor.hpp"
+#include "rclcpp/future_return_code.hpp"
+#include "rclcpp/node.hpp"
+#include "rclcpp/parameter.hpp"
+#include "rclcpp/parameter_value.hpp"
 #include "rclcpp/utilities.hpp"
 #include "rclcpp_components/component_manager.hpp"
 #include "rclcpp_components/component_manager_isolated.hpp"
@@ -203,11 +208,10 @@ void test_components_api(bool use_dedicated_executor)
     EXPECT_EQ(result->unique_id, 6u);
   }
 
-  std::array<std::string, 8u> valid_extra_arguments = {
+  std::array<std::string, 7u> valid_extra_arguments = {
     "forward_global_arguments",
     "use_intra_process_comms",
     "enable_rosout",
-    "enable_topic_statistics",
     "start_parameter_services",
     "start_parameter_event_publisher",
     "use_clock_thread",
