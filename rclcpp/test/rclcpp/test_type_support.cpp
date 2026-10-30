@@ -16,8 +16,12 @@
 
 #include <memory>
 
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/node.hpp"
+#include "rclcpp/publisher_base.hpp"
+#include "rclcpp/publisher_options.hpp"
+#include "rclcpp/qos.hpp"
 #include "rclcpp/type_support_decl.hpp"
+#include "rclcpp/utilities.hpp"
 #include "test_msgs/msg/empty.hpp"
 
 class TestTypeSupport : public ::testing::Test
@@ -153,13 +157,6 @@ TEST_F(TestTypeSupport, basic_getters) {
 
 /* Testing type support getters */
 TEST_F(TestTypeSupport, test_service_ts_get_params_srv) {
-  const rosidl_service_type_support_t * ts =
-    rclcpp::type_support::get_get_parameters_srv_type_support();
-  ASSERT_NE(nullptr, ts);
-  EXPECT_TRUE(test_type_support_init_fini(ts));
-}
-
-TEST_F(TestTypeSupport, test_service_ts_get_params_srv_type) {
   const rosidl_service_type_support_t * ts =
     rclcpp::type_support::get_get_parameters_srv_type_support();
   ASSERT_NE(nullptr, ts);
