@@ -157,10 +157,9 @@ ServerBase::ServerBase(
 
   rcl_node_t * rcl_node = node_base->get_rcl_node_handle();
 
-  // This timer callback will be exchanged at the RCL layer
-  // with a _timer_ callback that will call the _event_ callback
-  // passed in by set_on_ready_callback.
-  std::function<void()> timer_callback = [] () {};
+  std::function<void()> timer_callback = [this] () {
+      execute_check_expired_goals();
+    };
   pimpl_->expire_timer_ = std::make_shared<rclcpp::GenericTimer<decltype (timer_callback)>>(
       node_clock->get_clock(), std::chrono::nanoseconds(options.result_timeout.nanoseconds),
       std::move(timer_callback), node_base->get_context(), false);
@@ -188,7 +187,6 @@ ServerBase::ServerBase(
 
 ServerBase::~ServerBase()
 {
-  pimpl_->expire_timer_->cancel();
 }
 
 size_t
@@ -820,7 +818,6 @@ ServerBase::set_on_ready_callback(std::function<void(size_t, int)> callback)
   set_callback_to_entity(EntityType::GoalService, callback);
   set_callback_to_entity(EntityType::ResultService, callback);
   set_callback_to_entity(EntityType::CancelService, callback);
-  set_callback_to_entity(EntityType::Expired, callback);
 }
 
 void
@@ -918,14 +915,9 @@ ServerBase::set_on_ready_callback(
         break;
       }
 
-    case EntityType::Expired:
-      {
-        ret = rcl_action_server_set_expired_event_callback(
-          pimpl_->action_server_.get(),
-          callback,
-          user_data);
-        break;
-      }
+    default:
+      throw std::runtime_error("ServerBase::set_on_ready_callback: Unknown entity type.");
+      break;
   }
 
   if (RCL_RET_OK != ret) {
@@ -943,7 +935,6 @@ ServerBase::clear_on_ready_callback()
     set_on_ready_callback(EntityType::GoalService, nullptr, nullptr);
     set_on_ready_callback(EntityType::ResultService, nullptr, nullptr);
     set_on_ready_callback(EntityType::CancelService, nullptr, nullptr);
-    set_on_ready_callback(EntityType::Expired, nullptr, nullptr);
     on_ready_callback_set_ = false;
   }
 

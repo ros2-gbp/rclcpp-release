@@ -22,7 +22,6 @@
 #include <vector>
 
 #include "rclcpp/context.hpp"
-#include "rclcpp/contexts/default_context.hpp"
 #include "rclcpp/init_options.hpp"
 #include "rclcpp/visibility_control.hpp"
 
@@ -174,7 +173,7 @@ remove_ros_arguments(int argc, char const * const * argv);
  */
 RCLCPP_PUBLIC
 bool
-ok(const rclcpp::Context::SharedPtr & context = rclcpp::contexts::get_global_default_context());
+ok(rclcpp::Context::SharedPtr context = nullptr);
 
 /// Shutdown rclcpp context, invalidating it for derived entities.
 /**
@@ -193,7 +192,7 @@ ok(const rclcpp::Context::SharedPtr & context = rclcpp::contexts::get_global_def
 RCLCPP_PUBLIC
 bool
 shutdown(
-  const rclcpp::Context::SharedPtr & context = rclcpp::contexts::get_global_default_context(),
+  rclcpp::Context::SharedPtr context = nullptr,
   const std::string & reason = "user called rclcpp::shutdown()");
 
 /// Register a function to be called when shutdown is called on the context.
@@ -213,9 +212,7 @@ shutdown(
  */
 RCLCPP_PUBLIC
 void
-on_shutdown(
-  const std::function<void()> & callback,
-  const rclcpp::Context::SharedPtr & context = rclcpp::contexts::get_global_default_context());
+on_shutdown(std::function<void()> callback, rclcpp::Context::SharedPtr context = nullptr);
 
 /// Use the global condition variable to block for the specified amount of time.
 /**
@@ -234,7 +231,7 @@ RCLCPP_PUBLIC
 bool
 sleep_for(
   const std::chrono::nanoseconds & nanoseconds,
-  const rclcpp::Context::SharedPtr & context = rclcpp::contexts::get_global_default_context());
+  rclcpp::Context::SharedPtr context = nullptr);
 
 /// Safely check if addition will overflow.
 /**

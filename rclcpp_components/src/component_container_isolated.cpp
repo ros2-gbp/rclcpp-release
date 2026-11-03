@@ -16,20 +16,12 @@
 #include <vector>
 #include <string>
 
-#include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/executors/multi_threaded_executor.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "rclcpp/utilities.hpp"
-
 #include "rclcpp_components/component_manager_isolated.hpp"
 
 int main(int argc, char * argv[])
 {
-  RCUTILS_LOG_WARN_NAMED("component_container_isolated",
-    "This executable is deprecated and will be removed in M-turtle.\n"
-    "Use 'component_container --executor-type single-threaded --isolated' instead.\n"
-    "For a multi-threaded isolated setup,"
-    " use 'component_container --executor-type multi-threaded --isolated'.");
-
   /// Component container with dedicated single-threaded executors for each components.
   rclcpp::init(argc, argv);
   // parse arguments
@@ -41,8 +33,11 @@ int main(int argc, char * argv[])
     }
   }
   // create executor and component manager
-  auto exec = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
   rclcpp::Node::SharedPtr node;
+  // Declare the executor after the manager, so on destruction the executor is
+  // destroyed first. Otherwise, the executor could release component entities
+  // after the manager has unloaded their libraries.
+  auto exec = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
   if (use_multi_threaded_executor) {
     using ComponentManagerIsolated =
       rclcpp_components::ComponentManagerIsolated<rclcpp::executors::MultiThreadedExecutor>;
@@ -54,6 +49,4 @@ int main(int argc, char * argv[])
   }
   exec->add_node(node);
   exec->spin();
-
-  return 0;
 }

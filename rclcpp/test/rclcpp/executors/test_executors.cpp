@@ -480,6 +480,10 @@ TYPED_TEST(TestExecutors, spinSome)
 
 // The purpose of this test is to check that the ExecutorT.spin_some() method:
 //   - does not continue executing after max_duration has elapsed
+// TODO(wjwwood): The `StaticSingleThreadedExecutor`
+//   do not properly implement max_duration (it seems), so disable this test
+//   for them in the meantime.
+//   see: https://github.com/ros2/rclcpp/issues/2462
 TYPED_TEST(TestExecutorsStable, spinSomeMaxDuration)
 {
   using ExecutorType = TypeParam;
@@ -650,7 +654,7 @@ TYPED_TEST(TestExecutors, testRaceConditionAddNode)
           if (should_cancel) {
             break;
           }
-          total = total + k * (i + 42);
+          total += k * (i + 42);
           (void)total;
         }
       });
@@ -800,10 +804,8 @@ TEST(TestExecutors, testSpinUntilFutureCompleteNodePtr)
 }
 
 // Check spin functions with non default context
-TYPED_TEST(TestExecutors, testSpinWithNonDefaultContext)
+TEST(TestExecutors, testSpinWithNonDefaultContext)
 {
-  using ExecutorType = TypeParam;
-
   auto non_default_context = std::make_shared<rclcpp::Context>();
   non_default_context->init(0, nullptr);
 
@@ -811,14 +813,9 @@ TYPED_TEST(TestExecutors, testSpinWithNonDefaultContext)
     auto node =
       std::make_unique<rclcpp::Node>("node", rclcpp::NodeOptions().context(non_default_context));
 
-    rclcpp::ExecutorOptions options;
-    options.context = non_default_context;
-    ExecutorType executor(options);
-    EXPECT_NO_THROW(executor.add_node(node->get_node_base_interface()));
+    EXPECT_NO_THROW(rclcpp::spin_some(node->get_node_base_interface()));
 
-    EXPECT_NO_THROW(executor.spin_some());
-
-    EXPECT_NO_THROW(executor.spin_all(1s));
+    EXPECT_NO_THROW(rclcpp::spin_all(node->get_node_base_interface(), 1s));
 
     auto check_spin_until_future_complete = [&]() {
         std::promise<bool> promise;
@@ -826,7 +823,8 @@ TYPED_TEST(TestExecutors, testSpinWithNonDefaultContext)
         promise.set_value(true);
 
         auto shared_future = future.share();
-        auto ret = executor.spin_until_future_complete(shared_future, 1s);
+        auto ret = rclcpp::spin_until_future_complete(
+          node->get_node_base_interface(), shared_future, 1s);
         EXPECT_EQ(rclcpp::FutureReturnCode::SUCCESS, ret);
       };
     EXPECT_NO_THROW(check_spin_until_future_complete());
