@@ -8,6 +8,7 @@ find_package(ament_cmake_ros REQUIRED)
 find_package(ament_cmake_ros_core REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(builtin_interfaces REQUIRED)
+find_package(libstatistics_collector REQUIRED)
 find_package(rcl REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(rcl_logging_interface REQUIRED)
@@ -19,7 +20,9 @@ find_package(rosgraph_msgs REQUIRED)
 find_package(rosidl_dynamic_typesupport REQUIRED)
 find_package(rosidl_runtime_c REQUIRED)
 find_package(rosidl_runtime_cpp REQUIRED)
+find_package(rosidl_typesupport_c REQUIRED)
 find_package(rosidl_typesupport_cpp REQUIRED)
+find_package(statistics_msgs REQUIRED)
 find_package(tracetools REQUIRED)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -77,7 +80,6 @@ set(${PROJECT_NAME}_SRCS
   src/rclcpp/guard_condition.cpp
   src/rclcpp/init_options.cpp
   src/rclcpp/intra_process_manager.cpp
-  src/rclcpp/log_directory.cpp
   src/rclcpp/logger.cpp
   src/rclcpp/logging_mutex.cpp
   src/rclcpp/memory_strategy.cpp
@@ -198,6 +200,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
 target_link_libraries(${PROJECT_NAME} PUBLIC
   builtin_interfaces::builtin_interfaces
+  libstatistics_collector::libstatistics_collector
   rcl::rcl
   rcl_interfaces::rcl_interfaces
   rcl_yaml_param_parser::rcl_yaml_param_parser
@@ -209,6 +212,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   rosidl_runtime_c::rosidl_runtime_c
   rosidl_runtime_cpp::rosidl_runtime_cpp
   rosidl_typesupport_cpp::rosidl_typesupport_cpp
+  statistics_msgs::statistics_msgs
   tracetools::tracetools
   ${CMAKE_THREAD_LIBS_INIT}
   # Note we link public on purpose, as we want to export
@@ -233,11 +237,16 @@ install(
   RUNTIME DESTINATION bin
 )
 
+# Export old-style CMake variables
+ament_export_include_directories("include/${PROJECT_NAME}")
+ament_export_libraries(${PROJECT_NAME})
+
 # Export modern CMake targets
 ament_export_targets(${PROJECT_NAME})
 
 ament_export_dependencies(
   builtin_interfaces
+  libstatistics_collector
   rcl
   rcl_interfaces
   rcl_yaml_param_parser
@@ -249,6 +258,7 @@ ament_export_dependencies(
   rosidl_runtime_c
   rosidl_runtime_cpp
   rosidl_typesupport_cpp
+  statistics_msgs
   tracetools
 )
 

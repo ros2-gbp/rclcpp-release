@@ -14,11 +14,7 @@
 
 #include <gtest/gtest.h>
 
-#include <memory>
-
-#include "rclcpp/node.hpp"
-#include "rclcpp/node_options.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "test_msgs/msg/empty.hpp"
 
 #include "./waitable_test_helpers.hpp"

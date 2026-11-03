@@ -26,6 +26,7 @@
 #include "rclcpp/macros.hpp"
 #include "rclcpp/parameter.hpp"
 #include "rclcpp/visibility_control.hpp"
+#include "rmw/rmw.h"
 
 namespace rclcpp
 {

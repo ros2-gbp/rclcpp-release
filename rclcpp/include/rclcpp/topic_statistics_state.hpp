@@ -1,4 +1,4 @@
-// Copyright 2017 Open Source Robotics Foundation, Inc.
+// Copyright 2019 Open Source Robotics Foundation, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,28 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef RCLCPP__LOG_DIRECTORY_HPP_
-#define RCLCPP__LOG_DIRECTORY_HPP_
-
-#include <filesystem>
-
-#include "rclcpp/visibility_control.hpp"
+#ifndef RCLCPP__TOPIC_STATISTICS_STATE_HPP_
+#define RCLCPP__TOPIC_STATISTICS_STATE_HPP_
 
 namespace rclcpp
 {
 
-/// Get the current logging directory.
-/**
- * For more details of how the logging directory is determined,
- * see rcl_logging_get_logging_directory().
- *
- * \returns the logging directory being used.
- * \throws rclcpp::exceptions::RCLError if an unexpected error occurs.
- */
-RCLCPP_PUBLIC
-std::filesystem::path
-get_log_directory();
+/// Represent the state of topic statistics collector.
+/// Used as argument in create_subscriber.
+enum class TopicStatisticsState
+{
+  /// Explicitly enable topic statistics at subscription level.
+  Enable,
+  /// Explicitly disable topic statistics at subscription level.
+  Disable,
+  /// Take topic statistics state from the node.
+  NodeDefault
+};
 
 }  // namespace rclcpp
 
-#endif  // RCLCPP__LOG_DIRECTORY_HPP_
+#endif  // RCLCPP__TOPIC_STATISTICS_STATE_HPP_

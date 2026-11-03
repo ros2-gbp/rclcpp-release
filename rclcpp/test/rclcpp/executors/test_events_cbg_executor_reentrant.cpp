@@ -21,12 +21,7 @@
 #include <mutex>
 #include <thread>
 
-#include "rclcpp/callback_group.hpp"
-#include "rclcpp/executor_options.hpp"
-#include "rclcpp/executors/events_cbg_executor/events_cbg_executor.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/subscription_options.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "test_msgs/msg/empty.hpp"
 
 using namespace std::chrono_literals;

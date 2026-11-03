@@ -26,16 +26,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "rcpputils/compile_warnings.hpp"
-
-#include "rclcpp/callback_group.hpp"
-#include "rclcpp/executors.hpp"
-#include "rclcpp/experimental/executors/events_executor/events_executor.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/node_options.hpp"
-#include "rclcpp/qos.hpp"
-#include "rclcpp/subscription_options.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "test_msgs/msg/empty.hpp"
 
@@ -155,13 +146,11 @@ TYPED_TEST(TestExecutorsWarmup, spin_some_doesnt_require_warmup)
   // TODO(alsora): currently only the events-executor passes this test.
   // Enable single-threaded and multi-threaded executors
   // when https://github.com/ros2/rclcpp/pull/2595 gets merged
-  RCPPUTILS_DEPRECATION_WARNING_OFF_START
   if (
     !std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>())
   {
     GTEST_SKIP();
   }
-  RCPPUTILS_DEPRECATION_WARNING_OFF_STOP
 
   ExecutorType executor;
 
@@ -202,13 +191,11 @@ TYPED_TEST(TestExecutorsWarmup, spin_some_doesnt_require_warmup_with_cbgroup)
   // TODO(alsora): currently only the events-executor passes this test.
   // Enable single-threaded and multi-threaded executors
   // when https://github.com/ros2/rclcpp/pull/2595 gets merged
-  RCPPUTILS_DEPRECATION_WARNING_OFF_START
   if (
     !std::is_same<ExecutorType, rclcpp::experimental::executors::EventsExecutor>())
   {
     GTEST_SKIP();
   }
-  RCPPUTILS_DEPRECATION_WARNING_OFF_STOP
 
   ExecutorType executor;
 

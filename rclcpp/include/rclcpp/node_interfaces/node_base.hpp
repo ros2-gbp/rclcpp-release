@@ -53,6 +53,7 @@ public:
     rclcpp::Context::SharedPtr context,
     const rcl_node_options_t & rcl_node_options,
     bool use_intra_process_default,
+    bool enable_topic_statistics_default,
     rclcpp::CallbackGroup::SharedPtr default_callback_group = nullptr);
 
   RCLCPP_PUBLIC
@@ -132,6 +133,9 @@ public:
   bool
   get_use_intra_process_default() const override;
 
+  bool
+  get_enable_topic_statistics_default() const override;
+
   std::string
   resolve_topic_or_service_name(
     const std::string & name, bool is_service, bool only_expand = false) const override;
@@ -141,6 +145,7 @@ private:
 
   rclcpp::Context::SharedPtr context_;
   bool use_intra_process_default_;
+  bool enable_topic_statistics_default_;
 
   std::shared_ptr<rcl_node_t> node_handle_;
 

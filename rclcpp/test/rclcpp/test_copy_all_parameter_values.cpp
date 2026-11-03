@@ -13,14 +13,8 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
-
-#include <memory>
-#include <string>
-
 #include "rclcpp/copy_all_parameter_values.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/parameter_value.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 class TestNode : public ::testing::Test
 {

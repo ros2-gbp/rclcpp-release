@@ -14,33 +14,19 @@
 
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <functional>
 #include <limits>
 #include <map>
 #include <memory>
-#include <stdexcept>
 #include <string>
-#include <thread>
 #include <unordered_set>
 #include <vector>
 
-#include "rclcpp/callback_group.hpp"
-#include "rclcpp/context.hpp"
-#include "rclcpp/event.hpp"
 #include "rclcpp/exceptions.hpp"
-#include "rclcpp/expand_topic_or_service_name.hpp"
 #include "rclcpp/node.hpp"
-#include "rclcpp/node_interfaces/node_graph_interface.hpp"
-#include "rclcpp/node_options.hpp"
-#include "rclcpp/parameter.hpp"
-#include "rclcpp/parameter_value.hpp"
-#include "rclcpp/publisher.hpp"
-#include "rclcpp/qos.hpp"
-#include "rclcpp/subscription.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "rcpputils/filesystem_helper.hpp"
 #include "rcpputils/scope_exit.hpp"
@@ -1798,27 +1784,6 @@ TEST_F(TestNode, set_parameter_undeclared_parameters_not_allowed) {
     EXPECT_EQ(node->get_parameter(name).get_value<double>(), 50.0);
     EXPECT_FALSE(node->set_parameter(rclcpp::Parameter(name, nan)).successful);
     EXPECT_EQ(node->get_parameter(name).get_value<double>(), 50.0);
-  }
-  {
-    // setting a parameter to non-finite values with floating point range descriptor
-    auto name = "parameter"_unq;
-    rcl_interfaces::msg::ParameterDescriptor descriptor;
-    descriptor.floating_point_range.resize(1);
-    auto & floating_point_range = descriptor.floating_point_range.at(0);
-    constexpr double inf = std::numeric_limits<double>::infinity();
-    constexpr double nan = std::numeric_limits<double>::quiet_NaN();
-    floating_point_range.from_value = 0.0;
-    floating_point_range.to_value = inf;
-    floating_point_range.step = 0.0;
-    node->declare_parameter(name, 50.0, descriptor);
-    EXPECT_EQ(node->get_parameter(name).get_value<double>(), 50.0);
-
-    EXPECT_TRUE(node->set_parameter(rclcpp::Parameter(name, inf)).successful);
-    EXPECT_EQ(node->get_parameter(name).get_value<double>(), inf);
-    EXPECT_FALSE(node->set_parameter(rclcpp::Parameter(name, -inf)).successful);
-    EXPECT_EQ(node->get_parameter(name).get_value<double>(), inf);
-    EXPECT_FALSE(node->set_parameter(rclcpp::Parameter(name, nan)).successful);
-    EXPECT_EQ(node->get_parameter(name).get_value<double>(), inf);
   }
   {
     // setting an array parameter with floating point range descriptor

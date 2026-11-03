@@ -15,6 +15,7 @@
 #ifndef RCLCPP__MEMORY_STRATEGY_HPP_
 #define RCLCPP__MEMORY_STRATEGY_HPP_
 
+#include <list>
 #include <map>
 #include <memory>
 

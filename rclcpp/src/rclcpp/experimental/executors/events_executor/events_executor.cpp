@@ -18,14 +18,9 @@
 #include <utility>
 #include <vector>
 
-#include "rclcpp/utilities.hpp"
-#include "rcpputils/compile_warnings.hpp"
 #include "rcpputils/scope_exit.hpp"
 
 using namespace std::chrono_literals;
-
-// Disable deprecation warnings while maintaining the EventsExecutor
-RCPPUTILS_DEPRECATION_WARNING_OFF_START
 
 using rclcpp::experimental::executors::EventsExecutor;
 
@@ -108,7 +103,7 @@ EventsExecutor::setup_notify_waitable()
 
 EventsExecutor::~EventsExecutor()
 {
-  cancel_requested_.store(true);
+  spinning.store(false);
   notify_waitable_->clear_on_ready_callback();
   this->refresh_current_collection({});
 }
@@ -119,17 +114,12 @@ EventsExecutor::spin()
   if (spinning.exchange(true)) {
     throw std::runtime_error("spin() called while already spinning");
   }
-  RCPPUTILS_SCOPE_EXIT(
-    this->spinning.store(false);
-    this->cancel_requested_.store(false););
-  if (cancel_requested_.load()) {
-    return;
-  }
+  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
 
   timers_manager_->start();
   RCPPUTILS_SCOPE_EXIT(timers_manager_->stop(); );
 
-  while (rclcpp::ok(context_) && !cancel_requested_.load()) {
+  while (rclcpp::ok(context_) && spinning.load()) {
     // Wait until we get an event
     ExecutorEvent event;
     bool has_event = events_queue_->dequeue(event);
@@ -161,12 +151,7 @@ EventsExecutor::spin_some_impl(std::chrono::nanoseconds max_duration, bool exhau
     throw std::runtime_error("spin_some() called while already spinning");
   }
 
-  RCPPUTILS_SCOPE_EXIT(
-    this->spinning.store(false);
-    this->cancel_requested_.store(false););
-  if (cancel_requested_.load()) {
-    return;
-  }
+  RCPPUTILS_SCOPE_EXIT(this->spinning.store(false); );
 
   auto start = std::chrono::steady_clock::now();
 
@@ -196,7 +181,7 @@ EventsExecutor::spin_some_impl(std::chrono::nanoseconds max_duration, bool exhau
   const size_t ready_timers_at_start = timers_manager_->get_number_ready_timers();
   size_t executed_timers = 0;
 
-  while (rclcpp::ok(context_) && !cancel_requested_.load() && max_duration_not_elapsed()) {
+  while (rclcpp::ok(context_) && spinning.load() && max_duration_not_elapsed()) {
     // Execute first ready event from queue if exists
     if (exhaustive || (executed_events < ready_events_at_start)) {
       bool has_event = !events_queue_->empty();
@@ -469,5 +454,3 @@ EventsExecutor::add_notify_waitable_to_collection(
     {this->notify_waitable_, weak_group_ptr}
   });
 }
-
-RCPPUTILS_DEPRECATION_WARNING_OFF_STOP

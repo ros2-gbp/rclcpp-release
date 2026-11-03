@@ -117,12 +117,7 @@ ParameterEventHandler::remove_parameter_callback(
 {
   std::lock_guard<std::recursive_mutex> lock(callbacks_->mutex_);
   auto handle = callback_handle.get();
-  auto container_it =
-    callbacks_->parameter_callbacks_.find({handle->parameter_name, handle->node_name});
-  if (container_it == callbacks_->parameter_callbacks_.end()) {
-    throw std::runtime_error("Callback doesn't exist");
-  }
-  auto & container = container_it->second;
+  auto & container = callbacks_->parameter_callbacks_[{handle->parameter_name, handle->node_name}];
   auto it = std::find_if(
     container.begin(),
     container.end(),
@@ -132,7 +127,7 @@ ParameterEventHandler::remove_parameter_callback(
   if (it != container.end()) {
     container.erase(it);
     if (container.empty()) {
-      callbacks_->parameter_callbacks_.erase(container_it);
+      callbacks_->parameter_callbacks_.erase({handle->parameter_name, handle->node_name});
     }
   } else {
     throw std::runtime_error("Callback doesn't exist");
@@ -211,11 +206,10 @@ ParameterEventHandler::Callbacks::event_callback(const rcl_interfaces::msg::Para
   for (auto it = parameter_callbacks_.begin(); it != parameter_callbacks_.end(); ++it) {
     rclcpp::Parameter p;
     if (get_parameter_from_event(event, p, it->first.first, it->first.second)) {
-      for (auto cb = it->second.begin(); cb != it->second.end(); ) {
+      for (auto cb = it->second.begin(); cb != it->second.end(); ++cb) {
         auto shared_handle = cb->lock();
         if (nullptr != shared_handle) {
           shared_handle->callback(p);
-          ++cb;
         } else {
           cb = it->second.erase(cb);
         }
@@ -223,11 +217,10 @@ ParameterEventHandler::Callbacks::event_callback(const rcl_interfaces::msg::Para
     }
   }
 
-  for (auto event_cb = event_callbacks_.begin(); event_cb != event_callbacks_.end(); ) {
+  for (auto event_cb = event_callbacks_.begin(); event_cb != event_callbacks_.end(); ++event_cb) {
     auto shared_event_handle = event_cb->lock();
     if (nullptr != shared_event_handle) {
       shared_event_handle->callback(event);
-      ++event_cb;
     } else {
       event_cb = event_callbacks_.erase(event_cb);
     }

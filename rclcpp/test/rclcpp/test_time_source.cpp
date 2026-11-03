@@ -16,12 +16,8 @@
 
 #include <algorithm>
 #include <chrono>
-#include <condition_variable>
-#include <functional>
 #include <limits>
 #include <memory>
-#include <mutex>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -29,20 +25,9 @@
 #include "rcl/error_handling.h"
 #include "rcl/time.h"
 #include "rclcpp/clock.hpp"
-#include "rclcpp/duration.hpp"
-#include "rclcpp/executors.hpp"
-#include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/node_options.hpp"
-#include "rclcpp/parameter.hpp"
-#include "rclcpp/parameter_client.hpp"
-#include "rclcpp/parameter_value.hpp"
-#include "rclcpp/publisher.hpp"
-#include "rclcpp/qos.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "rclcpp/time.hpp"
 #include "rclcpp/time_source.hpp"
-#include "rclcpp/timer.hpp"
-#include "rclcpp/utilities.hpp"
 
 #include "../utils/rclcpp_gtest_macros.hpp"
 

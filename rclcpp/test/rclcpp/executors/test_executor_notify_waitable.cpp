@@ -19,10 +19,7 @@
 #include <stdexcept>
 
 #include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/guard_condition.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/utilities.hpp"
-#include "rclcpp/waitable.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "rcpputils/scope_exit.hpp"
 

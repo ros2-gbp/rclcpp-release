@@ -14,7 +14,6 @@
 
 #include <gmock/gmock.h>
 
-#include <array>
 #include <chrono>
 #include <filesystem>
 #include <functional>
@@ -24,17 +23,7 @@
 #include <string>
 #include <vector>
 
-#include "rclcpp/exceptions.hpp"
-#include "rclcpp/executors.hpp"
-#include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/future_return_code.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/node_options.hpp"
-#include "rclcpp/parameter.hpp"
-#include "rclcpp/parameter_client.hpp"
-#include "rclcpp/parameter_map.hpp"
-#include "rclcpp/parameter_value.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "../utils/rclcpp_gtest_macros.hpp"
 

@@ -16,8 +16,7 @@
 #include <string>
 
 #include "performance_test_fixture/performance_test_fixture.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 using performance_test_fixture::PerformanceTest;
 

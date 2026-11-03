@@ -12,14 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <functional>
 #include <memory>
 
 #include "performance_test_fixture/performance_test_fixture.hpp"
-#include "rclcpp/client.hpp"
-#include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "test_msgs/srv/empty.hpp"
 
 using performance_test_fixture::PerformanceTest;

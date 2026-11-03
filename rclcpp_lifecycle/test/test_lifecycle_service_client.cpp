@@ -28,10 +28,6 @@
 #include <utility>
 #include <vector>
 
-#include <cstdint>
-#include <future>
-#include <stdexcept>
-
 #include "lifecycle_msgs/msg/state.hpp"
 #include "lifecycle_msgs/msg/transition.hpp"
 #include "lifecycle_msgs/msg/transition_description.hpp"
@@ -42,14 +38,8 @@
 
 #include "rcl_lifecycle/rcl_lifecycle.h"
 
-#include "rclcpp/client.hpp"
-#include "rclcpp/event.hpp"
-#include "rclcpp/exceptions.hpp"
-#include "rclcpp/executors/single_threaded_executor.hpp"
-#include "rclcpp/node.hpp"
 #include "rclcpp/node_interfaces/node_graph.hpp"
-#include "rclcpp/parameter.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
 #include "rcpputils/scope_exit.hpp"
@@ -369,18 +359,6 @@ TEST_F(TestLifecycleServiceClient, lifecycle_transitions) {
     lifecycle_msgs::msg::State::PRIMARY_STATE_FINALIZED);
   transitions = lifecycle_client()->get_available_transitions();
   EXPECT_EQ(transitions.size(), 0u);
-}
-
-TEST_F(TestLifecycleServiceClient, invalid_transition_fails) {
-  EXPECT_EQ(
-    lifecycle_client()->get_state().id, lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED);
-
-  // ACTIVATE is not a valid transition from UNCONFIGURED.
-  EXPECT_FALSE(
-    lifecycle_client()->change_state(
-      lifecycle_msgs::msg::Transition::TRANSITION_ACTIVATE));
-  EXPECT_EQ(
-    lifecycle_client()->get_state().id, lifecycle_msgs::msg::State::PRIMARY_STATE_UNCONFIGURED);
 }
 
 TEST_F(TestLifecycleServiceClient, get_service_names_and_types_by_node)

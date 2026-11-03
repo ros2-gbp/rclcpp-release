@@ -14,17 +14,13 @@
 
 #include <gtest/gtest.h>
 
-#include <chrono>
 #include <iostream>
 #include <memory>
 #include <string>
 
-#include "rclcpp/context.hpp"
 #include "rclcpp/exceptions.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/node_options.hpp"
 #include "rclcpp/publisher.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "test_msgs/msg/empty.hpp"
 
@@ -87,6 +83,7 @@ struct ShouldUseIntraprocess
 };
 
 using UseIntraprocess = ShouldUseIntraprocess<true>;
+using DoNotUseIntraprocess = ShouldUseIntraprocess<false>;
 
 struct UseCustomContext
 {

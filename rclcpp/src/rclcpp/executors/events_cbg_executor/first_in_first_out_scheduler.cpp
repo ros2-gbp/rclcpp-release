@@ -154,6 +154,8 @@ FirstInFirstOutScheduler::get_handle_for_callback_group(
 
 CBGScheduler::ExecutableEntityWithInfo FirstInFirstOutScheduler::get_next_ready_entity_intern()
 {
+  std::lock_guard l(ready_callback_groups_mutex);
+
   while(!ready_callback_groups.empty()) {
     FirstInFirstOutCallbackGroupHandle *ready_cbg =
       static_cast<FirstInFirstOutCallbackGroupHandle *>(ready_callback_groups.front());
@@ -185,6 +187,8 @@ CBGScheduler::ExecutableEntityWithInfo FirstInFirstOutScheduler::get_next_ready_
 CBGScheduler::ExecutableEntityWithInfo FirstInFirstOutScheduler::get_next_ready_entity_intern(
   GlobalEventIdProvider::MonotonicId max_id)
 {
+  std::lock_guard l(ready_callback_groups_mutex);
+
   // as, we remove an reappend ready callback_groups during execution,
   // the first ready cbg may not contain the lowest id. Therefore we
   // need to search the whole deque

@@ -16,12 +16,10 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "lifecycle_msgs/msg/state.hpp"
 #include "performance_test_fixture/performance_test_fixture.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 
 /**

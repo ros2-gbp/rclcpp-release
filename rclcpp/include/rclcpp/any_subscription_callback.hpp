@@ -24,6 +24,7 @@
 #include <utility>
 #include <variant>
 
+#include "rosidl_runtime_cpp/traits.hpp"
 #include "tracetools/tracetools.h"
 #include "tracetools/utils.hpp"
 
@@ -351,6 +352,20 @@ private:
     typename CallbackTypes::SharedPtrSerializedMessageCallback;
   using SharedPtrSerializedMessageWithInfoCallback =
     typename CallbackTypes::SharedPtrSerializedMessageWithInfoCallback;
+
+  template<typename T>
+  struct NotNull
+  {
+    NotNull(const T * pointer_in, const char * msg)
+    : pointer(pointer_in)
+    {
+      if (pointer == nullptr) {
+        throw std::invalid_argument(msg);
+      }
+    }
+
+    const T * pointer;
+  };
 
 public:
   explicit

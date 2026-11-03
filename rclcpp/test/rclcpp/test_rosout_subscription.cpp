@@ -15,18 +15,10 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
-#include <future>
 #include <memory>
 #include <string>
 
-#include "rclcpp/executors.hpp"
-#include "rclcpp/future_return_code.hpp"
-#include "rclcpp/logger.hpp"
-#include "rclcpp/logging.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/node_options.hpp"
-#include "rclcpp/subscription.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "rcl_interfaces/msg/log.hpp"
 

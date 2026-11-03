@@ -21,10 +21,11 @@
 
 #include "rcpputils/shared_library.hpp"
 
+#include "rclcpp/callback_group.hpp"
 #include "rclcpp/macros.hpp"
 #include "rclcpp/node_interfaces/node_base_interface.hpp"
+#include "rclcpp/node_interfaces/node_topics_interface.hpp"
 #include "rclcpp/publisher_base.hpp"
-#include "rclcpp/publisher_options.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/serialized_message.hpp"
 #include "rclcpp/typesupport_helpers.hpp"

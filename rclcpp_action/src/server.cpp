@@ -34,6 +34,8 @@
 using rclcpp_action::ServerBase;
 using rclcpp_action::GoalUUID;
 
+struct ServerBaseData;
+
 namespace rclcpp_action
 {
 
@@ -224,7 +226,7 @@ ServerBase::add_to_wait_set(rcl_wait_set_t & wait_set)
 {
   std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
   rcl_ret_t ret = rcl_action_wait_set_add_action_server(
-    &wait_set, pimpl_->action_server_.get(), nullptr);
+    &wait_set, pimpl_->action_server_.get(), NULL);
   if (RCL_RET_OK != ret) {
     rclcpp::exceptions::throw_from_rcl_error(ret, "ServerBase::add_to_wait_set() failed");
   }
@@ -681,9 +683,22 @@ ServerBase::publish_status()
   rcl_ret_t ret;
 
   // We need to hold the lock across this entire method because
-  // rcl_action_get_goal_status_array() reads the C action server's goal data.
+  // rcl_action_server_get_goal_handles() returns an internal pointer to the
+  // goal data.
   std::lock_guard<std::recursive_mutex> lock(pimpl_->action_server_reentrant_mutex_);
 
+  // Get all goal handles known to C action server
+  rcl_action_goal_handle_t ** goal_handles = NULL;
+  size_t num_goals = 0;
+  ret = rcl_action_server_get_goal_handles(
+    pimpl_->action_server_.get(), &goal_handles, &num_goals);
+
+  if (RCL_RET_OK != ret) {
+    rclcpp::exceptions::throw_from_rcl_error(ret);
+  }
+
+  auto status_msg = std::make_shared<action_msgs::msg::GoalStatusArray>();
+  status_msg->status_list.reserve(num_goals);
   // Populate a c++ status message with the goals and their statuses
   rcl_action_goal_status_array_t c_status_array =
     rcl_action_get_zero_initialized_goal_status_array();
@@ -700,8 +715,6 @@ ServerBase::publish_status()
     }
   });
 
-  auto status_msg = std::make_shared<action_msgs::msg::GoalStatusArray>();
-  status_msg->status_list.reserve(c_status_array.msg.status_list.size);
   for (size_t i = 0; i < c_status_array.msg.status_list.size; ++i) {
     auto & c_status_msg = c_status_array.msg.status_list.data[i];
 

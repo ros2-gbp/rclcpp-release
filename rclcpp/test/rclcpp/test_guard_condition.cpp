@@ -14,17 +14,9 @@
 
 #include <gtest/gtest.h>
 
-#include <atomic>
-#include <chrono>
 #include <memory>
-#include <stdexcept>
 
-#include "rclcpp/context.hpp"
-#include "rclcpp/exceptions.hpp"
-#include "rclcpp/guard_condition.hpp"
-#include "rclcpp/utilities.hpp"
-#include "rclcpp/wait_result_kind.hpp"
-#include "rclcpp/wait_set.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "../mocking_utils/patch.hpp"
 

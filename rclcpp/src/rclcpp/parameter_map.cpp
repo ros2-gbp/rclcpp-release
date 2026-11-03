@@ -18,7 +18,6 @@
 
 #include "rcpputils/find_and_replace.hpp"
 #include "rcpputils/scope_exit.hpp"
-#include "rcl_yaml_param_parser/parser.h"
 #include "rclcpp/parameter_map.hpp"
 
 using rclcpp::exceptions::InvalidParametersException;
@@ -176,6 +175,7 @@ std::vector<rclcpp::Parameter>
 rclcpp::parameters_from_map(const ParameterMap & parameter_map, const char * node_fqn)
 {
   std::vector<rclcpp::Parameter> parameters;
+  std::string node_name_old;
   for (auto & [node_name, node_parameters] : parameter_map) {
     if (node_fqn && !is_node_name_matched(node_name, node_fqn)) {
       // No need to parse the items because the user just care about node_fqn

@@ -20,17 +20,8 @@
 #include <utility>
 #include <vector>
 
-#include "rcl_interfaces/msg/parameter.hpp"
-#include "rcl_interfaces/srv/set_parameters.hpp"
-#include "rcl_interfaces/srv/set_parameters_atomically.hpp"
-
+#include "rclcpp/rclcpp.hpp"
 #include "../../src/rclcpp/parameter_service_names.hpp"
-#include "rclcpp/node.hpp"
-#include "rclcpp/parameter.hpp"
-#include "rclcpp/parameter_client.hpp"
-#include "rclcpp/parameter_descriptor_wrapper.hpp"
-#include "rclcpp/parameter_value.hpp"
-#include "rclcpp/utilities.hpp"
 
 using namespace std::chrono_literals;
 

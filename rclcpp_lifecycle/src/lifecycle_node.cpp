@@ -74,7 +74,8 @@ LifecycleNode::LifecycleNode(
       namespace_,
       options.context(),
       *(options.get_rcl_node_options()),
-      options.use_intra_process_comms())),
+      options.use_intra_process_comms(),
+      options.enable_topic_statistics())),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),
   node_logging_(new rclcpp::node_interfaces::NodeLogging(node_base_)),
   node_timers_(new rclcpp::node_interfaces::NodeTimers(node_base_.get())),
@@ -154,7 +155,7 @@ LifecycleNode::~LifecycleNode()
   auto current_state = LifecycleNode::get_current_state().id();
   if (current_state != lifecycle_msgs::msg::State::PRIMARY_STATE_FINALIZED) {
     // This might be leaving sensors and devices without shutting down unintentionally.
-    // It is user's responsibility to call shutdown to avoid leaving them in unknown states.
+    // It is user's responsibility to call shutdown to avoid leaving them unknow states.
     RCLCPP_WARN(
       rclcpp::get_logger("rclcpp_lifecycle"),
       "LifecycleNode is not shut down: Node still in state(%u) in destructor",

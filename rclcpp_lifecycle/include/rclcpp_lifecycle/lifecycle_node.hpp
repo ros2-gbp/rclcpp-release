@@ -324,14 +324,12 @@ public:
   /**
    * \sa rclcpp::Node::create_generic_subscription
    */
-  template<
-    typename CallbackT,
-    typename AllocatorT = std::allocator<void>>
+  template<typename AllocatorT = std::allocator<void>>
   std::shared_ptr<rclcpp::GenericSubscription> create_generic_subscription(
     const std::string & topic_name,
     const std::string & topic_type,
     const rclcpp::QoS & qos,
-    CallbackT && callback,
+    std::function<void(std::shared_ptr<rclcpp::SerializedMessage>)> callback,
     const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options = (
       rclcpp::SubscriptionOptionsWithAllocator<AllocatorT>()
     )

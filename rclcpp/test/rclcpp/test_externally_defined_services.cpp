@@ -14,15 +14,13 @@
 
 #include <gtest/gtest.h>
 
-#include <exception>
-#include <memory>
-#include <stdexcept>
 #include <string>
+#include <memory>
 
-#include "rclcpp/any_service_callback.hpp"
 #include "rclcpp/node.hpp"
+#include "rclcpp/any_service_callback.hpp"
 #include "rclcpp/service.hpp"
-#include "rclcpp/utilities.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "rcl/service.h"
 
