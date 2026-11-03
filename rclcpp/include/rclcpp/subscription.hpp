@@ -90,6 +90,18 @@ public:
   using ROSMessageTypeAllocator = typename ROSMessageTypeAllocatorTraits::allocator_type;
   using ROSMessageTypeDeleter = allocator::Deleter<ROSMessageTypeAllocator, ROSMessageType>;
 
+  using MessageAllocatorTraits [[deprecated("use ROSMessageTypeAllocatorTraits")]] =
+    ROSMessageTypeAllocatorTraits;
+  using MessageAllocator [[deprecated("use ROSMessageTypeAllocator")]] =
+    ROSMessageTypeAllocator;
+  using MessageDeleter [[deprecated("use ROSMessageTypeDeleter")]] =
+    ROSMessageTypeDeleter;
+
+  using ConstMessageSharedPtr [[deprecated]] = std::shared_ptr<const ROSMessageType>;
+  using MessageUniquePtr
+  [[deprecated("use std::unique_ptr<ROSMessageType, ROSMessageTypeDeleter> instead")]] =
+    std::unique_ptr<ROSMessageType, ROSMessageTypeDeleter>;
+
 private:
   using SubscriptionTopicStatisticsSharedPtr =
     std::shared_ptr<rclcpp::topic_statistics::SubscriptionTopicStatistics>;
@@ -209,11 +221,13 @@ public:
   /// Called after construction to continue setup that requires shared_from_this().
   void
   post_init_setup(
-    [[maybe_unused]] rclcpp::node_interfaces::NodeBaseInterface * node_base,
-    [[maybe_unused]] const rclcpp::QoS & qos,
-    [[maybe_unused]] const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
+    rclcpp::node_interfaces::NodeBaseInterface * node_base,
+    const rclcpp::QoS & qos,
+    const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options)
   {
-    // This function is intentionally left empty.
+    (void)node_base;
+    (void)qos;
+    (void)options;
   }
 
   /// Take the next message from the inter-process subscription.
@@ -333,30 +347,16 @@ public:
     void * loaned_message,
     const rclcpp::MessageInfo & message_info) override
   {
-    auto typed_message = static_cast<ROSMessageType *>(loaned_message);
-
-    auto sub_handle = this->get_subscription_handle();
-    auto sptr = std::shared_ptr<ROSMessageType>(
-      typed_message, [sub_handle](ROSMessageType * msg) {
-        if (msg == nullptr) {
-          return;
-        }
-        rcl_ret_t ret = rcl_return_loaned_message_from_subscription(
-          sub_handle.get(), static_cast<void *>(msg));
-        if (RCL_RET_OK != ret) {
-          RCLCPP_ERROR(
-            rclcpp::get_logger("rclcpp"),
-            "rcl_return_loaned_message_from_subscription() failed: %s",
-            rcl_get_error_string().str);
-          rcl_reset_error();
-        }
-      });
-
     if (matches_any_intra_process_publishers(&message_info.get_rmw_message_info().publisher_gid)) {
       // In this case, the message will be delivered via intra process and
       // we should ignore this copy of the message.
       return;
     }
+
+    auto typed_message = static_cast<ROSMessageType *>(loaned_message);
+    // message is loaned, so we have to make sure that the deleter does not deallocate the message
+    auto sptr = std::shared_ptr<ROSMessageType>(
+      typed_message, [](ROSMessageType * msg) {(void) msg;});
 
     std::chrono::time_point<std::chrono::system_clock> now;
     if (subscription_topic_statistics_) {
@@ -434,17 +434,20 @@ public:
 
   void
   return_dynamic_message(
-    [[maybe_unused]] rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message) override
+    rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message) override
   {
+    (void) message;
     throw rclcpp::exceptions::UnimplementedError(
             "return_dynamic_message is not implemented for Subscription");
   }
 
   void
   handle_dynamic_message(
-    [[maybe_unused]] const rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message,
-    [[maybe_unused]] const rclcpp::MessageInfo & message_info) override
+    const rclcpp::dynamic_typesupport::DynamicMessage::SharedPtr & message,
+    const rclcpp::MessageInfo & message_info) override
   {
+    (void) message;
+    (void) message_info;
     throw rclcpp::exceptions::UnimplementedError(
             "handle_dynamic_message is not implemented for Subscription");
   }

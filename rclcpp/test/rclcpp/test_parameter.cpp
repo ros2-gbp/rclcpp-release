@@ -31,11 +31,6 @@ protected:
   {
     rclcpp::init(0, nullptr);
   }
-
-  static void TearDownTestCase()
-  {
-    rclcpp::shutdown();
-  }
 };
 
 TEST_F(TestParameter, construct_destruct) {

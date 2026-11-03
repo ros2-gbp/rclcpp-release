@@ -139,6 +139,7 @@ public:
   void
   spin(const std::function<void(const std::exception &)> & exception_handler);
 
+  RCLCPP_PUBLIC
   void
   spin_once(std::chrono::nanoseconds timeout = std::chrono::nanoseconds(-1)) override;
 
@@ -149,6 +150,7 @@ public:
   /**
    * @return true if work was available and executed
    */
+  RCLCPP_PUBLIC
   bool collect_and_execute_ready_events(
     std::chrono::nanoseconds max_duration,
     bool recollect_if_no_work_available);
@@ -241,6 +243,7 @@ protected:
   void
   run(size_t this_thread_number, bool block_initially);
 
+  RCLCPP_PUBLIC
   void
   run(
     size_t this_thread_number,

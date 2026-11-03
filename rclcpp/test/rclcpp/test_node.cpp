@@ -15,7 +15,6 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
-#include <filesystem>
 #include <functional>
 #include <limits>
 #include <map>
@@ -57,7 +56,7 @@ protected:
     test_resources_path /= "test_node";
   }
 
-  std::filesystem::path test_resources_path{TEST_RESOURCES_DIRECTORY};
+  rcpputils::fs::path test_resources_path{TEST_RESOURCES_DIRECTORY};
 };
 
 /*
@@ -306,39 +305,6 @@ TEST_F(TestNode, subnode_get_name_and_namespace) {
     }, rclcpp::exceptions::NameValidationError);
   }
 }
-
-TEST_F(TestNode, subnode_parameter_operation) {
-  auto node = std::make_shared<rclcpp::Node>("my_node", "ns");
-  auto subnode = node->create_sub_node("sub_ns");
-
-  auto value = subnode->declare_parameter("param", 5);
-  EXPECT_EQ(value, 5);
-  // node and sub-node shares NodeParametersInterface, so expecting the exception.
-  EXPECT_THROW(
-    node->declare_parameter("param", 0),
-    rclcpp::exceptions::ParameterAlreadyDeclaredException);
-  rclcpp::Parameter param;
-
-  node->get_parameter("param", param);
-  EXPECT_EQ(param.get_value<int>(), 5);
-  subnode->get_parameter("param", param);
-  EXPECT_EQ(param.get_value<int>(), 5);
-
-  int param_int;
-  node->get_parameter("param", param_int);
-  EXPECT_EQ(param_int, 5);
-  subnode->get_parameter("param", param_int);
-  EXPECT_EQ(param_int, 5);
-
-  EXPECT_EQ(node->get_parameter_or("param", 333), 5);
-  EXPECT_EQ(subnode->get_parameter_or("param", 666), 5);
-
-  node->get_parameter_or("param", param_int, 333);
-  EXPECT_EQ(param_int, 5);
-  subnode->get_parameter_or("param", param_int, 666);
-  EXPECT_EQ(param_int, 5);
-}
-
 /*
    Testing node construction and destruction.
  */

@@ -47,6 +47,9 @@ public:
     auto waitable_interfaces = node->get_node_waitables_interface();
     waitable = std::make_shared<TestWaitable>();
     waitable_interfaces->add_waitable(waitable, callback_group);
+
+    executor = std::make_shared<T>();
+    executor->add_callback_group(callback_group, node->get_node_base_interface());
   }
 
   void TearDown() override
@@ -105,6 +108,7 @@ public:
   rclcpp::CallbackGroup::SharedPtr callback_group;
   std::shared_ptr<TestWaitable> waitable;
   std::chrono::steady_clock::time_point start_time;
+  std::shared_ptr<T> executor;
   bool has_executed;
 };
 
@@ -112,16 +116,10 @@ TYPED_TEST_SUITE(TestBusyWaiting, ExecutorTypes, ExecutorTypeNames);
 
 TYPED_TEST(TestBusyWaiting, test_spin_all)
 {
-  using ExecutorType = TypeParam;
-  ExecutorType executor;
-  executor.add_callback_group(
-    this->callback_group,
-    this->node->get_node_base_interface());
-
   this->set_up_and_trigger_waitable();
 
   auto start_time = std::chrono::steady_clock::now();
-  executor.spin_all(this->max_duration);
+  this->executor->spin_all(this->max_duration);
   this->check_for_busy_waits(start_time);
   // this should get the initial trigger, and the follow up from in the callback
   ASSERT_EQ(this->waitable->get_count(), 2u);
@@ -129,16 +127,10 @@ TYPED_TEST(TestBusyWaiting, test_spin_all)
 
 TYPED_TEST(TestBusyWaiting, test_spin_some)
 {
-  using ExecutorType = TypeParam;
-  ExecutorType executor;
-  executor.add_callback_group(
-    this->callback_group,
-    this->node->get_node_base_interface());
-
   this->set_up_and_trigger_waitable();
 
   auto start_time = std::chrono::steady_clock::now();
-  executor.spin_some(this->max_duration);
+  this->executor->spin_some(this->max_duration);
   this->check_for_busy_waits(start_time);
   // this should get the inital trigger, but not the follow up in the callback
   ASSERT_EQ(this->waitable->get_count(), 1u);
@@ -146,12 +138,6 @@ TYPED_TEST(TestBusyWaiting, test_spin_some)
 
 TYPED_TEST(TestBusyWaiting, test_spin)
 {
-  using ExecutorType = TypeParam;
-  ExecutorType executor;
-  executor.add_callback_group(
-    this->callback_group,
-    this->node->get_node_base_interface());
-
   std::condition_variable cv;
   std::mutex cv_m;
   bool first_check_passed = false;
@@ -165,8 +151,8 @@ TYPED_TEST(TestBusyWaiting, test_spin)
   });
 
   auto start_time = std::chrono::steady_clock::now();
-  std::thread t([&executor]() {
-      executor.spin();
+  std::thread t([this]() {
+      this->executor->spin();
     });
 
   // wait until thread has started (first execute of waitable)
@@ -186,7 +172,7 @@ TYPED_TEST(TestBusyWaiting, test_spin)
   }
   EXPECT_EQ(this->waitable->get_count(), 2u);
 
-  executor.cancel();
+  this->executor->cancel();
   t.join();
 
   this->check_for_busy_waits(start_time);

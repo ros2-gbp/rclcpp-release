@@ -94,18 +94,6 @@ SubscriptionBase::SubscriptionBase(
 
 SubscriptionBase::~SubscriptionBase()
 {
-  try {
-    this->clear_on_new_message_callback();
-  } catch (const std::exception & exc) {
-    RCLCPP_ERROR(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to clear on new message callback in destructor: %s",
-      exc.what());
-  } catch (...) {
-    RCLCPP_ERROR(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to clear on new message callback in destructor");
-  }
   if (!use_intra_process_) {
     return;
   }
@@ -124,28 +112,16 @@ void
 SubscriptionBase::bind_event_callbacks(
   const SubscriptionEventCallbacks & event_callbacks, bool use_default_callbacks)
 {
-  try {
-    if (event_callbacks.deadline_callback) {
-      this->add_event_handler(
-        event_callbacks.deadline_callback,
-        RCL_SUBSCRIPTION_REQUESTED_DEADLINE_MISSED);
-    }
-  } catch (const UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for deadline; not supported");
+  if (event_callbacks.deadline_callback) {
+    this->add_event_handler(
+      event_callbacks.deadline_callback,
+      RCL_SUBSCRIPTION_REQUESTED_DEADLINE_MISSED);
   }
 
-  try {
-    if (event_callbacks.liveliness_callback) {
-      this->add_event_handler(
-        event_callbacks.liveliness_callback,
-        RCL_SUBSCRIPTION_LIVELINESS_CHANGED);
-    }
-  } catch (const UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for liveliness; not supported");
+  if (event_callbacks.liveliness_callback) {
+    this->add_event_handler(
+      event_callbacks.liveliness_callback,
+      RCL_SUBSCRIPTION_LIVELINESS_CHANGED);
   }
 
   QOSRequestedIncompatibleQoSCallbackType incompatible_qos_cb;
@@ -163,9 +139,7 @@ SubscriptionBase::bind_event_callbacks(
       this->add_event_handler(incompatible_qos_cb, RCL_SUBSCRIPTION_REQUESTED_INCOMPATIBLE_QOS);
     }
   } catch (const UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for incompatible qos; not supported");
+    // pass
   }
 
   IncompatibleTypeCallbackType incompatible_type_cb;
@@ -182,33 +156,18 @@ SubscriptionBase::bind_event_callbacks(
       this->add_event_handler(incompatible_type_cb, RCL_SUBSCRIPTION_INCOMPATIBLE_TYPE);
     }
   } catch (UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for incompatible type; not supported");
+    // pass
   }
 
-  try {
-    if (event_callbacks.message_lost_callback) {
-      this->add_event_handler(
-        event_callbacks.message_lost_callback,
-        RCL_SUBSCRIPTION_MESSAGE_LOST);
-    }
-  } catch (const UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for message lost; not supported");
+  if (event_callbacks.message_lost_callback) {
+    this->add_event_handler(
+      event_callbacks.message_lost_callback,
+      RCL_SUBSCRIPTION_MESSAGE_LOST);
   }
-
-  try {
-    if (event_callbacks.matched_callback) {
-      this->add_event_handler(
-        event_callbacks.matched_callback,
-        RCL_SUBSCRIPTION_MATCHED);
-    }
-  } catch (const UnsupportedEventTypeException & /*exc*/) {
-    RCLCPP_WARN(
-      rclcpp::get_logger("rclcpp"),
-      "Failed to add event handler for matched; not supported");
+  if (event_callbacks.matched_callback) {
+    this->add_event_handler(
+      event_callbacks.matched_callback,
+      RCL_SUBSCRIPTION_MATCHED);
   }
 }
 
@@ -342,7 +301,20 @@ SubscriptionBase::setup_intra_process(
 bool
 SubscriptionBase::can_loan_messages() const
 {
-  return rcl_subscription_can_loan_messages(subscription_handle_.get());
+  bool retval = rcl_subscription_can_loan_messages(subscription_handle_.get());
+  if (retval) {
+    // TODO(clalancette): The loaned message interface is currently not safe to use with
+    // shared_ptr callbacks.  If a user takes a copy of the shared_ptr, it can get freed from
+    // underneath them via rcl_return_loaned_message_from_subscription().  The correct solution is
+    // to return the loaned message in a custom deleter, but that needs to be carefully handled
+    // with locking.  Warn the user about this until we fix it.
+    RCLCPP_WARN_ONCE(
+      this->node_logger_,
+      "Loaned messages are only safe with const ref subscription callbacks. "
+      "If you are using any other kind of subscriptions, "
+      "set the ROS_DISABLE_LOANED_MESSAGES environment variable to 1 (the default).");
+  }
+  return retval;
 }
 
 rclcpp::Waitable::SharedPtr
@@ -380,8 +352,10 @@ SubscriptionBase::default_incompatible_qos_callback(
 
 void
 SubscriptionBase::default_incompatible_type_callback(
-  [[maybe_unused]] rclcpp::IncompatibleTypeInfo & event) const
+  rclcpp::IncompatibleTypeInfo & event) const
 {
+  (void)event;
+
   RCLCPP_WARN(
     rclcpp::get_logger(rcl_node_get_logger_name(node_handle_.get())),
     "Incompatible type on topic '%s', no messages will be sent to it.", get_topic_name());

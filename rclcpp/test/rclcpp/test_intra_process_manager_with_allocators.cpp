@@ -61,8 +61,9 @@ public:
     return static_cast<T *>(std::malloc(size * sizeof(T)));
   }
 
-  void deallocate(T * ptr, [[maybe_unused]] size_t size)
+  void deallocate(T * ptr, size_t size)
   {
+    (void)size;
     if (!ptr) {
       return;
     }
