@@ -1,10 +1,18 @@
-# `rclcpp_lifecycle`
+# rclcpp
 
-Package containing a prototype for lifecycle implementation.
+This repository contains the source code for the ROS Client Library for C++ package, included with a standard install of any ROS 2 distro.
 
-The link to the latest rclcpp_lifecycle API documentation, which includes a complete list of its main components and features, can be found on the [rclcpp_lifecycle package info page](https://docs.ros.org/en/rolling/p/rclcpp_lifecycle).
-For more information about LifeCycle in ROS 2, see the [design document](http://design.ros2.org/articles/node_lifecycle.html).
+rclcpp provides the standard C++ API for interacting with ROS 2.
 
-## Quality Declaration
+## Usage
 
-This package claims to be in the **Quality Level 1** category, see the [Quality Declaration](QUALITY_DECLARATION.md) for more details.
+`#include "rclcpp/rclcpp.hpp"` allows use of the most common elements of the ROS 2 system.
+
+The link to the latest API documentation can be found on the [rclcpp package info page](https://docs.ros.org/en/rolling/p/rclcpp).
+
+
+### Examples
+
+The ROS 2 tutorials [Writing a simple publisher and subscriber](https://docs.ros.org/en/rolling/Tutorials/Writing-A-Simple-Cpp-Publisher-And-Subscriber.html).
+and [Writing a simple service and client](https://docs.ros.org/en/rolling/Tutorials/Writing-A-Simple-Cpp-Service-And-Client.html)
+contain some examples of rclcpp APIs in use.
