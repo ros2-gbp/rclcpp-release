@@ -1,3 +1,30 @@
+## rclcpp (humble) - 16.0.22-2
+
+The packages in the `rclcpp` repository were released into the `humble` distro by running `/usr/bin/bloom-release --rosdistro humble --track humble rclcpp` on `Tue, 03 Nov 2026 11:50:55 -0000`
+
+These packages were released:
+- `rclcpp`
+- `rclcpp_action`
+- `rclcpp_components`
+- `rclcpp_lifecycle`
+
+Version of package(s) in repository `rclcpp`:
+
+- upstream repository: https://github.com/ros2/rclcpp.git
+- release repository: https://github.com/ros2-gbp/rclcpp-release.git
+- rosdistro version: `16.0.22-1`
+- old version: `16.0.22-1`
+- new version: `16.0.22-2`
+
+Versions of tools used:
+
+- bloom version: `0.14.4`
+- catkin_pkg version: `1.1.1`
+- rosdep version: `0.27.0`
+- rosdistro version: `1.1.0`
+- vcstools version: `0.1.42`
+
+
 ## rclcpp (jazzy) - 28.1.23-1
 
 The packages in the `rclcpp` repository were released into the `jazzy` distro by running `/usr/bin/bloom-release --rosdistro jazzy --track jazzy rclcpp` on `Tue, 03 Nov 2026 11:46:33 -0000`
