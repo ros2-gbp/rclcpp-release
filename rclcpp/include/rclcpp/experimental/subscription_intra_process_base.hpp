@@ -52,7 +52,7 @@ public:
   {}
 
   RCLCPP_PUBLIC
-  virtual ~SubscriptionIntraProcessBase() = default;
+  virtual ~SubscriptionIntraProcessBase();
 
   RCLCPP_PUBLIC
   size_t
@@ -60,19 +60,10 @@ public:
 
   RCLCPP_PUBLIC
   void
-  add_to_wait_set(rcl_wait_set_t & wait_set) override;
-
-  RCLCPP_PUBLIC
-  virtual
-  size_t
-  available_capacity() const = 0;
-
-  RCLCPP_PUBLIC
-  bool
-  is_durability_transient_local() const;
+  add_to_wait_set(rcl_wait_set_t * wait_set) override;
 
   bool
-  is_ready(const rcl_wait_set_t & wait_set) override = 0;
+  is_ready(rcl_wait_set_t * wait_set) override = 0;
 
   std::shared_ptr<void>
   take_data() override = 0;
@@ -85,7 +76,7 @@ public:
   }
 
   void
-  execute(const std::shared_ptr<void> & data) override = 0;
+  execute(std::shared_ptr<void> & data) override = 0;
 
   virtual
   bool

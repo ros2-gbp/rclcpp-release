@@ -47,11 +47,6 @@ resolve_intra_process_buffer_type(
   return resolved_buffer_type;
 }
 
-RCLCPP_PUBLIC
-rclcpp::IntraProcessBufferType
-resolve_intra_process_buffer_type(
-  const rclcpp::IntraProcessBufferType buffer_type);
-
 }  // namespace detail
 
 }  // namespace rclcpp

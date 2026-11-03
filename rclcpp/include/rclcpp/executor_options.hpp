@@ -15,8 +15,6 @@
 #ifndef RCLCPP__EXECUTOR_OPTIONS_HPP_
 #define RCLCPP__EXECUTOR_OPTIONS_HPP_
 
-#include <memory>
-
 #include "rclcpp/context.hpp"
 #include "rclcpp/contexts/default_context.hpp"
 #include "rclcpp/memory_strategies.hpp"
@@ -26,30 +24,18 @@
 namespace rclcpp
 {
 
-class ExecutorOptionsImplementation;
-
 /// Options to be passed to the executor constructor.
 struct ExecutorOptions
 {
-  RCLCPP_PUBLIC
-  ExecutorOptions();
-
-  RCLCPP_PUBLIC
-  virtual ~ExecutorOptions();
-
-  RCLCPP_PUBLIC
-  ExecutorOptions(const ExecutorOptions &);
-
-  RCLCPP_PUBLIC
-  ExecutorOptions & operator=(const ExecutorOptions &);
+  ExecutorOptions()
+  : memory_strategy(rclcpp::memory_strategies::create_default_strategy()),
+    context(rclcpp::contexts::get_global_default_context()),
+    max_conditions(0)
+  {}
 
   rclcpp::memory_strategy::MemoryStrategy::SharedPtr memory_strategy;
   rclcpp::Context::SharedPtr context;
   size_t max_conditions;
-
-private:
-  /// Pointer to implementation
-  std::unique_ptr<ExecutorOptionsImplementation> impl_;
 };
 
 }  // namespace rclcpp

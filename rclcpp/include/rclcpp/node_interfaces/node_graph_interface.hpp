@@ -54,8 +54,7 @@ public:
   RCLCPP_PUBLIC
   explicit TopicEndpointInfo(const rcl_topic_endpoint_info_t & info)
   : endpoint_type_(static_cast<rclcpp::EndpointType>(info.endpoint_type)),
-    qos_profile_({info.qos_profile.history, info.qos_profile.depth}, info.qos_profile),
-    topic_type_hash_(info.topic_type_hash)
+    qos_profile_({info.qos_profile.history, info.qos_profile.depth}, info.qos_profile)
   {
     if (!info.node_name || !info.node_namespace || !info.topic_type) {
       throw std::invalid_argument("Constructor TopicEndpointInfo with invalid topic endpoint info");
@@ -127,16 +126,6 @@ public:
   const rclcpp::QoS &
   qos_profile() const;
 
-  /// Get a mutable reference to the type hash of the topic endpoint.
-  RCLCPP_PUBLIC
-  rosidl_type_hash_t &
-  topic_type_hash();
-
-  /// Get a const reference to the type hash of the topic endpoint.
-  RCLCPP_PUBLIC
-  const rosidl_type_hash_t &
-  topic_type_hash() const;
-
 private:
   std::string node_name_;
   std::string node_namespace_;
@@ -144,7 +133,6 @@ private:
   rclcpp::EndpointType endpoint_type_;
   std::array<uint8_t, RMW_GID_STORAGE_SIZE> endpoint_gid_;
   rclcpp::QoS qos_profile_;
-  rosidl_type_hash_t topic_type_hash_;
 };
 
 namespace node_interfaces
@@ -308,24 +296,6 @@ public:
   virtual
   size_t
   count_subscribers(const std::string & topic_name) const = 0;
-
-  /// Return the number of clients created for a given service.
-  /*
-   * \param[in] service_name the actual service name used; it will not be automatically remapped.
-   */
-  RCLCPP_PUBLIC
-  virtual
-  size_t
-  count_clients(const std::string & service_name) const = 0;
-
-  /// Return the number of services created for a given service.
-  /*
-   * \param[in] service_name the actual service name used; it will not be automatically remapped.
-   */
-  RCLCPP_PUBLIC
-  virtual
-  size_t
-  count_services(const std::string & service_name) const = 0;
 
   /// Return the rcl guard condition which is triggered when the ROS graph changes.
   RCLCPP_PUBLIC
